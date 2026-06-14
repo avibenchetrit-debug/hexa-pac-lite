@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<!--
+  PLACEHOLDER — hexa-pac-lite
+  -------------------------------------------------------------------
+  Ce fichier est un PLACEHOLDER. Il doit etre remplace par le contenu
+  EXACT de "apercu-fiche-complete (7).html" (introuvable dans le repo
+  au moment du scaffolding). Ne pas modifier le HTML cible une fois
+  copie ici.
+
+  Les fetch() ci-dessous pointent vers des routes inexistantes et
+  echouent silencieusement — c'est normal et attendu a ce stade.
+-->
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>hexa-pac-lite — Fiche</title>
+  <style>
+    :root { --accent: #2563eb; --bg: #0f172a; --card: #1e293b; --text: #e2e8f0; --muted: #94a3b8; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background: var(--bg); color: var(--text); }
+    header { padding: 24px 32px; border-bottom: 1px solid #334155; display: flex; align-items: center; gap: 12px; }
+    header .dot { width: 12px; height: 12px; border-radius: 50%; background: var(--accent); }
+    header h1 { font-size: 18px; margin: 0; font-weight: 600; }
+    main { max-width: 880px; margin: 0 auto; padding: 32px; }
+    .card { background: var(--card); border: 1px solid #334155; border-radius: 12px; padding: 24px; margin-bottom: 20px; }
+    .card h2 { margin: 0 0 8px; font-size: 15px; color: var(--accent); text-transform: uppercase; letter-spacing: .04em; }
+    .badge { display: inline-block; padding: 4px 10px; border-radius: 999px; font-size: 12px; background: #334155; color: var(--muted); }
+    .row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #334155; font-size: 14px; }
+    .row:last-child { border-bottom: none; }
+    .muted { color: var(--muted); }
+    footer { text-align: center; color: var(--muted); font-size: 12px; padding: 24px; }
+  </style>
+</head>
+<body>
+  <header>
+    <span class="dot"></span>
+    <h1>hexa-pac-lite</h1>
+    <span class="badge">squelette FastAPI</span>
+  </header>
+
+  <main>
+    <div class="card">
+      <h2>Etat du service</h2>
+      <div class="row"><span class="muted">Backend</span><span id="health-status">verification…</span></div>
+      <div class="row"><span class="muted">Page</span><span>servie depuis templates/index.html</span></div>
+    </div>
+
+    <div class="card">
+      <h2>Fiche (apercu)</h2>
+      <div id="fiche">
+        <div class="row"><span class="muted">Donnees</span><span>chargement…</span></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Note</h2>
+      <p class="muted" style="margin:0">
+        Ceci est un placeholder. Remplacez ce fichier par le contenu exact de
+        <code>apercu-fiche-complete (7).html</code>. Les appels reseau vers des
+        routes inexistantes echouent silencieusement — c'est attendu a ce stade.
+      </p>
+    </div>
+  </main>
+
+  <footer>hexa-pac-lite · deployable Railway</footer>
+
+  <script>
+    // Verifie /health (route existante).
+    fetch('/health')
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        document.getElementById('health-status').textContent =
+          d && d.status === 'ok' ? 'ok' : 'inconnu';
+      })
+      .catch(function () {
+        document.getElementById('health-status').textContent = 'indisponible';
+      });
+
+    // Routes inexistantes — echouent silencieusement (attendu).
+    fetch('/api/fiche')
+      .then(function (r) { return r.json(); })
+      .then(function (d) { console.log('fiche', d); })
+      .catch(function () { /* attendu: route absente */ });
+
+    fetch('/api/data')
+      .then(function (r) { return r.json(); })
+      .then(function (d) { console.log('data', d); })
+      .catch(function () { /* attendu: route absente */ });
+  </script>
+</body>
+</html>
