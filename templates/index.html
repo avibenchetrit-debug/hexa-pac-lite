@@ -7119,6 +7119,13 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
   }
 </style>
 
+<style id="lot2-prospects">
+  /* Lot 2 — Tableau Prospects : 1 ligne par prospect, contenu centré, scroll horizontal si besoin */
+  .pv-table td { vertical-align: middle; text-align: center; padding: 10px 12px; }
+  .pv-table td.pv-nom { text-align: left; }
+  .pv-card { overflow-x: auto; }
+</style>
+
 </head>
 <body class="hexa-has-topbar" data-prospect-numero="PR-000001">
 
@@ -13793,6 +13800,8 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
         <div class="pv-sub">Liste de tous les prospects. Cliquez sur un en-tête pour trier A→Z ou Z→A, ou sur une ligne pour ouvrir la fiche.</div>
         <div class="pv-toolbar">
           <input class="pv-search" id="pv-search" placeholder="Rechercher un nom, email, téléphone…">
+          <label for="pv-import-file" class="pv-btn pv-btn-ghost" style="cursor:pointer">📥 Importer Excel</label>
+          <input type="file" id="pv-import-file" accept=".xlsx,.xls,.csv" style="display:none">
           <span class="pv-count" id="pv-count"></span>
         </div>
         <div class="pv-card">
@@ -13808,6 +13817,8 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
               <th data-k="date"><div class="pv-th-inner">Créé le <span class="pv-arrow">\u2195</span></div></th>
               <th data-k="nrp" class="pv-center"><div class="pv-th-inner">NRP <span class="pv-arrow">\u2195</span></div></th>
               <th data-k="dernnrp" class="pv-center"><div class="pv-th-inner">Dern. NRP <span class="pv-arrow">\u2195</span></div></th>
+              <th data-k="projet_initial"><div class="pv-th-inner">Projet initial <span class="pv-arrow">\u2195</span></div></th>
+              <th data-k="source"><div class="pv-th-inner">Source <span class="pv-arrow">\u2195</span></div></th>
             </tr></thead>
             <tbody id="pv-tbody"></tbody>
           </table>
@@ -13856,6 +13867,8 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
         +'<button class="pv-nrp-btn" data-act="inc" title="Ne répond pas (+1)">+</button>'
       +'</span></td>'
       +'<td class="pv-center pv-muted'+(last?' pv-dernnrp':'')+'"'+(last?' title="'+new Date(last).toLocaleString('fr-FR')+'"':'')+'>'+relTime(last)+'</td>'
+      +'<td>'+(p.projet_initial||'<span class="pv-muted">—</span>')+'</td>'
+      +'<td>'+(p.source||'<span class="pv-muted">—</span>')+'</td>'
       +'</tr>';
     }).join('');
     tb.querySelectorAll('tr').forEach(tr=>{
@@ -13905,6 +13918,29 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       });
     });
     document.getElementById('pv-search').addEventListener('input', e=>{ query=e.target.value; renderRows(); });
+    const impInput=document.getElementById('pv-import-file');
+    if(impInput) impInput.addEventListener('change', async e=>{
+      const file=e.target.files&&e.target.files[0]; if(!file) return;
+      const fd=new FormData(); fd.append('file', file);
+      try{
+        const r=await fetch('/api/import-leads',{method:'POST',body:fd});
+        const res=await r.json().catch(()=>({}));
+        if(!r.ok || !res.ok) throw new Error(res.detail||res.error||('HTTP '+r.status));
+        try{
+          const lr=await fetch('/api/leads');
+          const leads=lr.ok?await lr.json():[];
+          if(Array.isArray(leads)){
+            data=leads.map(p=>Object.assign({nrp_log:[]},p,{tel:(p.telephone||p.tel||'')}));
+            persist(); renderRows();
+          }
+        }catch(_){}
+        toastMsg((res.imported||0)+' leads importés'+((res.errors&&res.errors.length)?(' · '+res.errors.length+' erreur(s)'):''), '#0D6B3B');
+      }catch(err){
+        alert('Erreur import : '+(err.message||err));
+      }finally{
+        e.target.value='';
+      }
+    });
     document.getElementById('pv-new').addEventListener('click', openFiche);
     const admBtn=document.getElementById('pv-admin');
     if(admBtn) admBtn.addEventListener('click', ()=>{ if(window.HexaAdmin) window.HexaAdmin.open(); });
