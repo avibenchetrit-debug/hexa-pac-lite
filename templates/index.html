@@ -7077,12 +7077,51 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
   .bloc7-section--visite .bloc7-section-body.open { display: block; }
 </style>
 
+<style id="lot1-cadre-commun">
+  /* Lot 1 — Cadre commun : logo SVG + header pleine largeur + contenu centré 1280px responsive.
+     Bloc d'overrides appended en dernier pour primer sans modifier les règles existantes. */
+
+  /* Pas de marge externe pour permettre le header pleine largeur */
+  html, body { margin: 0; }
+
+  /* 2) Header : pleine largeur de l'écran, fond conservé (#fff, logo navy/rouge visible) */
+  .hexa-lite-top {
+    width: 100%;
+    max-width: none;
+    margin: 0 0 12px 0;
+    padding: 12px 24px;
+    border-radius: 0;
+    border-width: 0 0 1px 0;
+    box-sizing: border-box;
+  }
+
+  /* 1) Logo SVG correctement dimensionné */
+  .hexa-lite-top .logo-hexa-wordmark {
+    height: 32px;
+    width: auto;
+    max-width: 220px;
+    max-height: 32px;
+    display: block;
+  }
+
+  /* 3) Contenu centré dans un conteneur de largeur max 1280px */
+  .container { max-width: 1280px; }
+
+  /* 4) Responsive mobile (< 768px) : header pleine largeur, contenu 100%, header lisible */
+  @media (max-width: 768px) {
+    .hexa-lite-top { padding: 10px 14px; gap: 8px; }
+    .container { max-width: 100%; }
+    .hexa-lite-top .topbar-btn-primary { padding: 8px 12px; font-size: 11px; }
+    .hexa-lite-nav { padding-left: 8px; }
+  }
+</style>
+
 </head>
 <body class="hexa-has-topbar" data-prospect-numero="PR-000001">
 
 <header class="hexa-lite-top" role="banner">
   <a href="#" class="logo-hexa-link" aria-label="Hexa Rénov'" id="hexa-logo-home">
-    <img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMjAgNTIiIHJvbGU9ImltZyIgYXJpYS1sYWJlbD0iSGV4YSBS6W5vdiciPgogIDxnIGZpbGw9Im5vbmUiIHN0cm9rZT0iI0ZGRkZGRiIgc3Ryb2tlLXdpZHRoPSIyLjIiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPgogICAgPHBhdGggZD0iTTI2IDE0LjVMNDAgNi41TDU0IDE0LjVWMjguNUw0MCAzNi41TDI2IDI4LjVWMTQuNVoiLz4KICAgIDxwYXRoIGQ9Ik0yMiAxMS41TDQwIDIuNUw1OCAxMS41VjMxLjVMNDAgNDAuNUwyMiAzMS41VjExLjVaIi8+CiAgICA8cGF0aCBkPSJNNDAgMi41VjYuNU0yNCAxMi41TDI2IDE0LjVNMjIgMzEuNUwyNiAyOC41TTQwIDQwLjVWMzYuNU01NCAyOC41TDU4IDMxLjVNNTQgMTQuNUw1OCAxMS41Ii8+CiAgPC9nPgogIDx0ZXh0IHg9IjY4IiB5PSIzNCIgZmlsbD0iI0ZGRkZGRiIgZm9udC1mYW1pbHk9IkludGVyLCBBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIyMiIgZm9udC13ZWlnaHQ9IjcwMCI+SGV4YSBS6W5vdic8L3RleHQ+Cjwvc3ZnPgo=" alt="Hexa Rénov'" class="logo-hexa-wordmark">
+    <img src="/static/Logo.svg" alt="Hexa Rénov'" class="logo-hexa-wordmark" style="height:32px;width:auto;display:block">
     <span class="hexa-lite-fallback" hidden style="font-weight:800;color:#002E5A;">HEXA RÉNOV'</span>
   </a>
   <nav class="hexa-lite-nav">
