@@ -7077,97 +7077,12 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
   .bloc7-section--visite .bloc7-section-body.open { display: block; }
 </style>
 
-<style id="lot1-cadre-commun">
-  /* Lot 1 — Cadre commun : logo SVG + header pleine largeur + contenu centré 1280px responsive.
-     Bloc d'overrides appended en dernier pour primer sans modifier les règles existantes. */
-
-  /* Pas de marge externe pour permettre le header pleine largeur */
-  html, body { margin: 0; }
-
-  /* 2) Header : pleine largeur de l'écran, fond conservé (#fff, logo navy/rouge visible) */
-  .hexa-lite-top {
-    width: 100%;
-    max-width: none;
-    margin: 0 0 12px 0;
-    padding: 12px 24px;
-    border-radius: 0;
-    border-width: 0 0 1px 0;
-    box-sizing: border-box;
-  }
-
-  /* 1) Logo SVG correctement dimensionné */
-  .hexa-lite-top .logo-hexa-wordmark {
-    height: 32px;
-    width: auto;
-    max-width: 220px;
-    max-height: 32px;
-    display: block;
-  }
-
-  /* 3) Contenu centré dans un conteneur de largeur max 1280px */
-  .container { max-width: 1280px; }
-
-  /* Lot 1 fix : fiche prospect ~30% plus étroite (1280px -> 900px), centrée */
-  .hexa-prospect-page .container { max-width: 900px; margin: 0 auto; }
-
-  /* 4) Responsive mobile (< 768px) : header pleine largeur, contenu 100%, header lisible */
-  @media (max-width: 768px) {
-    .hexa-lite-top { padding: 10px 14px; gap: 8px; }
-    .container { max-width: 100%; }
-    .hexa-lite-top .topbar-btn-primary { padding: 8px 12px; font-size: 11px; }
-    .hexa-lite-nav { padding-left: 8px; }
-  }
-</style>
-
-<style id="lot2-prospects">
-  /* Lot 2 — Tableau Prospects : 12 colonnes visibles, AUCUN scroll horizontal,
-     aucun tronquage, aucune 2e ligne, email entier. On réduit la police + le padding
-     et on récupère de la largeur (padding du .pv-wrap) pour tout faire tenir à 1280px. */
-  .pv-table { font-size: 11px; table-layout: auto; width: 100%; min-width: 0; }
-  .pv-table th, .pv-table td {
-    vertical-align: middle;
-    text-align: center;
-    padding: 6px 6px;
-    white-space: nowrap;
-  }
-  .pv-table td.pv-nom { text-align: left; }
-  .pv-th-inner { font-size: 9.5px; padding: 7px 6px; gap: 4px; }
-
-  /* Interdit tout scroll horizontal et tout tronquage (email visible en entier) */
-  .pv-card, .pv-card > div, .pv-table { overflow-x: visible !important; }
-  .pv-card { overflow: visible !important; }
-  table.pv-table { width: 100%; min-width: 0; }
-  .pv-table td:nth-child(6) { max-width: none !important; overflow: visible !important; text-overflow: clip !important; }
-  .pv-mail { font-size: inherit; }
-
-  /* Compacte les contrôles NRP et le badge statut pour gagner de la place */
-  .pv-nrp-btn { width: 20px; height: 20px; font-size: 13px; }
-  .pv-nrp-ctl { gap: 5px; }
-  .pv-nrp-count { min-width: 22px; font-size: 12px; padding: 2px 5px; }
-  .pv-pid { font-size: 10px; padding: 2px 6px; }
-
-  /* Récupère de la largeur utile pour faire tenir les 12 colonnes sans scroll */
-  #hexa-prospects-view .pv-wrap { padding-left: 12px; padding-right: 12px; }
-</style>
-
-<style id="prospects-overlay-fix">
-  /* Fix mobile : en vue Accueil (overlay Prospects #hexa-prospects-view, position:fixed),
-     la page fiche pouvait défiler / transparaître DERRIÈRE l'overlay (comportement
-     classique sur mobile/iOS où le body continue de scroller derrière un overlay fixed).
-     On verrouille le scroll de fond et on retire la fiche du rendu tant qu'on est sur
-     l'Accueil. Tout est réversible : retirer la classe .hexa-view-prospects (openFiche)
-     réaffiche la fiche normalement. */
-  body.hexa-view-prospects { overflow: hidden; }
-  body.hexa-view-prospects > header.hexa-lite-top,
-  body.hexa-view-prospects .hexa-app-shell { display: none !important; }
-</style>
-
 </head>
 <body class="hexa-has-topbar" data-prospect-numero="PR-000001">
 
 <header class="hexa-lite-top" role="banner">
   <a href="#" class="logo-hexa-link" aria-label="Hexa Rénov'" id="hexa-logo-home">
-    <img src="/static/Logo.svg" alt="Hexa Rénov'" class="logo-hexa-wordmark" style="height:32px;width:auto;display:block">
+    <img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMjAgNTIiIHJvbGU9ImltZyIgYXJpYS1sYWJlbD0iSGV4YSBS6W5vdiciPgogIDxnIGZpbGw9Im5vbmUiIHN0cm9rZT0iI0ZGRkZGRiIgc3Ryb2tlLXdpZHRoPSIyLjIiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPgogICAgPHBhdGggZD0iTTI2IDE0LjVMNDAgNi41TDU0IDE0LjVWMjguNUw0MCAzNi41TDI2IDI4LjVWMTQuNVoiLz4KICAgIDxwYXRoIGQ9Ik0yMiAxMS41TDQwIDIuNUw1OCAxMS41VjMxLjVMNDAgNDAuNUwyMiAzMS41VjExLjVaIi8+CiAgICA8cGF0aCBkPSJNNDAgMi41VjYuNU0yNCAxMi41TDI2IDE0LjVNMjIgMzEuNUwyNiAyOC41TTQwIDQwLjVWMzYuNU01NCAyOC41TDU4IDMxLjVNNTQgMTQuNUw1OCAxMS41Ii8+CiAgPC9nPgogIDx0ZXh0IHg9IjY4IiB5PSIzNCIgZmlsbD0iI0ZGRkZGRiIgZm9udC1mYW1pbHk9IkludGVyLCBBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIyMiIgZm9udC13ZWlnaHQ9IjcwMCI+SGV4YSBS6W5vdic8L3RleHQ+Cjwvc3ZnPgo=" alt="Hexa Rénov'" class="logo-hexa-wordmark">
     <span class="hexa-lite-fallback" hidden style="font-weight:800;color:#002E5A;">HEXA RÉNOV'</span>
   </a>
   <nav class="hexa-lite-nav">
@@ -13824,7 +13739,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     const v=document.createElement('div'); v.id='hexa-prospects-view';
     v.innerHTML = `
       <div class="pv-top">
-        <div class="pv-brand"><img src="/static/Logo.svg" alt="Hexa Rénov'" style="height:32px;width:auto;display:block"></div>
+        <div class="pv-brand">Hexa-Rénov'</div>
         <div class="pv-actions">
           <button class="pv-btn pv-btn-ghost" id="pv-regie">📊 Simulateur régie</button>
           <button class="pv-btn pv-btn-ghost" id="pv-admin">⚙ Admin</button>
@@ -13836,8 +13751,6 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
         <div class="pv-sub">Liste de tous les prospects. Cliquez sur un en-tête pour trier A→Z ou Z→A, ou sur une ligne pour ouvrir la fiche.</div>
         <div class="pv-toolbar">
           <input class="pv-search" id="pv-search" placeholder="Rechercher un nom, email, téléphone…">
-          <label for="pv-import-file" class="pv-btn pv-btn-ghost" style="cursor:pointer">📥 Importer Excel</label>
-          <input type="file" id="pv-import-file" accept=".xlsx,.xls,.csv" style="display:none">
           <span class="pv-count" id="pv-count"></span>
         </div>
         <div class="pv-card">
@@ -13853,8 +13766,6 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
               <th data-k="date"><div class="pv-th-inner">Créé le <span class="pv-arrow">\u2195</span></div></th>
               <th data-k="nrp" class="pv-center"><div class="pv-th-inner">NRP <span class="pv-arrow">\u2195</span></div></th>
               <th data-k="dernnrp" class="pv-center"><div class="pv-th-inner">Dern. NRP <span class="pv-arrow">\u2195</span></div></th>
-              <th data-k="projet_initial"><div class="pv-th-inner">Projet initial <span class="pv-arrow">\u2195</span></div></th>
-              <th data-k="source"><div class="pv-th-inner">Source <span class="pv-arrow">\u2195</span></div></th>
             </tr></thead>
             <tbody id="pv-tbody"></tbody>
           </table>
@@ -13903,8 +13814,6 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
         +'<button class="pv-nrp-btn" data-act="inc" title="Ne répond pas (+1)">+</button>'
       +'</span></td>'
       +'<td class="pv-center pv-muted'+(last?' pv-dernnrp':'')+'"'+(last?' title="'+new Date(last).toLocaleString('fr-FR')+'"':'')+'>'+relTime(last)+'</td>'
-      +'<td>'+(p.projet_initial||'<span class="pv-muted">—</span>')+'</td>'
-      +'<td>'+(p.source||'<span class="pv-muted">—</span>')+'</td>'
       +'</tr>';
     }).join('');
     tb.querySelectorAll('tr').forEach(tr=>{
@@ -13954,29 +13863,6 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       });
     });
     document.getElementById('pv-search').addEventListener('input', e=>{ query=e.target.value; renderRows(); });
-    const impInput=document.getElementById('pv-import-file');
-    if(impInput) impInput.addEventListener('change', async e=>{
-      const file=e.target.files&&e.target.files[0]; if(!file) return;
-      const fd=new FormData(); fd.append('file', file);
-      try{
-        const r=await fetch('/api/import-leads',{method:'POST',body:fd});
-        const res=await r.json().catch(()=>({}));
-        if(!r.ok || !res.ok) throw new Error(res.detail||res.error||('HTTP '+r.status));
-        try{
-          const lr=await fetch('/api/leads');
-          const leads=lr.ok?await lr.json():[];
-          if(Array.isArray(leads)){
-            data=leads.map(p=>Object.assign({nrp_log:[]},p,{tel:(p.telephone||p.tel||'')}));
-            persist(); renderRows();
-          }
-        }catch(_){}
-        toastMsg((res.imported||0)+' leads importés'+((res.errors&&res.errors.length)?(' · '+res.errors.length+' erreur(s)'):''), '#0D6B3B');
-      }catch(err){
-        alert('Erreur import : '+(err.message||err));
-      }finally{
-        e.target.value='';
-      }
-    });
     document.getElementById('pv-new').addEventListener('click', openFiche);
     const admBtn=document.getElementById('pv-admin');
     if(admBtn) admBtn.addEventListener('click', ()=>{ if(window.HexaAdmin) window.HexaAdmin.open(); });
