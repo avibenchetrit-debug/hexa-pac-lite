@@ -13,5 +13,6 @@ COPY . .
 
 EXPOSE 8080
 
-# Shell form so $PORT (injected by Railway) is expanded at runtime.
-CMD uvicorn main:app --host 0.0.0.0 --port $PORT
+# Shell form (no JSON array) so ${PORT} is expanded by /bin/sh at runtime.
+# Railway injects $PORT; fall back to 8000 locally.
+CMD uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}
