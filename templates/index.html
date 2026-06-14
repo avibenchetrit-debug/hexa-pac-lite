@@ -7120,10 +7120,34 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
 </style>
 
 <style id="lot2-prospects">
-  /* Lot 2 — Tableau Prospects : 1 ligne par prospect, contenu centré, scroll horizontal si besoin */
-  .pv-table td { vertical-align: middle; text-align: center; padding: 10px 12px; }
+  /* Lot 2 — Tableau Prospects : 12 colonnes visibles, AUCUN scroll horizontal,
+     aucun tronquage, aucune 2e ligne, email entier. On réduit la police + le padding
+     et on récupère de la largeur (padding du .pv-wrap) pour tout faire tenir à 1280px. */
+  .pv-table { font-size: 11px; table-layout: auto; width: 100%; min-width: 0; }
+  .pv-table th, .pv-table td {
+    vertical-align: middle;
+    text-align: center;
+    padding: 6px 6px;
+    white-space: nowrap;
+  }
   .pv-table td.pv-nom { text-align: left; }
-  .pv-card { overflow-x: auto; }
+  .pv-th-inner { font-size: 9.5px; padding: 7px 6px; gap: 4px; }
+
+  /* Interdit tout scroll horizontal et tout tronquage (email visible en entier) */
+  .pv-card, .pv-card > div, .pv-table { overflow-x: visible !important; }
+  .pv-card { overflow: visible !important; }
+  table.pv-table { width: 100%; min-width: 0; }
+  .pv-table td:nth-child(6) { max-width: none !important; overflow: visible !important; text-overflow: clip !important; }
+  .pv-mail { font-size: inherit; }
+
+  /* Compacte les contrôles NRP et le badge statut pour gagner de la place */
+  .pv-nrp-btn { width: 20px; height: 20px; font-size: 13px; }
+  .pv-nrp-ctl { gap: 5px; }
+  .pv-nrp-count { min-width: 22px; font-size: 12px; padding: 2px 5px; }
+  .pv-pid { font-size: 10px; padding: 2px 6px; }
+
+  /* Récupère de la largeur utile pour faire tenir les 12 colonnes sans scroll */
+  #hexa-prospects-view .pv-wrap { padding-left: 12px; padding-right: 12px; }
 </style>
 
 </head>
