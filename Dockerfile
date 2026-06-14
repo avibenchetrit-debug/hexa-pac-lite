@@ -11,7 +11,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-EXPOSE 8000
+EXPOSE 8080
 
-# Railway overrides this via railway.json startCommand and injects $PORT.
-CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+# Shell form (no JSON array) so ${PORT} is expanded by /bin/sh at runtime.
+# Railway injects $PORT; fall back to 8000 locally.
+CMD uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}
