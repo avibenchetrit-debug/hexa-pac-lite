@@ -7150,6 +7150,18 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
   #hexa-prospects-view .pv-wrap { padding-left: 12px; padding-right: 12px; }
 </style>
 
+<style id="prospects-overlay-fix">
+  /* Fix mobile : en vue Accueil (overlay Prospects #hexa-prospects-view, position:fixed),
+     la page fiche pouvait défiler / transparaître DERRIÈRE l'overlay (comportement
+     classique sur mobile/iOS où le body continue de scroller derrière un overlay fixed).
+     On verrouille le scroll de fond et on retire la fiche du rendu tant qu'on est sur
+     l'Accueil. Tout est réversible : retirer la classe .hexa-view-prospects (openFiche)
+     réaffiche la fiche normalement. */
+  body.hexa-view-prospects { overflow: hidden; }
+  body.hexa-view-prospects > header.hexa-lite-top,
+  body.hexa-view-prospects .hexa-app-shell { display: none !important; }
+</style>
+
 </head>
 <body class="hexa-has-topbar" data-prospect-numero="PR-000001">
 
