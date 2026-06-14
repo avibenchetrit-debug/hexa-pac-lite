@@ -6917,6 +6917,16 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
 .pv-btn-ghost{ background:#fff; color:#002E5A; border:1px solid #E2E8F0; }
 
 .pv-wrap{ max-width:1140px; margin:0 auto; padding:28px; }
+.pv-stats-filter{border:0.5px solid #E2E8F0;border-radius:8px;padding:6px 10px;font-size:12px;background:#fff;color:#002E5A;font-family:inherit;cursor:pointer}
+.pv-stats-filter:focus{outline:none;border-color:#002E5A;box-shadow:0 0 0 3px rgba(0,46,90,.12)}
+.pv-stats-statut-pill{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;background:#F4F8FC;border:0.5px solid #E2E8F0;border-radius:9999px;font-size:12px;color:#002E5A;cursor:pointer;transition:all .12s}
+.pv-stats-statut-pill:hover{border-color:#002E5A;background:#E6F1FB}
+.pv-stats-statut-pill.active{background:#002E5A;color:#fff;border-color:#002E5A}
+.pv-stats-statut-pill b{font-weight:700}
+.pv-stats-detail-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:0.5px solid #F0F5FA;gap:10px}
+.pv-stats-detail-row:last-child{border-bottom:none}
+.pv-stats-detail-row .nom{font-weight:600;color:#002E5A}
+.pv-stats-detail-row .tel{color:#4A5568;font-size:11.5px}
 .pv-h1{ font-size:22px; color:#002E5A; margin:0 0 4px; font-family:Inter,Arial,sans-serif; }
 .pv-sub{ color:#9CA3AF; font-size:13px; margin-bottom:20px; }
 .pv-toolbar{ display:flex; gap:12px; margin-bottom:16px; align-items:center; }
@@ -13734,6 +13744,121 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
 
   const fmtDate = d => { try{ return new Date(d).toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric'}); }catch(_){ return d; } };
   const arrowFor = k => sortKey!==k ? '\u2195' : (sortDir>0?'\u2191':'\u2193');
+  const statsFilterFields = [
+    { id:'pv-stats-filter-statut', field:'statut', emptyLabel:'Tous statuts' },
+    { id:'pv-stats-filter-categorie', field:'categorie', emptyLabel:'Toutes catégories' },
+    { id:'pv-stats-filter-source', field:'source', emptyLabel:'Toutes sources' },
+    { id:'pv-stats-filter-projet', field:'projet', emptyLabel:'Tous projets' },
+  ];
+
+  function escapeHtml(v){
+    return String(v ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+  }
+  function cleanVal(v){ return String(v ?? '').trim(); }
+  function leadField(p, field){
+    if(field==='statut') return cleanVal(p?.statut || 'nouveau');
+    if(field==='categorie') return cleanVal(p?.categorie);
+    if(field==='source') return cleanVal(p?.source || p?.origine || p?.canal || p?.lead_source);
+    if(field==='projet') return cleanVal(p?.projet_initial || p?.projet || p?.type_projet);
+    return '';
+  }
+  function leadName(p){
+    const full = cleanVal(((p?.prenom || '') + ' ' + (p?.nom || '')).trim());
+    if(full) return full;
+    return cleanVal(p?.nom_complet || p?.name || p?.numero || 'Sans nom');
+  }
+  function leadTel(p){
+    return cleanVal(p?.tel || p?.telephone || p?.phone || '—');
+  }
+  function statutLabel(k){
+    if(STMAP[k]) return STMAP[k].label;
+    return k === 'sans_statut' ? 'Sans statut' : (k || 'Sans statut');
+  }
+  function statutOrder(k){
+    if(STMAP[k]) return STMAP[k].i;
+    if(k === 'sans_statut') return 9998;
+    return 9999;
+  }
+  function fillStatsFilters(){
+    statsFilterFields.forEach(({ id, field, emptyLabel })=>{
+      const el=document.getElementById(id); if(!el) return;
+      const prev = el.value || '';
+      const vals = Array.from(new Set(data.map(p=>leadField(p, field)).filter(Boolean)))
+        .sort((a,b)=>a.localeCompare(b,'fr',{ sensitivity:'base' }));
+      el.innerHTML = '<option value="">'+emptyLabel+'</option>' + vals.map(v=>'<option value="'+escapeHtml(v)+'">'+escapeHtml(v)+'</option>').join('');
+      if(prev && vals.includes(prev)) el.value = prev;
+    });
+  }
+  function getStatsFilteredLeads(){
+    const selected = Object.fromEntries(statsFilterFields.map(({id,field})=>{
+      const el=document.getElementById(id);
+      return [field, cleanVal(el ? el.value : '')];
+    }));
+    return data.filter(p=>{
+      return (!selected.statut || leadField(p,'statut') === selected.statut)
+        && (!selected.categorie || leadField(p,'categorie') === selected.categorie)
+        && (!selected.source || leadField(p,'source') === selected.source)
+        && (!selected.projet || leadField(p,'projet') === selected.projet);
+    });
+  }
+  function computeStats(){
+    const totalEl=document.getElementById('pv-stats-total');
+    const statutsEl=document.getElementById('pv-stats-statuts');
+    const detailEl=document.getElementById('pv-stats-detail');
+    const titleEl=document.getElementById('pv-stats-detail-title');
+    if(!totalEl || !statutsEl || !detailEl || !titleEl) return;
+    const rows = getStatsFilteredLeads();
+    totalEl.textContent = String(rows.length);
+    const byStatut = new Map();
+    rows.forEach(p=>{
+      const k = leadField(p,'statut') || 'sans_statut';
+      byStatut.set(k, (byStatut.get(k)||0) + 1);
+    });
+    const keys = Array.from(byStatut.keys()).sort((a,b)=>{
+      const da = statutOrder(a), db = statutOrder(b);
+      if(da !== db) return da - db;
+      return statutLabel(a).localeCompare(statutLabel(b),'fr',{ sensitivity:'base' });
+    });
+    statutsEl.innerHTML = keys.map(k =>
+      '<span class="pv-stats-statut-pill" data-statut="'+escapeHtml(k)+'"><span>'+escapeHtml(statutLabel(k))+'</span><b>'+byStatut.get(k)+'</b></span>'
+    ).join('');
+    titleEl.textContent = 'Sélectionnez un statut';
+    detailEl.innerHTML = rows.length
+      ? '<div class="pv-muted">Cliquez sur un statut pour afficher le détail.</div>'
+      : '<div class="pv-muted">Aucun lead pour ces filtres.</div>';
+    statutsEl.querySelectorAll('.pv-stats-statut-pill').forEach(pill=>{
+      pill.addEventListener('click', ()=>{
+        statutsEl.querySelectorAll('.pv-stats-statut-pill.active').forEach(el=>el.classList.remove('active'));
+        pill.classList.add('active');
+        const picked = pill.dataset.statut || '';
+        const leads = rows.filter(p=>(leadField(p,'statut') || 'sans_statut') === picked);
+        titleEl.textContent = statutLabel(picked) + ' (' + leads.length + ' lead' + (leads.length>1?'s':'') + ')';
+        detailEl.innerHTML = leads.length
+          ? leads.map(p=>'<div class="pv-stats-detail-row"><span class="nom">'+escapeHtml(leadName(p))+'</span><span class="tel">'+escapeHtml(leadTel(p))+'</span></div>').join('')
+          : '<div class="pv-muted">Aucun lead sur ce statut.</div>';
+      });
+    });
+  }
+  function refreshMasterStats(rebuildFilters){
+    if(rebuildFilters) fillStatsFilters();
+    computeStats();
+  }
+  async function refreshAfterImport(){
+    try{
+      const res = await fetch('/api/leads', { cache:'no-store' });
+      if(res.ok){
+        const leads = await res.json();
+        if(Array.isArray(leads)){
+          data = leads.map(p=>Object.assign({ nrp_log:[] }, p));
+          persist();
+          renderRows();
+          refreshMasterStats(true);
+          return;
+        }
+      }
+    }catch(_){}
+    refreshMasterStats(true);
+  }
 
   function buildView(){
     const v=document.createElement('div'); v.id='hexa-prospects-view';
@@ -13747,6 +13872,29 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
         </div>
       </div>
       <div class="pv-wrap">
+        <section id="pv-stats-master" style="background:#fff;border:0.5px solid #E2E8F0;border-radius:12px;padding:16px 20px;margin-bottom:20px">
+          <div id="pv-stats-filter" style="display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-bottom:14px">
+            <span style="font-size:18px;font-weight:600;color:#002E5A"><span id="pv-stats-total">0</span> leads</span>
+            <span style="flex:1"></span>
+            <select id="pv-stats-filter-statut" class="pv-stats-filter"><option value="">Tous statuts</option></select>
+            <select id="pv-stats-filter-categorie" class="pv-stats-filter"><option value="">Toutes catégories</option></select>
+            <select id="pv-stats-filter-source" class="pv-stats-filter"><option value="">Toutes sources</option></select>
+            <select id="pv-stats-filter-projet" class="pv-stats-filter"><option value="">Tous projets</option></select>
+            <button id="pv-stats-reset" class="pv-btn pv-btn-ghost" style="padding:6px 10px;font-size:12px">Réinitialiser</button>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+            <div style="border:0.5px solid #E2E8F0;border-radius:10px;padding:12px">
+              <div style="font-size:11px;font-weight:600;color:#9CA3AF;text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px">Par statut</div>
+              <div id="pv-stats-statuts" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+            </div>
+            <div style="border:0.5px solid #E2E8F0;border-radius:10px;padding:12px">
+              <div style="font-size:11px;font-weight:600;color:#9CA3AF;text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px">
+                <span id="pv-stats-detail-title">Sélectionnez un statut</span>
+              </div>
+              <div id="pv-stats-detail" style="font-size:12px;max-height:240px;overflow-y:auto"></div>
+            </div>
+          </div>
+        </section>
         <h1 class="pv-h1">Prospects</h1>
         <div class="pv-sub">Liste de tous les prospects. Cliquez sur un en-tête pour trier A→Z ou Z→A, ou sur une ligne pour ouvrir la fiche.</div>
         <div class="pv-toolbar">
@@ -13838,6 +13986,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
             const k=opt.dataset.k; const prev=rec.statut;
             rec.statut=k; persist(); menu.classList.remove('open');
             renderRows();
+            refreshMasterStats(true);
             if(k!==prev) celebrateStatut(k);
           });
         });
@@ -13868,6 +14017,20 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     if(admBtn) admBtn.addEventListener('click', ()=>{ if(window.HexaAdmin) window.HexaAdmin.open(); });
     const regieBtn=document.getElementById('pv-regie');
     if(regieBtn) regieBtn.addEventListener('click', ()=>{ if(window.HexaAdmin) window.HexaAdmin.openRegie(); });
+    statsFilterFields.forEach(({ id })=>{
+      const el=document.getElementById(id);
+      if(el) el.addEventListener('change', computeStats);
+    });
+    const resetBtn=document.getElementById('pv-stats-reset');
+    if(resetBtn){
+      resetBtn.addEventListener('click', ()=>{
+        statsFilterFields.forEach(({ id })=>{ const el=document.getElementById(id); if(el) el.value=''; });
+        computeStats();
+      });
+    }
+    window.addEventListener('hexa:leads-imported', refreshAfterImport);
+    document.addEventListener('hexa:leads-imported', refreshAfterImport);
+    window.hexaRefreshStatsAfterImport = refreshAfterImport;
   }
 
   // --- Menu statut : positionnement fixed (ne déborde pas) ---
@@ -13940,6 +14103,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     const view=buildView();
     document.body.appendChild(view);
     bindView(); renderRows();
+    refreshMasterStats(true);
     showProspects(); // accueil par défaut
 
     // Header de la fiche
