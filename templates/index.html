@@ -7107,6 +7107,9 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
   /* 3) Contenu centré dans un conteneur de largeur max 1280px */
   .container { max-width: 1280px; }
 
+  /* Lot 1 fix : fiche prospect ~30% plus étroite (1280px -> 900px), centrée */
+  .hexa-prospect-page .container { max-width: 900px; margin: 0 auto; }
+
   /* 4) Responsive mobile (< 768px) : header pleine largeur, contenu 100%, header lisible */
   @media (max-width: 768px) {
     .hexa-lite-top { padding: 10px 14px; gap: 8px; }
@@ -13778,7 +13781,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     const v=document.createElement('div'); v.id='hexa-prospects-view';
     v.innerHTML = `
       <div class="pv-top">
-        <div class="pv-brand">Hexa-Rénov'</div>
+        <div class="pv-brand"><img src="/static/Logo.svg" alt="Hexa Rénov'" style="height:32px;width:auto;display:block"></div>
         <div class="pv-actions">
           <button class="pv-btn pv-btn-ghost" id="pv-regie">📊 Simulateur régie</button>
           <button class="pv-btn pv-btn-ghost" id="pv-admin">⚙ Admin</button>
