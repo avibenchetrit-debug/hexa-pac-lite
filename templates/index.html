@@ -13713,13 +13713,11 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
   }
   function statutSortVal(p){ const s=STMAP[p.statut]; return s? String(s.i).padStart(2,'0') : '00'; }
   function loadProspects(){
-    try{ const raw=localStorage.getItem('hexa_prospects'); if(raw){ return JSON.parse(raw).map(p=>{
-      const o=Object.assign({nrp_log:[]},p);
-      if(typeof o.nrp==='number' && (!o.nrp_log || !o.nrp_log.length)){ o.nrp_log=Array.from({length:o.nrp},()=>null); }
-      if(!Array.isArray(o.nrp_log)) o.nrp_log=[];
-      delete o.nrp; return o;
-    }); } }catch(_){}
-    return DEMO.slice();
+    try{
+      const raw=localStorage.getItem('hexa_prospects');
+      if(raw){ return JSON.parse(raw).map(normalizeProspect); }
+    }catch(_){}
+    return DEMO.map(normalizeProspect);
   }
   function persist(){ try{ localStorage.setItem('hexa_prospects', JSON.stringify(data)); }catch(_){} }
 
@@ -13739,11 +13737,23 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
   const nrpCount = p => (p.nrp_log||[]).length;
   const nrpLast  = p => { const l=p.nrp_log||[]; return l.length?l[l.length-1]:null; };
 
-  let data = loadProspects();
+  let data = [];
   let sortKey='date', sortDir=-1, query='';
 
   const fmtDate = d => { try{ return new Date(d).toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric'}); }catch(_){ return d; } };
   const arrowFor = k => sortKey!==k ? '\u2195' : (sortDir>0?'\u2191':'\u2193');
+  const CAT_LABEL_TO_KEY = { tmo:'tres_modeste', mo:'modeste', int:'intermediaire', sup:'superieur' };
+  const STATUT_LABEL_TO_KEY = {
+    nouveau:'nouveau',
+    'a rappeler':'rappeler',
+    'a recontacter':'rappeler',
+    rdv:'rdv',
+    'rdv pris':'rdv',
+    devis:'devis',
+    'devis envoye':'devis',
+    signe:'signe',
+    perdu:'perdu',
+  };
   const statsFilterFields = [
     { id:'pv-stats-filter-statut', field:'statut', emptyLabel:'Tous statuts' },
     { id:'pv-stats-filter-categorie', field:'categorie', emptyLabel:'Toutes catégories' },
@@ -13755,6 +13765,30 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     return String(v ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
   }
   function cleanVal(v){ return String(v ?? '').trim(); }
+  function normTxt(v){
+    return String(v ?? '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .trim();
+  }
+  function normalizeProspect(p){
+    const o=Object.assign({ nrp_log:[] }, p||{});
+    if(typeof o.nrp==='number' && (!o.nrp_log || !o.nrp_log.length)){ o.nrp_log=Array.from({length:o.nrp},()=>null); }
+    if(!Array.isArray(o.nrp_log)) o.nrp_log=[];
+    if(!o.tel && o.telephone) o.tel = o.telephone;
+    if(!o.telephone && o.tel) o.telephone = o.tel;
+    const statutRaw = cleanVal(o.statut);
+    const statutNorm = normTxt(statutRaw);
+    if(STMAP[statutRaw]) o.statut = statutRaw;
+    else if(STATUT_LABEL_TO_KEY[statutNorm]) o.statut = STATUT_LABEL_TO_KEY[statutNorm];
+    const catRaw = cleanVal(o.categorie);
+    const catNorm = normTxt(catRaw);
+    if(!CAT[o.categorie] && CAT_LABEL_TO_KEY[catNorm]) o.categorie = CAT_LABEL_TO_KEY[catNorm];
+    delete o.nrp;
+    return o;
+  }
+  data = loadProspects();
   function leadField(p, field){
     if(field==='statut') return cleanVal(p?.statut || 'nouveau');
     if(field==='categorie') return cleanVal(p?.categorie);
@@ -13849,7 +13883,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       if(res.ok){
         const leads = await res.json();
         if(Array.isArray(leads)){
-          data = leads.map(p=>Object.assign({ nrp_log:[] }, p));
+          data = leads.map(normalizeProspect);
           persist();
           renderRows();
           refreshMasterStats(true);
@@ -13872,7 +13906,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
         </div>
       </div>
       <div class="pv-wrap">
-        <section id="pv-stats-master" style="background:#fff;border:0.5px solid #E2E8F0;border-radius:12px;padding:16px 20px;margin-bottom:20px">
+        <section id="pv-stats-master" style="background:#FAFBFC;border:0.5px solid #E2E8F0;border-radius:12px;padding:12px 16px;margin-bottom:16px">
           <div id="pv-stats-filter" style="display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-bottom:14px">
             <span style="font-size:18px;font-weight:600;color:#002E5A"><span id="pv-stats-total">0</span> leads</span>
             <span style="flex:1"></span>
@@ -13882,12 +13916,12 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
             <select id="pv-stats-filter-projet" class="pv-stats-filter"><option value="">Tous projets</option></select>
             <button id="pv-stats-reset" class="pv-btn pv-btn-ghost" style="padding:6px 10px;font-size:12px">Réinitialiser</button>
           </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
-            <div style="border:0.5px solid #E2E8F0;border-radius:10px;padding:12px">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <div style="border:none;border-radius:0;padding:10px 14px 10px 12px;background:transparent;border-right:0.5px solid #E2E8F0">
               <div style="font-size:11px;font-weight:600;color:#9CA3AF;text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px">Par statut</div>
               <div id="pv-stats-statuts" style="display:flex;flex-wrap:wrap;gap:6px"></div>
             </div>
-            <div style="border:0.5px solid #E2E8F0;border-radius:10px;padding:12px">
+            <div style="border:none;border-radius:0;padding:10px 12px;background:transparent">
               <div style="font-size:11px;font-weight:600;color:#9CA3AF;text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px">
                 <span id="pv-stats-detail-title">Sélectionnez un statut</span>
               </div>
@@ -13899,6 +13933,8 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
         <div class="pv-sub">Liste de tous les prospects. Cliquez sur un en-tête pour trier A→Z ou Z→A, ou sur une ligne pour ouvrir la fiche.</div>
         <div class="pv-toolbar">
           <input class="pv-search" id="pv-search" placeholder="Rechercher un nom, email, téléphone…">
+          <label for="pv-import-file" class="pv-btn pv-btn-ghost" style="cursor:pointer">📥 Importer Excel</label>
+          <input type="file" id="pv-import-file" accept=".xlsx,.xls,.csv" style="display:none">
           <span class="pv-count" id="pv-count"></span>
         </div>
         <div class="pv-card">
@@ -13914,6 +13950,8 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
               <th data-k="date"><div class="pv-th-inner">Créé le <span class="pv-arrow">\u2195</span></div></th>
               <th data-k="nrp" class="pv-center"><div class="pv-th-inner">NRP <span class="pv-arrow">\u2195</span></div></th>
               <th data-k="dernnrp" class="pv-center"><div class="pv-th-inner">Dern. NRP <span class="pv-arrow">\u2195</span></div></th>
+              <th data-k="projet_initial"><div class="pv-th-inner">Projet initial <span class="pv-arrow">\u2195</span></div></th>
+              <th data-k="source"><div class="pv-th-inner">Source <span class="pv-arrow">\u2195</span></div></th>
             </tr></thead>
             <tbody id="pv-tbody"></tbody>
           </table>
@@ -13925,7 +13963,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
 
   function renderRows(){
     const q=query.toLowerCase().trim();
-    let rows=data.filter(p=>!q || [p.nom,p.prenom,p.email,p.tel,p.numero,p.cp].join(' ').toLowerCase().includes(q));
+    let rows=data.filter(p=>!q || [p.nom,p.prenom,p.email,p.tel,p.telephone,p.numero,p.cp,p.projet_initial,p.source].join(' ').toLowerCase().includes(q));
     rows.sort((a,b)=>{
       if(sortKey==='nrp'){ return (nrpCount(a)-nrpCount(b))*sortDir; }
       if(sortKey==='dernnrp'){ const x=new Date(nrpLast(a)||0).getTime(); const y=new Date(nrpLast(b)||0).getTime(); return (x-y)*sortDir; }
@@ -13952,7 +13990,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       +'<td>'+statutSelect(p)+'</td>'
       +'<td class="pv-nom">'+((p.nom||'')+' '+(p.prenom||'')).trim()+'</td>'
       +'<td>'+(p.cp||'<span class="pv-muted">—</span>')+'</td>'
-      +'<td>'+(p.tel||'<span class="pv-muted">—</span>')+'</td>'
+      +'<td>'+(p.tel||p.telephone||'<span class="pv-muted">—</span>')+'</td>'
       +'<td>'+(p.email?'<a class="pv-mail" href="mailto:'+p.email+'">'+p.email+'</a>':'<span class="pv-muted">—</span>')+'</td>'
       +'<td>'+catBadge(p.categorie)+'</td>'
       +'<td class="pv-muted">'+(p.date?fmtDate(p.date):'—')+'</td>'
@@ -13962,6 +14000,8 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
         +'<button class="pv-nrp-btn" data-act="inc" title="Ne répond pas (+1)">+</button>'
       +'</span></td>'
       +'<td class="pv-center pv-muted'+(last?' pv-dernnrp':'')+'"'+(last?' title="'+new Date(last).toLocaleString('fr-FR')+'"':'')+'>'+relTime(last)+'</td>'
+      +'<td>'+(p.projet_initial||'<span class="pv-muted">—</span>')+'</td>'
+      +'<td>'+(p.source||'<span class="pv-muted">—</span>')+'</td>'
       +'</tr>';
     }).join('');
     tb.querySelectorAll('tr').forEach(tr=>{
@@ -14017,6 +14057,29 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     if(admBtn) admBtn.addEventListener('click', ()=>{ if(window.HexaAdmin) window.HexaAdmin.open(); });
     const regieBtn=document.getElementById('pv-regie');
     if(regieBtn) regieBtn.addEventListener('click', ()=>{ if(window.HexaAdmin) window.HexaAdmin.openRegie(); });
+    const importInput=document.getElementById('pv-import-file');
+    if(importInput){
+      importInput.addEventListener('change', async e=>{
+        const file = e.target?.files?.[0];
+        if(!file) return;
+        const fd = new FormData();
+        fd.append('file', file);
+        try{
+          const res = await fetch('/api/import-leads', { method:'POST', body:fd });
+          let payload = {};
+          try{ payload = await res.json(); }catch(_){}
+          if(!res.ok || !payload.ok){
+            alert((payload.errors && payload.errors[0]) || "Import impossible.");
+            return;
+          }
+          await refreshAfterImport();
+        }catch(_){
+          alert("Erreur réseau pendant l'import.");
+        }finally{
+          importInput.value='';
+        }
+      });
+    }
     statsFilterFields.forEach(({ id })=>{
       const el=document.getElementById(id);
       if(el) el.addEventListener('change', computeStats);
@@ -14104,6 +14167,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     document.body.appendChild(view);
     bindView(); renderRows();
     refreshMasterStats(true);
+    refreshAfterImport();
     showProspects(); // accueil par défaut
 
     // Header de la fiche
