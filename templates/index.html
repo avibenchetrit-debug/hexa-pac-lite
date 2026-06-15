@@ -6934,7 +6934,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
 .pv-search:focus{ outline:none; border-color:#002E5A; box-shadow:0 0 0 3px rgba(0,46,90,.12); }
 .pv-count{ font-size:13px; color:#4A5568; white-space:nowrap; }
 
-.pv-card{ background:#fff; border:1px solid #E2E8F0; border-radius:14px; box-shadow:0 2px 4px rgba(16,32,64,.04),0 4px 16px rgba(16,32,64,.07); overflow:hidden; }
+.pv-card{ background:#fff; border:1px solid #E2E8F0; border-radius:14px; box-shadow:0 2px 4px rgba(16,32,64,.04),0 4px 16px rgba(16,32,64,.07); overflow-x:visible; overflow-y:hidden; }
 .pv-table{ width:100%; border-collapse:collapse; }
 .pv-table th{ background:linear-gradient(100deg,#002E5A,#013A72); color:#fff; text-align:left; font-size:11px;
   text-transform:uppercase; letter-spacing:.05em; padding:0; font-weight:600; }
@@ -6967,15 +6967,16 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
 
 /* ===== Tout sur une seule ligne ===== */
 .pv-table{ table-layout:auto; }
-.pv-table th, .pv-table td{ white-space:nowrap; }
-.pv-table td{ font-size:13px; padding:11px 14px; }
-.pv-th-inner{ padding:12px 14px; font-size:10.5px; }
+.pv-table{ font-size:10.5px; }
+.pv-table th, .pv-table td{ white-space:nowrap; padding:7px 6px; }
+.pv-table td{ font-size:10.5px; padding:7px 6px; }
+.pv-th-inner{ padding:8px 6px; font-size:9.5px; }
 .pv-pid{ font-size:10.5px; padding:3px 7px; }
-.pv-nom{ font-weight:700; }
+.pv-nom{ font-weight:700; text-transform:uppercase; }
 .pv-mail{ font-size:12.5px; }
 .pv-wrap{ max-width:1340px; }
 /* la cellule mail peut être longue : on autorise l'ellipse si besoin */
-.pv-table td:nth-child(6){ max-width:200px; overflow:hidden; text-overflow:ellipsis; }
+.pv-table td:nth-child(6){ max-width:none; overflow:visible; text-overflow:clip; }
 
 /* ===== Badge statut déroulant custom ===== */
 .pv-statut-wrap{ position:relative; display:inline-block; }
