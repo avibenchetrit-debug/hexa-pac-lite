@@ -2787,17 +2787,17 @@ body.panel-is-open {
     }
 
     /* ===== CHAMPS — FOND VISIBLE ===== */
-    .row { display: grid; gap: 16px; margin-bottom: 16px; width: 100%; min-width: 0; }
+    .row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; margin-bottom: 12px; width: 100%; min-width: 0; }
     .row:last-child { margin-bottom: 0; }
-    .row > .field { min-width: 0; }
-    .row-2 { grid-template-columns: 1fr 1fr; gap: 16px; }
-    .row-3 { grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
-    .row-civilite-nom { grid-template-columns: 130px 1fr 1fr; gap: 16px; }
+    .row > .field { min-width: 0; margin-left: 0; margin-right: 0; }
+    .row-2 { grid-template-columns: 1fr 1fr; gap: 14px; }
+    .row-3 { grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
+    .row-civilite-nom { grid-template-columns: 130px 1fr 1fr; gap: 14px; }
     .row-4 { grid-template-columns: 1fr 1fr 1fr 1fr; }
     .row-2-1 { grid-template-columns: 2fr 1fr; }
     .row-1-2 { grid-template-columns: 1fr 2fr; }
 
-    .field { display: flex; flex-direction: column; }
+    .field { display: flex; flex-direction: column; min-width: 0; }
     .field > label {
       font-size: 13px; font-weight: 500; color: #4A5568;
       margin-bottom: 6px; display: block;
@@ -2829,6 +2829,14 @@ body.panel-is-open {
       text-transform: uppercase; color: #E2214B;
       margin: 16px 0 14px; padding-top: 16px;
       border-top: 1px solid #E8EFF7;
+    }
+    .sub-bloc-title {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      color: #E2214B;
+      margin: 14px 0 8px;
     }
     .card > .card-subtitle:first-of-type,
     .card-title + .card-subtitle {
@@ -7745,6 +7753,222 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
   </div>
 
 </div>
+
+<script>
+(function () {
+  'use strict';
+
+  function q(sel, root) { return (root || document).querySelector(sel); }
+  function qa(sel, root) { return Array.from((root || document).querySelectorAll(sel)); }
+  function cardTitleText(card) { return (q('.card-title', card)?.textContent || '').trim(); }
+  function findCard(re, root) { return qa('.card', root).find(c => re.test(cardTitleText(c))); }
+  function fieldByName(name, root) {
+    const el = q('[name="' + name + '"]', root || document);
+    return el ? el.closest('.field') : null;
+  }
+  function setCardTitle(card, number, title) {
+    if (!card) return;
+    const t = q('.card-title', card);
+    if (!t) return;
+    let num = q('.num-card', t);
+    if (!num) {
+      num = document.createElement('span');
+      num.className = 'num-card';
+      t.prepend(num);
+    }
+    num.textContent = String(number);
+    t.innerHTML = '';
+    t.appendChild(num);
+    t.appendChild(document.createTextNode(' ' + title));
+  }
+  function removeField(name, root) {
+    const f = fieldByName(name, root);
+    if (f) f.remove();
+  }
+  function wrapInputAsField(input, labelText) {
+    if (!input) return null;
+    const field = document.createElement('div');
+    field.className = 'field';
+    const label = document.createElement('label');
+    label.textContent = labelText;
+    field.appendChild(label);
+    field.appendChild(input);
+    return field;
+  }
+
+  function initMiniPrompt53() {
+    const form = q('#form-prospect');
+    const fieldset = q('fieldset', form);
+    if (!form || !fieldset || form.dataset.layout53Done === '1') return;
+    form.dataset.layout53Done = '1';
+
+    // BLOC 1: Origine & Statut (fusion block source + block statut)
+    const blockOrigine = findCard(/Source du prospect/i, form);
+    const blockStatut = findCard(/Statut du prospect/i, form);
+    if (blockOrigine && blockStatut && blockStatut !== blockOrigine) {
+      qa(':scope > *', blockStatut).forEach(node => {
+        if (!(node.classList && node.classList.contains('card-title'))) blockOrigine.appendChild(node);
+      });
+      blockStatut.remove();
+    }
+    setCardTitle(blockOrigine, 1, 'Origine & Statut');
+
+    // BLOC 2: Informations personnelles
+    const blockPerso = findCard(/Informations personnelles/i, form);
+    if (blockPerso) {
+      setCardTitle(blockPerso, 2, 'Informations personnelles');
+      const rowCivilite = q('.row-civilite-nom', blockPerso);
+      if (rowCivilite) rowCivilite.classList.add('row', 'row-3');
+      const telRow = qa('.row', blockPerso).find(r => r.querySelector('[name="telephone"]') && r.querySelector('[name="email"]'));
+      if (telRow) telRow.className = 'row row-2';
+    }
+
+    // BLOC 3: Adresse & Données réglementaires (2 sous-blocs)
+    const blockAdresse = findCard(/Adresse/i, form);
+    if (blockAdresse) {
+      setCardTitle(blockAdresse, 3, 'Adresse & Données réglementaires');
+      const subtitles = qa('.card-subtitle', blockAdresse);
+      const locTitle = subtitles[0] || document.createElement('div');
+      if (!subtitles[0]) {
+        locTitle.className = 'sub-bloc-title';
+        locTitle.textContent = 'Localisation';
+        const firstRow = q('.row', blockAdresse);
+        if (firstRow) blockAdresse.insertBefore(locTitle, firstRow);
+      } else {
+        locTitle.className = 'sub-bloc-title';
+        locTitle.textContent = 'Localisation';
+      }
+      let regTitle = subtitles[1];
+      if (!regTitle) {
+        regTitle = document.createElement('div');
+        regTitle.className = 'sub-bloc-title';
+        regTitle.textContent = 'Données réglementaires';
+        const regRow = qa('.row.reg-grid', blockAdresse)[0];
+        if (regRow) blockAdresse.insertBefore(regTitle, regRow);
+      } else {
+        regTitle.className = 'sub-bloc-title';
+        regTitle.textContent = 'Données réglementaires';
+      }
+      qa('.row.reg-grid', blockAdresse).forEach(row => {
+        if (row.querySelector('#batiment-classe-select') || row.querySelector('#zone-protegee-select')) row.remove();
+      });
+      q('#batiment-classe-select')?.closest('.field')?.remove();
+      q('#zone-protegee-select')?.closest('.field')?.remove();
+    }
+
+    // BLOC 4: Caractéristiques du bien (2 sous-blocs)
+    const blockCarac = q('#bloc-caracteristiques-bien') || findCard(/Caractéristiques du bien/i, form);
+    const blockChauffage = q('#bloc-chauffage-ecs')?.closest('.card');
+    if (blockCarac) {
+      setCardTitle(blockCarac, 4, 'Caractéristiques du bien');
+      const dpeField = q('#dpe-input', blockCarac)?.closest('.field');
+      const typeField = fieldByName('type_logement', form);
+      const surfaceField = fieldByName('surface_logement_m2', form);
+      const anneeField = fieldByName('annee_construction', form);
+      const modeField = fieldByName('mode_chauffage', form);
+      const coutField = fieldByName('cout_energetique_mensuel_eur', form);
+      const phaseField = q('#phase-input', form)?.closest('.field');
+      const puissanceField = fieldByName('puissance_compteur', form);
+      const altitudeField = fieldByName('altitude', form);
+      const panneauField = fieldByName('panneau_solaire', form);
+      const dpeNumero = q('#dpe-numero', form);
+      const dpeDate = q('#dpe-date', form);
+      const dpeSource = q('#dpe-source', form);
+
+      if (dpeNumero) {
+        dpeNumero.type = 'text';
+        dpeNumero.removeAttribute('hidden');
+      }
+      if (dpeDate) {
+        dpeDate.type = 'date';
+        if (dpeDate.value && dpeDate.value.includes('T')) dpeDate.value = dpeDate.value.slice(0, 10);
+        dpeDate.removeAttribute('hidden');
+      }
+      const dpeNumeroField = wrapInputAsField(dpeNumero, 'N° DPE');
+      const dpeDateField = wrapInputAsField(dpeDate, 'Date DPE');
+
+      if (coutField) {
+        const coutInput = q('[name="cout_energetique_mensuel_eur"]', coutField);
+        if (coutInput) coutInput.required = true;
+        const coutLabel = q('label', coutField);
+        if (coutLabel) {
+          const target = q('.label-row > span:first-child', coutLabel) || coutLabel;
+          if (target.firstChild) target.firstChild.textContent = 'Coût chauffage';
+          if (!q('.req', coutLabel)) {
+            const req = document.createElement('span');
+            req.className = 'req';
+            req.textContent = '*';
+            coutLabel.appendChild(document.createTextNode(' '));
+            coutLabel.appendChild(req);
+          }
+        }
+      }
+
+      ['conso_kwh_m2', 'emissions_ges', 'nb_niveaux', 'hauteur_batiment', 'hsp'].forEach(name => removeField(name, form));
+      q('#btn-infos-complementaires', form)?.remove();
+      q('#panel-infos-complementaires', form)?.remove();
+      q('.dpe-source-block', blockCarac)?.remove();
+
+      const title = q('.card-title', blockCarac);
+      blockCarac.innerHTML = '';
+      if (title) blockCarac.appendChild(title);
+
+      const sb1 = document.createElement('div');
+      sb1.className = 'sub-bloc-title';
+      sb1.textContent = 'Source DPE';
+      const rowS = document.createElement('div');
+      rowS.className = 'row row-3';
+      [dpeField, dpeNumeroField, dpeDateField].forEach(f => { if (f) rowS.appendChild(f); });
+
+      const sb2 = document.createElement('div');
+      sb2.className = 'sub-bloc-title';
+      sb2.textContent = 'Logement';
+      const rowA = document.createElement('div');
+      rowA.className = 'row row-3';
+      [typeField, surfaceField, anneeField].forEach(f => { if (f) rowA.appendChild(f); });
+      const rowB = document.createElement('div');
+      rowB.className = 'row row-3';
+      [modeField, coutField, phaseField].forEach(f => { if (f) rowB.appendChild(f); });
+      const rowC = document.createElement('div');
+      rowC.className = 'row row-3';
+      [puissanceField, altitudeField, panneauField].forEach(f => { if (f) rowC.appendChild(f); });
+
+      blockCarac.appendChild(sb1);
+      blockCarac.appendChild(rowS);
+      if (dpeSource) blockCarac.appendChild(dpeSource);
+      blockCarac.appendChild(sb2);
+      blockCarac.appendChild(rowA);
+      blockCarac.appendChild(rowB);
+      blockCarac.appendChild(rowC);
+    }
+
+    // BLOC 5: Informations fiscales
+    const blockFiscal = findCard(/Informations fiscales/i, form);
+    setCardTitle(blockFiscal, 5, 'Informations fiscales (propriétaire)');
+
+    // Retire la carte chauffage/ECS (bloc 7) après extraction
+    if (blockChauffage) {
+      let hiddenStore = q('#fp-hidden-preserved', form);
+      if (!hiddenStore) {
+        hiddenStore = document.createElement('div');
+        hiddenStore.id = 'fp-hidden-preserved';
+        hiddenStore.style.display = 'none';
+        form.appendChild(hiddenStore);
+      }
+      qa('input[type="hidden"]', blockChauffage).forEach(inp => hiddenStore.appendChild(inp));
+      blockChauffage.remove();
+    }
+
+    // Ordre final des cartes 1 -> 5
+    [blockOrigine, blockPerso, blockAdresse, blockCarac, blockFiscal].forEach(card => {
+      if (card) fieldset.appendChild(card);
+    });
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initMiniPrompt53);
+  else initMiniPrompt53();
+})();
+</script>
 
 <script>
 /**
