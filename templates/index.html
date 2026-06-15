@@ -7878,14 +7878,30 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       if (dpeNumero) {
         dpeNumero.type = 'text';
         dpeNumero.removeAttribute('hidden');
+        dpeNumero.readOnly = true;
+        dpeNumero.style.background = '#F4F8FC';
+        dpeNumero.style.color = '#4A5568';
+        dpeNumero.style.cursor = 'not-allowed';
       }
       if (dpeDate) {
         dpeDate.type = 'date';
         if (dpeDate.value && dpeDate.value.includes('T')) dpeDate.value = dpeDate.value.slice(0, 10);
         dpeDate.removeAttribute('hidden');
+        dpeDate.readOnly = true;
+        dpeDate.style.background = '#F4F8FC';
+        dpeDate.style.color = '#4A5568';
+        dpeDate.style.cursor = 'not-allowed';
       }
       const dpeNumeroField = wrapInputAsField(dpeNumero, 'N° DPE');
       const dpeDateField = wrapInputAsField(dpeDate, 'Date DPE');
+      const ecsField = document.createElement('div');
+      ecsField.className = 'field';
+      ecsField.innerHTML = '<label for="ecs">ECS</label>'
+        + '<select name="ecs" id="ecs">'
+        + '<option value="">—</option>'
+        + '<option value="chaudiere">Chaudière</option>'
+        + '<option value="independant">Indépendant</option>'
+        + '</select>';
 
       if (coutField) {
         const coutInput = q('[name="cout_energetique_mensuel_eur"]', coutField);
@@ -7928,10 +7944,13 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       [typeField, surfaceField, anneeField].forEach(f => { if (f) rowA.appendChild(f); });
       const rowB = document.createElement('div');
       rowB.className = 'row row-3';
-      [modeField, coutField, phaseField].forEach(f => { if (f) rowB.appendChild(f); });
+      [modeField, ecsField, coutField].forEach(f => { if (f) rowB.appendChild(f); });
       const rowC = document.createElement('div');
       rowC.className = 'row row-3';
-      [puissanceField, altitudeField, panneauField].forEach(f => { if (f) rowC.appendChild(f); });
+      [phaseField, puissanceField, altitudeField].forEach(f => { if (f) rowC.appendChild(f); });
+      const rowD = document.createElement('div');
+      rowD.className = 'row row-3';
+      [panneauField].forEach(f => { if (f) rowD.appendChild(f); });
 
       blockCarac.appendChild(sb1);
       blockCarac.appendChild(rowS);
@@ -7940,6 +7959,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       blockCarac.appendChild(rowA);
       blockCarac.appendChild(rowB);
       blockCarac.appendChild(rowC);
+      blockCarac.appendChild(rowD);
     }
 
     // BLOC 5: Informations fiscales
