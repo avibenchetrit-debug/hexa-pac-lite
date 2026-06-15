@@ -110,7 +110,7 @@ def _home(page):
 def _open_pr(page, numero="PR-000001"):
     _home(page)
     row = page.locator(f"#pv-tbody tr[data-num='{numero}']").first
-    row.click(timeout=10000)
+    row.locator("td").nth(2).click(timeout=10000)
     page.wait_for_function(
         "() => !document.body.classList.contains('hexa-view-prospects')", timeout=8000
     )
@@ -221,7 +221,7 @@ def _case_a11(page, cid):
 def _case_a12(page, cid):
     lead = _first_lead()
     _home(page)
-    page.locator(f"#pv-tbody tr[data-num='{lead.get('numero')}']").first.click()
+    page.locator(f"#pv-tbody tr[data-num='{lead.get('numero')}']").first.locator("td").nth(2).click()
     page.wait_for_selector("#psb-numero")
     _assert(page, cid, page.locator("#psb-numero").text_content().strip() == lead.get("numero"), "Mauvaise fiche ouverte")
 
@@ -675,7 +675,7 @@ def _case_i1(page, cid):
     _assert(page, cid, st == 200 and body.get("lead", {}).get("nom") == "COHERENCE", f"Création incohérente: {st} {body}")
     numero = body.get("numero")
     _home(page)
-    page.locator(f"#pv-tbody tr[data-num='{numero}']").first.click()
+    page.locator(f"#pv-tbody tr[data-num='{numero}']").first.locator("td").nth(2).click()
     _assert(page, cid, page.locator('[name="nom"]').input_value() == "COHERENCE" and page.locator('[name="telephone"]').input_value() == "0601010101", "Fiche créée incohérente avec saisie")
 
 
