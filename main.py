@@ -119,6 +119,7 @@ def _normalize_lead_payload(payload: dict) -> dict:
     for key in ("zone_climatique", "zone_climatique_chantier"):
         if key in normalized:
             normalized[key] = _normalize_zone_climatique(normalized.get(key))
+    _apply_field_aliases(normalized)
     return normalized
 
 
@@ -251,54 +252,72 @@ ZONE_CLIMATIQUE_ALIASES = {
     "h3": "H3",
 }
 
+FIELD_ALIASES = {
+    "code_postal_chantier": "cp",
+    "ville_chantier": "ville",
+}
+
 PROSPECT_FIELDS = [
+    # Champs existants (à conserver)
     "numero",
     "nom",
     "prenom",
-    "civilite",
     "telephone",
     "email",
-    "usage_bien",
-    "situation",
-    "situation_propriete",
+    "cp",
+    "ville",
     "statut",
+    "categorie",
     "source",
     "projet_initial",
+    "date",
+
+    # Métadonnées
+    "updated_at",
+    "cree_par",
+    "derniere_modification",
+
+    # Bloc 1 (Origine & Statut)
+    "usage_bien",
+    "situation_actuelle",
+    "date_acquisition",
+
+    # Bloc 2 (Informations personnelles)
+    "civilite",
+
+    # Bloc 3 (Adresse & Données réglementaires)
     "adresse_chantier",
     "code_postal_chantier",
     "ville_chantier",
     "zone_climatique",
-    "zone_climatique_chantier",
     "parcelle_cadastrale",
     "registre_copro",
+
+    # Bloc 4 (Caractéristiques du bien) - DPE
     "classe_dpe",
-    "dpe_connu",
     "dpe_numero",
     "dpe_date",
+
+    # Bloc 4 (Caractéristiques du bien) - Logement
     "type_logement",
     "surface_logement_m2",
     "hsp",
     "annee_construction",
     "mode_chauffage",
     "ecs",
-    "gestion_ecs",
     "cout_chauffage",
-    "cout_energetique_mensuel_eur",
     "phase_electrique",
     "puissance_compteur",
     "altitude",
     "panneaux_solaires",
-    "panneau_solaire",
+
+    # Bloc 5 (Informations fiscales)
     "rfr",
     "nombre_personnes",
     "code_postal_personne",
-    "categorie",
-    "date",
-    "updated_at",
+
+    # Logs
     "nrp_log",
-    # Compatibility fields used by the prospects table/imports.
-    "cp",
-    "ville",
 ]
 
 IMPORT_PROSPECT_FIELDS = [
@@ -328,6 +347,18 @@ def _normalize_zone_climatique(value: str) -> str:
     return ZONE_CLIMATIQUE_ALIASES.get(_norm(raw), raw)
 
 
+def _apply_field_aliases(lead: dict) -> bool:
+    changed = False
+    for frontend_key, backend_key in FIELD_ALIASES.items():
+        if lead.get(frontend_key) and not lead.get(backend_key):
+            lead[backend_key] = lead[frontend_key]
+            changed = True
+        if lead.get(backend_key) and not lead.get(frontend_key):
+            lead[frontend_key] = lead[backend_key]
+            changed = True
+    return changed
+
+
 def _lead_for_response(lead: dict) -> dict:
     normalized = dict(lead or {})
     normalized["statut"] = _normalize_statut(normalized.get("statut", ""))
@@ -336,6 +367,7 @@ def _lead_for_response(lead: dict) -> dict:
         normalized["zone_climatique"] = _normalize_zone_climatique(normalized.get("zone_climatique", ""))
     if "zone_climatique_chantier" in normalized:
         normalized["zone_climatique_chantier"] = _normalize_zone_climatique(normalized.get("zone_climatique_chantier", ""))
+    _apply_field_aliases(normalized)
     for field in PROSPECT_FIELDS:
         normalized.setdefault(field, "" if field != "nrp_log" else [])
     return normalized
@@ -344,14 +376,14 @@ def _lead_for_response(lead: dict) -> dict:
 def _migrate_leads_schema():
     leads = _read_leads()
     changed = False
-    categories_migrees = 0
-    zones_migrees = 0
+    normalized_count = 0
     migrated = []
     for lead in leads:
         if not isinstance(lead, dict):
             migrated.append(lead)
             continue
         item = dict(lead)
+        before = dict(item)
         statut = _normalize_statut(item.get("statut", ""))
         categorie = _normalize_categorie(item.get("categorie", ""))
         if item.get("statut") != statut:
@@ -359,20 +391,25 @@ def _migrate_leads_schema():
             changed = True
         if item.get("categorie") != categorie:
             item["categorie"] = categorie
-            categories_migrees += 1
             changed = True
         for key in ("zone_climatique", "zone_climatique_chantier"):
             if key in item:
                 zone = _normalize_zone_climatique(item.get(key, ""))
                 if item.get(key) != zone:
                     item[key] = zone
-                    zones_migrees += 1
                     changed = True
+        if _apply_field_aliases(item):
+            changed = True
+        for field in PROSPECT_FIELDS:
+            if field not in item:
+                item[field] = [] if field == "nrp_log" else ""
+                changed = True
+        if item != before:
+            normalized_count += 1
         migrated.append(item)
     if changed:
         _atomic_write_json(LEADS_PATH, migrated)
-    print(f"Migration catégories : {categories_migrees} leads migrés")
-    print(f"Migration zones climatiques : {zones_migrees} champs migrés")
+    print(f"Migration leads.json : {normalized_count} entrées normalisées")
 
 
 _migrate_leads_schema()
