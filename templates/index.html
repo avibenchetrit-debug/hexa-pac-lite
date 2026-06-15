@@ -7900,6 +7900,21 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
         const dpeDateField = document.createElement('div');
         dpeDateField.className = 'dpe-info-line';
         dpeDateField.innerHTML = '<span class="dpe-info-label">Date DPE :</span><span class="dpe-info-value" id="dpe-date-display">—</span>';
+
+        // Inputs cachés pour le backend (valeurs N° DPE et Date DPE)
+        const dpeNumeroHidden = document.createElement('input');
+        dpeNumeroHidden.type = 'hidden';
+        dpeNumeroHidden.name = 'dpe_numero';
+        dpeNumeroHidden.id = 'dpe-numero';
+        dpeNumeroHidden.value = '';
+        dpeNumeroField.appendChild(dpeNumeroHidden);
+
+        const dpeDateHidden = document.createElement('input');
+        dpeDateHidden.type = 'hidden';
+        dpeDateHidden.name = 'dpe_date';
+        dpeDateHidden.id = 'dpe-date';
+        dpeDateHidden.value = '';
+        dpeDateField.appendChild(dpeDateHidden);
       const ecsField = document.createElement('div');
       ecsField.className = 'field';
       ecsField.innerHTML = '<label for="ecs">ECS</label>'
