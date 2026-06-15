@@ -2689,6 +2689,28 @@ body.panel-is-open {
         transform: none;
       }
     }
+    .fp-shell { display:grid; grid-template-columns:auto 1fr auto; gap:16px; align-items:start; transition:grid-template-columns .2s ease; }
+    .fp-side-left { width:0; overflow:hidden; transition:width .2s ease; }
+    .fp-side-left.is-open { width:380px; }
+    .fp-main { min-width:0; }
+    .fp-side-right { width:0; overflow:hidden; transition:width .2s ease; }
+    .fp-side-right.is-open { width:380px; }
+    .fp-side-panel { background:#fff; border:1px solid #E2E8F0; border-radius:10px; min-height:120px; }
+    .fp-main-top { display:flex; justify-content:space-between; align-items:center; gap:12px; margin:0 0 12px; }
+    .fp-cta { display:flex; gap:8px; }
+    .fp-cta-btn { width:36px; height:36px; border:0.5px solid #E2E8F0; border-radius:8px; background:#fff; cursor:pointer; font-weight:600; color:#002E5A; }
+    .fp-cta-btn.is-active { background:#002E5A; color:#fff; border-color:#002E5A; }
+    .fp-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.35); z-index:999; }
+    .fp-overlay.is-open { display:block; }
+    #fp-notes-list { margin-top: 12px; display:flex; flex-direction:column; gap:8px; max-height:45vh; overflow:auto; }
+    .fp-note-item { border:1px solid #E2E8F0; border-radius:8px; padding:8px 10px; font-size:12px; color:#1A2233; background:#FAFBFC; }
+    .fp-note-meta { display:block; margin-top:4px; font-size:10.5px; color:#64748B; }
+    @media (max-width: 900px) {
+      .fp-shell { display:block; }
+      .fp-side-left, .fp-side-right { position:fixed; top:0; bottom:0; z-index:1000; background:#fff; box-shadow:0 0 20px rgba(0,0,0,.2); }
+      .fp-side-left.is-open { left:0; width:90vw; }
+      .fp-side-right.is-open { right:0; width:90vw; }
+    }
 
     /* ===== HEADER ===== */
     .header {
@@ -2792,6 +2814,8 @@ body.panel-is-open {
     .row > .field { min-width: 0; }
     .row-2 { grid-template-columns: 1fr 1fr; gap: 16px; }
     .row-3 { grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+    .row.row-3 { display:grid; grid-template-columns: 1fr 1fr 1fr; gap:14px; }
+    .row.row-3 .field { min-width:0; margin-left:0; margin-right:0; }
     .row-civilite-nom { grid-template-columns: 130px 1fr 1fr; gap: 16px; }
     .row-4 { grid-template-columns: 1fr 1fr 1fr 1fr; }
     .row-2-1 { grid-template-columns: 2fr 1fr; }
@@ -10617,6 +10641,390 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
   recalculerCategories();
   updateReseau();
   if (rfrInput && rfrInput.value) rfrInput.value = formaterRFR(rfrInput.value);
+</script>
+<script>
+(function () {
+  'use strict';
+
+  function qa(sel, root) { return Array.from((root || document).querySelectorAll(sel)); }
+  function q(sel, root) { return (root || document).querySelector(sel); }
+  function escapeHtml(v) {
+    return String(v == null ? '' : v).replace(/[&<>"']/g, function (c) {
+      return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c];
+    });
+  }
+  function prospectNumero() {
+    return (document.body.dataset.prospectNumero || '').trim();
+  }
+  function closestFieldByName(name, root) {
+    const el = q('[name="' + name + '"]', root || document);
+    return el ? el.closest('.field') : null;
+  }
+  function dpeSourceLabel(raw) {
+    const v = String(raw || '').trim().toLowerCase();
+    if (!v) return '—';
+    if (v === 'dpe_officiel' || v === 'ademe') return 'DPE officiel';
+    if (v === 'audit_officiel' || v === 'ademe_audit') return 'Audit officiel';
+    if (v === 'urbs_enrichi' || v === 'onb_urbs') return 'URBS enrichi';
+    return raw;
+  }
+
+  function removeBreadcrumbs() {
+    qa('.breadcrumb, .docs-breadcrumb').forEach(function (el) { el.remove(); });
+  }
+
+  function removeEtatTravauxBlock() {
+    qa('.card').forEach(function (card) {
+      const title = (q('.card-title', card)?.textContent || '').toLowerCase();
+      if (/état travaux du logement|etat travaux du logement/.test(title) || q('[name="isolation_toiture"], [name="isolation_murs"]', card)) {
+        card.remove();
+      }
+    });
+  }
+
+  function reorganizeBlocCaracteristiques() {
+    const bloc = q('#bloc-caracteristiques-bien');
+    if (!bloc) return;
+
+    const dpeField = q('#dpe-input') ? q('#dpe-input').closest('.field') : null;
+    const typeField = closestFieldByName('type_logement', bloc);
+    const modeField = closestFieldByName('mode_chauffage', document);
+    const coutField = closestFieldByName('cout_energetique_mensuel_eur', bloc);
+    const surfaceField = closestFieldByName('surface_logement_m2', bloc);
+    const anneeField = closestFieldByName('annee_construction', bloc);
+    const hspField = closestFieldByName('hsp', document);
+    const phaseField = q('#phase-input') ? q('#phase-input').closest('.field') : null;
+    const puissanceField = closestFieldByName('puissance_compteur', document);
+    const altitudeField = closestFieldByName('altitude', document);
+    const panneauField = closestFieldByName('panneau_solaire', document);
+
+    const hiddenNumero = q('input[name="dpe_numero"]', bloc);
+    const hiddenDate = q('input[name="dpe_date"]', bloc);
+    const hiddenSource = q('input[name="dpe_source"]', bloc);
+
+    const stash = document.createElement('div');
+    stash.style.display = 'none';
+    bloc.appendChild(stash);
+    [dpeField, typeField, modeField, coutField, surfaceField, anneeField, hspField, phaseField, puissanceField, altitudeField, panneauField].forEach(function (field) {
+      if (field) stash.appendChild(field);
+    });
+
+    ['conso_kwh_m2', 'emissions_ges', 'nb_niveaux', 'hauteur_batiment'].forEach(function (name) {
+      const field = closestFieldByName(name, document);
+      if (field) field.remove();
+    });
+    q('#btn-infos-complementaires')?.remove();
+    q('#panel-infos-complementaires')?.remove();
+
+    qa('.fp-bloc4-row', bloc).forEach(function (row) { row.remove(); });
+    Array.from(bloc.children).forEach(function (child) {
+      const keep = child.classList?.contains('card-title')
+        || child.classList?.contains('dpe-source-block')
+        || child === stash
+        || child === hiddenNumero
+        || child === hiddenDate
+        || child === hiddenSource;
+      if (!keep) child.remove();
+    });
+
+    const rowA = document.createElement('div');
+    rowA.className = 'row row-3 fp-bloc4-row';
+    const rowB = document.createElement('div');
+    rowB.className = 'row row-3 fp-bloc4-row';
+    const rowC = document.createElement('div');
+    rowC.className = 'row row-3 fp-bloc4-row';
+    const rowD = document.createElement('div');
+    rowD.className = 'row row-3 fp-bloc4-row';
+    const rowE = document.createElement('div');
+    rowE.className = 'row row-3 fp-bloc4-row';
+
+    const dpeDateField = document.createElement('div');
+    dpeDateField.className = 'field';
+    dpeDateField.innerHTML = '<label>Date DPE</label><input type="text" id="fp-dpe-date-visible" value="" readonly>';
+    const dpeSourceField = document.createElement('div');
+    dpeSourceField.className = 'field';
+    dpeSourceField.innerHTML = '<label>Source DPE</label><input type="text" id="fp-dpe-source-visible" value="" readonly>';
+
+    if (coutField) {
+      const costInput = q('[name="cout_energetique_mensuel_eur"]', coutField);
+      if (costInput) costInput.required = true;
+      const label = q('label', coutField);
+      if (label && !q('.req', label)) {
+        const req = document.createElement('span');
+        req.className = 'req';
+        req.textContent = ' *';
+        label.appendChild(req);
+      }
+    }
+
+    if (dpeField) rowA.appendChild(dpeField);
+    rowA.appendChild(dpeDateField);
+    rowA.appendChild(dpeSourceField);
+
+    if (typeField) rowB.appendChild(typeField);
+    if (modeField) rowB.appendChild(modeField);
+    if (coutField) rowB.appendChild(coutField);
+
+    if (surfaceField) rowC.appendChild(surfaceField);
+    if (anneeField) rowC.appendChild(anneeField);
+    if (hspField) rowC.appendChild(hspField);
+
+    if (puissanceField) rowD.appendChild(puissanceField);
+    if (phaseField) rowD.appendChild(phaseField);
+    if (altitudeField) rowD.appendChild(altitudeField);
+
+    if (panneauField) rowE.appendChild(panneauField);
+
+    [rowA, rowB, rowC, rowD, rowE].forEach(function (row) { bloc.appendChild(row); });
+
+    function syncDpeMeta() {
+      const d = (q('#dpe-date')?.value || '').trim();
+      const s = (q('#dpe-source')?.value || '').trim();
+      q('#fp-dpe-date-visible').value = d || '—';
+      q('#fp-dpe-source-visible').value = dpeSourceLabel(s);
+    }
+    q('#dpe-date')?.addEventListener('input', syncDpeMeta);
+    q('#dpe-date')?.addEventListener('change', syncDpeMeta);
+    q('#dpe-source')?.addEventListener('input', syncDpeMeta);
+    q('#dpe-source')?.addEventListener('change', syncDpeMeta);
+    syncDpeMeta();
+    stash.remove();
+  }
+
+  function ensureFicheShell() {
+    const container = q('.container');
+    const form = q('#form-prospect');
+    if (!container || !form) return null;
+
+    q('.prospect-shell-sticky')?.remove();
+    removeBreadcrumbs();
+
+    let shell = q('#fp-shell');
+    let left = q('#fp-side-left');
+    let main = q('#fp-main');
+    let right = q('#fp-side-right');
+    let overlay = q('#fp-overlay');
+
+    if (!shell) {
+      shell = document.createElement('div');
+      shell.id = 'fp-shell';
+      shell.className = 'fp-shell';
+
+      left = document.createElement('aside');
+      left.id = 'fp-side-left';
+      left.className = 'fp-side-left';
+      left.innerHTML = '<div class="fp-side-panel"><div style="padding:20px"><h3>Simulateur</h3><p>(à construire au Lot suivant)</p></div></div>';
+
+      main = document.createElement('section');
+      main.id = 'fp-main';
+      main.className = 'fp-main';
+
+      right = document.createElement('aside');
+      right.id = 'fp-side-right';
+      right.className = 'fp-side-right';
+      right.innerHTML = '<div class="fp-side-panel" id="fp-side-right-content"></div>';
+
+      form.parentNode.insertBefore(shell, form);
+      shell.appendChild(left);
+      shell.appendChild(main);
+      shell.appendChild(right);
+    }
+
+    let mainTop = q('#fp-main-top');
+    if (!mainTop) {
+      mainTop = document.createElement('div');
+      mainTop.id = 'fp-main-top';
+      mainTop.className = 'fp-main-top';
+      mainTop.innerHTML = '<a class="pv-btn pv-btn-ghost" href="#prospects" id="fp-back-list">← Retour à la liste</a>'
+        + '<div class="fp-cta">'
+        + '<button id="fp-btn-N" class="fp-cta-btn" title="Notes">N</button>'
+        + '<button id="fp-btn-D" class="fp-cta-btn" title="Documents">D</button>'
+        + '<button id="fp-btn-S" class="fp-cta-btn" title="Simulateur">S</button>'
+        + '<button id="fp-btn-edit" class="fp-cta-btn" title="Modifier">✏️</button>'
+        + '</div>';
+      main.appendChild(mainTop);
+    }
+
+    if (form.parentElement !== main) main.appendChild(form);
+    const actions = q('.form-actions-anchor');
+    if (actions && actions.parentElement !== main) main.appendChild(actions);
+
+    if (!overlay) {
+      overlay = document.createElement('div');
+      overlay.id = 'fp-overlay';
+      overlay.className = 'fp-overlay';
+      container.appendChild(overlay);
+    }
+    return { left: left, right: right, overlay: overlay };
+  }
+
+  function setupPanels(layout) {
+    const rightContent = q('#fp-side-right-content');
+    const btnS = q('#fp-btn-S');
+    const btnN = q('#fp-btn-N');
+    const btnD = q('#fp-btn-D');
+    const state = { left: false, right: '' };
+
+    function updateOverlay() {
+      const mobile = window.matchMedia('(max-width: 900px)').matches;
+      layout.overlay.classList.toggle('is-open', mobile && (state.left || !!state.right));
+    }
+    function renderNotes() {
+      const numero = prospectNumero();
+      rightContent.innerHTML = '<div style="padding:20px"><h3>Notes</h3>'
+        + (numero ? '<textarea id="fp-note-text" style="width:100%;min-height:90px;margin-bottom:10px"></textarea><button id="fp-note-add" class="pv-btn pv-btn-ghost">Ajouter</button><div id="fp-notes-list"></div>'
+          : '<p>Créez d\'abord le prospect pour ajouter des notes.</p>')
+        + '</div>';
+      if (!numero) return;
+      const load = async function () {
+        const list = q('#fp-notes-list');
+        if (!list) return;
+        try {
+          const r = await fetch('/prospect/' + encodeURIComponent(numero) + '/commentaires-json');
+          const j = r.ok ? await r.json() : { commentaires: [] };
+          const notes = Array.isArray(j.commentaires) ? j.commentaires : [];
+          list.innerHTML = notes.length
+            ? notes.map(function (n) {
+              const t = n.texte || n.texte_html || '';
+              const d = n.date || n.horodatage || '';
+              const a = n.auteur || 'Utilisateur';
+              return '<div class="fp-note-item">' + escapeHtml(t) + '<span class="fp-note-meta">' + escapeHtml(a + (d ? ' — ' + d : '')) + '</span></div>';
+            }).join('')
+            : '<p class="pv-muted">Aucune note.</p>';
+        } catch (_) {
+          list.innerHTML = '<p class="pv-muted">Impossible de charger les notes.</p>';
+        }
+      };
+      q('#fp-note-add')?.addEventListener('click', async function () {
+        const area = q('#fp-note-text');
+        const text = (area?.value || '').trim();
+        if (!text) return;
+        const fd = new FormData();
+        fd.append('texte', text);
+        try {
+          await fetch('/prospect/' + encodeURIComponent(numero) + '/commentaire-ajax', { method: 'POST', body: fd });
+          area.value = '';
+          await load();
+        } catch (_) {}
+      });
+      load();
+    }
+    function renderDocs() {
+      rightContent.innerHTML = '<div style="padding:20px"><h3>Documents</h3><p>(à brancher plus tard)</p></div>';
+    }
+    function sync() {
+      layout.left.classList.toggle('is-open', state.left);
+      layout.right.classList.toggle('is-open', !!state.right);
+      btnS.classList.toggle('is-active', state.left);
+      btnN.classList.toggle('is-active', state.right === 'notes');
+      btnD.classList.toggle('is-active', state.right === 'docs');
+      updateOverlay();
+    }
+
+    btnS?.addEventListener('click', function () {
+      state.left = !state.left;
+      sync();
+    });
+    btnN?.addEventListener('click', function () {
+      if (state.right === 'notes') state.right = '';
+      else { state.right = 'notes'; renderNotes(); }
+      sync();
+    });
+    btnD?.addEventListener('click', function () {
+      if (state.right === 'docs') state.right = '';
+      else { state.right = 'docs'; renderDocs(); }
+      sync();
+    });
+    layout.overlay.addEventListener('click', function () {
+      state.left = false;
+      state.right = '';
+      sync();
+    });
+    window.addEventListener('resize', updateOverlay);
+    sync();
+  }
+
+  function setupReadOnlyMode() {
+    const form = q('#form-prospect');
+    const editBtn = q('#fp-btn-edit');
+    const saveBtn = q('#btn-save');
+    const numero = prospectNumero();
+    const isExisting = /^PR-\d+/i.test(numero);
+    if (!form || !saveBtn || !editBtn) return;
+
+    let editable = !isExisting;
+    function setEditable(next) {
+      editable = !!next;
+      qa('input, select, textarea, button', form).forEach(function (el) {
+        if (el.type === 'hidden') return;
+        el.disabled = !editable;
+      });
+      saveBtn.style.display = editable ? 'inline-flex' : 'none';
+      editBtn.textContent = editable ? '✓' : '✏️';
+      editBtn.classList.toggle('is-active', editable);
+    }
+
+    async function saveExisting() {
+      if (!numero) return false;
+      const fd = new FormData(form);
+      const tryUrls = [
+        '/api/leads/' + encodeURIComponent(numero),
+        '/prospect/' + encodeURIComponent(numero) + '/ajax',
+      ];
+      for (const url of tryUrls) {
+        try {
+          const r = await fetch(url, { method: 'POST', body: fd, headers: { 'X-Requested-With': 'fetch' }, credentials: 'same-origin' });
+          if (r.ok) return true;
+        } catch (_) {}
+      }
+      return false;
+    }
+
+    if (!isExisting) {
+      editBtn.style.display = 'none';
+      setEditable(true);
+      return;
+    }
+
+    setEditable(false);
+    editBtn.addEventListener('click', async function () {
+      if (!editable) {
+        setEditable(true);
+        return;
+      }
+      const ok = await saveExisting();
+      if (ok) setEditable(false);
+    });
+    saveBtn.addEventListener('click', async function (e) {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      if (!editable) return;
+      const ok = await saveExisting();
+      if (ok) setEditable(false);
+    }, true);
+  }
+
+  function setupBackButton() {
+    q('#fp-back-list')?.addEventListener('click', function (e) {
+      e.preventDefault();
+      document.body.classList.add('hexa-view-prospects');
+      window.scrollTo(0, 0);
+    });
+  }
+
+  function initLot5Fiche() {
+    const layout = ensureFicheShell();
+    if (!layout) return;
+    removeEtatTravauxBlock();
+    reorganizeBlocCaracteristiques();
+    setupPanels(layout);
+    setupReadOnlyMode();
+    setupBackButton();
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initLot5Fiche);
+  else initLot5Fiche();
+})();
 </script>
   <!-- Google Places Autocomplete -->
   <script>
