@@ -6443,10 +6443,11 @@ body.sim-left-open .hexa-app-shell__main{
 .sim-btn-note-dim{ border:1px solid var(--c-line,#E2E8F0); border-radius:8px; height:34px; background:#fff; color:var(--c-navy,#002E5A); font-size:12px; font-weight:600; cursor:pointer; }
 .sim-btn-note-dim:hover{ border-color:var(--c-navy,#002E5A); background:#F4F8FC; }
 
-.sim-pnl-edit-wrap{ display:inline-flex; align-items:center; gap:8px; flex-wrap:wrap; justify-content:flex-end; }
-.sim-model-select{ min-width:220px; max-width:280px; height:32px; border:1px solid var(--c-line,#E2E8F0); border-radius:6px; padding:0 8px; font-size:11px; color:var(--c-ink,#1A2233); background:#fff; font-family:inherit; }
+.sim-pnl-edit-wrap{ display:inline-flex; align-items:center; gap:8px; flex-wrap:wrap; justify-content:flex-end; min-width:0; max-width:100%; }
+.sim-pnl-edit-wrap > *{ min-width:0; }
+.sim-model-select{ flex:1 1 220px; width:100%; max-width:100%; min-width:0; box-sizing:border-box; height:32px; border:1px solid var(--c-line,#E2E8F0); border-radius:6px; padding:0 8px; font-size:11px; color:var(--c-ink,#1A2233); background:#fff; font-family:inherit; text-overflow:ellipsis; overflow:hidden; white-space:nowrap; }
 .sim-model-select:focus{ outline:none; border-color:var(--c-navy,#002E5A); box-shadow:0 0 0 3px rgba(0,46,90,.12); }
-.sim-warn-badge{ display:inline-flex; align-items:center; height:24px; padding:0 8px; border-radius:999px; font-size:11px; font-weight:700; background:#FEF3C7; color:#B45309; border:1px solid #F59E0B; }
+.sim-warn-badge{ display:inline-flex; align-items:center; height:24px; padding:0 8px; border-radius:999px; font-size:11px; font-weight:700; background:#FEF3C7; color:#B45309; border:1px solid #F59E0B; flex:0 0 auto; }
 
 .sim-dim-modal{ position:fixed; inset:0; z-index:3400; background:rgba(8,20,40,.55); display:flex; align-items:center; justify-content:center; padding:16px; }
 .sim-dim-box{ width:min(760px,96vw); max-height:85vh; overflow:auto; background:#fff; border-radius:12px; border:1px solid var(--c-line,#E2E8F0); box-shadow:0 20px 60px rgba(0,0,0,.35); }
@@ -6459,6 +6460,11 @@ body.sim-left-open .hexa-app-shell__main{
 .sim-dim-table th{ width:38%; color:var(--c-navy,#002E5A); background:#F9FBFD; font-weight:600; }
 .sim-dim-table td{ color:var(--c-ink,#1A2233); }
 .sim-dim-warn{ margin:12px 14px 14px; padding:9px 11px; border:1px solid #F59E0B; border-radius:8px; background:#FEF3C7; color:#8A4B00; font-size:12px; }
+
+.dpe-info-line { display:flex; align-items:center; gap:8px; padding:8px 0; font-size:13px; border-bottom:0.5px solid #F0F5FA; }
+.dpe-info-line:last-child { border-bottom:none; }
+.dpe-info-label { color:#4A5568; font-weight:500; min-width:90px; }
+.dpe-info-value { color:#002E5A; font-weight:600; }
 
 .sim-note{ font-size:11.5px; line-height:1.5; color:var(--c-muted,#4A5568); margin:9px 0 2px; }
 .sim-note--warn{ background:var(--c-warn-bg,#FEF3C7); border:1px solid var(--c-warn,#B45309); border-radius:7px; padding:8px 11px; color:#5A4410; }
@@ -7132,7 +7138,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     border-radius: 6px; font-weight: 700; font-size: 12px; text-decoration: none;
     font-family: inherit; cursor: pointer;
   }
-  .hexa-lite-top .logo-hexa-link { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; }
+  .hexa-lite-top .logo-hexa-link { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; background:#002E5A; padding:6px 10px; border-radius:8px; }
   .hexa-lite-top .logo-hexa-icon { height: 30px; width: auto; }
   .hexa-lite-top .logo-hexa-wordmark { height: 26px; width: auto; max-width: 160px; }
   .hexa-lite-nav { margin-right: auto; padding-left: 18px; display:flex; gap:4px; }
@@ -7887,6 +7893,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       const typeField = fieldByName('type_logement', form);
       const surfaceField = fieldByName('surface_logement_m2', form);
       const anneeField = fieldByName('annee_construction', form);
+      let hspField = fieldByName('hsp', form);
       const modeField = fieldByName('mode_chauffage', form);
       const coutField = fieldByName('cout_energetique_mensuel_eur', form);
       const phaseField = q('#phase-input', form)?.closest('.field');
@@ -7897,25 +7904,38 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       const dpeDate = q('#dpe-date', form);
       const dpeSource = q('#dpe-source', form);
 
-      if (dpeNumero) {
-        dpeNumero.type = 'text';
-        dpeNumero.removeAttribute('hidden');
-        dpeNumero.readOnly = true;
-        dpeNumero.style.background = '#F4F8FC';
-        dpeNumero.style.color = '#4A5568';
-        dpeNumero.style.cursor = 'not-allowed';
+      function buildDpeDisplayField(hiddenInput, labelText, displayId){
+        if (!hiddenInput) return null;
+        hiddenInput.type = 'hidden';
+        const field = document.createElement('div');
+        field.className = 'field';
+        const line = document.createElement('span');
+        line.className = 'dpe-info-line';
+        line.innerHTML = `<span class="dpe-info-label">${labelText} :</span><span class="dpe-info-value" id="${displayId}">—</span>`;
+        field.appendChild(line);
+        field.appendChild(hiddenInput);
+        return field;
       }
-      if (dpeDate) {
-        dpeDate.type = 'date';
-        if (dpeDate.value && dpeDate.value.includes('T')) dpeDate.value = dpeDate.value.slice(0, 10);
-        dpeDate.removeAttribute('hidden');
-        dpeDate.readOnly = true;
-        dpeDate.style.background = '#F4F8FC';
-        dpeDate.style.color = '#4A5568';
-        dpeDate.style.cursor = 'not-allowed';
+      const dpeNumeroField = buildDpeDisplayField(dpeNumero, 'N° DPE', 'dpe-numero-display');
+      const dpeDateField = buildDpeDisplayField(dpeDate, 'Date DPE', 'dpe-date-display');
+      const hspInputRef = hspField ? q('[name="hsp"]', hspField) : null;
+      if (hspInputRef) {
+        hspInputRef.id = 'hsp';
+        hspInputRef.step = '0.1';
+        hspInputRef.min = '2.0';
+        hspInputRef.max = '5.0';
+        hspInputRef.placeholder = '2.5';
+        hspInputRef.setAttribute('inputmode', 'decimal');
+        const hspLabel = q('label', hspField);
+        if (hspLabel) {
+          const span = q('.label-row > span:first-child', hspLabel) || hspLabel;
+          if (span.firstChild) span.firstChild.textContent = 'HSP (m)';
+        }
+      } else if (!hspField) {
+        hspField = document.createElement('div');
+        hspField.className = 'field';
+        hspField.innerHTML = '<label for="hsp">HSP (m)</label><input type="number" id="hsp" name="hsp" step="0.1" min="2.0" max="5.0" placeholder="2.5" inputmode="decimal">';
       }
-      const dpeNumeroField = wrapInputAsField(dpeNumero, 'N° DPE');
-      const dpeDateField = wrapInputAsField(dpeDate, 'Date DPE');
       const ecsField = document.createElement('div');
       ecsField.className = 'field';
       ecsField.innerHTML = '<label for="ecs">ECS</label>'
@@ -7942,7 +7962,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
         }
       }
 
-      ['conso_kwh_m2', 'emissions_ges', 'nb_niveaux', 'hauteur_batiment', 'hsp'].forEach(name => removeField(name, form));
+      ['conso_kwh_m2', 'emissions_ges', 'nb_niveaux', 'hauteur_batiment'].forEach(name => removeField(name, form));
       q('#btn-infos-complementaires', form)?.remove();
       q('#panel-infos-complementaires', form)?.remove();
       q('.dpe-source-block', blockCarac)?.remove();
@@ -7963,16 +7983,16 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       sb2.textContent = 'Logement';
       const rowA = document.createElement('div');
       rowA.className = 'row row-3';
-      [typeField, surfaceField, anneeField].forEach(f => { if (f) rowA.appendChild(f); });
+      [typeField, surfaceField, hspField].forEach(f => { if (f) rowA.appendChild(f); });
       const rowB = document.createElement('div');
       rowB.className = 'row row-3';
-      [modeField, ecsField, coutField].forEach(f => { if (f) rowB.appendChild(f); });
+      [anneeField, modeField, ecsField].forEach(f => { if (f) rowB.appendChild(f); });
       const rowC = document.createElement('div');
       rowC.className = 'row row-3';
-      [phaseField, puissanceField, altitudeField].forEach(f => { if (f) rowC.appendChild(f); });
+      [coutField, phaseField, puissanceField].forEach(f => { if (f) rowC.appendChild(f); });
       const rowD = document.createElement('div');
       rowD.className = 'row row-3';
-      [panneauField].forEach(f => { if (f) rowD.appendChild(f); });
+      [altitudeField, panneauField].forEach(f => { if (f) rowD.appendChild(f); });
 
       blockCarac.appendChild(sb1);
       blockCarac.appendChild(rowS);
@@ -7982,6 +8002,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       blockCarac.appendChild(rowB);
       blockCarac.appendChild(rowC);
       blockCarac.appendChild(rowD);
+      if (typeof window.syncDpeMetaDisplay === 'function') window.syncDpeMetaDisplay();
     }
 
     // BLOC 5: Informations fiscales
@@ -8025,6 +8046,17 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
 (function () {
   'use strict';
 
+  function syncDpeMetaDisplay() {
+    const num = (document.getElementById('dpe-numero')?.value || '').trim();
+    const dateRaw = (document.getElementById('dpe-date')?.value || '').trim();
+    const date = dateRaw.includes('T') ? dateRaw.slice(0, 10) : dateRaw;
+    const numDisplay = document.getElementById('dpe-numero-display');
+    const dateDisplay = document.getElementById('dpe-date-display');
+    if (numDisplay) numDisplay.textContent = num || '—';
+    if (dateDisplay) dateDisplay.textContent = date || '—';
+  }
+  window.syncDpeMetaDisplay = syncDpeMetaDisplay;
+
   function setChamp(name, valeur) {
     if (valeur === '' || valeur === null || valeur === undefined) return;
     const el = document.querySelector(`[name="${name}"]`);
@@ -8038,6 +8070,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     }
     el.dispatchEvent(new Event('input', { bubbles: true }));
     el.dispatchEvent(new Event('change', { bubbles: true }));
+    if (name === 'dpe_numero' || name === 'dpe_date') syncDpeMetaDisplay();
   }
 
   function mapEnergieChauffage(energie) {
@@ -9694,6 +9727,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       }
       if (u.dpe_numero) {
         document.getElementById('dpe-numero').value = u.dpe_numero;
+        if (typeof window.syncDpeMetaDisplay === 'function') window.syncDpeMetaDisplay();
         const lien = document.getElementById('dpe-lien-officiel');
         if (lien) {
           lien.style.display = 'block';
@@ -9709,7 +9743,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
         }
       }
       if (typeof window.majBoutonVisualiserDpe === 'function') window.majBoutonVisualiserDpe();
-      if (u.dpe_date) document.getElementById('dpe-date').value = u.dpe_date;
+      if (u.dpe_date) { document.getElementById('dpe-date').value = u.dpe_date; if (typeof window.syncDpeMetaDisplay === 'function') window.syncDpeMetaDisplay(); }
     }
     if (u.conso_kwh != null) {
       const el = document.getElementById('conso-kwh-input');
@@ -10012,11 +10046,11 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     }
     if (data.numero_dpe || data.numero_rapport_audit) {
       const dn = document.getElementById('dpe-numero');
-      if (dn) dn.value = data.numero_rapport_audit || data.numero_dpe;
+      if (dn) { dn.value = data.numero_rapport_audit || data.numero_dpe; if (typeof window.syncDpeMetaDisplay === 'function') window.syncDpeMetaDisplay(); }
     }
     if (dt) {
       const dd = document.getElementById('dpe-date');
-      if (dd) dd.value = dt;
+      if (dd) { dd.value = dt; if (typeof window.syncDpeMetaDisplay === 'function') window.syncDpeMetaDisplay(); }
     }
     if (typeof window.majBadgesSource === 'function') {
       window.majBadgesSource(sourceKey, num, dt);
@@ -11211,8 +11245,8 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     }
 
     // Hidden metadata
-    if (dpe.numero_dpe) document.getElementById('dpe-numero').value = dpe.numero_dpe;
-    if (dpe.date_etablissement_dpe) document.getElementById('dpe-date').value = dpe.date_etablissement_dpe;
+    if (dpe.numero_dpe) { document.getElementById('dpe-numero').value = dpe.numero_dpe; if (typeof window.syncDpeMetaDisplay === 'function') window.syncDpeMetaDisplay(); }
+    if (dpe.date_etablissement_dpe) { document.getElementById('dpe-date').value = dpe.date_etablissement_dpe; if (typeof window.syncDpeMetaDisplay === 'function') window.syncDpeMetaDisplay(); }
     document.getElementById('dpe-source').value = source;
 
     majBadgeDPE(source, dpe.numero_dpe);
@@ -11311,6 +11345,16 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
   if (dpeNumInit && dpeNumInit.value) {
     majBadgeDPE('ademe', dpeNumInit.value);
   }
+  const dpeDateInit = document.getElementById('dpe-date');
+  if (dpeNumInit) {
+    dpeNumInit.addEventListener('input', () => window.syncDpeMetaDisplay?.());
+    dpeNumInit.addEventListener('change', () => window.syncDpeMetaDisplay?.());
+  }
+  if (dpeDateInit) {
+    dpeDateInit.addEventListener('input', () => window.syncDpeMetaDisplay?.());
+    dpeDateInit.addEventListener('change', () => window.syncDpeMetaDisplay?.());
+  }
+  window.syncDpeMetaDisplay?.();
 
 </script>
   <script>
@@ -12775,23 +12819,33 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
   }
 
   function normalizeModelePac(modele, idx){
-    const ref = String(modele?.ref || modele?.id || `PAC-${idx+1}`);
-    const nom = String(modele?.nom || modele?.modele || ref);
-    const marque = String(modele?.marque || '').trim();
-    const puiss = Number(modele?.puissance_kw ?? modele?.puiss35 ?? modele?.puiss_chauf ?? 0);
-    const prix = Number(modele?.prix_ttc ?? modele?.ttc ?? 0);
-    const etasRaw = String(modele?.etas || '').trim();
+    const raw = Object.assign({}, modele || {});
+    const ref = String(raw.ref || raw.id || `PAC-${idx+1}`);
+    const nom = String(raw.nom || raw.modele || ref);
+    const marque = String(raw.marque || '').trim();
+    const puiss = Number(raw.puissance_kw ?? raw.puiss35 ?? raw.puiss_chauf ?? 0);
+    const prix = Number(raw.prix_ttc ?? raw.ttc ?? 0);
+
+    if (!raw.etas) {
+      const e35 = Number(raw.etas35 || raw.eta || 0);
+      if (e35 >= 140) raw.etas = 'etas_140_plus';
+      else if (e35 >= 111) raw.etas = 'etas_111_139';
+      else raw.etas = null;
+    }
+
+    const etasRaw = String(raw.etas || '').trim();
     const etas = etasRaw === 'etas_111_139' || etasRaw === 'etas_140_plus' ? etasRaw : null;
     return {
       id: ref,
       ref,
       marque,
       nom,
+      usage: String(raw.usage || ''),
       label: `${marque ? marque + ' ' : ''}${nom}`.trim(),
       puissance_kw: Number.isFinite(puiss) ? puiss : 0,
       prix_ttc: Number.isFinite(prix) ? prix : 0,
       etas,
-      raw: modele
+      raw
     };
   }
 
@@ -12810,6 +12864,30 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     return labels[type]?.[key] || key;
   }
 
+  function puissanceModele(modele){
+    return Number(modele?.puiss_chauf ?? modele?.puiss35 ?? modele?.puissance_kw ?? 0) || 0;
+  }
+
+  function isModeleDuo(modele){
+    const nom = String(modele?.nom || modele?.label || modele?.ref || '').toUpperCase();
+    const usage = String(modele?.usage || modele?.raw?.usage || '').toUpperCase();
+    return nom.includes('DUO') || usage.includes('ECS');
+  }
+
+  function catalogueOptionsOrdonnees(service){
+    const isEcs = service === 'chauffage_ecs' || service === 'chauffage+ecs';
+    const preferred = [];
+    const others = [];
+    CATALOGUE_PAC.forEach((m) => {
+      const duo = isModeleDuo(m);
+      if ((isEcs && duo) || (!isEcs && !duo)) preferred.push(m);
+      else others.push(m);
+    });
+    preferred.sort((a,b)=>puissanceModele(a)-puissanceModele(b));
+    others.sort((a,b)=>puissanceModele(a)-puissanceModele(b));
+    return preferred.concat(others);
+  }
+
   async function chargerBaremes() {
     try {
       const [rBaremes, rCatalogue] = await Promise.all([
@@ -12824,7 +12902,8 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
         catalogue = await rCatalogue.json();
       }
       const fromStorage = chargerCatalogueDepuisStorage();
-      CATALOGUE_PAC = nettoyerCatalogue(fromStorage.length ? fromStorage : catalogue);
+      const serverCatalogue = nettoyerCatalogue(catalogue);
+      CATALOGUE_PAC = serverCatalogue.length ? serverCatalogue : nettoyerCatalogue(fromStorage);
       window.__hexaCataloguePacCache = CATALOGUE_PAC.map(m => m.raw || m);
     } catch(e) {
       console.error('Barèmes/catalogue non chargés:', e);
@@ -12859,6 +12938,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     puissance_requise_kw: null,
     modele_pac: '',
     modele_pac_id: '',
+    modele_force: false,
     sous_dimensionnement: false
   };
 
@@ -12891,39 +12971,53 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     const G_total = G_toit + G_mur + G_menui;
 
     const surface_chauffee = Number(state.surface_chauffee || (state.surface_habitable ? state.surface_habitable * 0.9 : 0));
+    const parsedHsp = Number(state.hsp);
+    const hsp = Number.isFinite(parsedHsp) && parsedHsp > 0 ? parsedHsp : 2.5;
+    const hspFallback = !(Number.isFinite(parsedHsp) && parsedHsp > 0);
+    const volume_chauffe = surface_chauffee * hsp;
+
     const delta_T = DELTA_T[state.zone] || 25;
-    const puissance_kw = G_total * surface_chauffee * delta_T * COEF_SECURITE / 1000;
+    const puissance_kw_raw = G_total * volume_chauffe * delta_T * COEF_SECURITE / 1000;
+    const puissance_kw = Math.round((Number.isFinite(puissance_kw_raw) ? puissance_kw_raw : 0) * 10) / 10;
 
     return {
-      puissance_kw: Math.round((Number.isFinite(puissance_kw) ? puissance_kw : 0) * 10) / 10,
+      puissance_kw,
       G_toit,
       G_mur,
       G_menui,
       G_total,
       delta_T,
       surface_chauffee,
+      hsp,
+      hsp_fallback: hspFallback,
+      volume_chauffe,
       iso_toit,
       iso_mur,
       iso_menuiserie: iso_menui,
     };
   }
 
-  function selectionnerPAC(puissance_requise, catalogue) {
-    const filtered = (Array.isArray(catalogue) ? catalogue : []).filter((m) => {
-      if (!m || !Number.isFinite(m.puissance_kw) || !Number.isFinite(m.prix_ttc)) return false;
+  function selectionnerPAC(puissance_requise, catalogue, service) {
+    const base = (Array.isArray(catalogue) ? catalogue : []).filter((m) => {
+      if (!m) return false;
+      const p = puissanceModele(m);
+      const prix = Number(m?.prix_ttc ?? m?.ttc ?? 0);
+      if (!Number.isFinite(p) || p <= 0 || !Number.isFinite(prix) || prix <= 0) return false;
       if (m.etas && state.etas && m.etas !== state.etas) return false;
       return true;
     });
-    const sorted = [...filtered].sort((a, b) => a.puissance_kw - b.puissance_kw);
-    if (!sorted.length) {
-      return { modele: null, sous_dimensionnement: false };
-    }
+    if (!base.length) return { modele: null, sous_dimensionnement: false };
 
-    const modele = sorted.find(m => m.puissance_kw >= puissance_requise);
-    if (modele) {
-      return { modele, sous_dimensionnement: false };
-    }
+    const isEcs = service === 'chauffage_ecs' || service === 'chauffage+ecs';
+    const filtres = base.filter((m) => {
+      const duo = isModeleDuo(m);
+      return isEcs ? duo : !duo;
+    });
 
+    const pool = filtres.length ? filtres : base;
+    const sorted = [...pool].sort((a, b) => puissanceModele(a) - puissanceModele(b));
+    const modele = sorted.find((m) => puissanceModele(m) >= puissance_requise);
+    if (modele) return { modele, sous_dimensionnement: false };
     return { modele: sorted[sorted.length - 1], sous_dimensionnement: true };
   }
 
@@ -12948,8 +13042,20 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     state.iso_mur = dim.iso_mur;
     state.iso_menuiserie = dim.iso_menuiserie;
     state.puissance_requise_kw = dim.puissance_kw;
-    const selection = selectionnerPAC(dim.puissance_kw, CATALOGUE_PAC);
-    appliquerSelectionPac(selection);
+
+    const forcedModele = state.modele_force ? getModeleActuel() : null;
+    let selection;
+    if (forcedModele) {
+      state.modele_pac = forcedModele.label || forcedModele.nom || forcedModele.ref;
+      state.modele_pac_id = forcedModele.id;
+      state.prix_pac = Math.round(forcedModele.prix_ttc || 0);
+      state.sous_dimensionnement = false;
+      selection = { modele: forcedModele, sous_dimensionnement: false, forced: true };
+    } else {
+      selection = selectionnerPAC(dim.puissance_kw, CATALOGUE_PAC, state.service);
+      appliquerSelectionPac(selection);
+    }
+
     return { ...dim, selection };
   }
 
@@ -12979,6 +13085,12 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     // Surface habitable -> chauffée 90%
     const sh = num(document.getElementById('surface-input')?.value || document.querySelector('[name="surface_logement_m2"]')?.value);
     if (sh!=null){ state.surface_habitable=sh; if(!state.surface_forcee) state.surface_chauffee=Math.round(sh*0.90); }
+    const hspRaw = document.getElementById('hsp')?.value
+      || document.getElementById('hsp-input')?.value
+      || document.querySelector('[name="hsp"]')?.value;
+    const hspVal = parseFloat(String(hspRaw == null ? '' : hspRaw).replace(',', '.'));
+    state.hsp = Number.isFinite(hspVal) && hspVal > 0 ? hspVal : 2.5;
+    state.hsp_fallback = !(Number.isFinite(hspVal) && hspVal > 0);
     // Facture avant
     const cout = num(document.getElementById('cout-annuel-input')?.value || document.querySelector('[name="cout_energetique_annuel_eur"]')?.value);
     if (cout!=null && cout>0) state.facture_avant=Math.round(cout/12);
@@ -13154,7 +13266,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
             <span class="sim-pnl-edit-wrap">
               <span class="sim-pnl-edit"><input type="text" inputmode="numeric" id="sim-prix" value="${new Intl.NumberFormat('fr-FR').format(state.prix_pac||0)}"><em>€</em></span>
               <select id="sim-modele-select" class="sim-model-select">
-                ${CATALOGUE_PAC.map(m => `<option value="${m.id}" ${m.id===state.modele_pac_id?'selected':''}>${m.label} · ${m.puissance_kw} kW · ${eur(m.prix_ttc)}</option>`).join('')}
+                ${catalogueOptionsOrdonnees(state.service).map(m => `<option value="${m.id}" ${m.id===state.modele_pac_id?'selected':''}>${m.label} · ${puissanceModele(m)} kW · ${eur(m.prix_ttc)}</option>`).join('')}
               </select>
               ${state.sous_dimensionnement ? '<span class="sim-warn-badge">⚠ Vérifier</span>' : ''}
             </span>
@@ -13267,11 +13379,11 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
   function bind(){
     const onIn=(id,fn)=>{ const el=document.getElementById(id); if(!el)return;
       const ev=el.tagName==='SELECT'?'change':'input'; el.addEventListener(ev,e=>{fn(e.target.value); refresh();}); };
-    onIn('sim-etas',v=>state.etas=v);
-    onIn('sim-service',v=>state.service=v);
-    onIn('iso-toit',v=>state.iso_toit=v);
-    onIn('iso-mur',v=>state.iso_mur=v);
-    onIn('iso-menuiserie',v=>state.iso_menuiserie=v);
+    onIn('sim-etas',v=>{ state.etas=v; state.modele_force=false; });
+    onIn('sim-service',v=>{ state.service=v; state.modele_force=false; });
+    onIn('iso-toit',v=>{ state.iso_toit=v; state.modele_force=false; });
+    onIn('iso-mur',v=>{ state.iso_mur=v; state.modele_force=false; });
+    onIn('iso-menuiserie',v=>{ state.iso_menuiserie=v; state.modele_force=false; });
     // Prix PAC : pendant la frappe on garde la valeur brute et on PATCHE seulement les
     // résultats (l'input n'est pas recréé -> curseur intact). Au blur on reformate.
     const prix=document.getElementById('sim-prix');
@@ -13294,6 +13406,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
         state.modele_pac_id = selected.id;
         state.modele_pac = selected.label;
         state.prix_pac = Math.round(selected.prix_ttc || 0);
+        state.modele_force = true;
         state.sous_dimensionnement = false;
         refresh();
       });
@@ -13305,6 +13418,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       const raw=e.target.value;
       if (raw==='') { state.surface_forcee=false; state.surface_chauffee = state.surface_habitable!=null?Math.round(state.surface_habitable*0.9):null; }
       else { const v=parseFloat(raw); if(!isNaN(v)){ state.surface_chauffee=v; state.surface_forcee=true; } }
+      state.modele_force = false;
       patch();
     });
     // options de financement : refresh complet (pas d'input -> ok), scroll préservé
@@ -13452,6 +13566,8 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     const rows = [
       ['Surface habitable', `${state.surface_habitable ?? '—'} m²`],
       ['Surface chauffée', `${dim.surface_chauffee ?? '—'} m²`],
+      ['HSP utilisé', `${dim.hsp} m${dim.hsp_fallback ? ' (valeur par défaut 2.5 m)' : ''}`],
+      ['Volume chauffé', `${Math.round((dim.volume_chauffe || 0) * 10) / 10} m³`],
       ['Zone climatique', `${state.zone} (ΔT ${dim.delta_T}°C)`],
       ['Toit / Comble', `${getIsoLabel('toit', dim.iso_toit)} (G=${dim.G_toit})`],
       ['Mur', `${getIsoLabel('mur', dim.iso_mur)} (G=${dim.G_mur})`],
@@ -13460,7 +13576,8 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       ['Coefficient sécurité', `×${COEF_SECURITE}`],
       ['Puissance requise', `${dim.puissance_kw} kW`],
       ['Modèle sélectionné', modele ? `${modele.label} · ${modele.puissance_kw} kW` : '—'],
-      ['Prix TTC', modele ? eur(modele.prix_ttc) : eur(state.prix_pac || 0)]
+      ['Prix TTC', modele ? eur(modele.prix_ttc) : eur(state.prix_pac || 0)],
+      ['Service', state.service === 'chauffage_ecs' ? 'Chauffage + ECS' : 'Chauffage seul']
     ];
     const htmlRows = rows.map(([k,v]) => `<tr><th>${k}</th><td>${v}</td></tr>`).join('');
     const old = document.getElementById('sim-dim-modal');
@@ -13556,6 +13673,12 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     if (!m.nom && m.modele) m.nom = m.modele;
     if (m.puissance_kw != null && (m.puiss35 == null || m.puiss35 === '')) m.puiss35 = m.puissance_kw;
     if (m.prix_ttc != null && (m.ttc == null || m.ttc === '')) m.ttc = m.prix_ttc;
+    if (!m.etas) {
+      const e35 = Number(m.etas35 || m.eta || 0);
+      if (e35 >= 140) m.etas = 'etas_140_plus';
+      else if (e35 >= 111) m.etas = 'etas_111_139';
+      else m.etas = null;
+    }
     return m;
   }
 
@@ -13564,14 +13687,86 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     return cache.map(normalizeAdminModel);
   }
 
-  async function hydrateCatalogueDefaults(){
-    if (Array.isArray(window.__hexaCataloguePacCache) && window.__hexaCataloguePacCache.length) return;
+  function readLocalConfigModels(){
+    try {
+      const raw = localStorage.getItem(LS_KEY);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed?.models) ? parsed.models.map(normalizeAdminModel) : [];
+    } catch(_) {
+      return [];
+    }
+  }
+
+  function persistCatalogueLocal(models){
+    const normalized = (Array.isArray(models) ? models : []).map(normalizeAdminModel);
+    window.__hexaCataloguePacCache = normalized;
+    try {
+      const raw = localStorage.getItem(LS_KEY);
+      const cfg = raw ? JSON.parse(raw) : { params:{}, models:[] };
+      cfg.models = normalized;
+      localStorage.setItem(LS_KEY, JSON.stringify(cfg));
+    } catch(_) {
+      // filets localStorage silencieux
+    }
+  }
+
+  async function fetchCatalogueFromServer(){
     try {
       const r = await fetch('/api/catalogue-pac');
-      if (!r.ok) return;
+      if (!r.ok) {
+        return { ok:false, error:`HTTP ${r.status}` };
+      }
       const data = await r.json();
-      window.__hexaCataloguePacCache = Array.isArray(data) ? data : [];
-    } catch (_) {}
+      if (!Array.isArray(data)) return { ok:false, error:'Réponse serveur invalide' };
+      return { ok:true, data:data.map(normalizeAdminModel) };
+    } catch (e) {
+      return { ok:false, error:e?.message || 'Erreur réseau' };
+    }
+  }
+
+  async function saveCatalogueToServer(models){
+    try {
+      const r = await fetch('/api/catalogue-pac', {
+        method:'POST',
+        headers:{ 'Content-Type':'application/json' },
+        body: JSON.stringify(models || [])
+      });
+      const body = await r.json().catch(()=>({}));
+      if (!r.ok) {
+        return { ok:false, error: body?.detail || body?.msg || `HTTP ${r.status}` };
+      }
+      return { ok:true, body };
+    } catch (e) {
+      return { ok:false, error:e?.message || 'Erreur réseau' };
+    }
+  }
+
+  function adminToast(text, color){
+    const t=document.createElement('div');
+    t.className='pv-toast';
+    t.textContent=text;
+    t.style.setProperty('--toast-c', color || '#002E5A');
+    document.body.appendChild(t);
+    requestAnimationFrame(()=>t.classList.add('show'));
+    setTimeout(()=>{ t.classList.remove('show'); setTimeout(()=>t.remove(),220); }, 2000);
+  }
+
+  async function hydrateCatalogueDefaults(){
+    if (Array.isArray(window.__hexaCataloguePacCache) && window.__hexaCataloguePacCache.length) {
+      return { source:'cache', models:window.__hexaCataloguePacCache.map(normalizeAdminModel) };
+    }
+    const server = await fetchCatalogueFromServer();
+    if (server.ok) {
+      persistCatalogueLocal(server.data);
+      return { source:'server', models:server.data };
+    }
+    const local = readLocalConfigModels();
+    if (local.length) {
+      persistCatalogueLocal(local);
+      return { source:'local', models:local, error:server.error };
+    }
+    return { source:'default', models:getCatalogueDefaults(), error:server.error };
   }
   hydrateCatalogueDefaults();
 
@@ -13611,10 +13806,9 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     if (cfg.models) cfg.models.forEach(m=>{ if(m.achat!=null) m.achat=Math.round(m.achat); if(m.ttc!=null) m.ttc=Math.round(m.ttc); });
     return cfg;
   }
-  function saveConfig(){
+  function saveConfig(notify=true){
     try { localStorage.setItem(LS_KEY, JSON.stringify(window.HexaConfig)); } catch(_){}
-    // notifie le simulateur qu'il doit se rafraîchir
-    window.dispatchEvent(new CustomEvent('hexa-config-changed'));
+    if (notify) window.dispatchEvent(new CustomEvent('hexa-config-changed'));
   }
 
   const eur = n => new Intl.NumberFormat('fr-FR',{style:'currency',currency:'EUR',maximumFractionDigits:0}).format(Math.round(n||0));
@@ -13906,9 +14100,28 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     });
     document.getElementById('adm-close').addEventListener('click', close);
     document.getElementById('adm-overlay').addEventListener('click', e=>{ if(e.target.id==='adm-overlay') close(); });
-    document.getElementById('adm-save').addEventListener('click', ()=>{
-      saveConfig();
-      const b=document.getElementById('adm-save'); const t=b.textContent; b.textContent='✓ Enregistré'; setTimeout(()=>b.textContent=t,1500);
+    document.getElementById('adm-save').addEventListener('click', async ()=>{
+      const b=document.getElementById('adm-save');
+      const t=b.textContent;
+      b.disabled = true;
+      b.textContent='Sauvegarde...';
+
+      const payload = (window.HexaConfig?.models || []).map((m)=>Object.assign({}, m));
+      const server = await saveCatalogueToServer(payload);
+      if (server.ok) {
+        persistCatalogueLocal(payload);
+        saveConfig(false);
+        window.dispatchEvent(new CustomEvent('hexa-config-changed'));
+        adminToast('Catalogue sauvegardé sur le serveur ✓', '#0D6B3B');
+        b.textContent='✓ Enregistré';
+      } else {
+        // filet local même en cas d'échec serveur
+        saveConfig(false);
+        window.dispatchEvent(new CustomEvent('hexa-config-changed'));
+        adminToast(`Erreur sauvegarde serveur: ${server.error}`, '#B91C1C');
+        b.textContent='⚠ Enregistré localement';
+      }
+      setTimeout(()=>{ b.textContent=t; b.disabled=false; }, 1800);
     });
     const addBtn=document.getElementById('adm-add');
     if(addBtn) addBtn.addEventListener('click', openAddForm);
@@ -14174,8 +14387,13 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
 
   function open(){
     close();
-    hydrateCatalogueDefaults().finally(()=>{
-      loadConfig();
+    hydrateCatalogueDefaults().then((hydrated)=>{
+      let cfg = loadConfig();
+      if (hydrated && Array.isArray(hydrated.models) && hydrated.models.length) {
+        cfg.models = hydrated.models.map(normalizeAdminModel);
+        window.HexaConfig = cfg;
+        saveConfig(false);
+      }
       const wrap=document.createElement('div'); wrap.id='adm-root'; wrap.innerHTML=render();
       document.body.appendChild(wrap);
       bind();

@@ -5,7 +5,7 @@ import re
 import unicodedata
 from datetime import datetime
 
-from fastapi import FastAPI, File, Request, UploadFile
+from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -202,6 +202,61 @@ def get_catalogue_pac() -> JSONResponse:
     if not isinstance(catalogue, list):
         catalogue = DEFAULT_CATALOGUE_PAC
     return JSONResponse(catalogue)
+
+
+@app.post("/api/catalogue-pac")
+async def post_catalogue_pac(request: Request) -> JSONResponse:
+    try:
+        payload = await request.json()
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=400, detail=f"Payload JSON invalide: {exc}"
+        ) from exc
+
+    if not isinstance(payload, list):
+        raise HTTPException(status_code=400, detail="Le payload doit être un tableau JSON.")
+
+    validated = []
+    for idx, entry in enumerate(payload):
+        if not isinstance(entry, dict):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Entrée #{idx + 1}: un objet JSON est attendu.",
+            )
+
+        ref = str(entry.get("ref", "")).strip()
+        nom = str(entry.get("nom", "")).strip()
+        if not ref and not nom:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Entrée #{idx + 1}: 'ref' ou 'nom' est obligatoire.",
+            )
+
+        raw_ttc = entry.get("ttc", entry.get("prix_ttc"))
+        try:
+            ttc = float(str(raw_ttc).replace(" ", "").replace(",", "."))
+        except (TypeError, ValueError):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Entrée #{idx + 1}: 'ttc' doit être numérique.",
+            ) from None
+
+        if ttc < 0:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Entrée #{idx + 1}: 'ttc' doit être positif.",
+            )
+
+        item = dict(entry)
+        if ref:
+            item["ref"] = ref
+        if nom:
+            item["nom"] = nom
+        item["ttc"] = round(ttc, 2)
+        validated.append(item)
+
+    _atomic_write_json(CATALOGUE_PAC_PATH, validated)
+    return JSONResponse({"ok": True, "count": len(validated)})
 
 
 @app.get("/api/leads")
