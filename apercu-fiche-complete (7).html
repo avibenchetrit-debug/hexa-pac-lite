@@ -4932,17 +4932,29 @@ body.panel-is-open .prospect-shell-sticky {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 0.5px solid #B5D4F4;
+  border-width: 0.5px;
+  border-style: solid;
   border-radius: 8px;
-  background: #fff;
-  color: #002E5A;
-  font-weight: 600;
+  font-weight: 700;
   font-size: 13px;
   cursor: pointer;
   transition: all .12s;
 }
-.psb-cta-btn:hover { background: #E6F1FB; border-color: #002E5A; }
-.psb-cta-btn.is-active { background: #002E5A; color: #fff; border-color: #002E5A; }
+.psb-cta-btn[data-cta="N"] { background:#FEF3C7; color:#854F0B; border-color:#F0AF19; }
+.psb-cta-btn[data-cta="N"]:hover { background:#FDE68A; }
+.psb-cta-btn[data-cta="N"].is-active { background:#F0AF19; color:#fff; }
+
+.psb-cta-btn[data-cta="E"] { background:#E6F1FB; color:#0C447C; border-color:#B5D4F4; }
+.psb-cta-btn[data-cta="E"]:hover { background:#D8E8F8; }
+.psb-cta-btn[data-cta="E"].is-active { background:#0C447C; color:#fff; }
+
+.psb-cta-btn[data-cta="D"] { background:#E6F4ED; color:#0D6B3B; border-color:#A6E0BD; }
+.psb-cta-btn[data-cta="D"]:hover { background:#C8E6D2; }
+.psb-cta-btn[data-cta="D"].is-active { background:#0D6B3B; color:#fff; }
+
+.psb-cta-btn[data-cta="S"] { background:#FDE8EC; color:#C71B40; border-color:#F4B3BF; }
+.psb-cta-btn[data-cta="S"]:hover { background:#FAD0D8; }
+.psb-cta-btn[data-cta="S"].is-active { background:#C71B40; color:#fff; }
 .psb-cta-btn .header-letter { font-size: 13px; font-weight: 600; line-height: 1; }
 .prospect-sticky-bar .psb-actions,
 .prospect-sticky-actions { display:flex; gap:6px; align-items:center; }
@@ -7149,21 +7161,21 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       <span id="psb-badge-dpe" class="psb-badge" style="display:none"></span>
     </div>
     <div class="prospect-sticky-actions psb-actions">
-      <button type="button" class="header-icon-btn psb-cta-btn btn-notes fiche-action-btn" title="Notes internes"
+      <button type="button" class="header-icon-btn psb-cta-btn btn-notes fiche-action-btn" data-cta="N" title="Notes internes"
         onclick="(window.ouvrirNotesInternes||window.ouvrirCommentaires)('PR-000001')">
         <span class="header-letter">N</span>
         <span class="fiche-action-count" id="count-notes">0</span>
       </button>
-      <button type="button" class="header-icon-btn psb-cta-btn btn-echanges fiche-action-btn" title="Échanges"
+      <button type="button" class="header-icon-btn psb-cta-btn btn-echanges fiche-action-btn" data-cta="E" title="Échanges"
         onclick="(window.ouvrirEchanges||window.ouvrirEchangesLazy||function(){})('PR-000001')">
         <span class="header-letter">E</span>
         <span class="fiche-action-count" id="count-echanges">0</span>
       </button>
-      <button type="button" class="header-icon-btn psb-cta-btn" title="Documents"
+      <button type="button" class="header-icon-btn psb-cta-btn" data-cta="D" title="Documents"
         onclick="(window.ouvrirDocumentsLazy||window.ouvrirDocuments)('PR-000001')">
         <span class="header-letter">D</span>
       </button>
-      <button type="button" class="header-icon-btn psb-cta-btn" title="Simulateur"
+      <button type="button" class="header-icon-btn psb-cta-btn" data-cta="S" title="Simulateur"
         onclick="window.ouvrirSimulationsDrawer('PR-000001')">
         <span class="header-letter">S</span>
       </button>
