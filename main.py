@@ -116,6 +116,9 @@ def _normalize_lead_payload(payload: dict) -> dict:
         normalized["statut"] = _normalize_statut(normalized.get("statut"))
     if "categorie" in normalized:
         normalized["categorie"] = _normalize_categorie(normalized.get("categorie"))
+    for key in ("zone_climatique", "zone_climatique_chantier"):
+        if key in normalized:
+            normalized[key] = _normalize_zone_climatique(normalized.get(key))
     return normalized
 
 
@@ -240,6 +243,14 @@ CATEGORIE_ALIASES = {
     "supérieur": "superieur",
 }
 
+ZONE_CLIMATIQUE_ALIASES = {
+    "h1a": "H1",
+    "h1b": "H1",
+    "h1": "H1",
+    "h2": "H2",
+    "h3": "H3",
+}
+
 PROSPECT_FIELDS = [
     "numero",
     "nom",
@@ -310,10 +321,21 @@ def _normalize_categorie(value: str) -> str:
     return CATEGORIE_ALIASES.get(_norm(raw), raw)
 
 
+def _normalize_zone_climatique(value: str) -> str:
+    raw = str(value or "").strip()
+    if not raw:
+        return ""
+    return ZONE_CLIMATIQUE_ALIASES.get(_norm(raw), raw)
+
+
 def _lead_for_response(lead: dict) -> dict:
     normalized = dict(lead or {})
     normalized["statut"] = _normalize_statut(normalized.get("statut", ""))
     normalized["categorie"] = _normalize_categorie(normalized.get("categorie", ""))
+    if "zone_climatique" in normalized:
+        normalized["zone_climatique"] = _normalize_zone_climatique(normalized.get("zone_climatique", ""))
+    if "zone_climatique_chantier" in normalized:
+        normalized["zone_climatique_chantier"] = _normalize_zone_climatique(normalized.get("zone_climatique_chantier", ""))
     for field in PROSPECT_FIELDS:
         normalized.setdefault(field, "" if field != "nrp_log" else [])
     return normalized
@@ -322,6 +344,8 @@ def _lead_for_response(lead: dict) -> dict:
 def _migrate_leads_schema():
     leads = _read_leads()
     changed = False
+    categories_migrees = 0
+    zones_migrees = 0
     migrated = []
     for lead in leads:
         if not isinstance(lead, dict):
@@ -335,10 +359,20 @@ def _migrate_leads_schema():
             changed = True
         if item.get("categorie") != categorie:
             item["categorie"] = categorie
+            categories_migrees += 1
             changed = True
+        for key in ("zone_climatique", "zone_climatique_chantier"):
+            if key in item:
+                zone = _normalize_zone_climatique(item.get(key, ""))
+                if item.get(key) != zone:
+                    item[key] = zone
+                    zones_migrees += 1
+                    changed = True
         migrated.append(item)
     if changed:
         _atomic_write_json(LEADS_PATH, migrated)
+    print(f"Migration catégories : {categories_migrees} leads migrés")
+    print(f"Migration zones climatiques : {zones_migrees} champs migrés")
 
 
 _migrate_leads_schema()

@@ -3168,70 +3168,6 @@ body.panel-is-open {
       color: var(--text-secondary, #64748B);
     }
 
-    /* ===== STATUT (boutons) ===== */
-    .statut-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-    .statut-dim-label {
-      font-size: 10px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-      color: #9ca3af;
-      margin: 0 0 8px;
-    }
-    .acquisition-date-wrap {
-      max-height: 0;
-      overflow: hidden;
-      opacity: 0;
-      margin-top: 0;
-      transition: max-height 200ms ease, opacity 200ms ease, margin-top 200ms ease;
-      text-align: center;
-    }
-    .acquisition-date-wrap.is-open {
-      max-height: 120px;
-      opacity: 1;
-      margin-top: 14px;
-    }
-    .acquisition-date-wrap label {
-      display: block;
-      font-size: 12px;
-      font-weight: 600;
-      color: #4a5568;
-      margin-bottom: 6px;
-    }
-    .acquisition-date-wrap input[type="date"] {
-      width: min(100%, 280px);
-      margin: 0 auto;
-      display: block;
-      padding: 10px 12px;
-      border: 1px solid #e2e8f0;
-      border-radius: 8px;
-      font-family: inherit;
-    }
-    .statut-btn {
-      min-height: 68px;
-      padding: 12px 16px;
-      border: 1.5px solid #E2E8F0;
-      border-radius: 8px;
-      background: #fff;
-      cursor: pointer;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 4px;
-      transition: all 0.15s;
-      font-family: inherit;
-      font-size: 13px;
-      font-weight: 500;
-      color: #64748B;
-    }
-    .statut-btn:hover { border-color: var(--input-hover); }
-    .statut-btn.selected {
-      border-color: var(--rouge); background: var(--rouge-soft); color: var(--bleu);
-      box-shadow: 0 0 0 2px rgba(226, 33, 75, 0.1);
-    }
-    .statut-btn .icon { display: block; font-size: 18px; margin-bottom: 4px; }
-
     /* ===== DPE (badge-like) ===== */
     .dpe-buttons {
       display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px;
@@ -3253,7 +3189,7 @@ body.panel-is-open {
       font-size: 13px;
       color: #9ca3af;
     }
-    .btn, .dpe-btn, .statut-btn, .btn-save { transition: all 150ms ease; }
+    .btn, .dpe-btn, .btn-save { transition: all 150ms ease; }
     .btn:hover:not(:disabled), .btn-save:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 2px 8px rgba(0,46,90,0.1); }
     input, select, textarea { transition: border-color 150ms ease, box-shadow 150ms ease; }
     /* Badges DPE / Auto (inline label) */
@@ -4100,7 +4036,6 @@ body.panel-is-open {
     @media (max-width: 920px) {
       .row-2, .row-3, .row-4, .row-2-1, .row-1-2, .row-chauffage-ecs, .row-isolation { grid-template-columns: 1fr; }
       .row-chauffage-ecs .chauffage-col { grid-template-rows: none; }
-      .statut-buttons { grid-template-columns: 1fr; }
       .dpe-buttons { grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
       .container { max-width: 100%; }
     }
@@ -4110,7 +4045,6 @@ body.panel-is-open {
       .card { padding: 14px 12px; }
       .field input, .field select { font-size: 14px; min-height: 42px; }
       .dpe-btn { min-height: 40px; font-size: 13px; padding: 8px 4px; }
-      .statut-btn { min-height: 48px; }
       .form-actions { flex-direction: column; align-items: stretch; }
       .form-actions .btn-save,
       .form-actions a.btn-save { width: 100%; justify-content: center; }
@@ -7251,6 +7185,36 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
             <option value="Autre">Autre</option>
           </select>
         </div>
+        <div class="row row-3" style="margin-top: 12px;">
+          <div class="field">
+            <label>Statut commercial</label>
+            <select name="statut" id="statut-input">
+              <option value="">— Sélectionner —</option>
+              <option value="nouveau">Nouveau</option>
+              <option value="rappeler">À rappeler</option>
+              <option value="rdv">RDV</option>
+              <option value="devis">Devis envoyé</option>
+              <option value="signe">Signé</option>
+              <option value="perdu">Perdu</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Usage du bien</label>
+            <select name="usage_bien" id="usage-bien-input">
+              <option value="">— Sélectionner —</option>
+              <option value="proprietaire_occupant">Propriétaire occupant</option>
+              <option value="bailleur">Bailleur</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Situation actuelle</label>
+            <select name="situation_propriete" id="situation-input">
+              <option value="">— Sélectionner —</option>
+              <option value="proprietaire">Déjà propriétaire</option>
+              <option value="acquisition">En cours d'acquisition</option>
+            </select>
+          </div>
+        </div>
         <div class="row row-2" style="margin-top: 12px;">
           <div class="field">
             <label>Créé par</label>
@@ -7260,62 +7224,6 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
             <label>Dernière modification</label>
             <div class="field-audit-readonly">—</div>
           </div>
-        </div>
-      </div>
-
-    <!-- BLOC 2 -->
-      <div class="card">
-        <div class="card-title"><span class="num-card">2</span> Statut du prospect</div>
-        <input type="hidden" name="statut" id="statut-input" value="">
-        <input type="hidden" name="usage_bien" id="usage-bien-input" value="">
-        <input type="hidden" name="situation_propriete" id="situation-input" value="">
-        <p class="statut-dim-label">Statut commercial</p>
-        <div class="statut-buttons statut-buttons--commercial">
-          <button type="button" class="statut-btn commercial-statut-btn" data-statut="nouveau">
-            <span class="icon">🆕</span>Nouveau
-          </button>
-          <button type="button" class="statut-btn commercial-statut-btn" data-statut="rappeler">
-            <span class="icon">📞</span>À rappeler
-          </button>
-          <button type="button" class="statut-btn commercial-statut-btn" data-statut="rdv">
-            <span class="icon">📅</span>RDV
-          </button>
-          <button type="button" class="statut-btn commercial-statut-btn" data-statut="devis">
-            <span class="icon">📄</span>Devis envoyé
-          </button>
-          <button type="button" class="statut-btn commercial-statut-btn" data-statut="signe">
-            <span class="icon">✅</span>Signé
-          </button>
-          <button type="button" class="statut-btn commercial-statut-btn" data-statut="perdu">
-            <span class="icon">⛔</span>Perdu
-          </button>
-        </div>
-        <p class="statut-dim-label">Usage du bien</p>
-        <div class="statut-buttons">
-          <button type="button" class="statut-btn "
-                  data-usage="proprietaire_occupant">
-            <span class="icon">🏠</span>Propriétaire occupant
-          </button>
-          <button type="button" class="statut-btn "
-                  data-usage="bailleur">
-            <span class="icon">🔑</span>Bailleur
-          </button>
-        </div>
-        <p class="statut-dim-label" style="margin-top:16px">Situation actuelle</p>
-        <div class="statut-buttons statut-buttons--situation">
-          <button type="button" class="statut-btn situation-btn "
-                  data-situation="proprietaire">
-            <span class="icon">✅</span>Déjà propriétaire
-          </button>
-          <button type="button" class="statut-btn situation-btn "
-                  data-situation="acquisition">
-            <span class="icon">🏗️</span>En cours d'acquisition
-          </button>
-        </div>
-        <div id="acquisition-date-wrap" class="acquisition-date-wrap">
-          <label for="date-acquisition-prevue">Date de propriété prévue</label>
-          <input type="date" name="date_acquisition_prevue" id="date-acquisition-prevue"
-                 value="" placeholder="jj/mm/aaaa">
         </div>
       </div>
 
@@ -7546,8 +7454,8 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
             <input type="text" inputmode="numeric" name="conso_kwh_m2" id="conso-kwh-input" value="" placeholder="ex: 280" data-digits-only="true" maxlength="4"></div>
           <div class="field" data-urbs-field="emissions_ges"><label><span class="label-row"><span>Émissions GES <span class="hint">(kg CO₂/m²/an)</span></span><span id="badge-ges" class="badge-source badge-dpe-auto" data-badge="dpe-auto" style="display:none"></span></span></label>
             <input type="text" inputmode="numeric" name="emissions_ges" id="emissions-ges-input" value="" placeholder="ex: 56" data-digits-only="true" maxlength="4"></div>
-          <div class="field" data-urbs-field="cout_energetique_mensuel_eur"><label><span class="label-row"><span>Coût énergétique <span class="hint">(€/mois)</span></span><span id="badge-cout" class="badge-source badge-dpe-auto" data-badge="dpe-auto" style="display:none"></span></span></label>
-            <input type="text" inputmode="numeric" name="cout_energetique_mensuel_eur" id="cout-energie-input" value="" placeholder="ex: 180" data-digits-only="true" maxlength="5"></div>
+          <div class="field" data-required="cout_energetique_mensuel_eur" data-label="Coût énergétique (€/mois)" data-urbs-field="cout_energetique_mensuel_eur"><label><span class="label-row"><span>Coût énergétique <span class="req">*</span> <span class="hint">(€/mois)</span></span><span id="badge-cout" class="badge-source badge-dpe-auto" data-badge="dpe-auto" style="display:none"></span></span></label>
+            <input type="text" inputmode="numeric" name="cout_energetique_mensuel_eur" id="cout-energie-input" value="" placeholder="ex: 180" data-digits-only="true" maxlength="5" required></div>
       </div>
       <div class="card-subtitle">Installation électrique</div>
       <div class="row row-2 row-phase-puissance">
@@ -9112,25 +9020,8 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
 <script>
   // ===== STATUT =====
   const statutInput = document.getElementById('statut-input');
-  const statutButtons = document.querySelectorAll('.statut-btn[data-statut]');
   const usageBienInput = document.getElementById('usage-bien-input');
-  const usageBienButtons = document.querySelectorAll('.statut-btn[data-usage]');
   const situationInput = document.getElementById('situation-input');
-  const situationButtons = document.querySelectorAll('.situation-btn');
-  const acquisitionWrap = document.getElementById('acquisition-date-wrap');
-  situationButtons.forEach(btn => {
-    btn.addEventListener('click', () => {
-      situationButtons.forEach(b => b.classList.remove('selected'));
-      btn.classList.add('selected');
-      const sit = btn.dataset.situation || 'proprietaire';
-      if (situationInput) situationInput.value = sit;
-      if (acquisitionWrap) acquisitionWrap.classList.toggle('is-open', sit === 'acquisition');
-      if (sit !== 'acquisition') {
-        const d = document.getElementById('date-acquisition-prevue');
-        if (d) d.value = '';
-      }
-    });
-  });
   let cpChantier = document.getElementById('cp-chantier');
   let cpPersonne = document.getElementById('cp-personne');
   let cpPersonneAuto = document.getElementById('cp-personne-auto');
@@ -9921,13 +9812,10 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
   });
 
   function updateCommercialStatutUI() {
-    const val = statutInput?.value || '';
-    statutButtons.forEach(b => b.classList.toggle('selected', b.dataset.statut === val));
     recalculerCategories();
   }
   function updateUsageBienUI() {
     const val = usageBienInput?.value || '';
-    usageBienButtons.forEach(b => b.classList.toggle('selected', b.dataset.usage === val));
     if (val === 'proprietaire_occupant') {
       if (cpPersonne && cpChantier) cpPersonne.value = cpChantier.value;
       if (cpPersonne) cpPersonne.readOnly = true;
@@ -9939,16 +9827,10 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     recalculerCategories();
   }
   if (statutInput) {
-    statutButtons.forEach(b => b.addEventListener('click', () => {
-      statutInput.value = b.dataset.statut;
-      updateCommercialStatutUI();
-    }));
+    statutInput.addEventListener('change', updateCommercialStatutUI);
   }
   if (usageBienInput) {
-    usageBienButtons.forEach(b => b.addEventListener('click', () => {
-      usageBienInput.value = b.dataset.usage;
-      updateUsageBienUI();
-    }));
+    usageBienInput.addEventListener('change', updateUsageBienUI);
   }
 
   if (cpChantier) {
@@ -9958,7 +9840,13 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     });
   }
 
-  // ===== ZONE CLIMATIQUE H1a / H1b / H2 / H3 (CP chantier) =====
+  // ===== ZONE CLIMATIQUE H1 / H2 / H3 (CP chantier) =====
+  function normaliserZoneClimatique(zone) {
+    const z = String(zone || '').trim().toUpperCase();
+    if (z === 'H1A' || z === 'H1B') return 'H1';
+    if (z === 'H1' || z === 'H2' || z === 'H3') return z;
+    return zone || null;
+  }
   function zoneClimatiqueFromCp(cp) {
     cp = (cp || '').replace(/\D/g, '').slice(0, 5);
     if (cp.length < 2) return null;
@@ -9966,13 +9854,13 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     const h1a = new Set(['75', '77', '78', '91', '92', '93', '94', '95']);
     const h1b = new Set(['02', '08', '10', '51', '52', '54', '55', '57', '67', '68', '88']);
     const h3 = new Set(['04', '06', '11', '13', '30', '34', '66', '83', '84']);
-    if (h1a.has(dept)) return 'H1a';
-    if (h1b.has(dept)) return 'H1b';
+    if (h1a.has(dept)) return 'H1';
+    if (h1b.has(dept)) return 'H1';
     if (h3.has(dept)) return 'H3';
     return 'H2';
   }
   function updateZoneClimatique(fromUrbs) {
-    const zone = fromUrbs || zoneClimatiqueFromCp((cpChantier?.value || '').trim());
+    const zone = normaliserZoneClimatique(fromUrbs || zoneClimatiqueFromCp((cpChantier?.value || '').trim()));
     const z = zone || '—';
     const valEl = document.getElementById('zone-clim-value');
     const inputEl = document.getElementById('zone-clim-input');
@@ -10726,21 +10614,21 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
 
   function validerFormulaire() {
     const champsManquants = [];
-    const requiredKeys = new Set(['nom', 'prenom', 'telephone']);
-    document.querySelectorAll('.field[data-required]').forEach(field => {
-      const key = String(field.dataset.required || '').trim();
-      if (!requiredKeys.has(key)) {
-        field.classList.remove('error');
-        return;
-      }
-      const input = field.querySelector('input, select');
-      if (!input) return;
-      const val = (input.value || '').trim();
-      if (!val) {
-        champsManquants.push(field.dataset.label || field.dataset.required);
-        field.classList.add('error');
+    form.querySelectorAll('input[required], select[required], textarea[required]').forEach(input => {
+      const field = input.closest('.field');
+      const labelEl = field?.querySelector('label');
+      const label = (field?.dataset.label || labelEl?.innerText || input.name || 'Champ obligatoire')
+        .replace(/\*/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+      const missing = input.tagName === 'SELECT'
+        ? (!input.value || input.selectedIndex === 0)
+        : !(input.value || '').trim();
+      if (missing) {
+        champsManquants.push(label);
+        field?.classList.add('error');
       } else {
-        field.classList.remove('error');
+        field?.classList.remove('error');
       }
     });
 
@@ -13221,8 +13109,12 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     state.phase_electrique = '';
     state.surface_habitable = null;
     if (!state.surface_forcee) state.surface_chauffee = null;
+    const categorieInput = document.getElementById('categorie-input')?.value || '';
+    if (['tres_modeste', 'modeste', 'intermediaire', 'superieur'].includes(categorieInput)) {
+      state.categorie = categorieInput;
+    }
     const badge = document.getElementById('cat-anah-badge');
-    if (badge && badge.textContent){
+    if (!state.categorie && badge && badge.textContent){
       const t = badge.textContent.trim().toUpperCase();
       if (t.startsWith('TM')||t.includes('TRÈS')||t.includes('TRES')) state.categorie='tres_modeste';
       else if (t.startsWith('MO')) state.categorie='modeste';
@@ -15228,12 +15120,6 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       const target = document.getElementById(p.dataset.target);
       p.classList.toggle('selected', !!target?.value && p.dataset.value === target.value);
     });
-    const usage = document.getElementById('statut-input')?.value || '';
-    document.querySelectorAll('.statut-btn[data-statut]').forEach(b => b.classList.toggle('selected', !!usage && b.dataset.statut === usage));
-    const usageBien = document.getElementById('usage-bien-input')?.value || '';
-    document.querySelectorAll('.statut-btn[data-usage]').forEach(b => b.classList.toggle('selected', !!usageBien && b.dataset.usage === usageBien));
-    const situation = document.getElementById('situation-input')?.value || '';
-    document.querySelectorAll('.situation-btn[data-situation]').forEach(b => b.classList.toggle('selected', !!situation && b.dataset.situation === situation));
   }
   function normalizeCategorie(value){
     const raw = String(value || '').trim();
@@ -15276,7 +15162,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     const tel = (document.querySelector('[name="telephone"]')?.value || '').trim();
     const email = (document.querySelector('[name="email"]')?.value || '').trim();
     const cp = (document.querySelector('[name="code_postal_chantier"]')?.value || '').replace(/\D/g,'').slice(0,5);
-    const usageVal = (document.getElementById('usage-bien-input')?.value || document.querySelector('.statut-btn[data-usage].selected')?.dataset.usage || '').trim().toLowerCase();
+    const usageVal = (document.getElementById('usage-bien-input')?.value || '').trim().toLowerCase();
     const dpe = (document.getElementById('dpe-input')?.value || '').trim().toUpperCase();
     const catInputRaw = (document.querySelector('[name="categorie"]')?.value || '').trim();
     const catInput = normalizeCategorie(catInputRaw)?.short || catInputRaw.toUpperCase();
@@ -15318,7 +15204,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     form.dataset.psbBound='1';
     form.addEventListener('input', updateIdentityBanner, true);
     form.addEventListener('change', updateIdentityBanner, true);
-    document.querySelectorAll('.statut-btn, .dpe-btn, .pill').forEach(btn=>{
+    document.querySelectorAll('.dpe-btn, .pill').forEach(btn=>{
       btn.addEventListener('click', ()=>setTimeout(updateIdentityBanner,0));
     });
     const cat = document.getElementById('cat-anah-badge');
@@ -15336,7 +15222,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       el.removeAttribute('readonly');
       el.disabled = false;
     });
-    document.querySelectorAll('.dpe-btn.selected, .statut-btn.selected, .pill.selected').forEach(el=>el.classList.remove('selected'));
+    document.querySelectorAll('.dpe-btn.selected, .pill.selected').forEach(el=>el.classList.remove('selected'));
     document.querySelectorAll('.field.error').forEach(el=>el.classList.remove('error'));
     const catAnah=document.getElementById('cat-anah-badge'); if(catAnah) catAnah.textContent='—';
     const catCee=document.getElementById('cat-cee-badge'); if(catCee) catCee.textContent='—';
