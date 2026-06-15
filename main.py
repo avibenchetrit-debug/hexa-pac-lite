@@ -15,6 +15,180 @@ STATIC_DIR = os.path.join(BASE_DIR, "static")
 DATA_DIR = os.path.join(BASE_DIR, "data")
 LEADS_PATH = os.path.join(DATA_DIR, "leads.json")
 NOTES_PATH = os.path.join(DATA_DIR, "notes.json")
+CATALOGUE_PAC_PATH = os.path.join(DATA_DIR, "catalogue_pac.json")
+
+DEFAULT_CATALOGUE_PAC = [
+  {
+    "ref": "ATL-EXCELLIA-S-9",
+    "nom": "ALFÉA EXCELLIA S 9",
+    "usage": "Chauffage",
+    "alim": "Monophasé",
+    "puiss35": 10.08,
+    "puiss_chauf": 10.08,
+    "etas35": 183,
+    "scop35": 4.66,
+    "cop": 4.66,
+    "classe": "A+++",
+    "fluide": "R32",
+    "ballon": null,
+    "db_ext": 56,
+    "achat": 4261.45,
+    "ttc": 12990
+  },
+  {
+    "ref": "ATL-EXCELLIA-S-12",
+    "nom": "ALFÉA EXCELLIA S 12",
+    "usage": "Chauffage",
+    "alim": "Monophasé",
+    "puiss35": 12.55,
+    "puiss_chauf": 12.55,
+    "etas35": 183,
+    "scop35": 4.66,
+    "cop": 4.66,
+    "classe": "A+++",
+    "fluide": "R32",
+    "ballon": null,
+    "db_ext": 56,
+    "achat": 4602.11,
+    "ttc": 13990
+  },
+  {
+    "ref": "ATL-EXCELLIA-S-14",
+    "nom": "ALFÉA EXCELLIA S 14",
+    "usage": "Chauffage",
+    "alim": "Monophasé",
+    "puiss35": 14.47,
+    "puiss_chauf": 14.47,
+    "etas35": 185,
+    "scop35": 4.71,
+    "cop": 4.71,
+    "classe": "A+++",
+    "fluide": "R32",
+    "ballon": null,
+    "db_ext": 58,
+    "achat": 4847.66,
+    "ttc": 14490
+  },
+  {
+    "ref": "ATL-EXCELLIA-S-12 TRI",
+    "nom": "ALFÉA EXCELLIA S 12 TRI",
+    "usage": "Chauffage",
+    "alim": "Triphasé",
+    "puiss35": 12.55,
+    "puiss_chauf": 12.55,
+    "etas35": 183,
+    "scop35": 4.66,
+    "cop": 4.66,
+    "classe": "A+++",
+    "fluide": "R32",
+    "ballon": null,
+    "db_ext": 56,
+    "achat": 4602.11,
+    "ttc": 13990
+  },
+  {
+    "ref": "ATL-EXCELLIA-S-14 TRI",
+    "nom": "ALFÉA EXCELLIA S 14 TRI",
+    "usage": "Chauffage",
+    "alim": "Triphasé",
+    "puiss35": 14.47,
+    "puiss_chauf": 14.47,
+    "etas35": 185,
+    "scop35": 4.71,
+    "cop": 4.71,
+    "classe": "A+++",
+    "fluide": "R32",
+    "ballon": null,
+    "db_ext": 58,
+    "achat": 4847.66,
+    "ttc": 14490
+  },
+  {
+    "ref": "ATL-EXCELLIA-S-DUO-9",
+    "nom": "ALFÉA EXCELLIA S DUO 9",
+    "usage": "Chauffage + ECS",
+    "alim": "Monophasé",
+    "puiss35": 10.08,
+    "puiss_chauf": 10.08,
+    "etas35": 183,
+    "scop35": 4.66,
+    "cop": 4.66,
+    "classe": "A+++",
+    "fluide": "R32",
+    "ballon": 190,
+    "db_ext": 56,
+    "achat": 5367.95,
+    "ttc": 14990
+  },
+  {
+    "ref": "ATL-EXCELLIA-S-DUO-12",
+    "nom": "ALFÉA EXCELLIA S DUO 12",
+    "usage": "Chauffage + ECS",
+    "alim": "Monophasé",
+    "puiss35": 12.55,
+    "puiss_chauf": 12.55,
+    "etas35": 183,
+    "scop35": 4.66,
+    "cop": 4.66,
+    "classe": "A+++",
+    "fluide": "R32",
+    "ballon": 190,
+    "db_ext": 56,
+    "achat": 5681.93,
+    "ttc": 15490
+  },
+  {
+    "ref": "ATL-EXCELLIA-S-DUO-14",
+    "nom": "ALFÉA EXCELLIA S DUO 14",
+    "usage": "Chauffage + ECS",
+    "alim": "Monophasé",
+    "puiss35": 14.47,
+    "puiss_chauf": 14.47,
+    "etas35": 185,
+    "scop35": 4.71,
+    "cop": 4.71,
+    "classe": "A+++",
+    "fluide": "R32",
+    "ballon": 190,
+    "db_ext": 58,
+    "achat": 5908.87,
+    "ttc": 15990
+  },
+  {
+    "ref": "ATL-EXCELLIA-S-DUO-12 TRI",
+    "nom": "ALFÉA EXCELLIA S DUO 12 TRI",
+    "usage": "Chauffage + ECS",
+    "alim": "Triphasé",
+    "puiss35": 12.55,
+    "puiss_chauf": 12.55,
+    "etas35": 183,
+    "scop35": 4.66,
+    "cop": 4.66,
+    "classe": "A+++",
+    "fluide": "R32",
+    "ballon": 190,
+    "db_ext": 56,
+    "achat": 5681.93,
+    "ttc": 15490
+  },
+  {
+    "ref": "ATL-EXCELLIA-S-DUO-14 TRI",
+    "nom": "ALFÉA EXCELLIA S DUO 14 TRI",
+    "usage": "Chauffage + ECS",
+    "alim": "Triphasé",
+    "puiss35": 14.47,
+    "puiss_chauf": 14.47,
+    "etas35": 185,
+    "scop35": 4.71,
+    "cop": 4.71,
+    "classe": "A+++",
+    "fluide": "R32",
+    "ballon": 190,
+    "db_ext": 58,
+    "achat": 5908.87,
+    "ttc": 15990
+  }
+]
 
 app = FastAPI(title="hexa-pac-lite")
 
@@ -50,6 +224,8 @@ def _init_storage():
         _atomic_write_json(LEADS_PATH, [])
     if not os.path.exists(NOTES_PATH):
         _atomic_write_json(NOTES_PATH, {})
+    if not os.path.exists(CATALOGUE_PAC_PATH):
+        _atomic_write_json(CATALOGUE_PAC_PATH, DEFAULT_CATALOGUE_PAC)
 
 
 _init_storage()
@@ -178,6 +354,16 @@ async def get_baremes():
 # ---------------------------------------------------------------------------
 # A) Leads
 # ---------------------------------------------------------------------------
+
+
+@app.get("/api/catalogue-pac")
+def get_catalogue_pac() -> JSONResponse:
+    catalogue = _read_json(CATALOGUE_PAC_PATH, DEFAULT_CATALOGUE_PAC)
+    if not isinstance(catalogue, list):
+        catalogue = DEFAULT_CATALOGUE_PAC
+    return JSONResponse(catalogue)
+
+
 @app.get("/api/leads")
 def get_leads() -> JSONResponse:
     return JSONResponse(_read_leads())

@@ -6438,6 +6438,28 @@ body.sim-left-open .hexa-app-shell__main{
   border-radius:7px; font-size:14px; color:var(--c-ink,#1A2233); background:#fff; font-family:inherit; box-sizing:border-box; }
 .sim-field select:focus, .sim-field input:focus{ outline:none; border-color:var(--c-navy,#002E5A); box-shadow:0 0 0 3px rgba(0,46,90,.12); }
 
+.sim-block{ background:#fff; border:1px solid var(--c-line,#E2E8F0); border-radius:10px; padding:12px 14px; margin-top:10px; display:grid; gap:10px; }
+.sim-block-title{ font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:.07em; color:var(--c-rouge,#E2214B); }
+.sim-btn-note-dim{ border:1px solid var(--c-line,#E2E8F0); border-radius:8px; height:34px; background:#fff; color:var(--c-navy,#002E5A); font-size:12px; font-weight:600; cursor:pointer; }
+.sim-btn-note-dim:hover{ border-color:var(--c-navy,#002E5A); background:#F4F8FC; }
+
+.sim-pnl-edit-wrap{ display:inline-flex; align-items:center; gap:8px; flex-wrap:wrap; justify-content:flex-end; }
+.sim-model-select{ min-width:220px; max-width:280px; height:32px; border:1px solid var(--c-line,#E2E8F0); border-radius:6px; padding:0 8px; font-size:11px; color:var(--c-ink,#1A2233); background:#fff; font-family:inherit; }
+.sim-model-select:focus{ outline:none; border-color:var(--c-navy,#002E5A); box-shadow:0 0 0 3px rgba(0,46,90,.12); }
+.sim-warn-badge{ display:inline-flex; align-items:center; height:24px; padding:0 8px; border-radius:999px; font-size:11px; font-weight:700; background:#FEF3C7; color:#B45309; border:1px solid #F59E0B; }
+
+.sim-dim-modal{ position:fixed; inset:0; z-index:3400; background:rgba(8,20,40,.55); display:flex; align-items:center; justify-content:center; padding:16px; }
+.sim-dim-box{ width:min(760px,96vw); max-height:85vh; overflow:auto; background:#fff; border-radius:12px; border:1px solid var(--c-line,#E2E8F0); box-shadow:0 20px 60px rgba(0,0,0,.35); }
+.sim-dim-head{ display:flex; align-items:center; justify-content:space-between; padding:14px 16px; border-bottom:1px solid var(--c-line,#E2E8F0); }
+.sim-dim-head h3{ margin:0; font-size:15px; color:var(--c-navy,#002E5A); }
+.sim-dim-head button{ border:none; background:none; color:var(--c-subtle,#9CA3AF); font-size:24px; cursor:pointer; line-height:1; }
+.sim-dim-head button:hover{ color:var(--c-rouge,#E2214B); }
+.sim-dim-table{ width:100%; border-collapse:collapse; font-size:12.5px; }
+.sim-dim-table th, .sim-dim-table td{ padding:9px 12px; border-bottom:1px solid var(--c-line-soft,#F0F5FA); text-align:left; vertical-align:top; }
+.sim-dim-table th{ width:38%; color:var(--c-navy,#002E5A); background:#F9FBFD; font-weight:600; }
+.sim-dim-table td{ color:var(--c-ink,#1A2233); }
+.sim-dim-warn{ margin:12px 14px 14px; padding:9px 11px; border:1px solid #F59E0B; border-radius:8px; background:#FEF3C7; color:#8A4B00; font-size:12px; }
+
 .sim-note{ font-size:11.5px; line-height:1.5; color:var(--c-muted,#4A5568); margin:9px 0 2px; }
 .sim-note--warn{ background:var(--c-warn-bg,#FEF3C7); border:1px solid var(--c-warn,#B45309); border-radius:7px; padding:8px 11px; color:#5A4410; }
 
@@ -12731,11 +12753,84 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
   'use strict';
 
   let GRILLE = {};
+  let CATALOGUE_PAC = [];
+
+  const COEF_ISO = {
+    toit: { tres_bien: 0.15, bien: 0.20, isole: 0.30, peu: 0.50, non: 0.80 },
+    mur: { tres_bien: 0.25, bien: 0.35, isole: 0.50, peu: 0.80, non: 1.20 },
+    menuiserie: { double: 2.0, sur_vitrage: 2.6, simple: 5.0 }
+  };
+  const DELTA_T = { H1: 28, H2: 25, H3: 22 };
+  const COEF_SECURITE = 1.2;
+
+  function chargerCatalogueDepuisStorage(){
+    try {
+      const raw = localStorage.getItem('hexa_config_v1');
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed?.models) ? parsed.models : [];
+    } catch(_) {
+      return [];
+    }
+  }
+
+  function normalizeModelePac(modele, idx){
+    const ref = String(modele?.ref || modele?.id || `PAC-${idx+1}`);
+    const nom = String(modele?.nom || modele?.modele || ref);
+    const marque = String(modele?.marque || '').trim();
+    const puiss = Number(modele?.puissance_kw ?? modele?.puiss35 ?? modele?.puiss_chauf ?? 0);
+    const prix = Number(modele?.prix_ttc ?? modele?.ttc ?? 0);
+    const etasRaw = String(modele?.etas || '').trim();
+    const etas = etasRaw === 'etas_111_139' || etasRaw === 'etas_140_plus' ? etasRaw : null;
+    return {
+      id: ref,
+      ref,
+      marque,
+      nom,
+      label: `${marque ? marque + ' ' : ''}${nom}`.trim(),
+      puissance_kw: Number.isFinite(puiss) ? puiss : 0,
+      prix_ttc: Number.isFinite(prix) ? prix : 0,
+      etas,
+      raw: modele
+    };
+  }
+
+  function nettoyerCatalogue(list){
+    return (Array.isArray(list) ? list : [])
+      .map((m, idx) => normalizeModelePac(m, idx))
+      .filter(m => m.puissance_kw > 0 && m.prix_ttc > 0);
+  }
+
+  function getIsoLabel(type, key){
+    const labels = {
+      toit: { tres_bien:'Très bien isolé', bien:'Bien isolé', isole:'Isolé', peu:'Peu isolé', non:'Non isolé' },
+      mur: { tres_bien:'Très bien isolé', bien:'Bien isolé', isole:'Isolé', peu:'Peu isolé', non:'Non isolé' },
+      menuiserie: { double:'Double vitrage', sur_vitrage:'Sur vitrage', simple:'Simple vitrage' }
+    };
+    return labels[type]?.[key] || key;
+  }
+
   async function chargerBaremes() {
     try {
-      const r = await fetch('/api/baremes');
-      if (r.ok) GRILLE = await r.json();
-    } catch(e) { console.error('Barèmes non chargés:', e); }
+      const [rBaremes, rCatalogue] = await Promise.all([
+        fetch('/api/baremes'),
+        fetch('/api/catalogue-pac')
+      ]);
+      if (rBaremes.ok) {
+        GRILLE = await rBaremes.json();
+      }
+      let catalogue = [];
+      if (rCatalogue.ok) {
+        catalogue = await rCatalogue.json();
+      }
+      const fromStorage = chargerCatalogueDepuisStorage();
+      CATALOGUE_PAC = nettoyerCatalogue(fromStorage.length ? fromStorage : catalogue);
+      window.__hexaCataloguePacCache = CATALOGUE_PAC.map(m => m.raw || m);
+    } catch(e) {
+      console.error('Barèmes/catalogue non chargés:', e);
+      CATALOGUE_PAC = nettoyerCatalogue(chargerCatalogueDepuisStorage());
+      window.__hexaCataloguePacCache = CATALOGUE_PAC.map(m => m.raw || m);
+    }
   }
   chargerBaremes();
 
@@ -12754,10 +12849,17 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     surface_forcee: false,
     etas: 'etas_140_plus',
     service: 'chauffage_seul',
-    prix_pac: 15000,
+    prix_pac: null,
     facture_avant: 200,            // €/mois
     facture_apres: 100,            // €/mois
-    option: 'opt1'                 // opt1 | opt2 | opt3 (financement propre)
+    option: 'opt1',                // opt1 | opt2 | opt3 (financement propre)
+    iso_toit: 'isole',
+    iso_mur: 'isole',
+    iso_menuiserie: 'double',
+    puissance_requise_kw: null,
+    modele_pac: '',
+    modele_pac_id: '',
+    sous_dimensionnement: false
   };
 
   const LABELS_ANAH = { tres_modeste:'TMO', modeste:'MO', intermediaire:'INT', superieur:'SUP' };
@@ -12777,6 +12879,85 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     return '>=90';
   }
   function labelTranche(k){ return {'<70':'≤ 69 m²','70-90':'70 à 89 m²','>=90':'≥ 90 m²'}[k]||k; }
+
+  function calculerPuissancePAC(state) {
+    const iso_toit = state.iso_toit || document.getElementById('iso-toit')?.value || 'isole';
+    const iso_mur = state.iso_mur || document.getElementById('iso-mur')?.value || 'isole';
+    const iso_menui = state.iso_menuiserie || document.getElementById('iso-menuiserie')?.value || 'double';
+
+    const G_toit = COEF_ISO.toit[iso_toit] ?? COEF_ISO.toit.isole;
+    const G_mur = COEF_ISO.mur[iso_mur] ?? COEF_ISO.mur.isole;
+    const G_menui = (COEF_ISO.menuiserie[iso_menui] ?? COEF_ISO.menuiserie.double) / 3;
+    const G_total = G_toit + G_mur + G_menui;
+
+    const surface_chauffee = Number(state.surface_chauffee || (state.surface_habitable ? state.surface_habitable * 0.9 : 0));
+    const delta_T = DELTA_T[state.zone] || 25;
+    const puissance_kw = G_total * surface_chauffee * delta_T * COEF_SECURITE / 1000;
+
+    return {
+      puissance_kw: Math.round((Number.isFinite(puissance_kw) ? puissance_kw : 0) * 10) / 10,
+      G_toit,
+      G_mur,
+      G_menui,
+      G_total,
+      delta_T,
+      surface_chauffee,
+      iso_toit,
+      iso_mur,
+      iso_menuiserie: iso_menui,
+    };
+  }
+
+  function selectionnerPAC(puissance_requise, catalogue) {
+    const filtered = (Array.isArray(catalogue) ? catalogue : []).filter((m) => {
+      if (!m || !Number.isFinite(m.puissance_kw) || !Number.isFinite(m.prix_ttc)) return false;
+      if (m.etas && state.etas && m.etas !== state.etas) return false;
+      return true;
+    });
+    const sorted = [...filtered].sort((a, b) => a.puissance_kw - b.puissance_kw);
+    if (!sorted.length) {
+      return { modele: null, sous_dimensionnement: false };
+    }
+
+    const modele = sorted.find(m => m.puissance_kw >= puissance_requise);
+    if (modele) {
+      return { modele, sous_dimensionnement: false };
+    }
+
+    return { modele: sorted[sorted.length - 1], sous_dimensionnement: true };
+  }
+
+  function appliquerSelectionPac(selection){
+    const modele = selection?.modele || null;
+    if (!modele) {
+      state.modele_pac = '';
+      state.modele_pac_id = '';
+      state.prix_pac = 0;
+      state.sous_dimensionnement = false;
+      return;
+    }
+    state.modele_pac = modele.label || modele.nom || modele.ref;
+    state.modele_pac_id = modele.id;
+    state.prix_pac = Math.round(modele.prix_ttc || 0);
+    state.sous_dimensionnement = !!selection.sous_dimensionnement;
+  }
+
+  function syncDimensionnement(){
+    const dim = calculerPuissancePAC(state);
+    state.iso_toit = dim.iso_toit;
+    state.iso_mur = dim.iso_mur;
+    state.iso_menuiserie = dim.iso_menuiserie;
+    state.puissance_requise_kw = dim.puissance_kw;
+    const selection = selectionnerPAC(dim.puissance_kw, CATALOGUE_PAC);
+    appliquerSelectionPac(selection);
+    return { ...dim, selection };
+  }
+
+  function getModeleActuel(){
+    return CATALOGUE_PAC.find(m => m.id === state.modele_pac_id)
+      || CATALOGUE_PAC.find(m => (m.label || m.nom || m.ref) === state.modele_pac)
+      || null;
+  }
 
   function lireContexteFiche(){
     const badge = document.getElementById('cat-anah-badge');
@@ -12811,14 +12992,15 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
   }
 
   async function calcul(){
-    if (Object.keys(GRILLE).length === 0) { await chargerBaremes(); }
+    if (Object.keys(GRILLE).length === 0 || !CATALOGUE_PAC.length) { await chargerBaremes(); }
+    const dim = syncDimensionnement();
     const sKey = trancheSurface(state.surface_chauffee);
     const node = GRILLE[state.etas]?.[sKey];
     const ceeDevis    = node ? node.cee_devis[state.zone][state.categorie]    : 0;
     const ceeConserve = node ? node.cee_conserve[state.zone][state.categorie] : 0;
     const mprDevis    = node ? node.mpr_devis[state.zone][state.categorie]    : 0;
     const aidesDevis  = ceeDevis + mprDevis;
-    const g29 = Math.max(0, state.prix_pac - aidesDevis);
+    const g29 = Math.max(0, (state.prix_pac || 0) - aidesDevis);
 
     const mensO1 = pmt(0.049,180,g29);
     const mensO2 = pmt(0.0,60,g29);
@@ -12830,7 +13012,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     const nMois = dureeOpt[state.option];
 
     return { sKey, ceeDevis, ceeConserve, mprDevis, aidesDevis, g29,
-             mensO1, mensO2, fraisO2, mensOpt, nMois };
+             mensO1, mensO2, fraisO2, mensOpt, nMois, dim };
   }
 
   // ROI : cumul des économies (facture avant inflatée − (facture après inflatée + crédit tant qu'il court))
@@ -12917,6 +13099,36 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
           </div>
         </div>
 
+        <div class="sim-block">
+          <div class="sim-block-title">ISOLATION DU LOGEMENT</div>
+          <label class="sim-field"><span>Toit / Comble</span>
+            <select id="iso-toit" name="iso_toit">
+              <option value="tres_bien" ${sel(state.iso_toit,'tres_bien')}>Très bien isolé</option>
+              <option value="bien" ${sel(state.iso_toit,'bien')}>Bien isolé</option>
+              <option value="isole" ${sel(state.iso_toit,'isole')}>Isolé</option>
+              <option value="peu" ${sel(state.iso_toit,'peu')}>Peu isolé</option>
+              <option value="non" ${sel(state.iso_toit,'non')}>Non isolé</option>
+            </select>
+          </label>
+          <label class="sim-field"><span>Mur</span>
+            <select id="iso-mur" name="iso_mur">
+              <option value="tres_bien" ${sel(state.iso_mur,'tres_bien')}>Très bien isolé</option>
+              <option value="bien" ${sel(state.iso_mur,'bien')}>Bien isolé</option>
+              <option value="isole" ${sel(state.iso_mur,'isole')}>Isolé</option>
+              <option value="peu" ${sel(state.iso_mur,'peu')}>Peu isolé</option>
+              <option value="non" ${sel(state.iso_mur,'non')}>Non isolé</option>
+            </select>
+          </label>
+          <label class="sim-field"><span>Menuiserie</span>
+            <select id="iso-menuiserie" name="iso_menuiserie">
+              <option value="double" ${sel(state.iso_menuiserie,'double')}>Double vitrage</option>
+              <option value="sur_vitrage" ${sel(state.iso_menuiserie,'sur_vitrage')}>Sur vitrage</option>
+              <option value="simple" ${sel(state.iso_menuiserie,'simple')}>Simple vitrage</option>
+            </select>
+          </label>
+          <button class="sim-btn-note-dim" type="button" onclick="ouvrirNoteDim()">📋 Voir la note de dimensionnement</button>
+        </div>
+
         <div class="sim-section-label">Paramètres PAC</div>
         <div class="sim-row2">
           <label class="sim-field"><span>ETAS de la PAC</span>
@@ -12939,7 +13151,13 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
         <div class="sim-pnl">
           <div class="sim-pnl-line sim-pnl-prix">
             <span>Prix PAC fourni posé <i>· note de dimensionnement</i></span>
-            <span class="sim-pnl-edit"><input type="text" inputmode="numeric" id="sim-prix" value="${new Intl.NumberFormat('fr-FR').format(state.prix_pac)}"><em>€</em></span>
+            <span class="sim-pnl-edit-wrap">
+              <span class="sim-pnl-edit"><input type="text" inputmode="numeric" id="sim-prix" value="${new Intl.NumberFormat('fr-FR').format(state.prix_pac||0)}"><em>€</em></span>
+              <select id="sim-modele-select" class="sim-model-select">
+                ${CATALOGUE_PAC.map(m => `<option value="${m.id}" ${m.id===state.modele_pac_id?'selected':''}>${m.label} · ${m.puissance_kw} kW · ${eur(m.prix_ttc)}</option>`).join('')}
+              </select>
+              ${state.sous_dimensionnement ? '<span class="sim-warn-badge">⚠ Vérifier</span>' : ''}
+            </span>
           </div>
           <div class="sim-pnl-sep"></div>
           <div class="sim-pnl-line sim-pnl-minus"><span>– MaPrimeRénov' (devis)</span><b id="sim-mpr">${eur(c.mprDevis)}</b></div>
@@ -13033,6 +13251,14 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     set('sim-aides', eur(c.aidesDevis));
     set('sim-reste', eur(c.g29));
     set('sim-conserve', eur(c.ceeConserve));
+    const prixInput = document.getElementById('sim-prix');
+    if (prixInput && document.activeElement !== prixInput) {
+      prixInput.value = new Intl.NumberFormat('fr-FR').format(state.prix_pac||0);
+    }
+    const modelSelect = document.getElementById('sim-modele-select');
+    if (modelSelect && state.modele_pac_id) {
+      modelSelect.value = state.modele_pac_id;
+    }
     // zone dynamique (financement + avant/après + ROI) : aucun input dedans
     const dyn = document.getElementById('sim-dynamic');
     if (dyn) dyn.innerHTML = renderDynamic(c, r, energieLbl, creditLine, totalApres, delta, phraseRoi);
@@ -13043,6 +13269,9 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       const ev=el.tagName==='SELECT'?'change':'input'; el.addEventListener(ev,e=>{fn(e.target.value); refresh();}); };
     onIn('sim-etas',v=>state.etas=v);
     onIn('sim-service',v=>state.service=v);
+    onIn('iso-toit',v=>state.iso_toit=v);
+    onIn('iso-mur',v=>state.iso_mur=v);
+    onIn('iso-menuiserie',v=>state.iso_menuiserie=v);
     // Prix PAC : pendant la frappe on garde la valeur brute et on PATCHE seulement les
     // résultats (l'input n'est pas recréé -> curseur intact). Au blur on reformate.
     const prix=document.getElementById('sim-prix');
@@ -13054,9 +13283,22 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       });
       prix.addEventListener('blur',()=>{ refresh(); }); // reformate avec séparateurs
       prix.addEventListener('focus',()=>{ // passer en valeur brute (sans espaces) à l'entrée
-        prix.value = String(state.prix_pac);
+        prix.value = String(state.prix_pac || 0);
       });
     }
+    const modelSelect = document.getElementById('sim-modele-select');
+    if (modelSelect){
+      modelSelect.addEventListener('change', e => {
+        const selected = CATALOGUE_PAC.find(m => m.id === e.target.value);
+        if (!selected) return;
+        state.modele_pac_id = selected.id;
+        state.modele_pac = selected.label;
+        state.prix_pac = Math.round(selected.prix_ttc || 0);
+        state.sous_dimensionnement = false;
+        refresh();
+      });
+    }
+
     // Surface chauffée forçable : PATCH seulement (curseur intact)
     const sc=document.getElementById('sim-surf-chauffee');
     if (sc) sc.addEventListener('input',e=>{
@@ -13140,6 +13382,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
 
     state.numero = numero || state.numero;
     lireContexteFiche();
+    chargerBaremes().then(()=>{ syncDimensionnement(); if (estOuvert()) refresh(); }).catch(()=>{});
 
     if (!document.getElementById('sim-drawer')){
       const panel = document.createElement('aside');
@@ -13200,8 +13443,49 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     window.fermerTousPanneaux = window.hexaCloseAllPanels;
   }
 
+  function ouvrirNoteDim(){
+    const dim = syncDimensionnement();
+    const modele = getModeleActuel();
+    const warning = state.sous_dimensionnement
+      ? '<p class="sim-dim-warn">⚠ Aucun modèle du catalogue ne couvre la puissance requise. Le modèle le plus puissant a été retenu. Validation technique recommandée.</p>'
+      : '';
+    const rows = [
+      ['Surface habitable', `${state.surface_habitable ?? '—'} m²`],
+      ['Surface chauffée', `${dim.surface_chauffee ?? '—'} m²`],
+      ['Zone climatique', `${state.zone} (ΔT ${dim.delta_T}°C)`],
+      ['Toit / Comble', `${getIsoLabel('toit', dim.iso_toit)} (G=${dim.G_toit})`],
+      ['Mur', `${getIsoLabel('mur', dim.iso_mur)} (G=${dim.G_mur})`],
+      ['Menuiserie', `${getIsoLabel('menuiserie', dim.iso_menuiserie)} (G=${dim.G_menui.toFixed(2)})`],
+      ['Coefficient G global', dim.G_total.toFixed(2)],
+      ['Coefficient sécurité', `×${COEF_SECURITE}`],
+      ['Puissance requise', `${dim.puissance_kw} kW`],
+      ['Modèle sélectionné', modele ? `${modele.label} · ${modele.puissance_kw} kW` : '—'],
+      ['Prix TTC', modele ? eur(modele.prix_ttc) : eur(state.prix_pac || 0)]
+    ];
+    const htmlRows = rows.map(([k,v]) => `<tr><th>${k}</th><td>${v}</td></tr>`).join('');
+    const old = document.getElementById('sim-dim-modal');
+    if (old) old.remove();
+    const wrap = document.createElement('div');
+    wrap.id = 'sim-dim-modal';
+    wrap.className = 'sim-dim-modal';
+    wrap.innerHTML = `
+      <div class="sim-dim-box">
+        <div class="sim-dim-head">
+          <h3>Note de dimensionnement</h3>
+          <button type="button" id="sim-dim-close" aria-label="Fermer">×</button>
+        </div>
+        <table class="sim-dim-table">${htmlRows}</table>
+        ${warning}
+      </div>`;
+    document.body.appendChild(wrap);
+    const close = () => wrap.remove();
+    document.getElementById('sim-dim-close')?.addEventListener('click', close);
+    wrap.addEventListener('click', (e)=>{ if (e.target === wrap) close(); });
+  }
+
   window.ouvrirSimulationsDrawer = ouvrir;
   window.fermerSimulationsDrawer = fermer;
+  window.ouvrirNoteDim = ouvrirNoteDim;
 
   // ----- Mise à jour LIVE : si la fiche change, le bloc "Repris de la fiche" suit -----
   // Délégation sur le document (les champs de la fiche peuvent être recréés dynamiquement).
@@ -13240,6 +13524,15 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     new MutationObserver(()=>syncDepuisFiche())
       .observe(badge, { childList:true, characterData:true, subtree:true });
   }
+
+  window.addEventListener('hexa-config-changed', ()=>{
+    const fromStorage = chargerCatalogueDepuisStorage();
+    if (fromStorage.length) {
+      CATALOGUE_PAC = nettoyerCatalogue(fromStorage);
+      window.__hexaCataloguePacCache = CATALOGUE_PAC.map(m => m.raw || m);
+      if (estOuvert()) refresh();
+    }
+  });
 })();
 
 </script>
@@ -13257,6 +13550,31 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
 
   const LS_KEY = 'hexa_config_v1';
 
+  function normalizeAdminModel(modele){
+    const m = Object.assign({}, modele || {});
+    if (!m.ref && m.id) m.ref = m.id;
+    if (!m.nom && m.modele) m.nom = m.modele;
+    if (m.puissance_kw != null && (m.puiss35 == null || m.puiss35 === '')) m.puiss35 = m.puissance_kw;
+    if (m.prix_ttc != null && (m.ttc == null || m.ttc === '')) m.ttc = m.prix_ttc;
+    return m;
+  }
+
+  function getCatalogueDefaults(){
+    const cache = Array.isArray(window.__hexaCataloguePacCache) ? window.__hexaCataloguePacCache : [];
+    return cache.map(normalizeAdminModel);
+  }
+
+  async function hydrateCatalogueDefaults(){
+    if (Array.isArray(window.__hexaCataloguePacCache) && window.__hexaCataloguePacCache.length) return;
+    try {
+      const r = await fetch('/api/catalogue-pac');
+      if (!r.ok) return;
+      const data = await r.json();
+      window.__hexaCataloguePacCache = Array.isArray(data) ? data : [];
+    } catch (_) {}
+  }
+  hydrateCatalogueDefaults();
+
   // ---- Config par défaut (issue du catalogue rempli) ----
   const DEFAULT = {
     params: {
@@ -13273,7 +13591,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       cession_pct: 0.20,       // marge de cession par défaut (% du catalogue HT)
       plafond_pct: 0.60        // plafond prix de vente régie = catalogue TTC + 60%
     },
-    models: [{"ref": "ATL-EXCELLIA-S-9", "nom": "ALFÉA EXCELLIA S 9", "usage": "Chauffage", "alim": "Monophasé", "puiss35": 10.08, "puiss_chauf": 10.08, "etas35": 183, "scop35": 4.66, "cop": 4.66, "classe": "A+++", "fluide": "R32", "ballon": null, "db_ext": 56, "achat": 4261.45, "ttc": 12990}, {"ref": "ATL-EXCELLIA-S-12", "nom": "ALFÉA EXCELLIA S 12", "usage": "Chauffage", "alim": "Monophasé", "puiss35": 12.55, "puiss_chauf": 12.55, "etas35": 183, "scop35": 4.66, "cop": 4.66, "classe": "A+++", "fluide": "R32", "ballon": null, "db_ext": 56, "achat": 4602.11, "ttc": 13990}, {"ref": "ATL-EXCELLIA-S-14", "nom": "ALFÉA EXCELLIA S 14", "usage": "Chauffage", "alim": "Monophasé", "puiss35": 14.47, "puiss_chauf": 14.47, "etas35": 185, "scop35": 4.71, "cop": 4.71, "classe": "A+++", "fluide": "R32", "ballon": null, "db_ext": 58, "achat": 4847.66, "ttc": 14490}, {"ref": "ATL-EXCELLIA-S-12 TRI", "nom": "ALFÉA EXCELLIA S 12 TRI", "usage": "Chauffage", "alim": "Triphasé", "puiss35": 12.55, "puiss_chauf": 12.55, "etas35": 183, "scop35": 4.66, "cop": 4.66, "classe": "A+++", "fluide": "R32", "ballon": null, "db_ext": 56, "achat": 4602.11, "ttc": 13990}, {"ref": "ATL-EXCELLIA-S-14 TRI", "nom": "ALFÉA EXCELLIA S 14 TRI", "usage": "Chauffage", "alim": "Triphasé", "puiss35": 14.47, "puiss_chauf": 14.47, "etas35": 185, "scop35": 4.71, "cop": 4.71, "classe": "A+++", "fluide": "R32", "ballon": null, "db_ext": 58, "achat": 4847.66, "ttc": 14490}, {"ref": "ATL-EXCELLIA-S-DUO-9", "nom": "ALFÉA EXCELLIA S DUO 9", "usage": "Chauffage + ECS", "alim": "Monophasé", "puiss35": 10.08, "puiss_chauf": 10.08, "etas35": 183, "scop35": 4.66, "cop": 4.66, "classe": "A+++", "fluide": "R32", "ballon": 190, "db_ext": 56, "achat": 5367.95, "ttc": 14990}, {"ref": "ATL-EXCELLIA-S-DUO-12", "nom": "ALFÉA EXCELLIA S DUO 12", "usage": "Chauffage + ECS", "alim": "Monophasé", "puiss35": 12.55, "puiss_chauf": 12.55, "etas35": 183, "scop35": 4.66, "cop": 4.66, "classe": "A+++", "fluide": "R32", "ballon": 190, "db_ext": 56, "achat": 5681.93, "ttc": 15490}, {"ref": "ATL-EXCELLIA-S-DUO-14", "nom": "ALFÉA EXCELLIA S DUO 14", "usage": "Chauffage + ECS", "alim": "Monophasé", "puiss35": 14.47, "puiss_chauf": 14.47, "etas35": 185, "scop35": 4.71, "cop": 4.71, "classe": "A+++", "fluide": "R32", "ballon": 190, "db_ext": 58, "achat": 5908.87, "ttc": 15990}, {"ref": "ATL-EXCELLIA-S-DUO-12 TRI", "nom": "ALFÉA EXCELLIA S DUO 12 TRI", "usage": "Chauffage + ECS", "alim": "Triphasé", "puiss35": 12.55, "puiss_chauf": 12.55, "etas35": 183, "scop35": 4.66, "cop": 4.66, "classe": "A+++", "fluide": "R32", "ballon": 190, "db_ext": 56, "achat": 5681.93, "ttc": 15490}, {"ref": "ATL-EXCELLIA-S-DUO-14 TRI", "nom": "ALFÉA EXCELLIA S DUO 14 TRI", "usage": "Chauffage + ECS", "alim": "Triphasé", "puiss35": 14.47, "puiss_chauf": 14.47, "etas35": 185, "scop35": 4.71, "cop": 4.71, "classe": "A+++", "fluide": "R32", "ballon": 190, "db_ext": 58, "achat": 5908.87, "ttc": 15990}]
+    models: []
   };
 
   // ---- Chargement / sauvegarde ----
@@ -13284,6 +13602,9 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     else {
       try { const raw = localStorage.getItem(LS_KEY); if (raw) cfg = JSON.parse(raw); } catch(_){}
       if (!cfg) cfg = JSON.parse(JSON.stringify(DEFAULT));
+      if (!Array.isArray(cfg.models) || !cfg.models.length) {
+        cfg.models = getCatalogueDefaults();
+      }
       window.HexaConfig = cfg;
     }
     // prix d'achat toujours en entier
@@ -13853,10 +14174,12 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
 
   function open(){
     close();
-    loadConfig();
-    const wrap=document.createElement('div'); wrap.id='adm-root'; wrap.innerHTML=render();
-    document.body.appendChild(wrap);
-    bind();
+    hydrateCatalogueDefaults().finally(()=>{
+      loadConfig();
+      const wrap=document.createElement('div'); wrap.id='adm-root'; wrap.innerHTML=render();
+      document.body.appendChild(wrap);
+      bind();
+    });
   }
   function close(){ const r=document.getElementById('adm-root'); if(r) r.remove(); }
 
