@@ -342,6 +342,15 @@ async def save_lead(request: Request) -> JSONResponse:
     )
 
 
+@app.get("/api/leads/{numero}")
+def get_lead(numero: str) -> JSONResponse:
+    wanted = str(numero or "").strip()
+    for lead in _read_leads():
+        if str(lead.get("numero", "")).strip() == wanted:
+            return JSONResponse(lead)
+    raise HTTPException(status_code=404, detail="Prospect introuvable")
+
+
 @app.post("/api/leads/{numero}")
 async def update_lead(numero: str, request: Request) -> JSONResponse:
     payload = _normalize_lead_payload(await _read_request_payload(request))

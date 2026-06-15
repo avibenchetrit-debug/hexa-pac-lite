@@ -7162,7 +7162,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
 </style>
 
 </head>
-<body class="hexa-has-topbar" data-prospect-numero="PR-000001">
+<body class="hexa-has-topbar" data-prospect-numero="">
 
 <header class="hexa-lite-top" role="banner">
   <a href="#" class="logo-hexa-link" aria-label="Hexa Rénov'" id="hexa-logo-home">
@@ -7186,12 +7186,12 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
 <div class="prospect-shell-sticky">
   <div class="prospect-sticky-bar prospect-sticky-header" id="prospect-sticky-bar">
     <div class="psb-main">
-      <span id="psb-numero" class="prospect-sticky-numero psb-numero">PR-000001</span>
-      <span id="psb-nom" class="prospect-sticky-nom psb-name prospect-nom">Jean-François BRETAGNE</span>
+      <span id="psb-numero" class="prospect-sticky-numero psb-numero">—</span>
+      <span id="psb-nom" class="prospect-sticky-nom psb-name prospect-nom">—</span>
     </div>
     <div class="prospect-sticky-contact psb-contact">
-      <a id="psb-tel" href="tel:0611812004" class="prospect-sticky-tel">06 11 81 20 04</a>
-      <a id="psb-email" href="mailto:jf.bretagne@email.fr" class="prospect-sticky-email">jf.bretagne@email.fr</a>
+      <a id="psb-tel" href="#" class="prospect-sticky-tel">—</a>
+      <a id="psb-email" href="#" class="prospect-sticky-email">—</a>
     </div>
     <div class="prospect-sticky-badges psb-badges">
       <span id="psb-badge-usage" class="psb-badge" style="display:none"></span>
@@ -7201,21 +7201,21 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     </div>
     <div class="prospect-sticky-actions psb-actions">
       <button type="button" class="header-icon-btn psb-cta-btn btn-notes fiche-action-btn" data-cta="N" title="Notes internes"
-        onclick="(window.ouvrirNotesInternes||window.ouvrirCommentaires)('PR-000001')">
+        onclick="(window.ouvrirNotesInternes||window.ouvrirCommentaires)(document.body.dataset.prospectNumero)">
         <span class="header-letter">N</span>
         <span class="fiche-action-count" id="count-notes">0</span>
       </button>
       <button type="button" class="header-icon-btn psb-cta-btn btn-echanges fiche-action-btn" data-cta="E" title="Échanges"
-        onclick="(window.ouvrirEchanges||window.ouvrirEchangesLazy||function(){})('PR-000001')">
+        onclick="(window.ouvrirEchanges||window.ouvrirEchangesLazy||function(){})(document.body.dataset.prospectNumero)">
         <span class="header-letter">E</span>
         <span class="fiche-action-count" id="count-echanges">0</span>
       </button>
       <button type="button" class="header-icon-btn psb-cta-btn" data-cta="D" title="Documents"
-        onclick="(window.ouvrirDocumentsLazy||window.ouvrirDocuments)('PR-000001')">
+        onclick="(window.ouvrirDocumentsLazy||window.ouvrirDocuments)(document.body.dataset.prospectNumero)">
         <span class="header-letter">D</span>
       </button>
       <button type="button" class="header-icon-btn psb-cta-btn" data-cta="S" title="Simulateur"
-        onclick="window.ouvrirSimulationsDrawer('PR-000001')">
+        onclick="window.ouvrirSimulationsDrawer(document.body.dataset.prospectNumero)">
         <span class="header-letter">S</span>
       </button>
     </div>
@@ -7229,7 +7229,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
   
 
 <form id="form-prospect" class="fiche-form" method="post" novalidate
-        action="/prospect/PR-000001">
+        action="">
     <fieldset >
 
     <!-- BLOC 1 -->
@@ -7252,9 +7252,6 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
             
             <option value="autre" >Autre</option>
             
-            
-            <option value="[object Object]" selected>[object Object]</option>
-            
           </select>
         </div>
         <div class="row row-2" style="margin-top: 12px;">
@@ -7272,8 +7269,8 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     <!-- BLOC 2 -->
       <div class="card">
         <div class="card-title"><span class="num-card">2</span> Statut du prospect</div>
-        <input type="hidden" name="statut" id="statut-input" value="[object Object]">
-        <input type="hidden" name="situation_propriete" id="situation-input" value="proprietaire">
+        <input type="hidden" name="statut" id="statut-input" value="">
+        <input type="hidden" name="situation_propriete" id="situation-input" value="">
         <p class="statut-dim-label">Usage du bien</p>
         <div class="statut-buttons">
           <button type="button" class="statut-btn "
@@ -7287,7 +7284,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
         </div>
         <p class="statut-dim-label" style="margin-top:16px">Situation actuelle</p>
         <div class="statut-buttons statut-buttons--situation">
-          <button type="button" class="statut-btn situation-btn selected"
+          <button type="button" class="statut-btn situation-btn "
                   data-situation="proprietaire">
             <span class="icon">✅</span>Déjà propriétaire
           </button>
@@ -7318,24 +7315,24 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
         </div>
         <div class="field" data-required="nom" data-label="Nom">
           <label>Nom <span class="req">*</span></label>
-          <input type="text" name="nom" required value="BRETAGNE" autocomplete="family-name" placeholder="DUPONT"
+          <input type="text" name="nom" required value="" autocomplete="family-name" placeholder="DUPONT"
                  oninput="this.value=this.value.replace(/[0-9,\?\*\/]/g,'').toUpperCase()"
                  style="text-transform: uppercase; font-weight: 600; letter-spacing: 0.04em;">
         </div>
         <div class="field" data-required="prenom" data-label="Prénom">
           <label>Prénom <span class="req">*</span></label>
-          <input type="text" name="prenom" required value="Jean-François" autocomplete="given-name" placeholder="Jean"
+          <input type="text" name="prenom" required value="" autocomplete="given-name" placeholder="Jean"
                  oninput="this.value=this.value.replace(/[0-9,\?\*\/]/g,'');if(this.value)this.value=this.value.charAt(0).toUpperCase()+this.value.slice(1).toLowerCase()">
         </div>
       </div>
       <div class="row row-2">
         <div class="field" data-required="telephone" data-label="Téléphone">
           <label>Téléphone <span class="req">*</span></label>
-          <input type="tel" name="telephone" id="telephone-input" required value="06 11 81 20 04" autocomplete="tel" placeholder="06 11 12 13 14" inputmode="numeric">
+          <input type="tel" name="telephone" id="telephone-input" required value="" autocomplete="tel" placeholder="06 11 12 13 14" inputmode="numeric">
         </div>
         <div class="field" data-required="email" data-label="E-mail">
           <label>E-mail <span class="req">*</span></label>
-          <input type="email" name="email" required value="jf.bretagne@email.fr" autocomplete="email" placeholder="prenom.nom@email.fr">
+          <input type="email" name="email" required value="" autocomplete="email" placeholder="prenom.nom@email.fr">
         </div>
       </div>
     </div>
@@ -7347,7 +7344,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
         <div class="row">
           <div class="field ban-field-wrap" data-required="adresse_chantier" data-label="Adresse du chantier">
             <label>Adresse <span class="req">*</span> <span class="hint">(autocomplétion BAN)</span></label>
-            <input type="text" id="input-adresse" name="adresse_chantier" required value="12 rue de l&#39;Église" placeholder="12 RUE DE L'ÉGLISE"
+            <input type="text" id="input-adresse" name="adresse_chantier" required value="" placeholder="12 RUE DE L'ÉGLISE"
                    oninput="this.value=this.value.toUpperCase()" style="text-transform:uppercase;" autocomplete="off">
             <div id="ban-suggestions" class="ban-suggestions" role="listbox"></div>
             <input type="hidden" id="lat-chantier" name="lat_chantier" value="">
@@ -7361,7 +7358,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
         <div class="row row-3">
           <div class="field" data-required="code_postal_chantier" data-label="Code postal du chantier">
             <label>Code postal <span class="req">*</span></label>
-            <input type="text" name="code_postal_chantier" required value="53000"
+            <input type="text" name="code_postal_chantier" required value=""
                    inputmode="numeric" pattern="[0-9]{4,5}" maxlength="5" id="cp-chantier" placeholder="53000">
           </div>
           <div class="field">
@@ -7406,9 +7403,9 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
           <select id="registre-copro-select" class="reg-auto-input" disabled>
             <option value="">—</option>
             <option value="oui" >Oui</option>
-            <option value="non" selected>Non</option>
+            <option value="non" >Non</option>
           </select>
-          <input type="hidden" name="registre_copro" id="registre-copro-hidden-sync" value="non">
+          <input type="hidden" name="registre_copro" id="registre-copro-hidden-sync" value="">
           <input type="hidden" name="registre_copro_force" id="copro-force-input" value="">
           <div id="registre-copro-status" class="cadastre-status reg-hint"></div>
         </div>
@@ -7460,7 +7457,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
             <span class="label-row"><span>Classe DPE</span><span id="badge-dpe-label" class="badge-source badge-dpe-auto" data-badge="dpe-auto" style="display:none"></span></span>
   
           </label>
-          <input type="hidden" name="dpe_connu" id="dpe-input" value="F">
+          <input type="hidden" name="dpe_connu" id="dpe-input" value="">
           <div class="dpe-buttons">
             
             <button type="button" class="dpe-btn " data-dpe="A">A</button>
@@ -7473,7 +7470,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
             
             <button type="button" class="dpe-btn " data-dpe="E">E</button>
             
-            <button type="button" class="dpe-btn selected" data-dpe="F">F</button>
+            <button type="button" class="dpe-btn " data-dpe="F">F</button>
             
             <button type="button" class="dpe-btn " data-dpe="G">G</button>
             
@@ -7492,7 +7489,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
             <label><span class="label-row"><span>Type</span><span id="badge-type-logement" class="badge-source badge-dpe-auto" data-badge="dpe-auto" style="display:none"></span></span></label>
             <select name="type_logement">
               <option value="">— Sélectionner —</option>
-              <option value="maison" selected>Maison</option>
+              <option value="maison" >Maison</option>
               <option value="appartement" >Appartement</option>
             </select>
           </div>
@@ -7500,7 +7497,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
             <label><span class="label-row"><span>Surface habitable</span><span id="badge-surface" class="badge-source badge-dpe-auto" data-badge="dpe-auto" style="display:none"></span></span></label>
             <div style="display:flex; align-items:center; gap:0;">
               <input type="text" inputmode="numeric" name="surface_logement_m2" id="surface-input"
-                     value="154"
+                     value=""
                      placeholder="120"
                      oninput="this.value=this.value.replace(/[^0-9]/g,'').replace(/\B(?=(\d{3})+(?!\d))/g,' ')"
                      style="border-radius:5px 0 0 5px; flex:1;">
@@ -7537,9 +7534,9 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       <div class="row row-2 row-phase-puissance">
           <div class="field">
             <label>Phase électrique</label>
-            <input type="hidden" name="phase_electrique" id="phase-input" value="monophase">
+            <input type="hidden" name="phase_electrique" id="phase-input" value="">
             <div class="toggle-pill">
-              <button type="button" class="pill selected"
+              <button type="button" class="pill "
                       data-value="monophase" data-target="phase-input">⚡ Monophasé</button>
               <button type="button" class="pill "
                       data-value="triphase" data-target="phase-input">⚡⚡⚡ Triphasé</button>
@@ -7608,11 +7605,11 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       <div class="row row-3">
         <div class="field" data-required="rfr" data-label="RFR (Revenu fiscal de référence)">
           <label>RFR <span class="req">*</span> <span class="hint">(€)</span></label>
-          <input type="text" name="rfr" required value="20 000" id="rfr-input" inputmode="numeric" placeholder="25 705">
+          <input type="text" name="rfr" required value="" id="rfr-input" inputmode="numeric" placeholder="25 705">
         </div>
         <div class="field" data-required="nombre_personnes" data-label="Nombre de personnes du foyer">
           <label>Nb personnes <span class="req">*</span></label>
-          <input type="number" name="nombre_personnes" required value="2"
+          <input type="number" name="nombre_personnes" required value=""
                  min="1" max="20" step="1" inputmode="numeric"
                  oninput="this.value=Math.floor(Math.abs(this.value)||1)">
         </div>
@@ -7621,13 +7618,14 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
             Code postal personne <span class="req">*</span>
             <span class="auto-tag" id="cp-personne-auto" style="display: none;">AUTO</span>
           </label>
-          <input type="text" name="code_postal_personne" required value="53000"
+          <input type="text" name="code_postal_personne" required value=""
                  id="cp-personne" inputmode="numeric" pattern="[0-9]{4,5}" maxlength="5" placeholder="53000">
         </div>
       </div>
       <div class="row row-2">
         <div class="field">
           <label>Catégorie ANAH <span class="auto-tag">CALCULÉE</span></label>
+          <input type="hidden" name="categorie" id="categorie-input" value="">
           <div class="field-auto" id="cat-anah-wrap">
             <span class="field-auto-icon">💰</span>
             <span class="cat-badge" id="cat-anah-badge">—</span>
@@ -7660,7 +7658,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
                 <label>Mode de chauffage</label>
                 <select name="mode_chauffage">
                   <option value="">— Sélectionner —</option>
-                  <option value="fioul" selected>Fioul</option>
+                  <option value="fioul" >Fioul</option>
                   <option value="gaz" >Gaz</option>
                   <option value="electricite" >Électricité</option>
                   <option value="pac" >PAC</option>
@@ -7748,7 +7746,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     <div class="form-actions" id="form-actions-bar">
       <div class="form-actions-info" id="form-actions-info">
         
-          <strong>PR-000001</strong>
+          <strong id="footer-prospect-num">—</strong>
         
       </div>
       
@@ -11067,6 +11065,11 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
 
   let _dpeSearchTimer = null;
   let _lastDpeSearch = '';
+  window.resetDpeDynamicState = function () {
+    dpeSourcesCache = null;
+    window.dpeSourcesCache = null;
+    _lastDpeSearch = '';
+  };
 
   function majBadgeDPE(source, numero) {
     const badgeEl = document.getElementById('dpe-source-badge');
@@ -14646,10 +14649,6 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
 (function(){
   'use strict';
 
-  const DEMO = [
-    { numero:"PR-000001", nom:"BRETAGNE", prenom:"Jean-François", cp:"53000", tel:"06 11 81 20 04", email:"jf.bretagne@email.fr", categorie:"tres_modeste", statut:"nouveau", date:"2026-06-01", nrp_log:[] },
-  ];
-
   // Couleurs des catégories ANAH (reprises de la fiche prospect) + libellé concaténé ANAH - CEE
   const CAT = {
     tres_modeste: { court:"TMO", cee:"Précaire",  bg:"#1D4ED8", fg:"#FFFFFF" },
@@ -14687,11 +14686,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
   }
   function statutSortVal(p){ const s=STMAP[p.statut]; return s? String(s.i).padStart(2,'0') : '00'; }
   function loadProspects(){
-    try{
-      const raw=localStorage.getItem('hexa_prospects');
-      if(raw){ return JSON.parse(raw).map(normalizeProspect); }
-    }catch(_){}
-    return DEMO.map(normalizeProspect);
+    return [];
   }
   function persist(){ try{ localStorage.setItem('hexa_prospects', JSON.stringify(data)); }catch(_){} }
 
@@ -14712,6 +14707,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
   const nrpLast  = p => { const l=p.nrp_log||[]; return l.length?l[l.length-1]:null; };
 
   let data = [];
+  let leadsLoading = true;
   let sortKey='date', sortDir=-1, query='';
 
   const fmtDate = d => { try{ return new Date(d).toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric'}); }catch(_){ return d; } };
@@ -14859,12 +14855,15 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
         if(Array.isArray(leads)){
           data = leads.map(normalizeProspect);
           persist();
+          leadsLoading = false;
           renderRows();
           refreshMasterStats(true);
           return;
         }
       }
     }catch(_){}
+    leadsLoading = false;
+    renderRows();
     refreshMasterStats(true);
   }
 
@@ -14955,7 +14954,12 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     });
     const tb=document.getElementById('pv-tbody'), empty=document.getElementById('pv-empty');
     document.getElementById('pv-count').textContent = rows.length+' prospect'+(rows.length>1?'s':'');
-    if(!rows.length){ tb.innerHTML=''; empty.style.display='block'; return; }
+    if(!rows.length){
+      tb.innerHTML='';
+      empty.textContent = leadsLoading ? 'Chargement des prospects…' : 'Aucun prospect pour le moment.';
+      empty.style.display='block';
+      return;
+    }
     empty.style.display='none';
     tb.innerHTML = rows.map(p=>{
       const cnt=nrpCount(p); const last=nrpLast(p);
@@ -15126,19 +15130,92 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
 
   // --- Navigation + bandeau identité ---
   function showProspects(){ document.body.classList.add('hexa-view-prospects'); window.scrollTo(0,0); }
-  function setFieldValue(name, value){
+  const FIELD_ALIASES = {
+    telephone: ['telephone', 'tel', 'phone'],
+    code_postal_chantier: ['code_postal_chantier', 'cp', 'code_postal'],
+    ville_chantier: ['ville_chantier', 'ville'],
+    zone_climatique_chantier: ['zone_climatique_chantier', 'zone_climatique', 'zone'],
+    dpe_connu: ['dpe_connu', 'classe_dpe', 'dpe', 'classe_energie'],
+    dpe_numero: ['dpe_numero', 'numero_dpe', 'n_dpe'],
+    dpe_date: ['dpe_date', 'date_dpe'],
+    type_logement: ['type_logement', 'logement_type'],
+    surface_logement_m2: ['surface_logement_m2', 'surface', 'surface_habitable'],
+    hsp: ['hsp', 'hauteur_sous_plafond'],
+    mode_chauffage: ['mode_chauffage', 'chauffage', 'energie_avant'],
+    gestion_ecs: ['gestion_ecs', 'ecs'],
+    cout_energetique_mensuel_eur: ['cout_energetique_mensuel_eur', 'cout_chauffage', 'cout_energie'],
+    phase_electrique: ['phase_electrique', 'phase'],
+    panneau_solaire: ['panneau_solaire', 'panneaux_solaires'],
+    code_postal_personne: ['code_postal_personne', 'cp_personne'],
+    statut: ['usage_bien', 'statut_usage', 'statut'],
+    situation_propriete: ['situation_propriete', 'situation'],
+    categorie: ['categorie', 'categorie_anah'],
+  };
+  function readLeadValue(lead, name){
+    const keys = [name].concat(FIELD_ALIASES[name] || []);
+    for(const key of keys){
+      if(Object.prototype.hasOwnProperty.call(lead || {}, key) && lead[key] != null) return lead[key];
+    }
+    return '';
+  }
+  function ensureSelectOption(select, value){
+    if(!select || value === '') return;
+    const str = String(value);
+    const has = Array.from(select.options).some(o => o.value === str);
+    if(!has){
+      const opt = document.createElement('option');
+      opt.value = str;
+      opt.textContent = str;
+      select.appendChild(opt);
+    }
+  }
+  function setFieldValue(name, value, options){
     const el = document.querySelector('[name="'+name+'"]');
     if(!el) return;
+    const val = value == null ? '' : String(value);
     if(el.tagName==='SELECT'){
-      const has = Array.from(el.options).some(o=>o.value===String(value));
-      if(has) el.value = String(value);
-      else if(el.options.length) el.selectedIndex = 0;
-      el.dispatchEvent(new Event('change', { bubbles:true }));
+      ensureSelectOption(el, val);
+      el.value = val;
+    }else if(el.type==='checkbox' || el.type==='radio'){
+      el.checked = !!value;
     }else{
-      el.value = value == null ? '' : value;
-      el.dispatchEvent(new Event('input', { bubbles:true }));
+      el.value = val;
+    }
+    if(options?.notify !== false){
       el.dispatchEvent(new Event('change', { bubbles:true }));
     }
+  }
+  function syncChoiceWidgets(){
+    const dpe = (document.getElementById('dpe-input')?.value || '').trim().toUpperCase();
+    document.querySelectorAll('.dpe-btn').forEach(b => b.classList.toggle('selected', !!dpe && b.dataset.dpe === dpe));
+    document.querySelectorAll('.pill[data-target]').forEach(p => {
+      const target = document.getElementById(p.dataset.target);
+      p.classList.toggle('selected', !!target?.value && p.dataset.value === target.value);
+    });
+    const usage = document.getElementById('statut-input')?.value || '';
+    document.querySelectorAll('.statut-btn[data-statut]').forEach(b => b.classList.toggle('selected', !!usage && b.dataset.statut === usage));
+    const situation = document.getElementById('situation-input')?.value || '';
+    document.querySelectorAll('.situation-btn[data-situation]').forEach(b => b.classList.toggle('selected', !!situation && b.dataset.situation === situation));
+  }
+  function normalizeCategorie(value){
+    const raw = String(value || '').trim();
+    const norm = raw.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+    if(['tmo','tm','tres_modeste','tres modeste'].includes(norm)) return { key:'tres_modeste', short:'TMO', cee:'Précaire' };
+    if(['mo','modeste'].includes(norm)) return { key:'modeste', short:'MO', cee:'Modeste' };
+    if(['int','intermediaire','intermédiaire'].includes(norm)) return { key:'intermediaire', short:'INT', cee:'Classique' };
+    if(['sup','superieur','supérieur'].includes(norm)) return { key:'superieur', short:'SUP', cee:'Classique' };
+    return null;
+  }
+  function setCategorieFromLead(value){
+    const cat = normalizeCategorie(value);
+    const input = document.getElementById('categorie-input');
+    const anah = document.getElementById('cat-anah-badge');
+    const cee = document.getElementById('cat-cee-badge');
+    const long = document.getElementById('cat-anah-long');
+    if(input) input.value = cat ? cat.short : '';
+    if(anah) anah.textContent = cat ? cat.short : '—';
+    if(cee) cee.textContent = cat ? cat.cee : '—';
+    if(long) long.textContent = '';
   }
   function applyBadge(id, text, bg, fg){
     const el=document.getElementById(id); if(!el) return;
@@ -15168,7 +15245,9 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     const categorie = catInput || (/^(TMO|MO|INT|SUP)$/.test(catBadge) ? catBadge : '');
 
     numEl.textContent = numero || '—';
-    nomEl.textContent = ((prenom + ' ' + nom.toUpperCase()).trim()) || '—';
+    const prenomBanner = prenom ? (prenom.charAt(0).toUpperCase() + prenom.slice(1)) : '';
+    const nomBanner = nom ? nom.toUpperCase() : '';
+    nomEl.textContent = (prenomBanner || nomBanner) ? ((prenomBanner || '—') + ' ' + (nomBanner || '—')) : '—';
     telEl.textContent = tel || '—';
     telEl.href = tel ? ('tel:' + tel.replace(/\D/g,'')) : '#';
     emailEl.textContent = email || '—';
@@ -15215,8 +15294,6 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       else if(el.tagName==='SELECT') el.selectedIndex = 0;
       else if(el.type==='checkbox' || el.type==='radio') el.checked = false;
       else el.value = '';
-      el.dispatchEvent(new Event('input', { bubbles:true }));
-      el.dispatchEvent(new Event('change', { bubbles:true }));
       el.removeAttribute('readonly');
       el.disabled = false;
     });
@@ -15226,9 +15303,10 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     const catCee=document.getElementById('cat-cee-badge'); if(catCee) catCee.textContent='—';
     const catAnahLong=document.getElementById('cat-anah-long'); if(catAnahLong) catAnahLong.textContent='';
     const fs=form.querySelector('fieldset'); if(fs) fs.disabled=false;
-    form.action='/api/leads';
+    form.action='';
     document.body.dataset.prospectNumero='';
-    const infoStrong=document.querySelector('#form-actions-info strong'); if(infoStrong) infoStrong.textContent='PR-NOUVEAU';
+    const infoStrong=document.querySelector('#footer-prospect-num') || document.querySelector('#form-actions-info strong');
+    if(infoStrong) infoStrong.textContent='—';
     const btnSave=document.getElementById('btn-save');
     if(btnSave){
       btnSave.style.display='inline-flex';
@@ -15236,21 +15314,55 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       if(btnSave.tagName==='BUTTON') btnSave.textContent='ENREGISTRER';
     }
   }
-  function openFiche(p){
-    if(p && p.numero){
-      window.HexaCurrentProspect = { numero:p.numero, nom_complet:((p.nom||'')+' '+(p.prenom||'')).trim() };
-      document.body.dataset.prospectNumero = p.numero;
-      setFieldValue('nom', p.nom || '');
-      setFieldValue('prenom', p.prenom || '');
-      setFieldValue('telephone', p.tel || p.telephone || '');
-      setFieldValue('email', p.email || '');
-      setFieldValue('code_postal_chantier', p.cp || '');
-      setFieldValue('source', p.source || '');
-      setFieldValue('statut', p.statut || '');
-      setFieldValue('projet_initial', p.projet_initial || '');
-      const infoStrong=document.querySelector('#form-actions-info strong'); if(infoStrong) infoStrong.textContent=p.numero;
-      const form=document.getElementById('form-prospect');
-      if(form) form.action='/api/leads/'+encodeURIComponent(p.numero);
+  async function fetchProspect(numero){
+    const response = await fetch('/api/leads/' + encodeURIComponent(numero), { cache:'no-store' });
+    if(!response.ok) throw new Error('HTTP ' + response.status);
+    return response.json();
+  }
+  function hydrateProspectForm(lead){
+    const form=document.getElementById('form-prospect'); if(!form) return;
+    clearProspectForm();
+    form.querySelectorAll('[name]').forEach(el => {
+      const name = el.getAttribute('name');
+      if(!name) return;
+      setFieldValue(name, readLeadValue(lead, name), { notify:false });
+    });
+    setFieldValue('telephone', readLeadValue(lead, 'telephone'), { notify:false });
+    setFieldValue('code_postal_chantier', readLeadValue(lead, 'code_postal_chantier'), { notify:false });
+    setFieldValue('ville_chantier', readLeadValue(lead, 'ville_chantier'), { notify:false });
+    setFieldValue('dpe_connu', readLeadValue(lead, 'dpe_connu'), { notify:false });
+    setFieldValue('cout_energetique_mensuel_eur', readLeadValue(lead, 'cout_energetique_mensuel_eur'), { notify:false });
+    setCategorieFromLead(readLeadValue(lead, 'categorie'));
+    syncChoiceWidgets();
+    const numero = String(lead.numero || '').trim();
+    document.body.dataset.prospectNumero = numero;
+    window.HexaCurrentProspect = { numero, nom_complet:((lead.nom||'')+' '+(lead.prenom||'')).trim() };
+    const infoStrong=document.querySelector('#footer-prospect-num') || document.querySelector('#form-actions-info strong');
+    if(infoStrong) infoStrong.textContent = numero || '—';
+    form.action = numero ? '/api/leads/' + encodeURIComponent(numero) : '';
+    const btnSave=document.getElementById('btn-save');
+    if(btnSave){
+      btnSave.style.display='inline-flex';
+      btnSave.dataset.ctaMode='view';
+      if(btnSave.tagName==='BUTTON') btnSave.textContent='MODIFIER';
+    }
+  }
+  async function openFiche(p){
+    const numero = (p && p.numero) ? String(p.numero).trim() : '';
+    if(!numero) return;
+    clearProspectForm();
+    document.body.dataset.prospectNumero = numero;
+    const infoStrong=document.querySelector('#footer-prospect-num') || document.querySelector('#form-actions-info strong');
+    if(infoStrong) infoStrong.textContent = numero;
+    if (typeof window.resetSimulateur === 'function') {
+      window.resetSimulateur();
+    }
+    try {
+      const lead = await fetchProspect(numero);
+      hydrateProspectForm(lead);
+    } catch (err) {
+      hydrateProspectForm(Object.assign({}, p || {}, { numero }));
+      console.warn('Prospect non hydraté depuis le serveur:', err);
     }
     if (typeof window.syncSimulateurDepuisFiche === 'function') {
       window.syncSimulateurDepuisFiche(true);
@@ -15259,11 +15371,17 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     document.body.classList.remove('hexa-view-prospects'); window.scrollTo(0,0);
   }
   function openNewProspect(){
+    clearProspectForm();
+    document.body.dataset.prospectNumero='';
+    window.HexaCurrentProspect = { numero:'', nom_complet:'' };
+    window.dpeSourcesCache = null;
+    window._lastDpeSearch = '';
+    if (typeof window.resetDpeDynamicState === 'function') {
+      window.resetDpeDynamicState();
+    }
     if (typeof window.resetSimulateur === 'function') {
       window.resetSimulateur();
     }
-    clearProspectForm();
-    window.HexaCurrentProspect = { numero:'', nom_complet:'' };
     if (typeof window.syncSimulateurDepuisFiche === 'function') {
       window.syncSimulateurDepuisFiche(true);
     }
