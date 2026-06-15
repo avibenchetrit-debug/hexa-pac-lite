@@ -6448,6 +6448,8 @@ body.sim-left-open .hexa-app-shell__main{
 .sim-model-select{ flex:1 1 220px; width:100%; max-width:100%; min-width:0; box-sizing:border-box; height:32px; border:1px solid var(--c-line,#E2E8F0); border-radius:6px; padding:0 8px; font-size:11px; color:var(--c-ink,#1A2233); background:#fff; font-family:inherit; text-overflow:ellipsis; overflow:hidden; white-space:nowrap; }
 .sim-model-select:focus{ outline:none; border-color:var(--c-navy,#002E5A); box-shadow:0 0 0 3px rgba(0,46,90,.12); }
 .sim-warn-badge{ display:inline-flex; align-items:center; height:24px; padding:0 8px; border-radius:999px; font-size:11px; font-weight:700; background:#FEF3C7; color:#B45309; border:1px solid #F59E0B; flex:0 0 auto; }
+.sim-strict-toggle{ display:inline-flex; align-items:center; gap:5px; font-size:11px; color:#4A5568; white-space:nowrap; }
+.sim-strict-toggle input{ margin:0; }
 
 .sim-dim-modal{ position:fixed; inset:0; z-index:3400; background:rgba(8,20,40,.55); display:flex; align-items:center; justify-content:center; padding:16px; }
 .sim-dim-box{ width:min(760px,96vw); max-height:85vh; overflow:auto; background:#fff; border-radius:12px; border:1px solid var(--c-line,#E2E8F0); box-shadow:0 20px 60px rgba(0,0,0,.35); }
@@ -6461,7 +6463,8 @@ body.sim-left-open .hexa-app-shell__main{
 .sim-dim-table td{ color:var(--c-ink,#1A2233); }
 .sim-dim-warn{ margin:12px 14px 14px; padding:9px 11px; border:1px solid #F59E0B; border-radius:8px; background:#FEF3C7; color:#8A4B00; font-size:12px; }
 
-.dpe-info-line { display:flex; align-items:center; gap:8px; padding:8px 0; font-size:13px; border-bottom:0.5px solid #F0F5FA; }
+.dpe-meta-lines { margin-top:12px; display:flex; flex-direction:column; gap:6px; }
+.dpe-info-line { display:flex; gap:8px; font-size:13px; padding:4px 0; border-bottom:0.5px solid #F0F5FA; }
 .dpe-info-line:last-child { border-bottom:none; }
 .dpe-info-label { color:#4A5568; font-weight:500; min-width:90px; }
 .dpe-info-value { color:#002E5A; font-weight:600; }
@@ -7163,7 +7166,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
 
 <header class="hexa-lite-top" role="banner">
   <a href="#" class="logo-hexa-link" aria-label="Hexa Rénov'" id="hexa-logo-home">
-    <img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMjAgNTIiIHJvbGU9ImltZyIgYXJpYS1sYWJlbD0iSGV4YSBS6W5vdiciPgogIDxnIGZpbGw9Im5vbmUiIHN0cm9rZT0iI0ZGRkZGRiIgc3Ryb2tlLXdpZHRoPSIyLjIiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPgogICAgPHBhdGggZD0iTTI2IDE0LjVMNDAgNi41TDU0IDE0LjVWMjguNUw0MCAzNi41TDI2IDI4LjVWMTQuNVoiLz4KICAgIDxwYXRoIGQ9Ik0yMiAxMS41TDQwIDIuNUw1OCAxMS41VjMxLjVMNDAgNDAuNUwyMiAzMS41VjExLjVaIi8+CiAgICA8cGF0aCBkPSJNNDAgMi41VjYuNU0yNCAxMi41TDI2IDE0LjVNMjIgMzEuNUwyNiAyOC41TTQwIDQwLjVWMzYuNU01NCAyOC41TDU4IDMxLjVNNTQgMTQuNUw1OCAxMS41Ii8+CiAgPC9nPgogIDx0ZXh0IHg9IjY4IiB5PSIzNCIgZmlsbD0iI0ZGRkZGRiIgZm9udC1mYW1pbHk9IkludGVyLCBBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIyMiIgZm9udC13ZWlnaHQ9IjcwMCI+SGV4YSBS6W5vdic8L3RleHQ+Cjwvc3ZnPgo=" alt="Hexa Rénov'" class="logo-hexa-wordmark">
+    <img src="/static/Logo.svg" alt="Hexa Rénov'" class="logo-hexa-wordmark" onerror="this.hidden=true;document.querySelector('.hexa-lite-fallback')?.removeAttribute('hidden');">
     <span class="hexa-lite-fallback" hidden style="font-weight:800;color:#002E5A;">HEXA RÉNOV'</span>
   </a>
   <nav class="hexa-lite-nav">
@@ -7975,8 +7978,17 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       sb1.className = 'sub-bloc-title';
       sb1.textContent = 'Source DPE';
       const rowS = document.createElement('div');
-      rowS.className = 'row row-3';
-      [dpeField, dpeNumeroField, dpeDateField].forEach(f => { if (f) rowS.appendChild(f); });
+      rowS.className = 'row';
+      [dpeField].forEach(f => { if (f) rowS.appendChild(f); });
+      const dpeMetaLines = document.createElement('div');
+      dpeMetaLines.className = 'dpe-meta-lines';
+      [dpeNumeroField, dpeDateField].forEach(f => {
+        if (!f) return;
+        const line = f.querySelector('.dpe-info-line');
+        const hidden = f.querySelector('input[type="hidden"]');
+        if (line) dpeMetaLines.appendChild(line);
+        if (hidden) dpeMetaLines.appendChild(hidden);
+      });
 
       const sb2 = document.createElement('div');
       sb2.className = 'sub-bloc-title';
@@ -7996,6 +8008,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
 
       blockCarac.appendChild(sb1);
       blockCarac.appendChild(rowS);
+      blockCarac.appendChild(dpeMetaLines);
       if (dpeSource) blockCarac.appendChild(dpeSource);
       blockCarac.appendChild(sb2);
       blockCarac.appendChild(rowA);
@@ -10681,8 +10694,13 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
 
   function validerFormulaire() {
     const champsManquants = [];
+    const requiredKeys = new Set(['nom', 'prenom', 'telephone']);
     document.querySelectorAll('.field[data-required]').forEach(field => {
-      if (field.id === 'field-civilite') return;
+      const key = String(field.dataset.required || '').trim();
+      if (!requiredKeys.has(key)) {
+        field.classList.remove('error');
+        return;
+      }
       const input = field.querySelector('input, select');
       if (!input) return;
       const val = (input.value || '').trim();
@@ -10701,17 +10719,6 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       email.closest('.field').classList.add('error');
     }
 
-    const civiliteSel = document.getElementById('civilite-select');
-    const errCiv = document.getElementById('err-civilite');
-    if (civiliteSel && !civiliteSel.value) {
-      champsManquants.push('Civilité');
-      document.getElementById('field-civilite')?.classList.add('error');
-      if (errCiv) errCiv.style.display = 'block';
-    } else {
-      document.getElementById('field-civilite')?.classList.remove('error');
-      if (errCiv) errCiv.style.display = 'none';
-    }
-
     // Validation code postal
     ['code_postal_chantier', 'code_postal_personne'].forEach(name => {
       const cp = form.querySelector(`input[name=${name}]`);
@@ -10725,6 +10732,19 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     });
 
     return [...new Set(champsManquants)];
+  }
+
+  function saveToast(text, color) {
+    const t = document.createElement('div');
+    t.className = 'pv-toast';
+    t.textContent = text;
+    t.style.setProperty('--toast-c', color || '#002E5A');
+    document.body.appendChild(t);
+    requestAnimationFrame(() => t.classList.add('show'));
+    setTimeout(() => {
+      t.classList.remove('show');
+      setTimeout(() => t.remove(), 220);
+    }, 2600);
   }
 
   function onSaveClick(e) {
@@ -10756,10 +10776,10 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       return;
     }
 
-    const prospectNumero = document.body.dataset.prospectNumero;
+    const prospectNumero = (document.body.dataset.prospectNumero || '').trim();
     const url = prospectNumero
-      ? `/prospect/${prospectNumero}/ajax`
-      : '/prospect/ajax';
+      ? `/api/leads/${encodeURIComponent(prospectNumero)}`
+      : '/api/leads';
     const rcSync = document.getElementById('registre-copro-hidden-sync');
     const rcSel = document.getElementById('registre-copro-select');
     if (rcSync && rcSel) rcSync.value = rcSel.value || rcSync.value;
@@ -10775,7 +10795,28 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
         try { data = await r.json(); } catch (e) { /* ignore */ }
         btn.disabled = false;
         if (btn.tagName === 'BUTTON') setSaveCtaLabel(saveLabel);
-        if (!r.ok || !(data.ok || data.status === 'ok')) {
+
+        if (!r.ok) {
+          modalListe.innerHTML = '';
+          if (r.status === 400) {
+            (data.erreurs || [data.detail || data.msg || 'Validation invalide']).forEach(err => {
+              const li = document.createElement('li');
+              li.textContent = typeof err === 'string' ? err : String(err);
+              modalListe.appendChild(li);
+            });
+            modal?.classList.add('show');
+          } else {
+            const li = document.createElement('li');
+            li.textContent = `Erreur technique (HTTP ${r.status}) — réessayer ou contacter le support`;
+            modalListe.appendChild(li);
+            modal?.classList.add('show');
+            saveToast(`Erreur technique (HTTP ${r.status})`, '#B91C1C');
+          }
+          if (rfrInput) rfrInput.value = formaterRFR(rfrInput.value);
+          return;
+        }
+
+        if (!(data.ok || data.status === 'ok')) {
           modalListe.innerHTML = '';
           (data.erreurs || [data.detail || data.msg || 'Erreur lors de l\'enregistrement']).forEach(err => {
             const li = document.createElement('li');
@@ -10786,20 +10827,28 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
           if (rfrInput) rfrInput.value = formaterRFR(rfrInput.value);
           return;
         }
-        if (data.url && !prospectNumero) {
-          window.location.href = data.url;
-          return;
+
+        const savedNumero = (data.numero || data.lead?.numero || prospectNumero || '').trim();
+        if (savedNumero) {
+          document.body.dataset.prospectNumero = savedNumero;
+          if (form) form.action = '/api/leads/' + encodeURIComponent(savedNumero);
+          const infoStrong = document.querySelector('#form-actions-info strong');
+          if (infoStrong) infoStrong.textContent = savedNumero;
         }
-        if (prospectNumero) {
-          window.location.assign('/prospect/' + encodeURIComponent(prospectNumero) + '?saved=1');
-          return;
-        }
+        btnSave.dataset.ctaMode = savedNumero ? 'view' : 'create';
+        setSaveCtaLabel(savedNumero ? 'MODIFIER' : 'ENREGISTRER');
+        saveToast('Prospect enregistré ✓', '#0D6B3B');
         majBadgesReglementairesBandeau();
       })
       .catch(() => {
         btn.disabled = false;
         if (btn.tagName === 'BUTTON') setSaveCtaLabel(saveLabel);
-        form.submit();
+        modalListe.innerHTML = '';
+        const li = document.createElement('li');
+        li.textContent = 'Erreur technique (HTTP 0) — réessayer ou contacter le support';
+        modalListe.appendChild(li);
+        modal?.classList.add('show');
+        saveToast('Erreur technique réseau', '#B91C1C');
       });
   }
 
@@ -12874,18 +12923,49 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     return nom.includes('DUO') || usage.includes('ECS');
   }
 
-  function catalogueOptionsOrdonnees(service){
-    const isEcs = service === 'chauffage_ecs' || service === 'chauffage+ecs';
-    const preferred = [];
-    const others = [];
-    CATALOGUE_PAC.forEach((m) => {
+  function isModeleTri(modele){
+    const nom = String(modele?.nom || modele?.label || modele?.ref || '').toUpperCase();
+    const usage = String(modele?.usage || modele?.raw?.usage || '').toUpperCase();
+    return nom.includes(' TRI') || nom.endsWith('TRI') || usage.includes('TRIPHASE');
+  }
+
+  function parsePhase(phaseValue){
+    const p = String(phaseValue || '').toLowerCase();
+    if (!p) return { hasPhase:false, isTri:false };
+    return { hasPhase:true, isTri: p.includes('tri') };
+  }
+
+  function getCatalogueCompatibles(simState, strictFilters = true){
+    const isEcs = simState.service === 'chauffage_ecs' || simState.service === 'chauffage+ecs';
+    const phase = parsePhase(simState.phase_electrique);
+    return CATALOGUE_PAC.filter((m) => {
+      if (!m) return false;
+      if (m.etas && simState.etas && m.etas !== simState.etas) return false;
+      if (!strictFilters) return true;
+
       const duo = isModeleDuo(m);
-      if ((isEcs && duo) || (!isEcs && !duo)) preferred.push(m);
-      else others.push(m);
+      const tri = isModeleTri(m);
+      if (isEcs && !duo) return false;
+      if (!isEcs && duo) return false;
+
+      if (phase.hasPhase) {
+        if (phase.isTri && !tri) return false;
+        if (!phase.isTri && tri) return false;
+      }
+      return true;
     });
-    preferred.sort((a,b)=>puissanceModele(a)-puissanceModele(b));
-    others.sort((a,b)=>puissanceModele(a)-puissanceModele(b));
-    return preferred.concat(others);
+  }
+
+  function catalogueOptionsOrdonnees(simState){
+    const strict = simState.filtres_stricts !== false;
+    const compatibles = getCatalogueCompatibles(simState, strict).sort((a,b)=>puissanceModele(a)-puissanceModele(b));
+    if (strict) return compatibles;
+
+    const compatIds = new Set(compatibles.map((m)=>m.id));
+    const others = CATALOGUE_PAC
+      .filter((m)=>!compatIds.has(m.id))
+      .sort((a,b)=>puissanceModele(a)-puissanceModele(b));
+    return compatibles.concat(others);
   }
 
   async function chargerBaremes() {
@@ -12918,11 +12998,11 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
   const INFLATION_ELEC = 0.03;     // PAC = électricité
   const DUREE_VIE_PAC = 20;        // ans
 
-  const state = {
+  const DEFAULT_SIM_STATE = {
     numero: null,
-    categorie: 'tres_modeste',
-    zone: 'H1',
-    energie_avant: 'fioul',        // fioul | gaz | bois | electricite (lu fiche)
+    categorie: '',
+    zone: '',
+    energie_avant: '',             // fioul | gaz | bois | electricite (lu fiche)
     surface_habitable: null,
     surface_chauffee: null,
     surface_forcee: false,
@@ -12935,12 +13015,18 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     iso_toit: 'isole',
     iso_mur: 'isole',
     iso_menuiserie: 'double',
+    phase_electrique: '',
+    hsp: null,
+    hsp_fallback: true,
     puissance_requise_kw: null,
     modele_pac: '',
     modele_pac_id: '',
     modele_force: false,
-    sous_dimensionnement: false
+    sous_dimensionnement: false,
+    selection_alerte: null,
+    filtres_stricts: true
   };
+  const state = { ...DEFAULT_SIM_STATE };
 
   const LABELS_ANAH = { tres_modeste:'TMO', modeste:'MO', intermediaire:'INT', superieur:'SUP' };
   const LABELS_CEE  = { tres_modeste:'Précaire', modeste:'Classique', intermediaire:'Classique', superieur:'Classique' };
@@ -12949,6 +13035,9 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
   // Format € avec séparateur de milliers (espace insécable)
   function eur(n){
     return new Intl.NumberFormat('fr-FR',{style:'currency',currency:'EUR',maximumFractionDigits:0}).format(Math.round(n||0));
+  }
+  function eurDash(n, enabled = true){
+    return enabled ? eur(n) : '— €';
   }
   function num(v){ const n=parseFloat(String(v==null?'':v).replace(/\s/g,'').replace(',','.')); return isNaN(n)?null:n; }
 
@@ -12997,28 +13086,35 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     };
   }
 
-  function selectionnerPAC(puissance_requise, catalogue, service) {
+  function selectionnerPAC(puissance_requise, catalogue, simState) {
+    const strict = simState.filtres_stricts !== false;
     const base = (Array.isArray(catalogue) ? catalogue : []).filter((m) => {
       if (!m) return false;
       const p = puissanceModele(m);
       const prix = Number(m?.prix_ttc ?? m?.ttc ?? 0);
       if (!Number.isFinite(p) || p <= 0 || !Number.isFinite(prix) || prix <= 0) return false;
-      if (m.etas && state.etas && m.etas !== state.etas) return false;
       return true;
     });
-    if (!base.length) return { modele: null, sous_dimensionnement: false };
+    if (!base.length) return { modele: null, sous_dimensionnement: false, alerte: 'Catalogue PAC vide' };
 
-    const isEcs = service === 'chauffage_ecs' || service === 'chauffage+ecs';
-    const filtres = base.filter((m) => {
-      const duo = isModeleDuo(m);
-      return isEcs ? duo : !duo;
-    });
-
-    const pool = filtres.length ? filtres : base;
+    const compatibles = getCatalogueCompatibles(simState, strict);
+    const pool = strict ? compatibles : (compatibles.length ? compatibles : base);
     const sorted = [...pool].sort((a, b) => puissanceModele(a) - puissanceModele(b));
+
+    if (!sorted.length) {
+      const phaseInfo = parsePhase(simState.phase_electrique);
+      const phaseTxt = phaseInfo.hasPhase ? (phaseInfo.isTri ? 'triphasé' : 'monophasé') : 'phase non renseignée';
+      const serviceTxt = (simState.service === 'chauffage_ecs' || simState.service === 'chauffage+ecs') ? 'DUO' : 'simple';
+      return {
+        modele: null,
+        sous_dimensionnement: false,
+        alerte: `Catalogue à compléter — aucune PAC ${phaseTxt} ${serviceTxt} disponible`
+      };
+    }
+
     const modele = sorted.find((m) => puissanceModele(m) >= puissance_requise);
-    if (modele) return { modele, sous_dimensionnement: false };
-    return { modele: sorted[sorted.length - 1], sous_dimensionnement: true };
+    if (modele) return { modele, sous_dimensionnement: false, alerte: null };
+    return { modele: sorted[sorted.length - 1], sous_dimensionnement: true, alerte: 'Aucun modèle ne couvre la puissance requise' };
   }
 
   function appliquerSelectionPac(selection){
@@ -13052,9 +13148,11 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       state.sous_dimensionnement = false;
       selection = { modele: forcedModele, sous_dimensionnement: false, forced: true };
     } else {
-      selection = selectionnerPAC(dim.puissance_kw, CATALOGUE_PAC, state.service);
+      selection = selectionnerPAC(dim.puissance_kw, CATALOGUE_PAC, state);
       appliquerSelectionPac(selection);
     }
+
+    state.selection_alerte = selection?.alerte || null;
 
     return { ...dim, selection };
   }
@@ -13065,7 +13163,26 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       || null;
   }
 
+  function resetSimulateurState(){
+    Object.assign(state, { ...DEFAULT_SIM_STATE });
+    state.numero = null;
+    state.modele_force = false;
+    state.selection_alerte = null;
+    const titleSub = document.getElementById('sim-drawer-prospect');
+    if (titleSub) titleSub.textContent = '—';
+    const content = document.getElementById('sim-drawer-content');
+    if (content) {
+      refresh();
+    }
+  }
+
   function lireContexteFiche(){
+    state.categorie = '';
+    state.zone = '';
+    state.energie_avant = '';
+    state.phase_electrique = '';
+    state.surface_habitable = null;
+    if (!state.surface_forcee) state.surface_chauffee = null;
     const badge = document.getElementById('cat-anah-badge');
     if (badge && badge.textContent){
       const t = badge.textContent.trim().toUpperCase();
@@ -13082,6 +13199,9 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     // Énergie avant (bloc 7)
     const mc = document.querySelector('select[name="mode_chauffage"]')?.value;
     if (mc) state.energie_avant = mc;
+    const phase = document.getElementById('phase-input')?.value
+      || document.querySelector('[name="phase_electrique"]')?.value;
+    if (phase) state.phase_electrique = String(phase);
     // Surface habitable -> chauffée 90%
     const sh = num(document.getElementById('surface-input')?.value || document.querySelector('[name="surface_logement_m2"]')?.value);
     if (sh!=null){ state.surface_habitable=sh; if(!state.surface_forcee) state.surface_chauffee=Math.round(sh*0.90); }
@@ -13106,11 +13226,12 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
   async function calcul(){
     if (Object.keys(GRILLE).length === 0 || !CATALOGUE_PAC.length) { await chargerBaremes(); }
     const dim = syncDimensionnement();
+    const contextePret = !!state.categorie && !!state.zone && Number.isFinite(dim.surface_chauffee) && dim.surface_chauffee > 0;
     const sKey = trancheSurface(state.surface_chauffee);
     const node = GRILLE[state.etas]?.[sKey];
-    const ceeDevis    = node ? node.cee_devis[state.zone][state.categorie]    : 0;
-    const ceeConserve = node ? node.cee_conserve[state.zone][state.categorie] : 0;
-    const mprDevis    = node ? node.mpr_devis[state.zone][state.categorie]    : 0;
+    const ceeDevis    = contextePret ? (node?.cee_devis?.[state.zone]?.[state.categorie] ?? 0) : 0;
+    const ceeConserve = contextePret ? (node?.cee_conserve?.[state.zone]?.[state.categorie] ?? 0) : 0;
+    const mprDevis    = contextePret ? (node?.mpr_devis?.[state.zone]?.[state.categorie] ?? 0) : 0;
     const aidesDevis  = ceeDevis + mprDevis;
     const g29 = Math.max(0, (state.prix_pac || 0) - aidesDevis);
 
@@ -13124,6 +13245,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     const nMois = dureeOpt[state.option];
 
     return { sKey, ceeDevis, ceeConserve, mprDevis, aidesDevis, g29,
+             contextePret,
              mensO1, mensO2, fraisO2, mensOpt, nMois, dim };
   }
 
@@ -13178,8 +13300,12 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     const c = await calcul();
     const r = roi(c);
     const sel=(a,b)=>a===b?'selected':'';
-    const catLabel = `${LABELS_ANAH[state.categorie]} (MPR) · ${LABELS_CEE[state.categorie]} (CEE)`;
-    const energieLbl = ENERGIE_LABEL[state.energie_avant] || 'énergie';
+    const anahLabel = LABELS_ANAH[state.categorie] || '—';
+    const ceeLabel = LABELS_CEE[state.categorie] || '—';
+    const catLabel = (anahLabel === '—' && ceeLabel === '—')
+      ? '—'
+      : `${anahLabel} (MPR) · ${ceeLabel} (CEE)`;
+    const energieLbl = ENERGIE_LABEL[state.energie_avant] || '—';
 
     // mensualité affichée dans Avant/Après selon option
     const creditLine = state.option==='opt3'
@@ -13195,7 +13321,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
         <div class="sim-section-label">Repris de la fiche</div>
         <div class="sim-context">
           <div class="sim-ctx-item"><span class="sim-ctx-k">Catégorie</span><span class="sim-ctx-v">${catLabel}</span></div>
-          <div class="sim-ctx-item"><span class="sim-ctx-k">Zone clim.</span><span class="sim-ctx-v">${state.zone}</span></div>
+          <div class="sim-ctx-item"><span class="sim-ctx-k">Zone clim.</span><span class="sim-ctx-v">${state.zone || '—'}</span></div>
           <div class="sim-ctx-item"><span class="sim-ctx-k">Énergie act.</span><span class="sim-ctx-v">${energieLbl}</span></div>
           <div class="sim-ctx-item">
             <span class="sim-ctx-k">Surf. chauffée</span>
@@ -13266,20 +13392,22 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
             <span class="sim-pnl-edit-wrap">
               <span class="sim-pnl-edit"><input type="text" inputmode="numeric" id="sim-prix" value="${new Intl.NumberFormat('fr-FR').format(state.prix_pac||0)}"><em>€</em></span>
               <select id="sim-modele-select" class="sim-model-select">
-                ${catalogueOptionsOrdonnees(state.service).map(m => `<option value="${m.id}" ${m.id===state.modele_pac_id?'selected':''}>${m.label} · ${puissanceModele(m)} kW · ${eur(m.prix_ttc)}</option>`).join('')}
+                ${catalogueOptionsOrdonnees(state).map(m => `<option value="${m.id}" ${m.id===state.modele_pac_id?'selected':''}>${m.label} · ${puissanceModele(m)} kW · ${eur(m.prix_ttc)}</option>`).join('')}
               </select>
+              <label class="sim-strict-toggle"><input type="checkbox" id="sim-strict-filters" ${state.filtres_stricts!==false ? 'checked' : ''}> Filtres stricts</label>
               ${state.sous_dimensionnement ? '<span class="sim-warn-badge">⚠ Vérifier</span>' : ''}
             </span>
           </div>
+          ${state.selection_alerte ? `<div class="sim-note sim-note--warn" id="sim-selection-alerte">${state.selection_alerte}</div>` : ''}
           <div class="sim-pnl-sep"></div>
-          <div class="sim-pnl-line sim-pnl-minus"><span>– MaPrimeRénov' (devis)</span><b id="sim-mpr">${eur(c.mprDevis)}</b></div>
-          <div class="sim-pnl-line sim-pnl-minus"><span>– Prime CEE (devis)</span><b id="sim-cee">${eur(c.ceeDevis)}</b></div>
-          <div class="sim-pnl-line sim-pnl-sub"><span>= Aides déduites</span><b id="sim-aides">${eur(c.aidesDevis)}</b></div>
+          <div class="sim-pnl-line sim-pnl-minus"><span>– MaPrimeRénov' (devis)</span><b id="sim-mpr">${eurDash(c.mprDevis, c.contextePret)}</b></div>
+          <div class="sim-pnl-line sim-pnl-minus"><span>– Prime CEE (devis)</span><b id="sim-cee">${eurDash(c.ceeDevis, c.contextePret)}</b></div>
+          <div class="sim-pnl-line sim-pnl-sub"><span>= Aides déduites</span><b id="sim-aides">${eurDash(c.aidesDevis, c.contextePret)}</b></div>
           <div class="sim-pnl-sep sim-pnl-sep--strong"></div>
-          <div class="sim-pnl-line sim-pnl-reste"><span>Reste à charge</span><strong id="sim-reste">${eur(c.g29)}</strong></div>
+          <div class="sim-pnl-line sim-pnl-reste"><span>Reste à charge</span><strong id="sim-reste">${eurDash(c.g29, c.contextePret)}</strong></div>
         </div>
         <div class="sim-marge">
-          <span>CEE conservé installateur <i>(écrêtement, hors devis)</i></span><b id="sim-conserve">${eur(c.ceeConserve)}</b>
+          <span>CEE conservé installateur <i>(écrêtement, hors devis)</i></span><b id="sim-conserve">${eurDash(c.ceeConserve, c.contextePret)}</b>
         </div>
 
         <!-- ZONE DYNAMIQUE : recalculée sans toucher aux champs de saisie -->
@@ -13347,7 +13475,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
   async function patch(){
     const c = await calcul();
     const r = roi(c);
-    const energieLbl = ENERGIE_LABEL[state.energie_avant] || 'énergie';
+    const energieLbl = ENERGIE_LABEL[state.energie_avant] || '—';
     const creditLine = state.option==='opt3' ? ''
       : `<div class="sa-line"><span>Crédit ${state.option==='opt1'?'Travaux':'Taux Zéro'} <i>${(c.nMois/12)}&nbsp;ans</i></span><b>${eur(state.option==='opt1'?c.mensO1:c.mensO2)}/mois</b></div>`;
     const totalApres = state.facture_apres + (state.option==='opt3'?0:(state.option==='opt1'?c.mensO1:c.mensO2));
@@ -13358,11 +13486,11 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     if (sub) sub.innerHTML = `90% de ${state.surface_habitable ?? '—'} m² habitables${state.surface_forcee?' · <b>forcé</b>':''} → tranche ${labelTranche(c.sKey)}`;
     // cellules compte de résultat
     const set=(id,val)=>{ const el=document.getElementById(id); if(el) el.textContent=val; };
-    set('sim-mpr', eur(c.mprDevis));
-    set('sim-cee', eur(c.ceeDevis));
-    set('sim-aides', eur(c.aidesDevis));
-    set('sim-reste', eur(c.g29));
-    set('sim-conserve', eur(c.ceeConserve));
+    set('sim-mpr', eurDash(c.mprDevis, c.contextePret));
+    set('sim-cee', eurDash(c.ceeDevis, c.contextePret));
+    set('sim-aides', eurDash(c.aidesDevis, c.contextePret));
+    set('sim-reste', eurDash(c.g29, c.contextePret));
+    set('sim-conserve', eurDash(c.ceeConserve, c.contextePret));
     const prixInput = document.getElementById('sim-prix');
     if (prixInput && document.activeElement !== prixInput) {
       prixInput.value = new Intl.NumberFormat('fr-FR').format(state.prix_pac||0);
@@ -13408,6 +13536,14 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
         state.prix_pac = Math.round(selected.prix_ttc || 0);
         state.modele_force = true;
         state.sous_dimensionnement = false;
+        refresh();
+      });
+    }
+    const strictFilters = document.getElementById('sim-strict-filters');
+    if (strictFilters){
+      strictFilters.addEventListener('change', e => {
+        state.filtres_stricts = !!e.target.checked;
+        state.modele_force = false;
         refresh();
       });
     }
@@ -13560,15 +13696,22 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
   function ouvrirNoteDim(){
     const dim = syncDimensionnement();
     const modele = getModeleActuel();
-    const warning = state.sous_dimensionnement
-      ? '<p class="sim-dim-warn">⚠ Aucun modèle du catalogue ne couvre la puissance requise. Le modèle le plus puissant a été retenu. Validation technique recommandée.</p>'
-      : '';
+    const phaseInfo = parsePhase(state.phase_electrique);
+    const phaseTxt = phaseInfo.hasPhase ? (phaseInfo.isTri ? 'Triphasé' : 'Monophasé') : 'Non renseignée';
+    const serviceTxt = state.service === 'chauffage_ecs' ? 'Chauffage + ECS' : 'Chauffage seul';
+    const phaseShort = phaseInfo.hasPhase ? (phaseInfo.isTri ? 'tri' : 'mono') : 'phase non renseignée';
+    let warning = '';
+    if (state.selection_alerte) {
+      warning = `<p class="sim-dim-warn">⚠ ${state.selection_alerte}. Catalogue à compléter — aucune PAC ${phaseShort} ${serviceTxt === 'Chauffage + ECS' ? 'DUO' : 'simple'} avec puissance ≥ ${dim.puissance_kw} kW dans le catalogue actuel.</p>`;
+    } else if (state.sous_dimensionnement) {
+      warning = '<p class="sim-dim-warn">⚠ Aucun modèle du catalogue ne couvre la puissance requise. Le modèle le plus puissant a été retenu. Validation technique recommandée.</p>';
+    }
     const rows = [
       ['Surface habitable', `${state.surface_habitable ?? '—'} m²`],
       ['Surface chauffée', `${dim.surface_chauffee ?? '—'} m²`],
       ['HSP utilisé', `${dim.hsp} m${dim.hsp_fallback ? ' (valeur par défaut 2.5 m)' : ''}`],
       ['Volume chauffé', `${Math.round((dim.volume_chauffe || 0) * 10) / 10} m³`],
-      ['Zone climatique', `${state.zone} (ΔT ${dim.delta_T}°C)`],
+      ['Zone climatique', `${state.zone || '—'} (ΔT ${dim.delta_T}°C)`],
       ['Toit / Comble', `${getIsoLabel('toit', dim.iso_toit)} (G=${dim.G_toit})`],
       ['Mur', `${getIsoLabel('mur', dim.iso_mur)} (G=${dim.G_mur})`],
       ['Menuiserie', `${getIsoLabel('menuiserie', dim.iso_menuiserie)} (G=${dim.G_menui.toFixed(2)})`],
@@ -13577,7 +13720,8 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       ['Puissance requise', `${dim.puissance_kw} kW`],
       ['Modèle sélectionné', modele ? `${modele.label} · ${modele.puissance_kw} kW` : '—'],
       ['Prix TTC', modele ? eur(modele.prix_ttc) : eur(state.prix_pac || 0)],
-      ['Service', state.service === 'chauffage_ecs' ? 'Chauffage + ECS' : 'Chauffage seul']
+      ['Service demandé', serviceTxt],
+      ['Phase électrique demandée', phaseTxt]
     ];
     const htmlRows = rows.map(([k,v]) => `<tr><th>${k}</th><td>${v}</td></tr>`).join('');
     const old = document.getElementById('sim-dim-modal');
@@ -13603,26 +13747,30 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
   window.ouvrirSimulationsDrawer = ouvrir;
   window.fermerSimulationsDrawer = fermer;
   window.ouvrirNoteDim = ouvrirNoteDim;
+  window.resetSimulateur = resetSimulateurState;
 
   // ----- Mise à jour LIVE : si la fiche change, le bloc "Repris de la fiche" suit -----
   // Délégation sur le document (les champs de la fiche peuvent être recréés dynamiquement).
   const CHAMPS_FICHE = [
     'surface-input', 'cout-annuel-input', 'cat-anah-badge',
-    'zone-climatique-chantier'
+    'zone-climatique-chantier', 'hsp', 'hsp-input', 'phase-input'
   ];
   const SELECTEURS_FICHE = [
     '#surface-input', '[name="surface_logement_m2"]',
     '#cout-annuel-input', '[name="cout_energetique_annuel_eur"]',
     'select[name="mode_chauffage"]', '#zone-climatique-chantier',
-    '[name="zone_climatique_chantier"]'
+    '[name="zone_climatique_chantier"]', '#hsp', '#hsp-input', '[name="hsp"]',
+    '#phase-input', '[name="phase_electrique"]'
   ].join(',');
 
-  function syncDepuisFiche(){
-    if (!estOuvert()) return;
-    // si la surface n'a pas été forcée manuellement, on resynchronise depuis la fiche
+  function syncDepuisFiche(force = false){
+    if (!force && !estOuvert()) return;
+    // Relecture complète depuis le DOM actif de la fiche.
     lireContexteFiche();
-    refresh();
+    if (force) state.modele_force = false;
+    if (estOuvert()) refresh();
   }
+  window.syncSimulateurDepuisFiche = syncDepuisFiche;
 
   // input + change couvrent saisie clavier et sélection
   ['input','change'].forEach(evt=>{
@@ -15078,7 +15226,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     const catCee=document.getElementById('cat-cee-badge'); if(catCee) catCee.textContent='—';
     const catAnahLong=document.getElementById('cat-anah-long'); if(catAnahLong) catAnahLong.textContent='';
     const fs=form.querySelector('fieldset'); if(fs) fs.disabled=false;
-    form.action='/prospect/ajax';
+    form.action='/api/leads';
     document.body.dataset.prospectNumero='';
     const infoStrong=document.querySelector('#form-actions-info strong'); if(infoStrong) infoStrong.textContent='PR-NOUVEAU';
     const btnSave=document.getElementById('btn-save');
@@ -15102,14 +15250,23 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       setFieldValue('projet_initial', p.projet_initial || '');
       const infoStrong=document.querySelector('#form-actions-info strong'); if(infoStrong) infoStrong.textContent=p.numero;
       const form=document.getElementById('form-prospect');
-      if(form) form.action='/prospect/'+encodeURIComponent(p.numero);
+      if(form) form.action='/api/leads/'+encodeURIComponent(p.numero);
+    }
+    if (typeof window.syncSimulateurDepuisFiche === 'function') {
+      window.syncSimulateurDepuisFiche(true);
     }
     updateIdentityBanner();
     document.body.classList.remove('hexa-view-prospects'); window.scrollTo(0,0);
   }
   function openNewProspect(){
+    if (typeof window.resetSimulateur === 'function') {
+      window.resetSimulateur();
+    }
     clearProspectForm();
     window.HexaCurrentProspect = { numero:'', nom_complet:'' };
+    if (typeof window.syncSimulateurDepuisFiche === 'function') {
+      window.syncSimulateurDepuisFiche(true);
+    }
     updateIdentityBanner();
     document.body.classList.remove('hexa-view-prospects'); window.scrollTo(0,0);
   }

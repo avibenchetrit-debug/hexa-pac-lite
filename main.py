@@ -81,6 +81,75 @@ def _read_notes():
     return notes if isinstance(notes, dict) else {}
 
 
+async def _read_request_payload(request: Request) -> dict:
+    """Read JSON or form payload and return a flat dict."""
+    ctype = request.headers.get("content-type", "")
+    if "application/json" in ctype:
+        data = await request.json()
+        return data if isinstance(data, dict) else {}
+
+    form = await request.form()
+    payload = {}
+    for key, value in form.items():
+        if hasattr(value, "filename"):  # UploadFile-like
+            continue
+        payload[key] = value
+    return payload
+
+
+def _normalize_lead_payload(payload: dict) -> dict:
+    normalized = {}
+    for key, value in (payload or {}).items():
+        if key is None:
+            continue
+        k = str(key).strip()
+        if not k:
+            continue
+        if value is None:
+            normalized[k] = ""
+        elif isinstance(value, (str, int, float, bool)):
+            normalized[k] = str(value)
+        else:
+            normalized[k] = str(value)
+    return normalized
+
+
+def _upsert_lead(payload: dict, forced_numero: str | None = None) -> tuple[dict, bool]:
+    leads = _read_leads()
+    now = _now_iso()
+    numero = (forced_numero or payload.get("numero") or "").strip()
+    index = None
+    existing = {}
+
+    if numero:
+        for i, lead in enumerate(leads):
+            if str(lead.get("numero", "")).strip() == numero:
+                index = i
+                existing = dict(lead)
+                break
+    else:
+        numero = _next_numero(leads)
+
+    if not existing:
+        existing = {"numero": numero, "date": now}
+
+    merged = dict(existing)
+    merged.update(payload)
+    merged["numero"] = numero
+    merged["date"] = existing.get("date") or now
+    merged["updated_at"] = now
+
+    if index is None:
+        leads.append(merged)
+        created = True
+    else:
+        leads[index] = merged
+        created = False
+
+    _atomic_write_json(LEADS_PATH, leads)
+    return merged, created
+
+
 def _now_iso():
     return datetime.now().isoformat(timespec="seconds")
 
@@ -257,6 +326,51 @@ async def post_catalogue_pac(request: Request) -> JSONResponse:
 
     _atomic_write_json(CATALOGUE_PAC_PATH, validated)
     return JSONResponse({"ok": True, "count": len(validated)})
+
+
+@app.post("/api/leads")
+async def save_lead(request: Request) -> JSONResponse:
+    payload = _normalize_lead_payload(await _read_request_payload(request))
+    lead, created = _upsert_lead(payload)
+    return JSONResponse(
+        {
+            "ok": True,
+            "numero": lead.get("numero"),
+            "lead": lead,
+            "created": created,
+        }
+    )
+
+
+@app.post("/api/leads/{numero}")
+async def update_lead(numero: str, request: Request) -> JSONResponse:
+    payload = _normalize_lead_payload(await _read_request_payload(request))
+    lead, _ = _upsert_lead(payload, forced_numero=numero)
+    return JSONResponse({"ok": True, "numero": lead.get("numero"), "lead": lead})
+
+
+@app.post("/prospect/ajax")
+async def save_prospect_ajax(request: Request) -> JSONResponse:
+    payload = _normalize_lead_payload(await _read_request_payload(request))
+    lead, created = _upsert_lead(payload)
+    return JSONResponse(
+        {
+            "ok": True,
+            "status": "ok",
+            "numero": lead.get("numero"),
+            "lead": lead,
+            "created": created,
+        }
+    )
+
+
+@app.post("/prospect/{numero}/ajax")
+async def update_prospect_ajax(numero: str, request: Request) -> JSONResponse:
+    payload = _normalize_lead_payload(await _read_request_payload(request))
+    lead, _ = _upsert_lead(payload, forced_numero=numero)
+    return JSONResponse(
+        {"ok": True, "status": "ok", "numero": lead.get("numero"), "lead": lead}
+    )
 
 
 @app.get("/api/leads")
