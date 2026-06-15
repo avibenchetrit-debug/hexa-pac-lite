@@ -2918,7 +2918,7 @@ body.panel-is-open {
     .field input::placeholder { color: #94A3B8; }
     .field input:disabled,
     .field input[readonly] {
-      background: #E2E8F0; color: var(--gris-texte); cursor: not-allowed;
+      background: #E2E8F0; color: var(--gris-texte); 
       border-style: dashed;
     }
     .field select {
@@ -3571,7 +3571,7 @@ body.panel-is-open {
       transition: background 0.15s, border-color 0.15s;
     }
     .header-icon-btn:hover { background: var(--gris-fond); border-color: var(--bleu); }
-    .header-icon-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+    .header-icon-btn:disabled { opacity: 0.35; }
     .header-icon-btn svg { width: 18px; height: 18px; }
 
     .fiche-form.is-readonly fieldset { border: none; margin: 0; padding: 0; min-width: 0; }
@@ -3657,7 +3657,6 @@ body.panel-is-open {
   select.reg-auto-input:disabled {
     background: #F1F5F9 !important;
     border: 1px solid #CBD5E0 !important;
-    cursor: not-allowed;
     height: 40px;
     min-height: 40px;
     box-sizing: border-box;
@@ -3706,7 +3705,7 @@ body.panel-is-open {
       color: #4A5568;
       transition: transform 150ms ease, opacity 150ms ease;
     }
-    .dpe-source-pill:disabled { opacity: 0.45; cursor: not-allowed; }
+    .dpe-source-pill:disabled { opacity: 0.45; }
     .dpe-source-pill.is-active { border-color: #002E5A; background: #002E5A; color: #fff; }
     .dpe-source-pill[data-source="dpe_officiel"].is-available:not(:disabled) { border-color: #059669; }
     .dpe-source-pill[data-source="audit_officiel"].is-available:not(:disabled) { border-color: #2563EB; }
@@ -5329,7 +5328,7 @@ body.panel-is-open .prospect-shell-sticky {
 }
 .comments-panel-submit:hover { filter: brightness(1.05); transform: translateY(-1px); }
 .comments-panel-submit:active { transform: translateY(0); }
-.comments-panel-submit:disabled { opacity: 0.5; cursor: not-allowed; }
+.comments-panel-submit:disabled { opacity: 0.5; }
 .comments-panel-immutable-note {
   font-size: 11px;
   font-style: italic;
@@ -5981,7 +5980,6 @@ body.comments-panel-open {
 .btn-visualiser-dpe:disabled {
   background: #d1d9e0;
   color: #9ca3af;
-  cursor: not-allowed;
   transform: none;
   box-shadow: none;
 }
@@ -6201,7 +6199,6 @@ body.parcel-drawer-open .container {
 .parcel-drawer-confirm:disabled {
   background: #D1D9E0;
   color: #9CA3AF;
-  cursor: not-allowed;
 }
 
 .parcel-drawer-confirm:not(:disabled):hover {
@@ -6801,7 +6798,7 @@ input:focus{ outline:none; border-color: var(--c-navy,#002E5A); box-shadow:0 0 0
 .adm-del-actions{ display:flex; justify-content:flex-end; gap:10px; margin-top:18px; }
 .adm-btn-danger{ background:var(--c-rouge,#E2214B); color:#fff; }
 .adm-btn-danger:hover:not(:disabled){ background:#c01b3f; }
-.adm-btn-danger:disabled{ opacity:.45; cursor:not-allowed; }
+.adm-btn-danger:disabled{ opacity:.45; }
 
 /* Colonne 8b commission régie : même famille que net2 */
 .adm-table th.adm-th2b{ background:#b81b3f; }
