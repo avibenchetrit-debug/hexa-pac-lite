@@ -7239,19 +7239,16 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
           <label>Provenance <span class="req">*</span></label>
           <select name="source" required>
             <option value="">— Sélectionner —</option>
-            
-            <option value="compleo" >Compléo</option>
-            
-            <option value="bouche_a_oreille" >Bouche à oreille</option>
-            
-            <option value="site_web" >Site web</option>
-            
-            <option value="salon" >Salon</option>
-            
-            <option value="meta" >Publicité Meta/Google</option>
-            
-            <option value="autre" >Autre</option>
-            
+            <option value="Direct">Direct</option>
+            <option value="Call">Call</option>
+            <option value="Régie commerciale">Régie commerciale</option>
+            <option value="Régie">Régie</option>
+            <option value="Compléo">Compléo</option>
+            <option value="Meta">Meta</option>
+            <option value="Bouche à oreille">Bouche à oreille</option>
+            <option value="Site web">Site web</option>
+            <option value="Salon">Salon</option>
+            <option value="Autre">Autre</option>
           </select>
         </div>
         <div class="row row-2" style="margin-top: 12px;">
@@ -7270,15 +7267,37 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       <div class="card">
         <div class="card-title"><span class="num-card">2</span> Statut du prospect</div>
         <input type="hidden" name="statut" id="statut-input" value="">
+        <input type="hidden" name="usage_bien" id="usage-bien-input" value="">
         <input type="hidden" name="situation_propriete" id="situation-input" value="">
+        <p class="statut-dim-label">Statut commercial</p>
+        <div class="statut-buttons statut-buttons--commercial">
+          <button type="button" class="statut-btn commercial-statut-btn" data-statut="nouveau">
+            <span class="icon">🆕</span>Nouveau
+          </button>
+          <button type="button" class="statut-btn commercial-statut-btn" data-statut="rappeler">
+            <span class="icon">📞</span>À rappeler
+          </button>
+          <button type="button" class="statut-btn commercial-statut-btn" data-statut="rdv">
+            <span class="icon">📅</span>RDV
+          </button>
+          <button type="button" class="statut-btn commercial-statut-btn" data-statut="devis">
+            <span class="icon">📄</span>Devis envoyé
+          </button>
+          <button type="button" class="statut-btn commercial-statut-btn" data-statut="signe">
+            <span class="icon">✅</span>Signé
+          </button>
+          <button type="button" class="statut-btn commercial-statut-btn" data-statut="perdu">
+            <span class="icon">⛔</span>Perdu
+          </button>
+        </div>
         <p class="statut-dim-label">Usage du bien</p>
         <div class="statut-buttons">
           <button type="button" class="statut-btn "
-                  data-statut="proprietaire_occupant">
+                  data-usage="proprietaire_occupant">
             <span class="icon">🏠</span>Propriétaire occupant
           </button>
           <button type="button" class="statut-btn "
-                  data-statut="bailleur">
+                  data-usage="bailleur">
             <span class="icon">🔑</span>Bailleur
           </button>
         </div>
@@ -9094,6 +9113,8 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
   // ===== STATUT =====
   const statutInput = document.getElementById('statut-input');
   const statutButtons = document.querySelectorAll('.statut-btn[data-statut]');
+  const usageBienInput = document.getElementById('usage-bien-input');
+  const usageBienButtons = document.querySelectorAll('.statut-btn[data-usage]');
   const situationInput = document.getElementById('situation-input');
   const situationButtons = document.querySelectorAll('.situation-btn');
   const acquisitionWrap = document.getElementById('acquisition-date-wrap');
@@ -9899,10 +9920,14 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     majBadgesReglementairesBandeau();
   });
 
-  function updateStatutUI() {
-    if (!statutInput) return;
-    const val = statutInput.value;
+  function updateCommercialStatutUI() {
+    const val = statutInput?.value || '';
     statutButtons.forEach(b => b.classList.toggle('selected', b.dataset.statut === val));
+    recalculerCategories();
+  }
+  function updateUsageBienUI() {
+    const val = usageBienInput?.value || '';
+    usageBienButtons.forEach(b => b.classList.toggle('selected', b.dataset.usage === val));
     if (val === 'proprietaire_occupant') {
       if (cpPersonne && cpChantier) cpPersonne.value = cpChantier.value;
       if (cpPersonne) cpPersonne.readOnly = true;
@@ -9916,13 +9941,19 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
   if (statutInput) {
     statutButtons.forEach(b => b.addEventListener('click', () => {
       statutInput.value = b.dataset.statut;
-      updateStatutUI();
+      updateCommercialStatutUI();
+    }));
+  }
+  if (usageBienInput) {
+    usageBienButtons.forEach(b => b.addEventListener('click', () => {
+      usageBienInput.value = b.dataset.usage;
+      updateUsageBienUI();
     }));
   }
 
   if (cpChantier) {
     cpChantier.addEventListener('input', () => {
-      if (statutInput && statutInput.value === 'proprietaire_occupant' && cpPersonne) cpPersonne.value = cpChantier.value;
+      if (usageBienInput && usageBienInput.value === 'proprietaire_occupant' && cpPersonne) cpPersonne.value = cpChantier.value;
       recalculerCategories();
     });
   }
@@ -10356,6 +10387,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     const badgeAnah = document.getElementById('cat-anah-badge');
     const badgeCee = document.getElementById('cat-cee-badge');
     const longAnah = document.getElementById('cat-anah-long');
+    const categorieInput = document.getElementById('categorie-input');
     if (!badgeAnah || !badgeCee) return;
 
     if (!rfrStr || isNaN(rfr) || rfr <= 0 || !nbPers || nbPers < 1 || isIDF === null) {
@@ -10364,6 +10396,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       badgeCee.textContent = '—';
       badgeCee.className = 'cat-badge empty';
       longAnah.textContent = '';
+      if (categorieInput) categorieInput.value = '';
       return;
     }
 
@@ -10381,6 +10414,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     badgeAnah.style.background = badgeA.bg;
     badgeAnah.style.color = badgeA.fg;
     longAnah.textContent = longLabels[catAnah];
+    if (categorieInput) categorieInput.value = catAnah;
 
     // Badge CEE
     const catCee = ANAH_TO_CEE[catAnah];
@@ -10992,7 +11026,8 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
   });
 
   // Init
-  if (statutInput) updateStatutUI();
+  if (statutInput) updateCommercialStatutUI();
+  if (usageBienInput) updateUsageBienUI();
   recalculerCategories();
   updateReseau();
   if (rfrInput && rfrInput.value) rfrInput.value = formaterRFR(rfrInput.value);
@@ -15147,7 +15182,8 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     phase_electrique: ['phase_electrique', 'phase'],
     panneau_solaire: ['panneau_solaire', 'panneaux_solaires'],
     code_postal_personne: ['code_postal_personne', 'cp_personne'],
-    statut: ['usage_bien', 'statut_usage', 'statut'],
+    statut: ['statut'],
+    usage_bien: ['usage_bien', 'statut_usage', 'usage'],
     situation_propriete: ['situation_propriete', 'situation'],
     categorie: ['categorie', 'categorie_anah'],
   };
@@ -15194,6 +15230,8 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     });
     const usage = document.getElementById('statut-input')?.value || '';
     document.querySelectorAll('.statut-btn[data-statut]').forEach(b => b.classList.toggle('selected', !!usage && b.dataset.statut === usage));
+    const usageBien = document.getElementById('usage-bien-input')?.value || '';
+    document.querySelectorAll('.statut-btn[data-usage]').forEach(b => b.classList.toggle('selected', !!usageBien && b.dataset.usage === usageBien));
     const situation = document.getElementById('situation-input')?.value || '';
     document.querySelectorAll('.situation-btn[data-situation]').forEach(b => b.classList.toggle('selected', !!situation && b.dataset.situation === situation));
   }
@@ -15212,7 +15250,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     const anah = document.getElementById('cat-anah-badge');
     const cee = document.getElementById('cat-cee-badge');
     const long = document.getElementById('cat-anah-long');
-    if(input) input.value = cat ? cat.short : '';
+    if(input) input.value = cat ? cat.key : '';
     if(anah) anah.textContent = cat ? cat.short : '—';
     if(cee) cee.textContent = cat ? cat.cee : '—';
     if(long) long.textContent = '';
@@ -15238,9 +15276,10 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     const tel = (document.querySelector('[name="telephone"]')?.value || '').trim();
     const email = (document.querySelector('[name="email"]')?.value || '').trim();
     const cp = (document.querySelector('[name="code_postal_chantier"]')?.value || '').replace(/\D/g,'').slice(0,5);
-    const statutVal = (document.getElementById('statut-input')?.value || document.querySelector('.statut-btn.selected')?.dataset.statut || '').trim().toLowerCase();
+    const usageVal = (document.getElementById('usage-bien-input')?.value || document.querySelector('.statut-btn[data-usage].selected')?.dataset.usage || '').trim().toLowerCase();
     const dpe = (document.getElementById('dpe-input')?.value || '').trim().toUpperCase();
-    const catInput = (document.querySelector('[name="categorie"]')?.value || '').trim().toUpperCase();
+    const catInputRaw = (document.querySelector('[name="categorie"]')?.value || '').trim();
+    const catInput = normalizeCategorie(catInputRaw)?.short || catInputRaw.toUpperCase();
     const catBadge = (document.getElementById('cat-anah-badge')?.textContent || '').trim().toUpperCase();
     const categorie = catInput || (/^(TMO|MO|INT|SUP)$/.test(catBadge) ? catBadge : '');
 
@@ -15257,7 +15296,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       proprietaire_occupant: { label:'PROPRIÉTAIRE OCCUPANT', bg:'#FDE8EC', fg:'#B01830' },
       bailleur: { label:'BAILLEUR', bg:'#DBEAFE', fg:'#1E40AF' },
     };
-    const usage = usageMap[statutVal];
+    const usage = usageMap[usageVal];
     applyBadge('psb-badge-usage', usage?.label || '', usage?.bg, usage?.fg);
     applyBadge('psb-badge-cp', cp ? ('CP ' + cp) : '', '#F1F5F9', '#475569');
     const catColors = {

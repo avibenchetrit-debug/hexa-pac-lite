@@ -111,6 +111,11 @@ def _normalize_lead_payload(payload: dict) -> dict:
             normalized[k] = str(value)
         else:
             normalized[k] = str(value)
+
+    if "statut" in normalized:
+        normalized["statut"] = _normalize_statut(normalized.get("statut"))
+    if "categorie" in normalized:
+        normalized["categorie"] = _normalize_categorie(normalized.get("categorie"))
     return normalized
 
 
@@ -203,10 +208,140 @@ _FIELD_ALIASES = {
     "commentaires": "notes",
 }
 
+STATUT_ALIASES = {
+    "nouveau": "nouveau",
+    "a rappeler": "rappeler",
+    "à rappeler": "rappeler",
+    "a recontacter": "rappeler",
+    "rappeler": "rappeler",
+    "rdv": "rdv",
+    "rdv pris": "rdv",
+    "devis": "devis",
+    "devis envoye": "devis",
+    "devis envoyé": "devis",
+    "signe": "signe",
+    "signé": "signe",
+    "perdu": "perdu",
+}
+
+CATEGORIE_ALIASES = {
+    "tmo": "tres_modeste",
+    "tm": "tres_modeste",
+    "tres modeste": "tres_modeste",
+    "très modeste": "tres_modeste",
+    "tres_modeste": "tres_modeste",
+    "mo": "modeste",
+    "modeste": "modeste",
+    "int": "intermediaire",
+    "intermediaire": "intermediaire",
+    "intermédiaire": "intermediaire",
+    "sup": "superieur",
+    "superieur": "superieur",
+    "supérieur": "superieur",
+}
+
 PROSPECT_FIELDS = [
+    "numero",
+    "nom",
+    "prenom",
+    "civilite",
+    "telephone",
+    "email",
+    "usage_bien",
+    "situation",
+    "situation_propriete",
+    "statut",
+    "source",
+    "projet_initial",
+    "adresse_chantier",
+    "code_postal_chantier",
+    "ville_chantier",
+    "zone_climatique",
+    "zone_climatique_chantier",
+    "parcelle_cadastrale",
+    "registre_copro",
+    "classe_dpe",
+    "dpe_connu",
+    "dpe_numero",
+    "dpe_date",
+    "type_logement",
+    "surface_logement_m2",
+    "hsp",
+    "annee_construction",
+    "mode_chauffage",
+    "ecs",
+    "gestion_ecs",
+    "cout_chauffage",
+    "cout_energetique_mensuel_eur",
+    "phase_electrique",
+    "puissance_compteur",
+    "altitude",
+    "panneaux_solaires",
+    "panneau_solaire",
+    "rfr",
+    "nombre_personnes",
+    "code_postal_personne",
+    "categorie",
+    "date",
+    "updated_at",
+    "nrp_log",
+    # Compatibility fields used by the prospects table/imports.
+    "cp",
+    "ville",
+]
+
+IMPORT_PROSPECT_FIELDS = [
     "nom", "prenom", "telephone", "email", "cp",
     "ville", "statut", "categorie", "source", "projet_initial",
 ]
+
+
+def _normalize_statut(value: str) -> str:
+    raw = str(value or "").strip()
+    if not raw:
+        return ""
+    return STATUT_ALIASES.get(_norm(raw), raw)
+
+
+def _normalize_categorie(value: str) -> str:
+    raw = str(value or "").strip()
+    if not raw:
+        return ""
+    return CATEGORIE_ALIASES.get(_norm(raw), raw)
+
+
+def _lead_for_response(lead: dict) -> dict:
+    normalized = dict(lead or {})
+    normalized["statut"] = _normalize_statut(normalized.get("statut", ""))
+    normalized["categorie"] = _normalize_categorie(normalized.get("categorie", ""))
+    for field in PROSPECT_FIELDS:
+        normalized.setdefault(field, "" if field != "nrp_log" else [])
+    return normalized
+
+
+def _migrate_leads_schema():
+    leads = _read_leads()
+    changed = False
+    migrated = []
+    for lead in leads:
+        if not isinstance(lead, dict):
+            migrated.append(lead)
+            continue
+        item = dict(lead)
+        statut = _normalize_statut(item.get("statut", ""))
+        categorie = _normalize_categorie(item.get("categorie", ""))
+        if item.get("statut") != statut:
+            item["statut"] = statut
+            changed = True
+        if item.get("categorie") != categorie:
+            item["categorie"] = categorie
+            changed = True
+        migrated.append(item)
+    if changed:
+        _atomic_write_json(LEADS_PATH, migrated)
+
+
+_migrate_leads_schema()
 
 
 def _extract_texte(payload_form, payload_json):
@@ -336,7 +471,7 @@ async def save_lead(request: Request) -> JSONResponse:
         {
             "ok": True,
             "numero": lead.get("numero"),
-            "lead": lead,
+            "lead": _lead_for_response(lead),
             "created": created,
         }
     )
@@ -347,7 +482,7 @@ def get_lead(numero: str) -> JSONResponse:
     wanted = str(numero or "").strip()
     for lead in _read_leads():
         if str(lead.get("numero", "")).strip() == wanted:
-            return JSONResponse(lead)
+            return JSONResponse(_lead_for_response(lead))
     raise HTTPException(status_code=404, detail="Prospect introuvable")
 
 
@@ -355,7 +490,7 @@ def get_lead(numero: str) -> JSONResponse:
 async def update_lead(numero: str, request: Request) -> JSONResponse:
     payload = _normalize_lead_payload(await _read_request_payload(request))
     lead, _ = _upsert_lead(payload, forced_numero=numero)
-    return JSONResponse({"ok": True, "numero": lead.get("numero"), "lead": lead})
+    return JSONResponse({"ok": True, "numero": lead.get("numero"), "lead": _lead_for_response(lead)})
 
 
 @app.post("/prospect/ajax")
@@ -367,7 +502,7 @@ async def save_prospect_ajax(request: Request) -> JSONResponse:
             "ok": True,
             "status": "ok",
             "numero": lead.get("numero"),
-            "lead": lead,
+            "lead": _lead_for_response(lead),
             "created": created,
         }
     )
@@ -378,13 +513,13 @@ async def update_prospect_ajax(numero: str, request: Request) -> JSONResponse:
     payload = _normalize_lead_payload(await _read_request_payload(request))
     lead, _ = _upsert_lead(payload, forced_numero=numero)
     return JSONResponse(
-        {"ok": True, "status": "ok", "numero": lead.get("numero"), "lead": lead}
+        {"ok": True, "status": "ok", "numero": lead.get("numero"), "lead": _lead_for_response(lead)}
     )
 
 
 @app.get("/api/leads")
 def get_leads() -> JSONResponse:
-    return JSONResponse(_read_leads())
+    return JSONResponse([_lead_for_response(lead) for lead in _read_leads()])
 
 
 # ---------------------------------------------------------------------------
@@ -423,7 +558,11 @@ async def import_leads(file: UploadFile = File(...)) -> JSONResponse:
 
     for idx, row in df.iterrows():
         record = {field: str(row[col]).strip() for col, field in col_map.items()}
-        record = {k: v for k, v in record.items() if k in PROSPECT_FIELDS}
+        record = {k: v for k, v in record.items() if k in IMPORT_PROSPECT_FIELDS}
+        if "statut" in record:
+            record["statut"] = _normalize_statut(record.get("statut"))
+        if "categorie" in record:
+            record["categorie"] = _normalize_categorie(record.get("categorie"))
         note_text = ""
         for col, field in col_map.items():
             if field == "notes":
@@ -435,7 +574,7 @@ async def import_leads(file: UploadFile = File(...)) -> JSONResponse:
 
         numero = _next_numero(leads)
         prospect = {"numero": numero, "date": _now_iso()}
-        prospect.update({field: record.get(field, "") for field in PROSPECT_FIELDS})
+        prospect.update({field: record.get(field, "") for field in IMPORT_PROSPECT_FIELDS})
         leads.append(prospect)
         imported += 1
 
