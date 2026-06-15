@@ -10759,6 +10759,9 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
         setSaveCtaLabel(savedNumero ? 'MODIFIER' : 'ENREGISTRER');
         saveToast('Prospect enregistré ✓', '#0D6B3B');
         majBadgesReglementairesBandeau();
+        if (typeof window.hexaRefreshProspectsTable === 'function') {
+          window.hexaRefreshProspectsTable();
+        }
       })
       .catch(() => {
         btn.disabled = false;
@@ -14612,10 +14615,9 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
          + '</span>';
   }
   function statutSortVal(p){ const s=STMAP[p.statut]; return s? String(s.i).padStart(2,'0') : '00'; }
-  function loadProspects(){
-    return [];
+  function clearLegacyProspectsCache(){
+    try { localStorage.removeItem('hexa_prospects'); } catch(_) {}
   }
-  function persist(){ try{ localStorage.setItem('hexa_prospects', JSON.stringify(data)); }catch(_){} }
 
   // Temps relatif court
   function relTime(iso){
@@ -14635,6 +14637,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
 
   let data = [];
   let leadsLoading = true;
+  let leadsLoadError = '';
   let sortKey='date', sortDir=-1, query='';
 
   const fmtDate = d => { try{ return new Date(d).toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric'}); }catch(_){ return d; } };
@@ -14685,7 +14688,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     delete o.nrp;
     return o;
   }
-  data = loadProspects();
+  clearLegacyProspectsCache();
   function leadField(p, field){
     if(field==='statut') return cleanVal(p?.statut || 'nouveau');
     if(field==='categorie') return cleanVal(p?.categorie);
@@ -14774,24 +14777,28 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     if(rebuildFilters) fillStatsFilters();
     computeStats();
   }
-  async function refreshAfterImport(){
+  async function refreshProspectsTable(){
+    leadsLoading = true;
+    leadsLoadError = '';
+    data = [];
+    renderRows();
+    refreshMasterStats(true);
     try{
       const res = await fetch('/api/leads', { cache:'no-store' });
-      if(res.ok){
-        const leads = await res.json();
-        if(Array.isArray(leads)){
-          data = leads.map(normalizeProspect);
-          persist();
-          leadsLoading = false;
-          renderRows();
-          refreshMasterStats(true);
-          return;
-        }
-      }
-    }catch(_){}
+      if(!res.ok) throw new Error('HTTP ' + res.status);
+      const leads = await res.json();
+      if(!Array.isArray(leads)) throw new Error('Réponse invalide');
+      data = leads.map(normalizeProspect);
+    }catch(_){
+      data = [];
+      leadsLoadError = 'Connexion au serveur impossible. Vérifiez votre connexion.';
+    }
     leadsLoading = false;
     renderRows();
     refreshMasterStats(true);
+  }
+  async function refreshAfterImport(){
+    return refreshProspectsTable();
   }
 
   function buildView(){
@@ -14883,7 +14890,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     document.getElementById('pv-count').textContent = rows.length+' prospect'+(rows.length>1?'s':'');
     if(!rows.length){
       tb.innerHTML='';
-      empty.textContent = leadsLoading ? 'Chargement des prospects…' : 'Aucun prospect pour le moment.';
+      empty.textContent = leadsLoading ? 'Chargement des prospects…' : (leadsLoadError || 'Aucun prospect pour le moment.');
       empty.style.display='block';
       return;
     }
@@ -14929,7 +14936,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
           opt.addEventListener('click', e=>{
             e.stopPropagation();
             const k=opt.dataset.k; const prev=rec.statut;
-            rec.statut=k; persist(); menu.classList.remove('open');
+            rec.statut=k; menu.classList.remove('open');
             renderRows();
             refreshMasterStats(true);
             if(k!==prev) celebrateStatut(k);
@@ -14942,7 +14949,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
           if(!Array.isArray(rec.nrp_log)) rec.nrp_log=[];
           if(btn.dataset.act==='inc') rec.nrp_log.push(new Date().toISOString());
           else rec.nrp_log.pop();           // annule le dernier NRP (clic par erreur)
-          persist(); renderRows();
+          renderRows();
         });
       });
     });
@@ -14999,6 +15006,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     window.addEventListener('hexa:leads-imported', refreshAfterImport);
     document.addEventListener('hexa:leads-imported', refreshAfterImport);
     window.hexaRefreshStatsAfterImport = refreshAfterImport;
+    window.hexaRefreshProspectsTable = refreshProspectsTable;
   }
 
   // --- Menu statut : positionnement fixed (ne déborde pas) ---
@@ -15056,7 +15064,13 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
   }
 
   // --- Navigation + bandeau identité ---
-  function showProspects(){ document.body.classList.add('hexa-view-prospects'); window.scrollTo(0,0); }
+  function showProspects(){
+    document.body.classList.add('hexa-view-prospects');
+    window.scrollTo(0,0);
+    if (typeof window.hexaRefreshProspectsTable === 'function') {
+      window.hexaRefreshProspectsTable();
+    }
+  }
   const FIELD_ALIASES = {
     telephone: ['telephone', 'tel', 'phone'],
     code_postal_chantier: ['code_postal_chantier', 'cp', 'code_postal'],
@@ -15319,7 +15333,6 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     document.body.appendChild(view);
     bindView(); renderRows();
     refreshMasterStats(true);
-    refreshAfterImport();
     showProspects(); // accueil par défaut
 
     // Header de la fiche
