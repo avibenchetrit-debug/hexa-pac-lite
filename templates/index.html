@@ -4924,6 +4924,28 @@ body.panel-is-open .prospect-shell-sticky {
   font-weight: 900;
   line-height: 1;
 }
+.psb-cta-btn {
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0.5px solid #B5D4F4;
+  border-radius: 8px;
+  background: #fff;
+  color: #002E5A;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all .12s;
+}
+.psb-cta-btn:hover { background: #E6F1FB; border-color: #002E5A; }
+.psb-cta-btn.is-active { background: #002E5A; color: #fff; border-color: #002E5A; }
+.psb-cta-btn .header-letter { font-size: 13px; font-weight: 600; line-height: 1; }
+.prospect-sticky-bar .psb-actions,
+.prospect-sticky-actions { display:flex; gap:6px; align-items:center; }
 
 .header .numero-prospect {
   display: inline-flex;
@@ -7127,23 +7149,23 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       <span id="psb-badge-dpe" class="psb-badge" style="display:none"></span>
     </div>
     <div class="prospect-sticky-actions psb-actions">
-      <button type="button" class="header-icon-btn btn-notes fiche-action-btn" title="Notes internes"
+      <button type="button" class="header-icon-btn psb-cta-btn btn-notes fiche-action-btn" title="Notes internes"
         onclick="(window.ouvrirNotesInternes||window.ouvrirCommentaires)('PR-000001')">
         <span class="header-letter">N</span>
         <span class="fiche-action-count" id="count-notes">0</span>
       </button>
-      <button type="button" class="header-icon-btn btn-echanges fiche-action-btn" title="Échanges"
+      <button type="button" class="header-icon-btn psb-cta-btn btn-echanges fiche-action-btn" title="Échanges"
         onclick="(window.ouvrirEchanges||window.ouvrirEchangesLazy||function(){})('PR-000001')">
         <span class="header-letter">E</span>
         <span class="fiche-action-count" id="count-echanges">0</span>
       </button>
-      <button type="button" class="header-icon-btn" title="Documents"
+      <button type="button" class="header-icon-btn psb-cta-btn" title="Documents"
         onclick="(window.ouvrirDocumentsLazy||window.ouvrirDocuments)('PR-000001')">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        <span class="header-letter">D</span>
       </button>
-      <button type="button" class="header-icon-btn" title="Simulations"
+      <button type="button" class="header-icon-btn psb-cta-btn" title="Simulateur"
         onclick="window.ouvrirSimulationsDrawer('PR-000001')">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+        <span class="header-letter">S</span>
       </button>
     </div>
   </div>
