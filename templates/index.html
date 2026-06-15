@@ -7113,20 +7113,18 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
 <div class="prospect-shell-sticky">
   <div class="prospect-sticky-bar prospect-sticky-header" id="prospect-sticky-bar">
     <div class="psb-main">
-      <span class="prospect-sticky-numero psb-numero">PR-000001</span>
-      <span class="prospect-sticky-nom psb-name prospect-nom">Jean-François BRETAGNE</span>
+      <span id="psb-numero" class="prospect-sticky-numero psb-numero">PR-000001</span>
+      <span id="psb-nom" class="prospect-sticky-nom psb-name prospect-nom">Jean-François BRETAGNE</span>
     </div>
     <div class="prospect-sticky-contact psb-contact">
-      <a href="tel:0611812004" class="prospect-sticky-tel">06 11 81 20 04</a>
-      <a href="mailto:jf.bretagne@email.fr" class="prospect-sticky-email">jf.bretagne@email.fr</a>
+      <a id="psb-tel" href="tel:0611812004" class="prospect-sticky-tel">06 11 81 20 04</a>
+      <a id="psb-email" href="mailto:jf.bretagne@email.fr" class="prospect-sticky-email">jf.bretagne@email.fr</a>
     </div>
     <div class="prospect-sticky-badges psb-badges">
-      <span class="psb-badge" style="background:var(--rouge-soft);color:var(--rouge);">proprietaire occupant</span>
-      <span class="psb-badge" style="background:#E0E7FF;color:#3730A3;">HORS_IDF</span>
-      <span class="psb-badge" style="background:#F1F5F9;color:#475569;">CP 53000</span>
-      <span class="psb-badge" style="background:#DBEAFE;color:#1E40AF;">ANAH TMO</span>
-      <span class="psb-badge" style="background:#FEF3C7;color:#92400E;">CEE Précaire</span>
-      <span class="psb-badge" style="background:#D1FAE5;color:#065F46;">DPE F</span>
+      <span id="psb-badge-usage" class="psb-badge" style="display:none"></span>
+      <span id="psb-badge-cp" class="psb-badge" style="display:none"></span>
+      <span id="psb-badge-categorie" class="psb-badge" style="display:none"></span>
+      <span id="psb-badge-dpe" class="psb-badge" style="display:none"></span>
     </div>
     <div class="prospect-sticky-actions psb-actions">
       <button type="button" class="header-icon-btn btn-notes fiche-action-btn" title="Notes internes"
@@ -14053,7 +14051,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       });
     });
     document.getElementById('pv-search').addEventListener('input', e=>{ query=e.target.value; renderRows(); });
-    document.getElementById('pv-new').addEventListener('click', openFiche);
+    document.getElementById('pv-new').addEventListener('click', openNewProspect);
     const admBtn=document.getElementById('pv-admin');
     if(admBtn) admBtn.addEventListener('click', ()=>{ if(window.HexaAdmin) window.HexaAdmin.open(); });
     const regieBtn=document.getElementById('pv-regie');
@@ -14151,15 +14149,141 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     setTimeout(()=>{ if(cv.parentNode) cv.remove(); }, 3200);
   }
 
-  // --- Navigation ---
+  // --- Navigation + bandeau identité ---
   function showProspects(){ document.body.classList.add('hexa-view-prospects'); window.scrollTo(0,0); }
+  function setFieldValue(name, value){
+    const el = document.querySelector('[name="'+name+'"]');
+    if(!el) return;
+    if(el.tagName==='SELECT'){
+      const has = Array.from(el.options).some(o=>o.value===String(value));
+      if(has) el.value = String(value);
+      else if(el.options.length) el.selectedIndex = 0;
+      el.dispatchEvent(new Event('change', { bubbles:true }));
+    }else{
+      el.value = value == null ? '' : value;
+      el.dispatchEvent(new Event('input', { bubbles:true }));
+      el.dispatchEvent(new Event('change', { bubbles:true }));
+    }
+  }
+  function applyBadge(id, text, bg, fg){
+    const el=document.getElementById(id); if(!el) return;
+    if(!text){ el.style.display='none'; el.textContent=''; return; }
+    el.style.display='inline-flex';
+    el.style.background = bg || '#F1F5F9';
+    el.style.color = fg || '#475569';
+    el.textContent = text;
+  }
+  function updateIdentityBanner(){
+    const numEl=document.getElementById('psb-numero');
+    const nomEl=document.getElementById('psb-nom');
+    const telEl=document.getElementById('psb-tel');
+    const emailEl=document.getElementById('psb-email');
+    if(!numEl || !nomEl || !telEl || !emailEl) return;
+    const isNew = !String(document.body.dataset.prospectNumero||'').trim();
+    const numero = isNew ? 'PR-NOUVEAU' : (document.body.dataset.prospectNumero || '—');
+    const nom = (document.querySelector('[name="nom"]')?.value || '').trim();
+    const prenom = (document.querySelector('[name="prenom"]')?.value || '').trim();
+    const tel = (document.querySelector('[name="telephone"]')?.value || '').trim();
+    const email = (document.querySelector('[name="email"]')?.value || '').trim();
+    const cp = (document.querySelector('[name="code_postal_chantier"]')?.value || '').replace(/\D/g,'').slice(0,5);
+    const statutVal = (document.getElementById('statut-input')?.value || document.querySelector('.statut-btn.selected')?.dataset.statut || '').trim().toLowerCase();
+    const dpe = (document.getElementById('dpe-input')?.value || '').trim().toUpperCase();
+    const catInput = (document.querySelector('[name="categorie"]')?.value || '').trim().toUpperCase();
+    const catBadge = (document.getElementById('cat-anah-badge')?.textContent || '').trim().toUpperCase();
+    const categorie = catInput || (/^(TMO|MO|INT|SUP)$/.test(catBadge) ? catBadge : '');
+
+    numEl.textContent = numero || '—';
+    nomEl.textContent = ((prenom + ' ' + nom.toUpperCase()).trim()) || '—';
+    telEl.textContent = tel || '—';
+    telEl.href = tel ? ('tel:' + tel.replace(/\D/g,'')) : '#';
+    emailEl.textContent = email || '—';
+    emailEl.href = email ? ('mailto:' + email) : '#';
+
+    const usageMap = {
+      proprietaire_occupant: { label:'PROPRIÉTAIRE OCCUPANT', bg:'#FDE8EC', fg:'#B01830' },
+      bailleur: { label:'BAILLEUR', bg:'#DBEAFE', fg:'#1E40AF' },
+    };
+    const usage = usageMap[statutVal];
+    applyBadge('psb-badge-usage', usage?.label || '', usage?.bg, usage?.fg);
+    applyBadge('psb-badge-cp', cp ? ('CP ' + cp) : '', '#F1F5F9', '#475569');
+    const catColors = {
+      TMO: ['#DBEAFE','#1E40AF'],
+      MO: ['#FFEDD5','#9A3412'],
+      INT:['#EDE9FE','#6D28D9'],
+      SUP:['#FCE7F3','#9D174D'],
+    };
+    applyBadge('psb-badge-categorie', categorie ? ('ANAH ' + categorie) : '', catColors[categorie]?.[0], catColors[categorie]?.[1]);
+    const dpeColors = {
+      A:['#DCFCE7','#166534'], B:['#D9F99D','#3F6212'], C:['#FEF9C3','#854D0E'],
+      D:['#FFEDD5','#9A3412'], E:['#FED7AA','#9A3412'], F:['#FECACA','#991B1B'], G:['#FCA5A5','#7F1D1D'],
+    };
+    applyBadge('psb-badge-dpe', /^[A-G]$/.test(dpe) ? ('DPE ' + dpe) : '', dpeColors[dpe]?.[0], dpeColors[dpe]?.[1]);
+  }
+  function bindIdentityBannerLive(){
+    const form = document.getElementById('form-prospect');
+    if(!form || form.dataset.psbBound==='1') return;
+    form.dataset.psbBound='1';
+    form.addEventListener('input', updateIdentityBanner, true);
+    form.addEventListener('change', updateIdentityBanner, true);
+    document.querySelectorAll('.statut-btn, .dpe-btn, .pill').forEach(btn=>{
+      btn.addEventListener('click', ()=>setTimeout(updateIdentityBanner,0));
+    });
+    const cat = document.getElementById('cat-anah-badge');
+    if(cat && 'MutationObserver' in window){
+      new MutationObserver(updateIdentityBanner).observe(cat, { childList:true, characterData:true, subtree:true });
+    }
+  }
+  function clearProspectForm(){
+    const form=document.getElementById('form-prospect'); if(!form) return;
+    form.querySelectorAll('input, select, textarea').forEach(el=>{
+      if(el.type==='hidden') el.value='';
+      else if(el.tagName==='SELECT') el.selectedIndex = 0;
+      else if(el.type==='checkbox' || el.type==='radio') el.checked = false;
+      else el.value = '';
+      el.dispatchEvent(new Event('input', { bubbles:true }));
+      el.dispatchEvent(new Event('change', { bubbles:true }));
+      el.removeAttribute('readonly');
+      el.disabled = false;
+    });
+    document.querySelectorAll('.dpe-btn.selected, .statut-btn.selected, .pill.selected').forEach(el=>el.classList.remove('selected'));
+    document.querySelectorAll('.field.error').forEach(el=>el.classList.remove('error'));
+    const catAnah=document.getElementById('cat-anah-badge'); if(catAnah) catAnah.textContent='—';
+    const catCee=document.getElementById('cat-cee-badge'); if(catCee) catCee.textContent='—';
+    const catAnahLong=document.getElementById('cat-anah-long'); if(catAnahLong) catAnahLong.textContent='';
+    const fs=form.querySelector('fieldset'); if(fs) fs.disabled=false;
+    form.action='/prospect/ajax';
+    document.body.dataset.prospectNumero='';
+    const infoStrong=document.querySelector('#form-actions-info strong'); if(infoStrong) infoStrong.textContent='PR-NOUVEAU';
+    const btnSave=document.getElementById('btn-save');
+    if(btnSave){
+      btnSave.style.display='inline-flex';
+      btnSave.dataset.ctaMode='create';
+      if(btnSave.tagName==='BUTTON') btnSave.textContent='ENREGISTRER';
+    }
+  }
   function openFiche(p){
-    // mémorise le prospect courant pour les panneaux Notes/Échanges/Documents
     if(p && p.numero){
       window.HexaCurrentProspect = { numero:p.numero, nom_complet:((p.nom||'')+' '+(p.prenom||'')).trim() };
-    } else if(!window.HexaCurrentProspect){
-      const d=data[0]||{}; window.HexaCurrentProspect = { numero:d.numero||'PR-000001', nom_complet:((d.nom||'')+' '+(d.prenom||'')).trim() };
+      document.body.dataset.prospectNumero = p.numero;
+      setFieldValue('nom', p.nom || '');
+      setFieldValue('prenom', p.prenom || '');
+      setFieldValue('telephone', p.tel || p.telephone || '');
+      setFieldValue('email', p.email || '');
+      setFieldValue('code_postal_chantier', p.cp || '');
+      setFieldValue('source', p.source || '');
+      setFieldValue('statut', p.statut || '');
+      setFieldValue('projet_initial', p.projet_initial || '');
+      const infoStrong=document.querySelector('#form-actions-info strong'); if(infoStrong) infoStrong.textContent=p.numero;
+      const form=document.getElementById('form-prospect');
+      if(form) form.action='/prospect/'+encodeURIComponent(p.numero);
     }
+    updateIdentityBanner();
+    document.body.classList.remove('hexa-view-prospects'); window.scrollTo(0,0);
+  }
+  function openNewProspect(){
+    clearProspectForm();
+    window.HexaCurrentProspect = { numero:'', nom_complet:'' };
+    updateIdentityBanner();
     document.body.classList.remove('hexa-view-prospects'); window.scrollTo(0,0);
   }
 
@@ -14177,7 +14301,9 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     const neu=document.getElementById('hexa-nav-new');
     if(home) home.addEventListener('click', e=>{ e.preventDefault(); showProspects(); });
     if(logo) logo.addEventListener('click', e=>{ e.preventDefault(); showProspects(); });
-    if(neu) neu.addEventListener('click', e=>{ e.preventDefault(); openFiche(); });
+    if(neu) neu.addEventListener('click', e=>{ e.preventDefault(); openNewProspect(); });
+    bindIdentityBannerLive();
+    updateIdentityBanner();
   }
   if(document.readyState!=='loading') init();
   else document.addEventListener('DOMContentLoaded', init);
