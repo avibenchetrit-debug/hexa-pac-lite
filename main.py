@@ -164,6 +164,17 @@ async def health() -> JSONResponse:
     return JSONResponse({"status": "ok"})
 
 
+@app.get("/api/baremes")
+async def get_baremes():
+    from pathlib import Path
+
+    p = Path(__file__).parent / "data" / "baremes.json"
+    if not p.exists():
+        return {}
+    with open(p, encoding="utf-8") as f:
+        return json.load(f)
+
+
 # ---------------------------------------------------------------------------
 # A) Leads
 # ---------------------------------------------------------------------------

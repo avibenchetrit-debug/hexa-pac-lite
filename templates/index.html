@@ -12751,7 +12751,14 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
 (function () {
   'use strict';
 
-  const GRILLE = {"etas_111_139":{"<70":{"cee_devis":{"H1":{"superieur":1963,"intermediaire":1963,"modeste":1963,"tres_modeste":3136},"H2":{"superieur":1636,"intermediaire":1636,"modeste":1636,"tres_modeste":2613},"H3":{"superieur":1145,"intermediaire":1145,"modeste":1145,"tres_modeste":1829}},"cee_conserve":{"H1":{"superieur":0,"intermediaire":0,"modeste":0,"tres_modeste":0},"H2":{"superieur":0,"intermediaire":0,"modeste":0,"tres_modeste":0},"H3":{"superieur":0,"intermediaire":0,"modeste":0,"tres_modeste":0}},"mpr_devis":{"H1":{"superieur":0,"intermediaire":3000,"modeste":4000,"tres_modeste":5000},"H2":{"superieur":0,"intermediaire":3000,"modeste":4000,"tres_modeste":5000},"H3":{"superieur":0,"intermediaire":3000,"modeste":4000,"tres_modeste":5000}}},"70-90":{"cee_devis":{"H1":{"superieur":2749,"intermediaire":2749,"modeste":2749,"tres_modeste":4390},"H2":{"superieur":2291,"intermediaire":2291,"modeste":2291,"tres_modeste":3659},"H3":{"superieur":1603,"intermediaire":1603,"modeste":1603,"tres_modeste":2561}},"cee_conserve":{"H1":{"superieur":0,"intermediaire":0,"modeste":0,"tres_modeste":0},"H2":{"superieur":0,"intermediaire":0,"modeste":0,"tres_modeste":0},"H3":{"superieur":0,"intermediaire":0,"modeste":0,"tres_modeste":0}},"mpr_devis":{"H1":{"superieur":0,"intermediaire":3000,"modeste":4000,"tres_modeste":5000},"H2":{"superieur":0,"intermediaire":3000,"modeste":4000,"tres_modeste":5000},"H3":{"superieur":0,"intermediaire":3000,"modeste":4000,"tres_modeste":5000}}},">=90":{"cee_devis":{"H1":{"superieur":3927,"intermediaire":3927,"modeste":3927,"tres_modeste":5800},"H2":{"superieur":3272,"intermediaire":3272,"modeste":3272,"tres_modeste":5227},"H3":{"superieur":2291,"intermediaire":2291,"modeste":2291,"tres_modeste":3659}},"cee_conserve":{"H1":{"superieur":0,"intermediaire":0,"modeste":0,"tres_modeste":472},"H2":{"superieur":0,"intermediaire":0,"modeste":0,"tres_modeste":0},"H3":{"superieur":0,"intermediaire":0,"modeste":0,"tres_modeste":0}},"mpr_devis":{"H1":{"superieur":0,"intermediaire":3000,"modeste":4000,"tres_modeste":5000},"H2":{"superieur":0,"intermediaire":3000,"modeste":4000,"tres_modeste":5000},"H3":{"superieur":0,"intermediaire":3000,"modeste":4000,"tres_modeste":5000}}}},"etas_140_plus":{"<70":{"cee_devis":{"H1":{"superieur":2359,"intermediaire":2359,"modeste":2359,"tres_modeste":3767},"H2":{"superieur":1966,"intermediaire":1966,"modeste":1966,"tres_modeste":3140},"H3":{"superieur":1376,"intermediaire":1376,"modeste":1376,"tres_modeste":2198}},"cee_conserve":{"H1":{"superieur":0,"intermediaire":0,"modeste":0,"tres_modeste":0},"H2":{"superieur":0,"intermediaire":0,"modeste":0,"tres_modeste":0},"H3":{"superieur":0,"intermediaire":0,"modeste":0,"tres_modeste":0}},"mpr_devis":{"H1":{"superieur":0,"intermediaire":3000,"modeste":4000,"tres_modeste":5000},"H2":{"superieur":0,"intermediaire":3000,"modeste":4000,"tres_modeste":5000},"H3":{"superieur":0,"intermediaire":3000,"modeste":4000,"tres_modeste":5000}}},"70-90":{"cee_devis":{"H1":{"superieur":3302,"intermediaire":3302,"modeste":3302,"tres_modeste":5274},"H2":{"superieur":2752,"intermediaire":2752,"modeste":2752,"tres_modeste":4395},"H3":{"superieur":1926,"intermediaire":1926,"modeste":1926,"tres_modeste":3077}},"cee_conserve":{"H1":{"superieur":0,"intermediaire":0,"modeste":0,"tres_modeste":0},"H2":{"superieur":0,"intermediaire":0,"modeste":0,"tres_modeste":0},"H3":{"superieur":0,"intermediaire":0,"modeste":0,"tres_modeste":0}},"mpr_devis":{"H1":{"superieur":0,"intermediaire":3000,"modeste":4000,"tres_modeste":5000},"H2":{"superieur":0,"intermediaire":3000,"modeste":4000,"tres_modeste":5000},"H3":{"superieur":0,"intermediaire":3000,"modeste":4000,"tres_modeste":5000}}},">=90":{"cee_devis":{"H1":{"superieur":4717,"intermediaire":4200,"modeste":4717,"tres_modeste":5800},"H2":{"superieur":3931,"intermediaire":3931,"modeste":3931,"tres_modeste":5800},"H3":{"superieur":2752,"intermediaire":2752,"modeste":2752,"tres_modeste":4395}},"cee_conserve":{"H1":{"superieur":0,"intermediaire":517,"modeste":0,"tres_modeste":1735},"H2":{"superieur":0,"intermediaire":0,"modeste":0,"tres_modeste":479},"H3":{"superieur":0,"intermediaire":0,"modeste":0,"tres_modeste":0}},"mpr_devis":{"H1":{"superieur":0,"intermediaire":3000,"modeste":4000,"tres_modeste":5000},"H2":{"superieur":0,"intermediaire":3000,"modeste":4000,"tres_modeste":5000},"H3":{"superieur":0,"intermediaire":3000,"modeste":4000,"tres_modeste":5000}}}}};
+  let GRILLE = {};
+  async function chargerBaremes() {
+    try {
+      const r = await fetch('/api/baremes');
+      if (r.ok) GRILLE = await r.json();
+    } catch(e) { console.error('Barèmes non chargés:', e); }
+  }
+  chargerBaremes();
 
   // Inflations annuelles par type d'énergie (modifiables)
   const INFLATION = { fioul:0.04, gaz:0.04, bois:0.025, electricite:0.03, pac:0.03, defaut:0.04 };
@@ -12824,7 +12831,8 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     return capital*i/(1-Math.pow(1+i,-nMois));
   }
 
-  function calcul(){
+  async function calcul(){
+    if (Object.keys(GRILLE).length === 0) { await chargerBaremes(); }
     const sKey = trancheSurface(state.surface_chauffee);
     const node = GRILLE[state.etas]?.[sKey];
     const ceeDevis    = node ? node.cee_devis[state.zone][state.categorie]    : 0;
@@ -12893,8 +12901,8 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
   }
 
 
-  function render(){
-    const c = calcul();
+  async function render(){
+    const c = await calcul();
     const r = roi(c);
     const sel=(a,b)=>a===b?'selected':'';
     const catLabel = `${LABELS_ANAH[state.categorie]} (MPR) · ${LABELS_CEE[state.categorie]} (CEE)`;
@@ -13027,8 +13035,8 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
 
   // Mise à jour PARTIELLE : recalcule et réinjecte uniquement les zones de résultat,
   // sans recréer les inputs (prix, surface) -> le curseur n'est jamais perturbé.
-  function patch(){
-    const c = calcul();
+  async function patch(){
+    const c = await calcul();
     const r = roi(c);
     const energieLbl = ENERGIE_LABEL[state.energie_avant] || 'énergie';
     const creditLine = state.option==='opt3' ? ''
@@ -13100,7 +13108,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     });
   }
 
-  function refresh(){
+  async function refresh(){
     const content=document.getElementById('sim-drawer-content');
     const body=document.querySelector('.sim-body');
     if(!content) return;
@@ -13113,7 +13121,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       caretStart=active.selectionStart; caretEnd=active.selectionEnd;
     }
     // 2) Réinjecter
-    content.innerHTML=render();
+    content.innerHTML=await render();
     bind();
     // 3) Restaurer scroll
     const body2=document.querySelector('.sim-body');
