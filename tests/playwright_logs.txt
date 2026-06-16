@@ -1,0 +1,198 @@
+...F....F........F.FF.........FF.FF.....F..F..F.F....F....FF....F.F..... [ 90%]
+...F.F..                                                                 [100%]
+=================================== FAILURES ===================================
+______________________ test_audit_maxi_case[chromium-A.4] ______________________
+tests/test_audit_maxi.py:798: in test_audit_maxi_case
+    func(page, case_id.replace(".", "_"))
+tests/test_audit_maxi.py:165: in _case_a4
+    _assert(page, cid, not errors, "Erreurs console JS: " + " | ".join(errors[:5]))
+tests/test_audit_maxi.py:96: in _assert
+    raise AssertionError(f"{message} | screenshot={screenshot}")
+E   AssertionError: Erreurs console JS: Failed to load resource: the server responded with a status of 404 () | Failed to load resource: the server responded with a status of 404 () | Failed to load resource: the server responded with a status of 404 () | Failed to load resource: the server responded with a status of 404 () | Failed to load resource: the server responded with a status of 404 () | screenshot=tests/screenshots/A_4.png
+______________________ test_audit_maxi_case[chromium-A.9] ______________________
+tests/test_audit_maxi.py:798: in test_audit_maxi_case
+    func(page, case_id.replace(".", "_"))
+tests/test_audit_maxi.py:203: in _case_a9
+    _assert(page, cid, raw == expected and transform != "uppercase", f"Nom affiché/casse incohérents: raw={raw!r}, expected={expected!r}, CSS={transform!r}")
+tests/test_audit_maxi.py:96: in _assert
+    raise AssertionError(f"{message} | screenshot={screenshot}")
+E   AssertionError: Nom affiché/casse incohérents: raw='Bretagne Jean-François', expected='Bretagne Jean-François', CSS='uppercase' | screenshot=tests/screenshots/A_9.png
+______________________ test_audit_maxi_case[chromium-C.1] ______________________
+tests/test_audit_maxi.py:798: in test_audit_maxi_case
+    func(page, case_id.replace(".", "_"))
+tests/test_audit_maxi.py:271: in _case_c1
+    _assert(page, cid, "PR-000001" in page.locator("#psb-numero").text_content() and lead.get("prenom", "") in banner and lead.get("nom", "").upper() in banner.upper(), f"Bandeau identité incorrect: {banner}")
+tests/test_audit_maxi.py:96: in _assert
+    raise AssertionError(f"{message} | screenshot={screenshot}")
+E   AssertionError: Bandeau identité incorrect: Jean-françois BRETAGNE | screenshot=tests/screenshots/C_1.png
+______________________ test_audit_maxi_case[chromium-C.3] ______________________
+tests/test_audit_maxi.py:798: in test_audit_maxi_case
+    func(page, case_id.replace(".", "_"))
+tests/test_audit_maxi.py:287: in _case_c3
+    _assert(page, cid, addr == expected_addr and cp == lead.get("cp", "") and (not lead.get("ville") or city == lead.get("ville")), f"Adresse hardcodée/incorrecte: addr={addr!r}, cp={cp!r}, city={city!r}, lead={lead}")
+tests/test_audit_maxi.py:96: in _assert
+    raise AssertionError(f"{message} | screenshot={screenshot}")
+E   AssertionError: Adresse hardcodée/incorrecte: addr="12 rue de l'Église", cp='53000', city='LAVAL', lead={'numero': 'PR-000001', 'nom': 'Bretagne', 'prenom': 'Jean-François', 'telephone': '06 11 81 20 04', 'email': 'jf.bretagne@email.fr', 'cp': '53000', 'ville': 'Laval', 'statut': 'Nouveau', 'categorie': 'TMO', 'source': 'Call', 'projet_initial': 'PAC air-eau', 'date': '2026-06-14T08:00:00', 'updated_at': '2026-06-15T15:15:53'} | screenshot=tests/screenshots/C_3.png
+______________________ test_audit_maxi_case[chromium-C.4] ______________________
+tests/test_audit_maxi.py:798: in test_audit_maxi_case
+    func(page, case_id.replace(".", "_"))
+tests/test_audit_maxi.py:295: in _case_c4
+    _assert(page, cid, surface == str(lead.get("surface_logement_m2", "")) and chauffage == lead.get("mode_chauffage", ""), f"Surface/chauffage résiduels: {surface=} {chauffage=}")
+tests/test_audit_maxi.py:96: in _assert
+    raise AssertionError(f"{message} | screenshot={screenshot}")
+E   AssertionError: Surface/chauffage résiduels: surface='154' chauffage='fioul' | screenshot=tests/screenshots/C_4.png
+_____________________ test_audit_maxi_case[chromium-C.14] ______________________
+tests/test_audit_maxi.py:798: in test_audit_maxi_case
+    func(page, case_id.replace(".", "_"))
+tests/test_audit_maxi.py:357: in _case_c14
+    _assert(page, cid, link.count() > 0 and link.first.is_visible(), "Bouton retour absent")
+tests/test_audit_maxi.py:96: in _assert
+    raise AssertionError(f"{message} | screenshot={screenshot}")
+E   AssertionError: Bouton retour absent | screenshot=tests/screenshots/C_14.png
+_____________________ test_audit_maxi_case[chromium-C.15] ______________________
+tests/test_audit_maxi.py:798: in test_audit_maxi_case
+    func(page, case_id.replace(".", "_"))
+tests/test_audit_maxi.py:364: in _case_c15
+    page.get_by_text("← Retour à la liste").first.click()
+.venv/lib/python3.12/site-packages/playwright/sync_api/_generated.py:17422: in click
+    self._sync(
+.venv/lib/python3.12/site-packages/playwright/_impl/_locator.py:163: in click
+    return await self._frame._click(self._selector, strict=True, **params)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv/lib/python3.12/site-packages/playwright/_impl/_frame.py:569: in _click
+    await self._channel.send("click", self._timeout, locals_to_params(locals()))
+.venv/lib/python3.12/site-packages/playwright/_impl/_connection.py:69: in send
+    return await self._connection.wrap_api_call(
+.venv/lib/python3.12/site-packages/playwright/_impl/_connection.py:559: in wrap_api_call
+    raise rewrite_error(error, f"{parsed_st['apiName']}: {error}") from None
+E   playwright._impl._errors.TimeoutError: Locator.click: Timeout 30000ms exceeded.
+E   Call log:
+E     - waiting for get_by_text("← Retour à la liste").first
+______________________ test_audit_maxi_case[chromium-D.2] ______________________
+tests/test_audit_maxi.py:798: in test_audit_maxi_case
+    func(page, case_id.replace(".", "_"))
+tests/test_audit_maxi.py:376: in _case_d2
+    _assert(page, cid, not filled, f"Champs préremplis sur nouveau prospect: {filled[:10]}")
+tests/test_audit_maxi.py:96: in _assert
+    raise AssertionError(f"{message} | screenshot={screenshot}")
+E   AssertionError: Champs préremplis sur nouveau prospect: ['nombre_personnes=1'] | screenshot=tests/screenshots/D_2.png
+______________________ test_audit_maxi_case[chromium-D.3] ______________________
+tests/test_audit_maxi.py:798: in test_audit_maxi_case
+    func(page, case_id.replace(".", "_"))
+tests/test_audit_maxi.py:383: in _case_d3
+    _assert(page, cid, not bad, f"Valeurs hardcodées présentes: {bad}")
+tests/test_audit_maxi.py:96: in _assert
+    raise AssertionError(f"{message} | screenshot={screenshot}")
+E   AssertionError: Valeurs hardcodées présentes: ['fioul'] | screenshot=tests/screenshots/D_3.png
+______________________ test_audit_maxi_case[chromium-D.9] ______________________
+tests/test_audit_maxi.py:798: in test_audit_maxi_case
+    func(page, case_id.replace(".", "_"))
+tests/test_audit_maxi.py:431: in _case_d9
+    _assert(page, cid, any(l.get("nom") == "TESTAUDIT" and l.get("prenom") == "Marie" for l in local), "data/leads.json local ne contient pas TESTAUDIT/Marie après test sur cible distante")
+tests/test_audit_maxi.py:96: in _assert
+    raise AssertionError(f"{message} | screenshot={screenshot}")
+E   AssertionError: data/leads.json local ne contient pas TESTAUDIT/Marie après test sur cible distante | screenshot=tests/screenshots/D_9.png
+______________________ test_audit_maxi_case[chromium-E.2] ______________________
+tests/test_audit_maxi.py:798: in test_audit_maxi_case
+    func(page, case_id.replace(".", "_"))
+tests/test_audit_maxi.py:459: in _case_e2
+    _assert(page, cid, "138" in txt or any("138" in str(v) for _, v in forced), "Surface chauffée 154 x 0.9 (=138.6) non visible")
+tests/test_audit_maxi.py:96: in _assert
+    raise AssertionError(f"{message} | screenshot={screenshot}")
+E   AssertionError: Surface chauffée 154 x 0.9 (=138.6) non visible | screenshot=tests/screenshots/E_2.png
+______________________ test_audit_maxi_case[chromium-E.5] ______________________
+tests/test_audit_maxi.py:798: in test_audit_maxi_case
+    func(page, case_id.replace(".", "_"))
+tests/test_audit_maxi.py:482: in _case_e5
+    _assert(page, cid, before != after, "Changer isolation ne recalcule pas l'affichage")
+tests/test_audit_maxi.py:96: in _assert
+    raise AssertionError(f"{message} | screenshot={screenshot}")
+E   AssertionError: Changer isolation ne recalcule pas l'affichage | screenshot=tests/screenshots/E_5.png
+______________________ test_audit_maxi_case[chromium-E.7] ______________________
+tests/test_audit_maxi.py:798: in test_audit_maxi_case
+    func(page, case_id.replace(".", "_"))
+tests/test_audit_maxi.py:496: in _case_e7
+    _assert(page, cid, opts and all("TRI" in o.upper() for o in opts if o.strip() and "—" not in o), f"Triphasé affiche des modèles non TRI: {opts}")
+tests/test_audit_maxi.py:96: in _assert
+    raise AssertionError(f"{message} | screenshot={screenshot}")
+E   AssertionError: Triphasé affiche des modèles non TRI: ['ALFÉA EXCELLIA S 9 · 10.08 kW · 12\u202f990\xa0€', 'ALFÉA EXCELLIA S 12 · 12.55 kW · 13\u202f990\xa0€', 'ALFÉA EXCELLIA S 14 · 14.47 kW · 14\u202f490\xa0€'] | screenshot=tests/screenshots/E_7.png
+_____________________ test_audit_maxi_case[chromium-E.12] ______________________
+tests/test_audit_maxi.py:798: in test_audit_maxi_case
+    func(page, case_id.replace(".", "_"))
+tests/test_audit_maxi.py:534: in _case_e12
+    _assert(page, cid, page.get_by_text("Envoyer le pré-devis").count() > 0, "Bouton Envoyer le pré-devis absent")
+tests/test_audit_maxi.py:96: in _assert
+    raise AssertionError(f"{message} | screenshot={screenshot}")
+E   AssertionError: Bouton Envoyer le pré-devis absent | screenshot=tests/screenshots/E_12.png
+______________________ test_audit_maxi_case[chromium-F.5] ______________________
+tests/test_audit_maxi.py:798: in test_audit_maxi_case
+    func(page, case_id.replace(".", "_"))
+tests/test_audit_maxi.py:570: in _case_f5
+    _assert(page, cid, expected and expected in txt.replace(" ", ""), f"Prix modifié {expected} non visible après rechargement admin")
+tests/test_audit_maxi.py:96: in _assert
+    raise AssertionError(f"{message} | screenshot={screenshot}")
+E   AssertionError: Prix modifié 12991 non visible après rechargement admin | screenshot=tests/screenshots/F_5.png
+______________________ test_audit_maxi_case[chromium-F.6] ______________________
+tests/test_audit_maxi.py:798: in test_audit_maxi_case
+    func(page, case_id.replace(".", "_"))
+tests/test_audit_maxi.py:578: in _case_f6
+    _case_f5(p, cid)
+tests/test_audit_maxi.py:570: in _case_f5
+    _assert(page, cid, expected and expected in txt.replace(" ", ""), f"Prix modifié {expected} non visible après rechargement admin")
+tests/test_audit_maxi.py:96: in _assert
+    raise AssertionError(f"{message} | screenshot={screenshot}")
+E   AssertionError: Prix modifié 12991 non visible après rechargement admin | screenshot=tests/screenshots/F_6.png
+______________________ test_audit_maxi_case[chromium-G.3] ______________________
+tests/test_audit_maxi.py:798: in test_audit_maxi_case
+    func(page, case_id.replace(".", "_"))
+tests/test_audit_maxi.py:609: in _case_g3
+    _assert(page, cid, "Import impossible" not in page.locator("body").text_content(), "Import affiche une erreur")
+tests/test_audit_maxi.py:96: in _assert
+    raise AssertionError(f"{message} | screenshot={screenshot}")
+E   AssertionError: Import affiche une erreur | screenshot=tests/screenshots/G_3.png
+______________________ test_audit_maxi_case[chromium-G.5] ______________________
+tests/test_audit_maxi.py:798: in test_audit_maxi_case
+    func(page, case_id.replace(".", "_"))
+tests/test_audit_maxi.py:621: in _case_g5
+    _assert(page, cid, "Note import audit 1" in found, "data/notes.json local ne contient pas les notes importées sur cible distante")
+tests/test_audit_maxi.py:96: in _assert
+    raise AssertionError(f"{message} | screenshot={screenshot}")
+E   AssertionError: data/notes.json local ne contient pas les notes importées sur cible distante | screenshot=tests/screenshots/G_5.png
+______________________ test_audit_maxi_case[chromium-I.1] ______________________
+tests/test_audit_maxi.py:798: in test_audit_maxi_case
+    func(page, case_id.replace(".", "_"))
+tests/test_audit_maxi.py:679: in _case_i1
+    _assert(page, cid, page.locator('[name="nom"]').input_value() == "COHERENCE" and page.locator('[name="telephone"]').input_value() == "0601010101", "Fiche créée incohérente avec saisie")
+tests/test_audit_maxi.py:96: in _assert
+    raise AssertionError(f"{message} | screenshot={screenshot}")
+E   AssertionError: Fiche créée incohérente avec saisie | screenshot=tests/screenshots/I_1.png
+______________________ test_audit_maxi_case[chromium-I.3] ______________________
+tests/test_audit_maxi.py:798: in test_audit_maxi_case
+    func(page, case_id.replace(".", "_"))
+tests/test_audit_maxi.py:695: in _case_i3
+    _assert(page, cid, "Note API audit" in json.dumps(notes, ensure_ascii=False), "Note ajoutée absente de data/notes.json local sur cible distante")
+tests/test_audit_maxi.py:96: in _assert
+    raise AssertionError(f"{message} | screenshot={screenshot}")
+E   AssertionError: Note ajoutée absente de data/notes.json local sur cible distante | screenshot=tests/screenshots/I_3.png
+=========================== short test summary info ============================
+FAILED tests/test_audit_maxi.py::test_audit_maxi_case[chromium-A.4] - Asserti...
+FAILED tests/test_audit_maxi.py::test_audit_maxi_case[chromium-A.9] - Asserti...
+FAILED tests/test_audit_maxi.py::test_audit_maxi_case[chromium-C.1] - Asserti...
+FAILED tests/test_audit_maxi.py::test_audit_maxi_case[chromium-C.3] - Asserti...
+FAILED tests/test_audit_maxi.py::test_audit_maxi_case[chromium-C.4] - Asserti...
+FAILED tests/test_audit_maxi.py::test_audit_maxi_case[chromium-C.14] - Assert...
+FAILED tests/test_audit_maxi.py::test_audit_maxi_case[chromium-C.15] - playwr...
+FAILED tests/test_audit_maxi.py::test_audit_maxi_case[chromium-D.2] - Asserti...
+FAILED tests/test_audit_maxi.py::test_audit_maxi_case[chromium-D.3] - Asserti...
+FAILED tests/test_audit_maxi.py::test_audit_maxi_case[chromium-D.9] - Asserti...
+FAILED tests/test_audit_maxi.py::test_audit_maxi_case[chromium-E.2] - Asserti...
+FAILED tests/test_audit_maxi.py::test_audit_maxi_case[chromium-E.5] - Asserti...
+FAILED tests/test_audit_maxi.py::test_audit_maxi_case[chromium-E.7] - Asserti...
+FAILED tests/test_audit_maxi.py::test_audit_maxi_case[chromium-E.12] - Assert...
+FAILED tests/test_audit_maxi.py::test_audit_maxi_case[chromium-F.5] - Asserti...
+FAILED tests/test_audit_maxi.py::test_audit_maxi_case[chromium-F.6] - Asserti...
+FAILED tests/test_audit_maxi.py::test_audit_maxi_case[chromium-G.3] - Asserti...
+FAILED tests/test_audit_maxi.py::test_audit_maxi_case[chromium-G.5] - Asserti...
+FAILED tests/test_audit_maxi.py::test_audit_maxi_case[chromium-I.1] - Asserti...
+FAILED tests/test_audit_maxi.py::test_audit_maxi_case[chromium-I.3] - Asserti...
+20 failed, 60 passed in 192.59s (0:03:12)
