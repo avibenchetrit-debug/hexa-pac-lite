@@ -6980,6 +6980,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
 .pv-th-inner{ padding:8px 6px; font-size:9.5px; }
 .pv-pid{ font-size:10.5px; padding:3px 7px; }
 .pv-nom{ font-weight:700; }
+.pv-nom-only{ text-transform:uppercase; }    
 .pv-mail{ font-size:12.5px; }
 .pv-wrap{ max-width:1340px; }
 /* la cellule mail peut être longue : on autorise l'ellipse si besoin */
@@ -14929,7 +14930,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       return '<tr data-num="'+p.numero+'">'
       +'<td><span class="pv-pid">'+(p.numero||'—')+'</span></td>'
       +'<td>'+statutSelect(p)+'</td>'
-      +'<td class="pv-nom">'+((p.nom||'')+' '+(p.prenom||'')).trim()+'</td>'
+      +'<td class="pv-nom"><span class="pv-nom-only">'+(p.nom||'')+'</span> '+(p.prenom||'')+'</td>'
       +'<td>'+(p.cp||'<span class="pv-muted">—</span>')+'</td>'
       +'<td>'+(p.tel||p.telephone||'<span class="pv-muted">—</span>')+'</td>'
       +'<td>'+(p.email?'<a class="pv-mail" href="mailto:'+p.email+'">'+p.email+'</a>':'<span class="pv-muted">—</span>')+'</td>'
