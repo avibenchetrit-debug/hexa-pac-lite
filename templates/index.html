@@ -15191,13 +15191,20 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       return (x>y?1:x<y?-1:0)*sortDir;
     });
     document.querySelectorAll('#pv-thead th').forEach(th=>{
-      const k=th.dataset.k; th.classList.toggle('sorted',k===sortKey);
-      th.querySelector('.pv-arrow').textContent=arrowFor(k);
+      const k=th.dataset.k;
+      const arrow = th.querySelector('.pv-arrow');
+      th.classList.toggle('sorted', !!k && k===sortKey);
+      if(arrow && k) arrow.textContent=arrowFor(k);
     });
     const tb=document.getElementById('pv-tbody'), empty=document.getElementById('pv-empty');
-    document.getElementById('pv-count').textContent = rows.length+' prospect'+(rows.length>1?'s':'');
+    const countEl=document.getElementById('pv-count');
+    if(countEl) countEl.textContent = rows.length+' prospect'+(rows.length>1?'s':'');
     const visibleSet = new Set(rows.map(p => p.numero).filter(Boolean));
     selectedNumeros.forEach(num => { if (!visibleSet.has(num)) selectedNumeros.delete(num); });
+    if(!tb || !empty){
+      syncSelectionState(rows);
+      return;
+    }
     if(!rows.length){
       tb.innerHTML='';
       empty.textContent = leadsLoading ? 'Chargement des prospects…' : (leadsLoadError || 'Aucun prospect pour le moment.');
@@ -15259,6 +15266,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       if(stWrap){
         const btn=stWrap.querySelector('.pv-statut');
         const menu=stWrap.querySelector('.pv-statut-menu');
+        if(!btn || !menu) return;
         btn.addEventListener('click', e=>{
           e.stopPropagation();
           const open=menu.classList.contains('open');
@@ -15298,8 +15306,10 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
         renderRows();
       });
     });
-    document.getElementById('pv-search').addEventListener('input', e=>{ query=e.target.value; renderRows(); });
-    document.getElementById('pv-new').addEventListener('click', openNewProspect);
+    const search=document.getElementById('pv-search');
+    if(search) search.addEventListener('input', e=>{ query=e.target.value; renderRows(); });
+    const newBtn=document.getElementById('pv-new');
+    if(newBtn) newBtn.addEventListener('click', openNewProspect);
     const admBtn=document.getElementById('pv-admin');
     if(admBtn) admBtn.addEventListener('click', ()=>{ if(window.HexaAdmin) window.HexaAdmin.open(); });
     const regieBtn=document.getElementById('pv-regie');
@@ -15706,10 +15716,11 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
 
   function init(){
     const view=buildView();
-    document.body.appendChild(view);
+    if(view) document.body.appendChild(view);
     bindView(); renderRows();
     refreshMasterStats(true);
-    showProspects(); // accueil par défaut
+    if (window.location.hash === '#nouveau') openNewProspect();
+    else showProspects(); // accueil par défaut
 
     // Header de la fiche
     const home=document.getElementById('hexa-nav-home');
