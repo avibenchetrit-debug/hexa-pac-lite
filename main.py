@@ -4,13 +4,15 @@ import json
 import os
 import re
 import shutil
+import smtplib
 import urllib.parse
 import urllib.request
 import unicodedata
+from email.message import EmailMessage
 from datetime import datetime
 
 from fastapi import FastAPI, File, HTTPException, Request, UploadFile
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -24,8 +26,39 @@ CATALOGUE_PATH = os.path.join(DATA_DIR, "catalogue_pac.json")
 CATALOGUE_PAC_PATH = CATALOGUE_PATH
 BAREMES_PATH = os.path.join(DATA_DIR, "baremes.json")
 ECHANGES_PATH = os.path.join(DATA_DIR, "echanges.json")
+DELEGATAIRES_PATH = os.path.join(DATA_DIR, "delegataires.json")
+MODELES_EMAIL_PATH = os.path.join(DATA_DIR, "modeles_email.json")
+DEVIS_DIR = os.path.join(DATA_DIR, "devis")
+DEVIS_META_PATH = os.path.join(DEVIS_DIR, "devis_meta.json")
 REPO_CATALOGUE_PATH = os.path.join(REPO_DATA_DIR, "catalogue_pac.json")
 REPO_BAREMES_PATH = os.path.join(REPO_DATA_DIR, "baremes.json")
+
+DEFAULT_DELEGATAIRES = [
+    {"nom": "PICOTY", "mwh_precaire": 12.50, "mwh_classique": 7.20, "actif": True}
+]
+DEFAULT_MODELES_EMAIL = [
+    {
+        "id": "modele_1",
+        "label": "Premier contact",
+        "titre": "Premier contact",
+        "sujet": "Votre projet de pompe à chaleur Hexa Rénov'",
+        "contenu": "Bonjour {prenom},\n\nMerci pour votre intérêt. Nous revenons vers vous au sujet de votre projet {numero}.\n\nCordialement,\nL'équipe Hexa-Rénov'",
+    },
+    {
+        "id": "modele_2",
+        "label": "Relance après pré-visite",
+        "titre": "Relance après pré-visite",
+        "sujet": "Suite à notre pré-visite Hexa Rénov'",
+        "contenu": "Bonjour {prenom},\n\nSuite à la pré-visite, nous restons disponibles pour finaliser votre projet.\n\nCordialement,\nL'équipe Hexa-Rénov'",
+    },
+    {
+        "id": "modele_3",
+        "label": "Relance après devis",
+        "titre": "Relance après devis",
+        "sujet": "Votre devis Hexa Rénov'",
+        "contenu": "Bonjour {prenom},\n\nJe me permets de revenir vers vous concernant le devis {numero} pour {modele_pac}. Le reste à charge estimé est de {reste_a_charge}.\n\nCordialement,\nL'équipe Hexa-Rénov'",
+    },
+]
 
 
 def _load_default_catalogue():
@@ -83,8 +116,12 @@ def _init_storage():
     _seed_json_file(LEADS_PATH, [])
     _seed_json_file(NOTES_PATH, {})
     _seed_json_file(ECHANGES_PATH, {})
+    _seed_json_file(DELEGATAIRES_PATH, DEFAULT_DELEGATAIRES)
+    _seed_json_file(MODELES_EMAIL_PATH, DEFAULT_MODELES_EMAIL)
     _seed_json_file(CATALOGUE_PATH, DEFAULT_CATALOGUE_PAC, REPO_CATALOGUE_PATH)
     _seed_json_file(BAREMES_PATH, {}, REPO_BAREMES_PATH)
+    os.makedirs(DEVIS_DIR, exist_ok=True)
+    _seed_json_file(DEVIS_META_PATH, {})
 
 
 def _read_leads():
@@ -100,6 +137,21 @@ def _read_notes():
 def _read_echanges():
     echanges = _read_json(ECHANGES_PATH, {})
     return echanges if isinstance(echanges, dict) else {}
+
+
+def _read_delegataires():
+    delegataires = _read_json(DELEGATAIRES_PATH, DEFAULT_DELEGATAIRES)
+    return delegataires if isinstance(delegataires, list) else DEFAULT_DELEGATAIRES
+
+
+def _read_modeles_email():
+    modeles = _read_json(MODELES_EMAIL_PATH, DEFAULT_MODELES_EMAIL)
+    return modeles if isinstance(modeles, list) else DEFAULT_MODELES_EMAIL
+
+
+def _read_devis_meta():
+    meta = _read_json(DEVIS_META_PATH, {})
+    return meta if isinstance(meta, dict) else {}
 
 
 async def _read_request_payload(request: Request) -> dict:
@@ -508,6 +560,167 @@ def _exchange_for_front(entry):
     }
 
 
+def _find_lead(numero: str) -> dict | None:
+    wanted = str(numero or "").strip()
+    for lead in _read_leads():
+        if str(lead.get("numero", "")).strip() == wanted:
+            return lead
+    return None
+
+
+def _money(value) -> str:
+    try:
+        amount = float(value or 0)
+    except (TypeError, ValueError):
+        amount = 0
+    return f"{amount:,.2f}".replace(",", " ").replace(".", ",") + " €"
+
+
+def _float_value(value, default=0.0):
+    try:
+        return float(str(value or "").replace(" ", "").replace(",", "."))
+    except (TypeError, ValueError):
+        return default
+
+
+def _active_delegataire():
+    delegataires = _read_delegataires()
+    return next((d for d in delegataires if d.get("actif")), delegataires[0] if delegataires else DEFAULT_DELEGATAIRES[0])
+
+
+def _next_devis_version(numero: str) -> int:
+    os.makedirs(DEVIS_DIR, exist_ok=True)
+    versions = []
+    for name in os.listdir(DEVIS_DIR):
+        m = re.fullmatch(rf"{re.escape(numero)}_v(\d+)\.pdf", name)
+        if m:
+            versions.append(int(m.group(1)))
+    return (max(versions) if versions else 0) + 1
+
+
+def _devis_path(numero: str, version: int) -> str:
+    return os.path.join(DEVIS_DIR, f"{numero}_v{version}.pdf")
+
+
+def _devis_context(numero: str) -> dict:
+    lead = _find_lead(numero)
+    if not lead:
+        raise HTTPException(status_code=404, detail="Prospect introuvable")
+    catalogue = _read_json(CATALOGUE_PAC_PATH, DEFAULT_CATALOGUE_PAC)
+    if not isinstance(catalogue, list):
+        catalogue = DEFAULT_CATALOGUE_PAC
+    service = "Chauffage + ECS"
+    phase = str(lead.get("phase_electrique") or "monophase")
+    wants_tri = "tri" in phase.lower()
+    compatibles = []
+    for model in catalogue:
+        nom_ref = f"{model.get('nom','')} {model.get('ref','')}".upper()
+        if "DUO" not in nom_ref:
+            continue
+        if wants_tri and "TRI" not in nom_ref:
+            continue
+        if not wants_tri and "TRI" in nom_ref:
+            continue
+        puissance = _float_value(model.get("puiss_chauf") or model.get("puiss35") or model.get("puissance_kw"))
+        if puissance > 0:
+            compatibles.append((puissance, model))
+    compatibles.sort(key=lambda item: item[0])
+    modele = compatibles[0][1] if compatibles else (catalogue[0] if catalogue else {})
+    puissance = _float_value(modele.get("puiss_chauf") or modele.get("puiss35") or modele.get("puissance_kw"), 9)
+    prix_ttc = _float_value(modele.get("ttc") or modele.get("prix_ttc"), 14990)
+    baremes = _read_json(BAREMES_PATH, {})
+    forfaits = baremes.get("forfaits_mpr") if isinstance(baremes, dict) else {}
+    if not isinstance(forfaits, dict):
+        forfaits = {}
+    categorie = str(lead.get("categorie") or "modeste")
+    mpr = _float_value(forfaits.get(categorie), {"tres_modeste": 5000, "modeste": 4000, "intermediaire": 3000, "superieur": 0}.get(categorie, 4000))
+    delegataire = _active_delegataire()
+    mwh = max(_float_value(lead.get("surface_logement_m2"), 90) / 10, 1)
+    cee_unitaire = _float_value(delegataire.get("mwh_precaire" if categorie == "tres_modeste" else "mwh_classique"), 7.2)
+    cee = round(mwh * cee_unitaire * 10, 2)
+    bonif = baremes.get("bonification_cee", {"actif": True, "multiplicateur": 5}) if isinstance(baremes, dict) else {"actif": True, "multiplicateur": 5}
+    if isinstance(bonif, dict) and bonif.get("actif", True):
+        cee *= int(bonif.get("multiplicateur") or 5)
+    reste = max(prix_ttc - mpr - cee, 0)
+    mensualite_10 = reste / 120 if reste else 0
+    surface_chauffee = round(_float_value(lead.get("surface_logement_m2"), 100) * 0.9, 1)
+    return {
+        "lead": lead,
+        "numero": numero,
+        "modele": modele.get("nom") or modele.get("ref") or "ATLANTIC ALFÉA EXCELLIA S DUO 9",
+        "puissance": puissance,
+        "prix_ttc": prix_ttc,
+        "mpr": mpr,
+        "cee": cee,
+        "reste": reste,
+        "mensualite_10": mensualite_10,
+        "service": service,
+        "phase": "Triphasé" if wants_tri else "Monophasé",
+        "surface_chauffee": surface_chauffee,
+        "zone": lead.get("zone_climatique") or lead.get("zone_climatique_chantier") or "",
+        "delegataire": delegataire.get("nom", "PICOTY"),
+        "categorie": categorie,
+    }
+
+
+def _generate_devis_pdf(numero: str) -> bytes:
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.styles import getSampleStyleSheet
+    from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+
+    ctx = _devis_context(numero)
+    lead = ctx["lead"]
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=36, leftMargin=36, topMargin=36, bottomMargin=36)
+    styles = getSampleStyleSheet()
+    story = []
+    header = Table(
+        [[Paragraph("<b>Hexa-Rénov'</b>", styles["Title"]), Paragraph(f"<font color='white'>{numero}</font>", styles["Normal"])]],
+        colWidths=[350, 150],
+        rowHeights=[60],
+    )
+    header.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#002E5A")),
+        ("TEXTCOLOR", (0, 0), (-1, -1), colors.white),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("ALIGN", (1, 0), (1, 0), "RIGHT"),
+    ]))
+    story.append(header)
+    story.append(Paragraph(f"Date d'édition : {_now_iso().split('T')[0]}", styles["Normal"]))
+    story.append(Spacer(1, 12))
+    client = f"{lead.get('civilite','')} {lead.get('nom','')} {lead.get('prenom','')}".strip()
+    adresse = " ".join(str(lead.get(k, "")).strip() for k in ("adresse_chantier", "code_postal_chantier", "ville_chantier") if lead.get(k))
+    story.append(Table([[Paragraph(f"<b>CLIENT</b><br/>{client}<br/>{adresse}<br/>{lead.get('telephone','')} | {lead.get('email','')}", styles["Normal"])]], colWidths=[500], style=[("BOX", (0, 0), (-1, -1), 0.5, colors.grey), ("PADDING", (0, 0), (-1, -1), 8)]))
+    story.append(Spacer(1, 12))
+    story.append(Paragraph("<b>INSTALLATION POMPE À CHALEUR AIR/EAU</b>", styles["Heading2"]))
+    story.append(Paragraph(f"Modèle : {ctx['modele']}<br/>Puissance : {ctx['puissance']:.1f} kW<br/>Service : {ctx['service']}<br/>Phase : {ctx['phase']}<br/>Surface chauffée : {ctx['surface_chauffee']} m²<br/>Zone climatique : {ctx['zone']}", styles["Normal"]))
+    story.append(Spacer(1, 12))
+    rows = [
+        ["Désignation", "Montant TTC"],
+        ["Fourniture et pose PAC", _money(ctx["prix_ttc"])],
+        [f"MaPrimeRénov' (catégorie {ctx['categorie']})", "-" + _money(ctx["mpr"])],
+        [f"Prime CEE ({ctx['delegataire']} classique)", "-" + _money(ctx["cee"] / 5 if ctx["cee"] else 0)],
+        ["Bonification CEE (coup de pouce x5)", "-" + _money(ctx["cee"] - (ctx["cee"] / 5 if ctx["cee"] else 0))],
+        ["RESTE À CHARGE TTC", _money(ctx["reste"])],
+    ]
+    table = Table(rows, colWidths=[360, 140])
+    table.setStyle(TableStyle([
+        ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#EEF2F7")),
+        ("FONTNAME", (0, -1), (-1, -1), "Helvetica-Bold"),
+        ("ALIGN", (1, 0), (1, -1), "RIGHT"),
+    ]))
+    story.append(table)
+    story.append(Spacer(1, 12))
+    story.append(Table([["Durée", "Mensualité"], ["5 ans", _money(ctx["reste"] / 60) + "/mois"], ["7 ans", _money(ctx["reste"] / 84) + "/mois"], ["10 ans", _money(ctx["mensualite_10"]) + "/mois"]], colWidths=[250, 250], style=[("GRID", (0, 0), (-1, -1), 0.5, colors.grey), ("ALIGN", (1, 0), (1, -1), "RIGHT")]))
+    story.append(Spacer(1, 24))
+    story.append(Paragraph("Hexa-Rénov' SAS — Asnières-sur-Seine (92)<br/>SIRET : [à compléter]<br/>RCS Nanterre<br/>Devis valable 30 jours à compter de la date d'édition", styles["Normal"]))
+    story.append(Paragraph(f"<font size='8'>Document généré le {_now_iso()} via le simulateur Hexa-Rénov'</font>", styles["Normal"]))
+    doc.build(story)
+    return buffer.getvalue()
+
+
 # ---------------------------------------------------------------------------
 # Pages
 # ---------------------------------------------------------------------------
@@ -880,3 +1093,166 @@ async def echanges_ajax(numero: str, request: Request) -> JSONResponse:
     echanges.setdefault(numero, []).append(entry)
     _atomic_write_json(ECHANGES_PATH, echanges)
     return JSONResponse({"ok": True, "count": len(echanges[numero])})
+
+
+@app.get("/api/admin/m3")
+def get_admin_m3() -> JSONResponse:
+    baremes = _read_json(BAREMES_PATH, {})
+    if not isinstance(baremes, dict):
+        baremes = {}
+    return JSONResponse(
+        {
+            "forfaits_mpr": baremes.get(
+                "forfaits_mpr",
+                {"tres_modeste": 5000, "modeste": 4000, "intermediaire": 3000, "superieur": 0},
+            ),
+            "bonification_cee": baremes.get("bonification_cee", {"actif": True, "multiplicateur": 5}),
+            "delegataires": _read_delegataires(),
+            "modeles_email": _read_modeles_email(),
+        }
+    )
+
+
+@app.post("/api/admin/m3")
+async def post_admin_m3(request: Request) -> JSONResponse:
+    payload = await _read_request_payload(request)
+    baremes = _read_json(BAREMES_PATH, {})
+    if not isinstance(baremes, dict):
+        baremes = {}
+    if isinstance(payload.get("forfaits_mpr"), dict):
+        baremes["forfaits_mpr"] = payload["forfaits_mpr"]
+    if isinstance(payload.get("bonification_cee"), dict):
+        baremes["bonification_cee"] = payload["bonification_cee"]
+    _atomic_write_json(BAREMES_PATH, baremes)
+    if isinstance(payload.get("delegataires"), list):
+        delegataires = payload["delegataires"] or DEFAULT_DELEGATAIRES
+        if not any(d.get("actif") for d in delegataires):
+            delegataires[0]["actif"] = True
+        _atomic_write_json(DELEGATAIRES_PATH, delegataires)
+    if isinstance(payload.get("modeles_email"), list):
+        _atomic_write_json(MODELES_EMAIL_PATH, payload["modeles_email"])
+    return JSONResponse({"ok": True})
+
+
+@app.get("/api/modeles-email")
+def get_modeles_email() -> JSONResponse:
+    return JSONResponse(_read_modeles_email())
+
+
+@app.get("/api/devis/{numero}/preview")
+async def preview_devis(numero: str) -> Response:
+    return Response(content=_generate_devis_pdf(numero), media_type="application/pdf")
+
+
+@app.post("/api/devis/{numero}/envoyer")
+async def envoyer_devis(numero: str, request: Request) -> JSONResponse:
+    payload = await _read_request_payload(request)
+    ctx = _devis_context(numero)
+    lead = ctx["lead"]
+    email_to = str(lead.get("email") or "").strip()
+    if not email_to:
+        raise HTTPException(status_code=400, detail="Email prospect manquant")
+    version = _next_devis_version(numero)
+    pdf = _generate_devis_pdf(numero)
+    path = _devis_path(numero, version)
+    with open(path, "wb") as f:
+        f.write(pdf)
+
+    smtp_user = os.environ.get("SMTP_USER", "")
+    smtp_pass = os.environ.get("SMTP_PASS", "")
+    if smtp_user and smtp_pass:
+        msg = EmailMessage()
+        msg["From"] = smtp_user
+        msg["To"] = email_to
+        msg["Subject"] = "Votre devis Hexa Rénov' - Installation Pompe à Chaleur"
+        prenom = lead.get("prenom") or ""
+        body = f"""Bonjour {prenom},
+
+Suite à notre échange, vous trouverez ci-joint votre devis pour l'installation d'une pompe à chaleur air/eau Atlantic ALFÉA EXCELLIA.
+
+Récapitulatif :
+- Modèle proposé : {ctx['modele']}
+- Reste à charge après aides : {round(ctx['reste'])} € TTC
+- Mensualité indicative : à partir de {ctx['mensualite_10']:.2f} €/mois sur 10 ans
+
+Ce devis est valable 30 jours.
+
+Pour toute question ou pour planifier la visite technique, vous pouvez nous joindre au [téléphone Hexa-Rénov'] ou par retour de mail.
+
+À très bientôt,
+L'équipe Hexa-Rénov'
+"""
+        msg.set_content(body)
+        msg.add_attachment(pdf, maintype="application", subtype="pdf", filename=f"devis_{numero}_v{version}.pdf")
+        with smtplib.SMTP("smtp.gmail.com", 587, timeout=20) as smtp:
+            smtp.starttls()
+            smtp.login(smtp_user, smtp_pass)
+            smtp.send_message(msg)
+
+    leads = _read_leads()
+    idx = _find_lead_index(leads, numero)
+    if idx is not None:
+        leads[idx]["statut"] = "devis"
+        leads[idx]["date_envoi_devis"] = _now_iso()
+        _atomic_write_json(LEADS_PATH, leads)
+
+    auteur = str(payload.get("auteur") or "Anonyme")
+    notes = _read_notes()
+    notes.setdefault(numero, []).append(
+        {"texte": f"📩 Devis v{version} envoyé le {_now_iso()} à {email_to} par {auteur}", "date": _now_iso(), "auteur": auteur}
+    )
+    _atomic_write_json(NOTES_PATH, notes)
+    meta = _read_devis_meta()
+    meta.setdefault(numero, []).append({"version": version, "sent_at": _now_iso(), "email": email_to, "file": path})
+    _atomic_write_json(DEVIS_META_PATH, meta)
+    return JSONResponse({"ok": True, "version": version, "stored_at": path})
+
+
+@app.get("/api/devis/{numero}/list")
+async def list_devis(numero: str) -> JSONResponse:
+    meta = _read_devis_meta().get(numero, [])
+    items = []
+    for item in meta:
+        version = int(item.get("version") or 0)
+        path = _devis_path(numero, version)
+        if version and os.path.exists(path):
+            items.append({"version": version, "sent_at": item.get("sent_at", ""), "email": item.get("email", ""), "file": path})
+    return JSONResponse(items)
+
+
+@app.get("/api/devis/{numero}/download")
+async def download_devis(numero: str, version: int):
+    path = _devis_path(numero, version)
+    if not os.path.exists(path):
+        raise HTTPException(status_code=404, detail="Devis introuvable")
+    return FileResponse(path, media_type="application/pdf", filename=os.path.basename(path))
+
+
+@app.post("/api/modeles-email/{numero}/envoyer")
+async def envoyer_modele_email(numero: str, request: Request) -> JSONResponse:
+    payload = await _read_request_payload(request)
+    lead = _find_lead(numero)
+    if not lead:
+        raise HTTPException(status_code=404, detail="Prospect introuvable")
+    email_to = str(lead.get("email") or "").strip()
+    if not email_to:
+        raise HTTPException(status_code=400, detail="Email prospect manquant")
+    sujet = str(payload.get("sujet") or "")
+    contenu = str(payload.get("contenu") or "")
+    smtp_user = os.environ.get("SMTP_USER", "")
+    smtp_pass = os.environ.get("SMTP_PASS", "")
+    if smtp_user and smtp_pass:
+        msg = EmailMessage()
+        msg["From"] = smtp_user
+        msg["To"] = email_to
+        msg["Subject"] = sujet
+        msg.set_content(contenu)
+        with smtplib.SMTP("smtp.gmail.com", 587, timeout=20) as smtp:
+            smtp.starttls()
+            smtp.login(smtp_user, smtp_pass)
+            smtp.send_message(msg)
+    auteur = str(payload.get("auteur") or "Anonyme")
+    notes = _read_notes()
+    notes.setdefault(numero, []).append({"texte": f"📧 Email envoyé à {email_to} : {sujet}", "date": _now_iso(), "auteur": auteur})
+    _atomic_write_json(NOTES_PATH, notes)
+    return JSONResponse({"ok": True})

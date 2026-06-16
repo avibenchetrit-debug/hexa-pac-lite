@@ -1,0 +1,23 @@
+[
+  {
+    "id": "modele_1",
+    "label": "Premier contact",
+    "titre": "Premier contact",
+    "sujet": "Votre projet de pompe à chaleur Hexa Rénov'",
+    "contenu": "Bonjour {prenom},\n\nMerci pour votre intérêt. Nous revenons vers vous au sujet de votre projet {numero}.\n\nCordialement,\nL'équipe Hexa-Rénov'"
+  },
+  {
+    "id": "modele_2",
+    "label": "Relance après pré-visite",
+    "titre": "Relance après pré-visite",
+    "sujet": "Suite à notre pré-visite Hexa Rénov'",
+    "contenu": "Bonjour {prenom},\n\nSuite à la pré-visite, nous restons disponibles pour finaliser votre projet.\n\nCordialement,\nL'équipe Hexa-Rénov'"
+  },
+  {
+    "id": "modele_3",
+    "label": "Relance après devis",
+    "titre": "Relance après devis",
+    "sujet": "Votre devis Hexa Rénov'",
+    "contenu": "Bonjour {prenom},\n\nJe me permets de revenir vers vous concernant le devis {numero} pour {modele_pac}. Le reste à charge estimé est de {reste_a_charge}.\n\nCordialement,\nL'équipe Hexa-Rénov'"
+  }
+]

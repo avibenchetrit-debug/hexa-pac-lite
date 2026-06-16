@@ -5423,6 +5423,10 @@ body.comments-panel-open {
 .docs-uploaded-name { flex: 1; font-weight: 600; overflow: hidden; text-overflow: ellipsis; }
 .docs-uploaded-size { color: var(--text-muted); font-size: 11px; }
 .docs-uploaded-ok { color: var(--vert); font-weight: 700; }
+.docs-devis-block{ margin:0 0 14px; padding:12px; border:1px solid #E2E8F0; border-radius:10px; background:#F8FAFC; }
+.docs-devis-title{ font-size:12px; font-weight:800; color:#002E5A; text-transform:uppercase; letter-spacing:.06em; margin-bottom:8px; }
+.docs-devis-row{ display:flex; align-items:center; justify-content:space-between; gap:10px; padding:8px; border-radius:8px; background:#fff; border:1px solid #E2E8F0; margin-top:6px; }
+.docs-devis-actions{ display:flex; gap:6px; flex-wrap:wrap; }
 
 /* Documents panel — navigation, badges, fichiers */
 .docs-nav-back {
@@ -6055,11 +6059,21 @@ body.parcel-drawer-open .hexa-prospect-page {
   flex-direction: column;
 }
 
+.parcel-sidebar {
+  display: flex;
+  flex-direction: column;
+}
+
 .parcel-drawer-map-wrap {
-  flex: 0 0 60%;
+  flex: 1;
   min-height: 180px;
   position: relative;
   border-bottom: 1px solid #E2E8F0;
+}
+
+.parcel-map-section {
+  flex: 1;
+  min-height: 0;
 }
 
 #parcel-drawer-map {
@@ -6085,7 +6099,7 @@ body.parcel-drawer-open .hexa-prospect-page {
 }
 
 .parcel-drawer-street {
-  flex: 0 0 40%;
+  flex: 1;
   min-height: 120px;
   display: flex;
   align-items: center;
@@ -6096,10 +6110,17 @@ body.parcel-drawer-open .hexa-prospect-page {
   text-align: center;
 }
 
+.parcel-streetview-section {
+  flex: 1;
+  min-height: 0;
+}
+
 .parcel-drawer-street iframe {
   width: 100%;
   height: 100%;
   border: 0;
+  outline: none;
+  border-radius: 8px;
 }
 
 .parcel-drawer-street-inner {
@@ -6413,7 +6434,8 @@ body.sim-left-open .hexa-app-shell__main{
 .sim-pnl-edit-wrap > *{ min-width:0; }
 .sim-model-select{ flex:1 1 220px; width:100%; max-width:100%; min-width:0; box-sizing:border-box; height:32px; border:1px solid var(--c-line,#E2E8F0); border-radius:6px; padding:0 8px; font-size:11px; color:var(--c-ink,#1A2233); background:#fff; font-family:inherit; text-overflow:ellipsis; overflow:hidden; white-space:nowrap; }
 .sim-model-select:focus{ outline:none; border-color:var(--c-navy,#002E5A); box-shadow:0 0 0 3px rgba(0,46,90,.12); }
-.sim-zone-select{ width:100%; max-width:100%; min-width:74px; border:1px solid var(--c-line,#E2E8F0); border-radius:6px; padding:4px 7px; font-size:12px; color:var(--c-navy,#002E5A); background:#fff; font-family:inherit; font-weight:700; }
+.sim-zone-badge{ display:inline-flex; align-items:center; justify-content:center; min-width:48px; padding:4px 12px; border-radius:6px; background:#1A4A7A; color:#fff; font-size:12px; font-weight:800; }
+.sim-zone-badge.is-empty{ background:#E2E8F0; color:#64748B; }
 .sim-warn-badge{ display:inline-flex; align-items:center; height:24px; padding:0 8px; border-radius:999px; font-size:11px; font-weight:700; background:#FEF3C7; color:#B45309; border:1px solid #F59E0B; flex:0 0 auto; }
 .sim-strict-toggle{ display:inline-flex; align-items:center; gap:5px; font-size:11px; color:#4A5568; white-space:nowrap; }
 .sim-strict-toggle input{ margin:0; }
@@ -6447,6 +6469,17 @@ body.sim-left-open .hexa-app-shell__main{
 
 .sim-note{ font-size:11.5px; line-height:1.5; color:var(--c-muted,#4A5568); margin:9px 0 2px; }
 .sim-note--warn{ background:var(--c-warn-bg,#FEF3C7); border:1px solid var(--c-warn,#B45309); border-radius:7px; padding:8px 11px; color:#5A4410; }
+.cta-primary-large{ background:#E2214B; color:white; padding:14px 32px; font-size:18px; font-weight:700; border-radius:8px; width:100%; margin-top:24px; cursor:pointer; border:none; font-family:inherit; }
+.cta-primary-large:hover{ background:#C01E40; }
+.devis-modal-overlay{ position:fixed; inset:0; z-index:5400; background:rgba(8,20,40,.72); display:flex; align-items:center; justify-content:center; padding:20px; }
+.devis-modal-box{ width:90vw; height:90vh; background:#fff; border-radius:14px; overflow:hidden; display:flex; flex-direction:column; box-shadow:0 24px 80px rgba(0,0,0,.35); }
+.devis-modal-head{ display:flex; align-items:center; gap:12px; padding:12px 16px; background:#002E5A; color:#fff; }
+.devis-modal-title{ flex:1; font-size:16px; font-weight:800; }
+.devis-send-btn{ border:none; border-radius:8px; padding:9px 14px; background:#16a34a; color:#fff; font-weight:800; cursor:pointer; }
+.devis-close-btn{ border:none; background:rgba(255,255,255,.15); color:#fff; width:34px; height:34px; border-radius:8px; font-size:22px; line-height:1; cursor:pointer; }
+.devis-modal-body{ flex:1; min-height:0; background:#EEF2F7; }
+.devis-modal-body iframe{ width:100%; height:100%; border:0; }
+.devis-modal-foot{ padding:12px 16px; border-top:1px solid #E2E8F0; display:flex; justify-content:flex-end; }
 
 /* Compte de résultat : Prix → aides (–) → reste à charge */
 .sim-pnl{ background:#fff; border:1px solid var(--c-line,#E2E8F0); border-radius:10px; padding:14px 16px; }
@@ -9182,7 +9215,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
 
   function urlGoogleMapsSplit(lat, lon, requete) {
     if (lat && lon) {
-      return `https://www.google.com/maps/@${lat},${lon},18z/data=!3m1!1e3`;
+      return `https://www.google.com/maps/?q=${encodeURIComponent(lat + ',' + lon)}&layer=c`;
     }
     if (requete) {
       return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(requete)}`;
@@ -11972,6 +12005,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
   let activeType = 'sms';
   let exchangeConfig = null;
   let currentUser = 'Avi B.';
+  let emailTemplates = [];
 
   function hexaAuteurCourant() {
     try { return localStorage.getItem('hexa_user') || ''; } catch (_) { return ''; }
@@ -12049,6 +12083,11 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
         <button type="button" class="exchanges-tab" data-type="email">✉️ Email</button>
       </div>
       <div class="exchanges-form">
+        <div class="email-template-buttons" id="email-template-buttons">
+          <button type="button" class="exchanges-history-ctrl" data-email-template="0">📧 Modèle 1</button>
+          <button type="button" class="exchanges-history-ctrl" data-email-template="1">📧 Modèle 2</button>
+          <button type="button" class="exchanges-history-ctrl" data-email-template="2">📧 Modèle 3</button>
+        </div>
         <div id="exchanges-field-objet" hidden>
           <label for="exchanges-objet">Objet</label>
           <input type="text" id="exchanges-objet" placeholder="Objet du message">
@@ -12087,9 +12126,70 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       if (tpl) document.getElementById('exchanges-contenu').value = templateText(tpl);
     });
     document.getElementById('exchanges-submit')?.addEventListener('click', () => window.enregistrerEchange());
+    document.querySelectorAll('[data-email-template]').forEach(btn => {
+      btn.addEventListener('click', () => ouvrirModeleEmail(Number(btn.dataset.emailTemplate || 0)));
+    });
     document.getElementById('exchanges-expand-all')?.addEventListener('click', () => setAllHistoryExpanded(true));
     document.getElementById('exchanges-collapse-all')?.addEventListener('click', () => setAllHistoryExpanded(false));
     updateSubmitButton('sms');
+  }
+
+  async function loadEmailTemplates() {
+    if (emailTemplates.length) return emailTemplates;
+    const r = await fetch('/api/modeles-email', { cache:'no-store' });
+    emailTemplates = r.ok ? await r.json() : [];
+    return emailTemplates;
+  }
+
+  function replaceEmailVars(text) {
+    const cp = window.HexaCurrentProspect || {};
+    const [nom='', prenom=''] = String(cp.nom_complet || '').split(/\s+/, 2);
+    return String(text || '')
+      .replaceAll('{prenom}', prenom || '')
+      .replaceAll('{nom}', nom || '')
+      .replaceAll('{numero}', currentProspect || '')
+      .replaceAll('{modele_pac}', '')
+      .replaceAll('{reste_a_charge}', '');
+  }
+
+  async function ouvrirModeleEmail(idx) {
+    await loadEmailTemplates();
+    const tpl = emailTemplates[idx];
+    if (!tpl || !currentProspect) return;
+    const old = document.getElementById('email-template-modal');
+    if (old) old.remove();
+    const wrap = document.createElement('div');
+    wrap.id = 'email-template-modal';
+    wrap.className = 'hexa-confirm-modal';
+    wrap.innerHTML = `
+      <div class="hexa-confirm-box" style="width:min(720px,96vw)">
+        <div class="hexa-confirm-text"><b>${escapeHtml(tpl.titre || tpl.label || 'Modèle email')}</b></div>
+        <label>Sujet</label>
+        <input id="email-template-sujet" style="width:100%;margin:6px 0 10px;padding:8px" value="${escapeHtml(replaceEmailVars(tpl.sujet || ''))}">
+        <label>Contenu</label>
+        <textarea id="email-template-contenu" rows="10" style="width:100%;margin:6px 0 12px;padding:8px">${escapeHtml(replaceEmailVars(tpl.contenu || ''))}</textarea>
+        <div class="hexa-confirm-actions">
+          <button type="button" class="adm-btn adm-btn-cancel" data-act="cancel">Annuler</button>
+          <button type="button" class="adm-btn adm-btn-primary" data-act="send">Envoyer</button>
+        </div>
+      </div>`;
+    document.body.appendChild(wrap);
+    wrap.addEventListener('click', async e => {
+      const act = e.target?.dataset?.act;
+      if (!act && e.target !== wrap) return;
+      if (act !== 'send') { wrap.remove(); return; }
+      const sujet = document.getElementById('email-template-sujet')?.value || '';
+      const contenu = document.getElementById('email-template-contenu')?.value || '';
+      const auteur = hexaAuteurCourant();
+      const r = await fetch(`/api/modeles-email/${currentProspect}/envoyer`, {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ sujet, contenu, auteur })
+      });
+      if (!r.ok) { alert('Envoi impossible'); return; }
+      wrap.remove();
+      await chargerHistorique();
+    });
   }
 
   function setActiveType(type) {
@@ -12328,6 +12428,10 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
         <button class="comments-panel-close" onclick="fermerDocuments()" aria-label="Fermer">×</button>
       </div>
       <div class="comments-panel-list documents-panel-body">
+        <div class="docs-devis-block" id="docs-devis-block">
+          <div class="docs-devis-title">Devis envoyés</div>
+          <div id="docs-devis-list">Chargement…</div>
+        </div>
         <button type="button" class="docs-nav-back" id="docs-nav-back" style="display:none;">‹ Retour</button>
         <nav id="docs-breadcrumb" class="docs-breadcrumb"></nav>
         <div id="docs-view-root"><div id="docs-cat-list" class="docs-folder-list"></div></div>
@@ -12795,6 +12899,48 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     });
   }
 
+  async function refreshDevisList() {
+    const root = document.getElementById('docs-devis-list');
+    if (!root || !currentProspect) return;
+    try {
+      const r = await fetch(`/api/devis/${encodeURIComponent(currentProspect)}/list`, { cache:'no-store' });
+      const items = r.ok ? await r.json() : [];
+      if (!items.length) {
+        root.innerHTML = '<div class="pv-muted">Aucun devis envoyé pour ce prospect</div>';
+        return;
+      }
+      root.innerHTML = items.map(item => `
+        <div class="docs-devis-row">
+          <div><b>v${item.version}</b> · ${formatParis(item.sent_at)}<br><span class="pv-muted">${escapeHtml(item.email || '')}</span></div>
+          <div class="docs-devis-actions">
+            <button type="button" class="hexa-meta-card-action" data-devis-preview="${item.version}">👁 Aperçu</button>
+            <button type="button" class="hexa-meta-card-action" data-devis-download="${item.version}">⬇ Télécharger</button>
+          </div>
+        </div>`).join('');
+      root.querySelectorAll('[data-devis-preview]').forEach(btn => {
+        btn.addEventListener('click', () => openDevisPdfViewer(btn.dataset.devisPreview));
+      });
+      root.querySelectorAll('[data-devis-download]').forEach(btn => {
+        btn.addEventListener('click', () => window.open(`/api/devis/${encodeURIComponent(currentProspect)}/download?version=${encodeURIComponent(btn.dataset.devisDownload)}`, '_blank'));
+      });
+    } catch (_) {
+      root.innerHTML = '<div class="pv-muted">Aucun devis envoyé pour ce prospect</div>';
+    }
+  }
+
+  function openDevisPdfViewer(version) {
+    ensureViewer();
+    const ov = document.getElementById('doc-viewer-overlay');
+    const body = document.getElementById('doc-viewer-body');
+    const ttl = document.getElementById('doc-viewer-title');
+    if (!ov || !body) return;
+    const url = `/api/devis/${encodeURIComponent(currentProspect)}/download?version=${encodeURIComponent(version)}`;
+    ttl.textContent = `Devis v${version}`;
+    body.innerHTML = `<iframe title="Devis v${version}" src="${url}"></iframe>`;
+    document.getElementById('doc-viewer-dl').onclick = () => window.open(url, '_blank');
+    ov.classList.add('open');
+  }
+
   async function refreshStatus() {
     if (!currentProspect) return;
     const r = await fetch(`/prospect/${currentProspect}/documents/status`);
@@ -12949,6 +13095,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       document.body.classList.add('panel-is-open');
     }
     await chargerSousTitreProspect();
+    await refreshDevisList();
     await loadCategories();
     await refreshStatus();
     navToRoot();
@@ -12979,12 +13126,12 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     <h2>Localiser la parcelle</h2>
     <button type="button" class="parcel-drawer-close" id="parcel-drawer-close" aria-label="Fermer">×</button>
   </div>
-  <div class="parcel-drawer-body">
-    <div class="parcel-drawer-map-wrap">
+  <div class="parcel-drawer-body parcel-sidebar">
+    <div class="parcel-drawer-map-wrap parcel-map-section">
       <div id="parcel-drawer-map" role="application" aria-label="Carte cadastrale"></div>
       <div class="parcel-drawer-map-hint">Cliquez sur votre maison pour sélectionner la parcelle cadastrale.</div>
     </div>
-    <div class="parcel-drawer-street" id="parcel-drawer-street">
+    <div class="parcel-drawer-street parcel-streetview-section" id="parcel-drawer-street">
       <div class="parcel-drawer-street-inner">
         <strong>⚠ Street View indisponible</strong>
         Street View indisponible (clé Google Maps non configurée)
@@ -13038,6 +13185,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
 
   let GRILLE = {};
   let CATALOGUE_PAC = [];
+  let M3_CONFIG = null;
 
   const TEMP_BASE_ZONE = { H1: -7, H2: -4, H3: 0 };
   const TEMP_BASE_SOUS_ZONE = { H1A: -9, H1B: -8, H1C: -7, H2A: -4, H2B: -5, H2C: -3, H2D: -2, H3: 0 };
@@ -13177,6 +13325,10 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       const fromStorage = chargerCatalogueDepuisStorage();
       const serverCatalogue = nettoyerCatalogue(catalogue);
       CATALOGUE_PAC = serverCatalogue.length ? serverCatalogue : nettoyerCatalogue(fromStorage);
+      try {
+        const rM3 = await fetch('/api/admin/m3', { cache:'no-store' });
+        if (rM3.ok) M3_CONFIG = await rM3.json();
+      } catch(_) {}
       window.__hexaCataloguePacCache = CATALOGUE_PAC.map(m => m.raw || m);
     } catch(e) {
       console.error('Barèmes/catalogue non chargés:', e);
@@ -13389,9 +13541,28 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       };
     }
 
+    const min = sorted[0];
+    const max = sorted[sorted.length - 1];
+    const minKw = puissanceModele(min);
+    const maxKw = puissanceModele(max);
+    const fmtKw = (n) => (Math.round(Number(n || 0) * 10) / 10).toLocaleString('fr-FR', { maximumFractionDigits: 1 });
+    if (puissance_requise < minKw) {
+      return {
+        modele: min,
+        sous_dimensionnement: true,
+        alerte: `⚠ Puissance demandée (${fmtKw(puissance_requise)} kW) inférieure au plus petit modèle catalogue (${fmtKw(minKw)} kW). Risque de cycles courts, vérifier le dimensionnement.`
+      };
+    }
     const modele = sorted.find((m) => puissanceModele(m) >= puissance_requise);
     if (modele) return { modele, sous_dimensionnement: false, alerte: null };
-    return { modele: null, sous_dimensionnement: false, alerte: '⚠ Aucun modèle catalogue compatible. Validation technique nécessaire.' };
+    if (puissance_requise > maxKw) {
+      return {
+        modele: max,
+        sous_dimensionnement: true,
+        alerte: `⚠ Puissance demandée (${fmtKw(puissance_requise)} kW) supérieure au plus gros modèle catalogue (${fmtKw(maxKw)} kW). Vérifier le dimensionnement, étude technique recommandée.`
+      };
+    }
+    return { modele: max, sous_dimensionnement: true, alerte: null };
   }
 
   function appliquerSelectionPac(selection){
@@ -13535,9 +13706,19 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     const contextePret = !!state.categorie && !!state.zone && Number.isFinite(dim.surface_chauffee) && dim.surface_chauffee > 0;
     const sKey = trancheSurface(state.surface_chauffee);
     const node = GRILLE[state.etas]?.[sKey];
-    const ceeDevis    = contextePret ? (node?.cee_devis?.[state.zone]?.[state.categorie] ?? 0) : 0;
+    let ceeDevis    = contextePret ? (node?.cee_devis?.[state.zone]?.[state.categorie] ?? 0) : 0;
     const ceeConserve = contextePret ? (node?.cee_conserve?.[state.zone]?.[state.categorie] ?? 0) : 0;
-    const mprDevis    = contextePret ? (node?.mpr_devis?.[state.zone]?.[state.categorie] ?? 0) : 0;
+    let mprDevis    = contextePret ? (node?.mpr_devis?.[state.zone]?.[state.categorie] ?? 0) : 0;
+    if (M3_CONFIG?.forfaits_mpr && state.categorie in M3_CONFIG.forfaits_mpr) {
+      mprDevis = Number(M3_CONFIG.forfaits_mpr[state.categorie]) || 0;
+    }
+    const actif = (M3_CONFIG?.delegataires || []).find(d => d.actif);
+    if (actif && Number.isFinite(Number(state.surface_chauffee))) {
+      const mwh = Math.max(Number(state.surface_chauffee || 0) / 10, 1);
+      const unit = state.categorie === 'tres_modeste' ? Number(actif.mwh_precaire || 0) : Number(actif.mwh_classique || 0);
+      ceeDevis = Math.round(mwh * unit * 10);
+      if (M3_CONFIG?.bonification_cee?.actif) ceeDevis *= Number(M3_CONFIG.bonification_cee.multiplicateur || 5);
+    }
     const aidesDevis  = ceeDevis + mprDevis;
     const g29 = Math.max(0, (state.prix_pac || 0) - aidesDevis);
 
@@ -13613,9 +13794,6 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       : `${anahLabel} (MPR) · ${ceeLabel} (CEE)`;
     const energieLbl = ENERGIE_LABEL[state.energie_avant] || '—';
     const zoneValue = state.zone_detail || state.zone || '';
-    const zoneOptions = ['H1a','H1b','H1c','H2a','H2b','H2c','H2d','H3','H1','H2']
-      .map(z => `<option value="${z}" ${sel(zoneValue,z) || sel(normaliserZone(zoneValue), normaliserZone(z))}>${z}</option>`)
-      .join('');
 
     // mensualité affichée dans Avant/Après selon option
     const creditLine = state.option==='opt3'
@@ -13631,7 +13809,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
         <div class="sim-section-label">Repris de la fiche</div>
         <div class="sim-context">
           <div class="sim-ctx-item"><span class="sim-ctx-k">Catégorie</span><span class="sim-ctx-v">${catLabel}</span></div>
-          <div class="sim-ctx-item"><span class="sim-ctx-k">Zone clim.</span><span class="sim-ctx-v"><select id="sim-zone-climatique" class="sim-zone-select">${zoneOptions}</select></span></div>
+          <div class="sim-ctx-item"><span class="sim-ctx-k">Zone clim.</span><span class="sim-ctx-v"><span class="sim-zone-badge ${zoneValue?'':'is-empty'}">${zoneValue || '—'}</span></span></div>
           <div class="sim-ctx-item"><span class="sim-ctx-k">Énergie act.</span><span class="sim-ctx-v">${energieLbl}</span></div>
           <div class="sim-ctx-item">
             <span class="sim-ctx-k">Surf. chauffée</span>
@@ -13775,7 +13953,8 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
           <div class="sim-roi-pop" id="sim-roi-pop" hidden>
             ${explicationCalcul(c, r, energieLbl)}
           </div>
-        </div>`;
+        </div>
+        <button type="button" id="btn-voir-devis" class="cta-primary-large">📄 Voir le devis</button>`;
   }
 
 
@@ -13822,7 +14001,6 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       const ev=el.tagName==='SELECT'?'change':'input'; el.addEventListener(ev,e=>{fn(e.target.value); refresh();}); };
     onIn('sim-etas',v=>{ state.etas=v; state.modele_force=false; });
     onIn('sim-service',v=>{ state.service=v; state.modele_force=false; });
-    onIn('sim-zone-climatique',v=>{ state.zone_detail=normaliserZone(v); state.zone=zonePrincipale(v); state.modele_force=false; });
     onIn('iso-toit',v=>{ state.iso_toit=v; state.modele_force=false; });
     onIn('iso-mur',v=>{ state.iso_mur=v; state.modele_force=false; });
     onIn('iso-menuiserie',v=>{ state.iso_menuiserie=v; state.modele_force=false; });
@@ -13866,6 +14044,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     document.querySelectorAll('.sim-opt').forEach(btn=>{
       btn.addEventListener('click',()=>{ state.option=btn.dataset.opt; refresh(); });
     });
+    document.getElementById('btn-voir-devis')?.addEventListener('click', ouvrirModalDevis);
     // bulles info : délégation (survit aux patch de #sim-dynamic)
     bindInfoDelegation();
   }
@@ -14073,6 +14252,54 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     wrap.addEventListener('click', (e)=>{ if (e.target === wrap) close(); });
   }
 
+  function ouvrirModalDevis(){
+    const numero = state.numero || document.body.dataset.prospectNumero;
+    if(!numero) return;
+    document.getElementById('devis-modal-overlay')?.remove();
+    const wrap = document.createElement('div');
+    wrap.id = 'devis-modal-overlay';
+    wrap.className = 'devis-modal-overlay';
+    const pdfUrl = `/api/devis/${encodeURIComponent(numero)}/preview`;
+    wrap.innerHTML = `
+      <div class="devis-modal-box" role="dialog" aria-modal="true">
+        <div class="devis-modal-head">
+          <div class="devis-modal-title">Devis ${numero} (aperçu)</div>
+          <button type="button" class="devis-send-btn" id="devis-send-btn">📩 Envoyer au client</button>
+          <button type="button" class="devis-close-btn" id="devis-close-btn" aria-label="Fermer">×</button>
+        </div>
+        <div class="devis-modal-body"><iframe title="Aperçu devis" src="${pdfUrl}"></iframe></div>
+        <div class="devis-modal-foot"><button type="button" class="adm-btn adm-btn-cancel" id="devis-close-bottom">Fermer</button></div>
+      </div>`;
+    document.body.appendChild(wrap);
+    const close = () => wrap.remove();
+    document.getElementById('devis-close-btn')?.addEventListener('click', close);
+    document.getElementById('devis-close-bottom')?.addEventListener('click', close);
+    wrap.addEventListener('click', (e)=>{ if(e.target === wrap) close(); });
+    document.getElementById('devis-send-btn')?.addEventListener('click', async ()=>{
+      const btn = document.getElementById('devis-send-btn');
+      const prev = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = 'Envoi...';
+      try{
+        const auteur = (localStorage.getItem('hexa_user') || 'Anonyme');
+        const r = await fetch(`/api/devis/${encodeURIComponent(numero)}/envoyer`, {
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ auteur })
+        });
+        const data = await r.json().catch(()=>({}));
+        if(!r.ok || !data.ok) throw new Error(data.detail || data.msg || 'Envoi impossible');
+        alert('Devis envoyé au client.');
+        if(typeof window.hexaRefreshProspectsTable === 'function') window.hexaRefreshProspectsTable();
+      }catch(err){
+        alert('Erreur : ' + err.message);
+      }finally{
+        btn.disabled = false;
+        btn.textContent = prev;
+      }
+    });
+  }
+
   window.ouvrirSimulationsDrawer = ouvrir;
   window.fermerSimulationsDrawer = fermer;
   window.ouvrirNoteDim = ouvrirNoteDim;
@@ -14131,8 +14358,11 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     if (fromStorage.length) {
       CATALOGUE_PAC = nettoyerCatalogue(fromStorage);
       window.__hexaCataloguePacCache = CATALOGUE_PAC.map(m => m.raw || m);
-      if (estOuvert()) refresh();
     }
+    fetch('/api/admin/m3', { cache:'no-store' })
+      .then(r=>r.ok?r.json():null)
+      .then(cfg=>{ if(cfg) M3_CONFIG = cfg; if (estOuvert()) refresh(); })
+      .catch(()=>{ if (estOuvert()) refresh(); });
   });
 })();
 
@@ -14301,6 +14531,63 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       root.className = 'adm-trash-empty';
       root.textContent = 'Corbeille indisponible.';
     }
+  }
+
+  let M3_ADMIN = null;
+  async function fetchAdminM3(){
+    if (M3_ADMIN) return M3_ADMIN;
+    const r = await fetch('/api/admin/m3', { cache:'no-store' });
+    M3_ADMIN = r.ok ? await r.json() : {};
+    return M3_ADMIN;
+  }
+  function renderAdminM3Section(){
+    const cfg = M3_ADMIN || {};
+    const forfaits = cfg.forfaits_mpr || { tres_modeste:5000, modeste:4000, intermediaire:3000, superieur:0 };
+    const bonif = cfg.bonification_cee || { actif:true, multiplicateur:5 };
+    const delegataires = cfg.delegataires || [{nom:'PICOTY', mwh_precaire:12.5, mwh_classique:7.2, actif:true}];
+    const emails = cfg.modeles_email || [];
+    const emailRows = [0,1,2].map(i => {
+      const m = emails[i] || { titre:['Premier contact','Relance après pré-visite','Relance après devis'][i], sujet:'', contenu:'' };
+      return `<div class="adm-card" data-email-i="${i}">
+        <div class="adm-card-h">Modèle ${i+1} : ${m.titre || ''}</div>
+        <div class="adm-field"><span class="adm-lab">Titre court</span><input type="text" class="adm-email-titre" value="${adminEscape(m.titre || '')}"></div>
+        <div class="adm-field"><span class="adm-lab">Sujet</span><input type="text" class="adm-email-sujet" value="${adminEscape(m.sujet || '')}"></div>
+        <div class="adm-field"><span class="adm-lab">Contenu</span><textarea class="adm-email-contenu" rows="5">${adminEscape(m.contenu || '')}</textarea></div>
+        <p class="adm-opt2-note">Variables : {prenom}, {nom}, {numero}, {modele_pac}, {reste_a_charge}</p>
+      </div>`;
+    }).join('');
+    return `
+      <div class="adm-section">Forfaits MPR Mono-Geste</div>
+      <div class="adm-card">
+        ${[
+          ['tres_modeste','TMO (Très modeste)'],
+          ['modeste','MO (Modeste)'],
+          ['intermediaire','INT (Intermédiaire)'],
+          ['superieur','SUP (Supérieur)']
+        ].map(([k,l])=>`<div class="adm-field adm-field-row"><span class="adm-lab">${l}</span><span class="adm-euro"><input type="text" inputmode="numeric" class="adm-m3-mpr adm-money" data-cat="${k}" value="${adminEscape(forfaits[k] ?? 0)}"><i>€</i></span></div>`).join('')}
+      </div>
+      <div class="adm-section">Délégataires CEE</div>
+      <div class="adm-card">
+        <div id="adm-delegataires-list">
+          ${delegataires.map((d,i)=>`<div class="adm-field adm-field-row adm-delegataire-row" data-i="${i}">
+            <input type="radio" name="adm-del-actif" class="adm-del-actif" ${d.actif?'checked':''}>
+            <input type="text" class="adm-del-nom" value="${adminEscape(d.nom || '')}" placeholder="Nom">
+            <input type="text" inputmode="decimal" class="adm-del-precaire" value="${adminEscape(d.mwh_precaire ?? '')}" placeholder="MWh précaire">
+            <input type="text" inputmode="decimal" class="adm-del-classique" value="${adminEscape(d.mwh_classique ?? '')}" placeholder="MWh classique">
+            <button type="button" class="adm-btn adm-btn-danger adm-del-remove">Supprimer</button>
+          </div>`).join('')}
+        </div>
+        <button type="button" class="adm-btn adm-btn-add" id="adm-add-delegataire">+ Ajouter délégataire</button>
+      </div>
+      <div class="adm-section">Bonification CEE (Coup de pouce)</div>
+      <div class="adm-card">
+        <label class="adm-check"><input type="checkbox" id="adm-bonif-actif" ${bonif.actif ? 'checked' : ''}> Coup de pouce actif</label>
+        <div class="adm-field adm-field-row"><span class="adm-lab">Multiplicateur</span><input type="number" min="1" max="10" id="adm-bonif-mult" value="${adminEscape(bonif.multiplicateur || 5)}"></div>
+        <p class="adm-opt2-note">La bonification multiplie le montant CEE classique. Par défaut x5 (Coup de pouce Chauffage).</p>
+      </div>
+      <div class="adm-section">Modèles d'emails</div>
+      <div class="adm-cols">${emailRows}</div>
+      <div class="adm-add-row"><button type="button" class="adm-btn adm-btn-primary" id="adm-save-m3">Enregistrer MPR/CEE/Emails</button></div>`;
   }
 
   async function hydrateCatalogueDefaults(){
@@ -14568,6 +14855,8 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
               <div class="adm-legend-row"><span class="adm-dot adm-dot2"></span><span>Option 2 — prix de cession : marge garantie au-dessus de (coût + visite + COFRAC + urbanisme). La régie revend au-dessus et garde le surplus ; la colonne « Commission régie » montre ce qu'elle gagne si elle revend à ton prix catalogue.</span></div>
             </div>
 
+            ${renderAdminM3Section()}
+
             <div class="adm-section">Corbeille</div>
             <div id="adm-trash" class="adm-trash-empty">Chargement...</div>
             </div>
@@ -14708,6 +14997,56 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       btn.addEventListener('click', ()=>{
         const i=+btn.dataset.i; delete window.HexaConfig.models[i].cession_forcee; recalc();
       });
+    });
+    bindAdminM3();
+  }
+
+  function bindAdminM3(){
+    document.getElementById('adm-add-delegataire')?.addEventListener('click', ()=>{
+      M3_ADMIN = M3_ADMIN || {};
+      M3_ADMIN.delegataires = M3_ADMIN.delegataires || [];
+      M3_ADMIN.delegataires.push({ nom:'', mwh_precaire:0, mwh_classique:0, actif:false });
+      rerenderBody();
+    });
+    document.querySelectorAll('.adm-del-remove').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const row = btn.closest('.adm-delegataire-row');
+        const i = Number(row?.dataset.i || 0);
+        M3_ADMIN.delegataires.splice(i,1);
+        if (!M3_ADMIN.delegataires.some(d=>d.actif) && M3_ADMIN.delegataires[0]) M3_ADMIN.delegataires[0].actif = true;
+        rerenderBody();
+      });
+    });
+    document.getElementById('adm-save-m3')?.addEventListener('click', async ()=>{
+      const forfaits_mpr = {};
+      document.querySelectorAll('.adm-m3-mpr').forEach(input=>{ forfaits_mpr[input.dataset.cat] = Number(String(input.value).replace(/\s/g,'').replace(',','.')) || 0; });
+      const delegataires = Array.from(document.querySelectorAll('.adm-delegataire-row')).map((row,i)=>({
+        nom: row.querySelector('.adm-del-nom')?.value || '',
+        mwh_precaire: Number(String(row.querySelector('.adm-del-precaire')?.value || '').replace(',','.')) || 0,
+        mwh_classique: Number(String(row.querySelector('.adm-del-classique')?.value || '').replace(',','.')) || 0,
+        actif: !!row.querySelector('.adm-del-actif')?.checked
+      }));
+      const modeles_email = Array.from(document.querySelectorAll('[data-email-i]')).map((card,i)=>({
+        id: 'modele_' + (i+1),
+        label: card.querySelector('.adm-email-titre')?.value || ('Modèle ' + (i+1)),
+        titre: card.querySelector('.adm-email-titre')?.value || '',
+        sujet: card.querySelector('.adm-email-sujet')?.value || '',
+        contenu: card.querySelector('.adm-email-contenu')?.value || ''
+      }));
+      const payload = {
+        forfaits_mpr,
+        delegataires,
+        bonification_cee: { actif: !!document.getElementById('adm-bonif-actif')?.checked, multiplicateur: Number(document.getElementById('adm-bonif-mult')?.value || 5) },
+        modeles_email
+      };
+      const r = await fetch('/api/admin/m3', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+      if (r.ok) {
+        M3_ADMIN = payload;
+        adminToast('Configuration MPR/CEE/Emails sauvegardée ✓', '#0D6B3B');
+        window.dispatchEvent(new CustomEvent('hexa-config-changed'));
+      } else {
+        adminToast('Erreur sauvegarde MPR/CEE/Emails', '#B91C1C');
+      }
     });
   }
 
@@ -14942,6 +15281,8 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
   function open(){
     close();
     hydrateCatalogueDefaults().then((hydrated)=>{
+      return fetchAdminM3().then(()=>hydrated);
+    }).then((hydrated)=>{
       let cfg = loadConfig();
       if (hydrated && Array.isArray(hydrated.models) && hydrated.models.length) {
         cfg.models = hydrated.models.map(normalizeAdminModel);
