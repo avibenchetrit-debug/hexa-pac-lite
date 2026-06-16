@@ -1,7 +1,9 @@
 import io
+import html
 import json
 import os
 import re
+import shutil
 import unicodedata
 from datetime import datetime
 
@@ -12,16 +14,22 @@ from fastapi.staticfiles import StaticFiles
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 TEMPLATES_DIR = os.path.join(BASE_DIR, "templates")
 STATIC_DIR = os.path.join(BASE_DIR, "static")
-DATA_DIR = os.path.join(BASE_DIR, "data")
+REPO_DATA_DIR = os.path.join(BASE_DIR, "data")
+DATA_DIR = os.environ.get("DATA_DIR", "data")
 LEADS_PATH = os.path.join(DATA_DIR, "leads.json")
 NOTES_PATH = os.path.join(DATA_DIR, "notes.json")
-CATALOGUE_PAC_PATH = os.path.join(DATA_DIR, "catalogue_pac.json")
+CATALOGUE_PATH = os.path.join(DATA_DIR, "catalogue_pac.json")
+CATALOGUE_PAC_PATH = CATALOGUE_PATH
+BAREMES_PATH = os.path.join(DATA_DIR, "baremes.json")
+ECHANGES_PATH = os.path.join(DATA_DIR, "echanges.json")
+REPO_CATALOGUE_PATH = os.path.join(REPO_DATA_DIR, "catalogue_pac.json")
+REPO_BAREMES_PATH = os.path.join(REPO_DATA_DIR, "baremes.json")
 
 
 def _load_default_catalogue():
     """Load the committed PAC catalogue as the initialization fallback."""
     try:
-        with open(CATALOGUE_PAC_PATH, encoding="utf-8") as f:
+        with open(REPO_CATALOGUE_PATH, encoding="utf-8") as f:
             data = json.load(f)
             return data if isinstance(data, list) else []
     except (FileNotFoundError, ValueError):
@@ -58,17 +66,23 @@ def _atomic_write_json(path, obj):
     os.replace(tmp, path)
 
 
+def _seed_json_file(path, default, repo_source=None):
+    if os.path.exists(path):
+        return
+    if repo_source and os.path.exists(repo_source):
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        shutil.copyfile(repo_source, path)
+        return
+    _atomic_write_json(path, default)
+
+
 def _init_storage():
     os.makedirs(DATA_DIR, exist_ok=True)
-    if not os.path.exists(LEADS_PATH):
-        _atomic_write_json(LEADS_PATH, [])
-    if not os.path.exists(NOTES_PATH):
-        _atomic_write_json(NOTES_PATH, {})
-    if not os.path.exists(CATALOGUE_PAC_PATH):
-        _atomic_write_json(CATALOGUE_PAC_PATH, DEFAULT_CATALOGUE_PAC)
-
-
-_init_storage()
+    _seed_json_file(LEADS_PATH, [])
+    _seed_json_file(NOTES_PATH, {})
+    _seed_json_file(ECHANGES_PATH, {})
+    _seed_json_file(CATALOGUE_PATH, DEFAULT_CATALOGUE_PAC, REPO_CATALOGUE_PATH)
+    _seed_json_file(BAREMES_PATH, {}, REPO_BAREMES_PATH)
 
 
 def _read_leads():
@@ -79,6 +93,11 @@ def _read_leads():
 def _read_notes():
     notes = _read_json(NOTES_PATH, {})
     return notes if isinstance(notes, dict) else {}
+
+
+def _read_echanges():
+    echanges = _read_json(ECHANGES_PATH, {})
+    return echanges if isinstance(echanges, dict) else {}
 
 
 async def _read_request_payload(request: Request) -> dict:
@@ -276,6 +295,7 @@ PROSPECT_FIELDS = [
     "updated_at",
     "cree_par",
     "derniere_modification",
+    "deleted_at",
 
     # Bloc 1 (Origine & Statut)
     "usage_bien",
@@ -412,7 +432,10 @@ def _migrate_leads_schema():
     print(f"Migration leads.json : {normalized_count} entrées normalisées")
 
 
-_migrate_leads_schema()
+@app.on_event("startup")
+async def startup_event():
+    _init_storage()
+    _migrate_leads_schema()
 
 
 def _extract_texte(payload_form, payload_json):
@@ -422,6 +445,15 @@ def _extract_texte(payload_form, payload_json):
         if payload_json and payload_json.get(key):
             return str(payload_json.get(key))
     return ""
+
+
+def _extract_auteur(payload_form, payload_json):
+    for key in ("auteur", "created_by"):
+        if payload_form and payload_form.get(key):
+            return str(payload_form.get(key)).strip() or "Anonyme"
+        if payload_json and payload_json.get(key):
+            return str(payload_json.get(key)).strip() or "Anonyme"
+    return "Anonyme"
 
 
 def _note_for_front(entry):
@@ -436,6 +468,41 @@ def _note_for_front(entry):
         "date": date,
         "horodatage": date,
         "auteur": auteur,
+    }
+
+
+def _is_deleted(lead):
+    return bool(str((lead or {}).get("deleted_at", "")).strip())
+
+
+def _find_lead_index(leads, numero):
+    wanted = str(numero or "").strip()
+    for i, lead in enumerate(leads):
+        if str((lead or {}).get("numero", "")).strip() == wanted:
+            return i
+    return None
+
+
+def _lead_display_name(lead):
+    nom = str((lead or {}).get("nom", "")).strip()
+    prenom = str((lead or {}).get("prenom", "")).strip()
+    return " ".join(part for part in (prenom, nom) if part)
+
+
+def _exchange_for_front(entry):
+    contenu = str((entry or {}).get("contenu", ""))
+    created_at = (entry or {}).get("created_at", "")
+    auteur = (entry or {}).get("auteur") or (entry or {}).get("created_by") or "Anonyme"
+    return {
+        "type": (entry or {}).get("type", "sms"),
+        "contenu": contenu,
+        "contenu_html": (entry or {}).get("contenu_html") or html.escape(contenu).replace("\n", "<br>"),
+        "objet": (entry or {}).get("objet"),
+        "template_id": (entry or {}).get("template_id"),
+        "created_at": created_at,
+        "created_by": auteur,
+        "auteur": auteur,
+        "nrp": bool((entry or {}).get("nrp")),
     }
 
 
@@ -457,12 +524,9 @@ async def health() -> JSONResponse:
 
 @app.get("/api/baremes")
 async def get_baremes():
-    from pathlib import Path
-
-    p = Path(__file__).parent / "data" / "baremes.json"
-    if not p.exists():
+    if not os.path.exists(BAREMES_PATH):
         return {}
-    with open(p, encoding="utf-8") as f:
+    with open(BAREMES_PATH, encoding="utf-8") as f:
         return json.load(f)
 
 
@@ -548,6 +612,19 @@ async def save_lead(request: Request) -> JSONResponse:
     )
 
 
+@app.get("/api/leads")
+def get_leads(include_deleted: bool = False) -> JSONResponse:
+    leads = _read_leads()
+    if not include_deleted:
+        leads = [lead for lead in leads if not _is_deleted(lead)]
+    return JSONResponse([_lead_for_response(lead) for lead in leads])
+
+
+@app.get("/api/leads/trash")
+def get_leads_trash() -> JSONResponse:
+    return JSONResponse([_lead_for_response(lead) for lead in _read_leads() if _is_deleted(lead)])
+
+
 @app.get("/api/leads/{numero}")
 def get_lead(numero: str) -> JSONResponse:
     wanted = str(numero or "").strip()
@@ -562,6 +639,41 @@ async def update_lead(numero: str, request: Request) -> JSONResponse:
     payload = _normalize_lead_payload(await _read_request_payload(request))
     lead, _ = _upsert_lead(payload, forced_numero=numero)
     return JSONResponse({"ok": True, "numero": lead.get("numero"), "lead": _lead_for_response(lead)})
+
+
+@app.delete("/api/leads/{numero}")
+def delete_lead(numero: str) -> JSONResponse:
+    leads = _read_leads()
+    index = _find_lead_index(leads, numero)
+    if index is None:
+        raise HTTPException(status_code=404, detail="Prospect introuvable")
+    leads[index]["deleted_at"] = _now_iso()
+    leads[index]["updated_at"] = _now_iso()
+    _atomic_write_json(LEADS_PATH, leads)
+    return JSONResponse({"ok": True})
+
+
+@app.post("/api/leads/{numero}/restore")
+def restore_lead(numero: str) -> JSONResponse:
+    leads = _read_leads()
+    index = _find_lead_index(leads, numero)
+    if index is None:
+        raise HTTPException(status_code=404, detail="Prospect introuvable")
+    leads[index]["deleted_at"] = ""
+    leads[index]["updated_at"] = _now_iso()
+    _atomic_write_json(LEADS_PATH, leads)
+    return JSONResponse({"ok": True})
+
+
+@app.delete("/api/leads/{numero}/purge")
+def purge_lead(numero: str) -> JSONResponse:
+    leads = _read_leads()
+    index = _find_lead_index(leads, numero)
+    if index is None:
+        raise HTTPException(status_code=404, detail="Prospect introuvable")
+    del leads[index]
+    _atomic_write_json(LEADS_PATH, leads)
+    return JSONResponse({"ok": True})
 
 
 @app.post("/prospect/ajax")
@@ -586,11 +698,6 @@ async def update_prospect_ajax(numero: str, request: Request) -> JSONResponse:
     return JSONResponse(
         {"ok": True, "status": "ok", "numero": lead.get("numero"), "lead": _lead_for_response(lead)}
     )
-
-
-@app.get("/api/leads")
-def get_leads() -> JSONResponse:
-    return JSONResponse([_lead_for_response(lead) for lead in _read_leads()])
 
 
 # ---------------------------------------------------------------------------
@@ -692,13 +799,53 @@ async def commentaire_ajax(numero: str, request: Request) -> JSONResponse:
             payload_form = None
 
     texte = _extract_texte(payload_form, payload_json).strip()
+    auteur = _extract_auteur(payload_form, payload_json)
     if not texte:
         return JSONResponse({"ok": False, "msg": "Texte vide"}, status_code=400)
 
     notes = _read_notes()
     notes.setdefault(numero, []).append(
-        {"texte": texte, "date": _now_iso(), "auteur": "Manuel"}
+        {"texte": texte, "date": _now_iso(), "auteur": auteur}
     )
     _atomic_write_json(NOTES_PATH, notes)
 
     return JSONResponse({"ok": True, "count": len(notes[numero])})
+
+
+@app.get("/prospect/{numero}/echanges-json")
+def echanges_json(numero: str) -> JSONResponse:
+    echanges = _read_echanges()
+    leads = _read_leads()
+    lead = next((lead for lead in leads if str(lead.get("numero", "")).strip() == numero), {})
+    entries = echanges.get(numero, [])
+    return JSONResponse(
+        {
+            "numero": numero,
+            "nom_complet": _lead_display_name(lead),
+            "echanges": [_exchange_for_front(e) for e in entries],
+        }
+    )
+
+
+@app.post("/prospect/{numero}/echanges-ajax")
+async def echanges_ajax(numero: str, request: Request) -> JSONResponse:
+    payload = await _read_request_payload(request)
+    contenu = str(payload.get("contenu", "")).strip()
+    if not contenu:
+        return JSONResponse({"ok": False, "msg": "Texte vide"}, status_code=400)
+
+    auteur = str(payload.get("auteur") or payload.get("created_by") or "").strip() or "Anonyme"
+    entry = {
+        "type": str(payload.get("type") or "sms").strip() or "sms",
+        "contenu": contenu,
+        "contenu_html": html.escape(contenu).replace("\n", "<br>"),
+        "objet": payload.get("objet") or "",
+        "template_id": payload.get("template_id") or "",
+        "created_at": _now_iso(),
+        "created_by": auteur,
+        "auteur": auteur,
+    }
+    echanges = _read_echanges()
+    echanges.setdefault(numero, []).append(entry)
+    _atomic_write_json(ECHANGES_PATH, echanges)
+    return JSONResponse({"ok": True, "count": len(echanges[numero])})

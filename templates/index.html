@@ -6954,6 +6954,36 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
 .pv-table tr:last-child td{ border-bottom:none; }
 .pv-table tbody tr{ transition:background .12s; cursor:pointer; }
 .pv-table tbody tr:hover{ background:#F4F8FC; }
+.pv-select-cell,.pv-action-cell{ text-align:center; vertical-align:middle; }
+.pv-select-cell{ width:34px; }
+.pv-select-checkbox{ width:18px; height:18px; accent-color:#002E5A; cursor:pointer; vertical-align:middle; }
+.pv-select-checkbox:focus{ outline:2px solid rgba(0,46,90,.20); outline-offset:2px; }
+.pv-delete-btn{ border:none; background:transparent; color:#9CA3AF; cursor:pointer; font-size:17px; line-height:1; padding:4px 6px; border-radius:6px; }
+.pv-delete-btn:hover{ color:#E2214B; background:#FDE8EC; }
+.pv-bulk-delete{ display:none; background:#E2214B; color:#fff; }
+.pv-bulk-delete:hover{ background:#c01b3f; }
+.hexa-user-menu{ position:relative; }
+.hexa-user-btn{ border:1px solid #E2E8F0; background:#fff; color:#002E5A; border-radius:9px; padding:9px 12px; font-size:13px; font-weight:700; cursor:pointer; font-family:inherit; }
+.hexa-user-dropdown{ position:absolute; right:0; top:calc(100% + 6px); display:none; min-width:190px; background:#fff; border:1px solid #E2E8F0; border-radius:10px; box-shadow:0 12px 32px rgba(16,32,64,.18); padding:6px; z-index:2600; }
+.hexa-user-dropdown.open{ display:block; }
+.hexa-user-dropdown button{ width:100%; border:none; background:transparent; color:#002E5A; text-align:left; padding:9px 10px; border-radius:8px; cursor:pointer; font-family:inherit; font-size:13px; }
+.hexa-user-dropdown button:hover{ background:#F4F8FC; }
+.hexa-user-modal{ position:fixed; inset:0; z-index:5000; display:flex; align-items:center; justify-content:center; background:rgba(8,20,40,.55); }
+.hexa-user-box{ width:min(420px,92vw); background:#fff; border-radius:14px; padding:24px; box-shadow:0 20px 60px rgba(0,0,0,.28); text-align:center; }
+.hexa-user-title{ color:#002E5A; font-size:18px; font-weight:800; margin-bottom:18px; }
+.hexa-user-choices{ display:flex; gap:10px; justify-content:center; }
+.hexa-user-choices button{ flex:1; border:1px solid #E2E8F0; background:#F8FAFC; color:#002E5A; border-radius:10px; padding:12px; font-weight:700; cursor:pointer; font-family:inherit; }
+.hexa-user-choices button:hover{ border-color:#E2214B; color:#E2214B; }
+.hexa-confirm-modal{ position:fixed; inset:0; z-index:5200; display:flex; align-items:center; justify-content:center; background:rgba(8,20,40,.55); padding:20px; }
+.hexa-confirm-box{ background:#fff; border-radius:14px; width:min(460px,100%); padding:22px; box-shadow:0 20px 60px rgba(0,0,0,.30); }
+.hexa-confirm-text{ color:#1A2233; font-size:14px; line-height:1.5; margin-bottom:18px; }
+.hexa-confirm-actions{ display:flex; justify-content:flex-end; gap:10px; }
+.adm-trash-table{ width:100%; border-collapse:collapse; font-size:12px; background:#fff; border:1px solid #E2E8F0; border-radius:12px; overflow:hidden; }
+.adm-trash-table th{ background:#002E5A; color:#fff; text-align:left; padding:9px 10px; font-size:10px; text-transform:uppercase; letter-spacing:.05em; }
+.adm-trash-table td{ border-top:1px solid #E2E8F0; padding:9px 10px; color:#1A2233; }
+.adm-trash-actions{ display:flex; gap:8px; flex-wrap:wrap; }
+.adm-trash-table .adm-btn-ghost{ background:#fff; color:#002E5A; border:1px solid #E2E8F0; }
+.adm-trash-empty{ background:#fff; border:1px solid #E2E8F0; border-radius:12px; padding:16px; color:#9CA3AF; }
 .pv-nom{ font-weight:700; color:#002E5A; }
 .pv-muted{ color:#9CA3AF; }
 .pv-mail{ color:#002E5A; text-decoration:none; }
@@ -6980,11 +7010,11 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
 .pv-th-inner{ padding:8px 6px; font-size:9.5px; }
 .pv-pid{ font-size:10.5px; padding:3px 7px; }
 .pv-nom{ font-weight:700; }
-.pv-nom-only{ text-transform:uppercase; }    
+.pv-nom-only{ text-transform:uppercase; }
 .pv-mail{ font-size:12.5px; }
 .pv-wrap{ max-width:1340px; }
 /* la cellule mail peut être longue : on autorise l'ellipse si besoin */
-.pv-table td:nth-child(6){ max-width:none; overflow:visible; text-overflow:clip; }
+.pv-table td:nth-child(7){ max-width:none; overflow:visible; text-overflow:clip; }
 
 /* ===== Badge statut déroulant custom ===== */
 .pv-statut-wrap{ position:relative; display:inline-block; }
@@ -7106,6 +7136,12 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
   <nav class="hexa-lite-nav">
     <a href="#" class="hexa-nav-link" id="hexa-nav-home">Accueil</a>
   </nav>
+  <div class="hexa-user-menu" id="hexa-user-menu">
+    <button type="button" class="hexa-user-btn" id="hexa-user-btn">👤 — ▾</button>
+    <div class="hexa-user-dropdown" id="hexa-user-dropdown">
+      <button type="button" id="hexa-change-user">Changer d'utilisateur</button>
+    </div>
+  </div>
   <a href="#" class="topbar-btn-primary hexa-topbar-new" id="hexa-nav-new">+ Nouveau</a>
 </header>
 
@@ -7246,7 +7282,8 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
         <div class="field" data-required="prenom" data-label="Prénom">
           <label>Prénom <span class="req">*</span></label>
           <input type="text" name="prenom" required value="" autocomplete="given-name" placeholder="Jean"
-                 oninput="this.value=this.value.replace(/[0-9,\?\*\/]/g,'');if(this.value)this.value=this.value.charAt(0).toUpperCase()+this.value.slice(1).toLowerCase()">
+                 oninput="this.value=window.hexaCapitalizePrenom?window.hexaCapitalizePrenom(this.value):this.value.replace(/[0-9,\?\*\/]/g,'')"
+                 onblur="this.value=window.hexaCapitalizePrenom?window.hexaCapitalizePrenom(this.value):this.value">
         </div>
       </div>
       <div class="row row-2">
@@ -7490,7 +7527,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
               <input type="number" name="nb_niveaux" id="nb-niveaux-input" value="" min="1" max="20" step="1"></div>
             <div class="field" data-urbs-field="hsp">
               <label><span class="label-row"><span>HSP — hauteur sous plafond (m)</span><span id="badge-hsp" class="badge-source badge-dpe-auto" data-badge="dpe-auto" style="display:none"></span></span></label>
-              <input type="number" name="hsp" id="hsp-input" value="" min="1" max="6" step="0.01"></div>
+              <input type="text" name="hsp" id="hsp-input" value="" inputmode="decimal" pattern="[0-9],?[0-9]*"></div>
             <div class="field" data-urbs-field="hauteur_batiment">
               <label><span class="label-row"><span>Hauteur du bâtiment (m)</span><span id="badge-hauteur" class="badge-source badge-dpe-auto" data-badge="dpe-auto" style="display:none"></span></span></label>
               <input type="number" name="hauteur_batiment" id="hauteur-batiment-input" value="" min="1" step="0.1"></div>
@@ -7846,11 +7883,10 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       const hspInputRef = hspField ? q('[name="hsp"]', hspField) : null;
       if (hspInputRef) {
         hspInputRef.id = 'hsp';
-        hspInputRef.step = '0.1';
-        hspInputRef.min = '2.0';
-        hspInputRef.max = '5.0';
+        hspInputRef.type = 'text';
         hspInputRef.placeholder = '2.5';
         hspInputRef.setAttribute('inputmode', 'decimal');
+        hspInputRef.setAttribute('pattern', '[0-9],?[0-9]*');
         const hspLabel = q('label', hspField);
         if (hspLabel) {
           const span = q('.label-row > span:first-child', hspLabel) || hspLabel;
@@ -7859,7 +7895,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       } else if (!hspField) {
         hspField = document.createElement('div');
         hspField.className = 'field';
-        hspField.innerHTML = '<label for="hsp">HSP (m)</label><input type="number" id="hsp" name="hsp" step="0.1" min="2.0" max="5.0" placeholder="2.5" inputmode="decimal">';
+        hspField.innerHTML = '<label for="hsp">HSP (m)</label><input type="text" id="hsp" name="hsp" placeholder="2.5" inputmode="decimal" pattern="[0-9],?[0-9]*">';
       }
       const ecsField = document.createElement('div');
       ecsField.className = 'field';
@@ -9927,19 +9963,59 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     });
   });
 
+  window.hexaCapitalizePrenom = function (value) {
+    return String(value || '')
+      .replace(/[0-9,\?\*\/]/g, '')
+      .toLowerCase()
+      .replace(/(^|[\s\-'])([a-zà-ÿ])/g, function (_, sep, letter) {
+        return sep + letter.toUpperCase();
+      });
+  };
+
   // ===== FORMAT TÉLÉPHONE : XX XX XX XX XX =====
   function formatTelephone(input) {
     if (!input) return;
     let v = (input.value || '').replace(/\D/g, '');
-    if (v.startsWith('33') && v.length >= 11) v = '0' + v.slice(2);
     if (v.length > 10) v = v.slice(0, 10);
     input.value = v.replace(/(\d{2})(?=\d)/g, '$1 ').trim();
+    if (typeof window.updateIdentityBanner === 'function') window.updateIdentityBanner();
   }
   const telInput = document.getElementById('telephone-input');
   if (telInput) {
     formatTelephone(telInput);
     telInput.addEventListener('input', () => formatTelephone(telInput));
   }
+
+  function bindHspInput(input) {
+    if (!input || input.dataset.hspBound === '1') return;
+    input.dataset.hspBound = '1';
+    input.type = 'text';
+    input.setAttribute('inputmode', 'decimal');
+    input.setAttribute('pattern', '[0-9],?[0-9]*');
+    const warning = document.createElement('div');
+    warning.className = 'field-warning hsp-warning';
+    warning.style.cssText = 'display:none;color:#B45309;font-size:11px;margin-top:4px';
+    warning.textContent = 'HSP hors plage recommandée (2,0 à 5,0 m)';
+    input.closest('.field')?.appendChild(warning);
+    const clean = () => {
+      let v = (input.value || '').replace(/\./g, ',').replace(/[^0-9,]/g, '');
+      const firstComma = v.indexOf(',');
+      if (firstComma !== -1) {
+        v = v.slice(0, firstComma + 1) + v.slice(firstComma + 1).replace(/,/g, '');
+      }
+      input.value = v;
+      const n = parseFloat(v.replace(',', '.'));
+      warning.style.display = v && Number.isFinite(n) && (n < 2 || n > 5) ? 'block' : 'none';
+    };
+    input.addEventListener('input', clean);
+    input.addEventListener('blur', clean);
+    clean();
+  }
+  bindHspInput(document.getElementById('hsp-input'));
+  bindHspInput(document.getElementById('hsp'));
+  document.addEventListener('focusin', (e) => {
+    if (e.target?.matches?.('[name="hsp"], #hsp, #hsp-input')) bindHspInput(e.target);
+  });
 
   // ===== ANNÉE CONSTRUCTION — badges ANAH + CEE =====
   function calcAgeLogement(annee) {
@@ -10198,7 +10274,6 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
   // ===== VALIDATION EMAIL CÔTÉ CLIENT =====
   const emailInput = document.querySelector('input[name="email"]');
   if (emailInput) {
-    emailInput.addEventListener('input', function() { this.value = this.value.toLowerCase(); });
     emailInput.addEventListener('blur', function() {
       this.value = this.value.toLowerCase().trim();
       const v = this.value;
@@ -10650,8 +10725,9 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
 
     // Validation e-mail (format)
     const email = form.querySelector('input[name=email]');
-    if (email && email.value && !email.value.includes('@')) {
-      champsManquants.push('E-mail (format invalide)');
+    if (email) email.value = email.value.toLowerCase().trim();
+    if (email && email.value && !email.validity.valid) {
+      champsManquants.push('Email invalide');
       email.closest('.field').classList.add('error');
     }
 
@@ -10694,6 +10770,13 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
 
     // 1. Nettoyer le RFR (retirer espaces)
     if (rfrInput) rfrInput.value = (rfrInput.value || '').replace(/\s/g, '');
+    const hspSaveInput = form.querySelector('[name="hsp"]');
+    if (hspSaveInput) {
+      let hsp = (hspSaveInput.value || '').replace(/\./g, ',').replace(/[^0-9,]/g, '');
+      const firstComma = hsp.indexOf(',');
+      if (firstComma !== -1) hsp = hsp.slice(0, firstComma + 1) + hsp.slice(firstComma + 1).replace(/,/g, '');
+      hspSaveInput.value = hsp;
+    }
 
     // 2. Valider
     const erreurs = validerFormulaire();
@@ -11538,6 +11621,10 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
   const AUTEUR_DEFAUT = 'Avi B.';
   let currentProspect = null;
 
+  function hexaAuteurCourant() {
+    try { return localStorage.getItem('hexa_user') || ''; } catch (_) { return ''; }
+  }
+
   function formatParis(iso) {
     if (!iso) return '—';
     try {
@@ -11699,6 +11786,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     try {
       const fd = new FormData();
       fd.append('texte_commentaire', html);
+      fd.append('auteur', hexaAuteurCourant());
       const resp = await fetch(`/prospect/${currentProspect}/commentaire-ajax`, { method: 'POST', body: fd });
       const data = await resp.json().catch(() => ({}));
       if (!resp.ok) throw new Error(data.msg || data.detail || `HTTP ${resp.status}`);
@@ -11742,6 +11830,10 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
   let activeType = 'sms';
   let exchangeConfig = null;
   let currentUser = 'Avi B.';
+
+  function hexaAuteurCourant() {
+    try { return localStorage.getItem('hexa_user') || ''; } catch (_) { return ''; }
+  }
 
   window.resetEchangesPanelState = function () {
     exchangeConfig = null;
@@ -12026,12 +12118,14 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     const btn = document.getElementById('exchanges-submit');
     btn.disabled = true;
     try {
+      const auteur = hexaAuteurCourant();
       const body = {
         type: activeType,
         contenu,
         objet: (document.getElementById('exchanges-objet')?.value || '').trim() || null,
         template_id: document.getElementById('exchanges-template')?.value || null,
-        created_by: currentUser,
+        created_by: auteur || currentUser,
+        auteur,
       };
       const resp = await fetch(`/prospect/${currentProspect}/echanges-ajax`, {
         method: 'POST',
@@ -13862,6 +13956,73 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     setTimeout(()=>{ t.classList.remove('show'); setTimeout(()=>t.remove(),220); }, 2000);
   }
 
+  function adminEscape(v){
+    return String(v ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+  }
+  function adminDate(v){
+    if(!v) return '—';
+    try { return new Date(v).toLocaleString('fr-FR'); } catch(_) { return v; }
+  }
+  async function loadTrash(){
+    const root = document.getElementById('adm-trash');
+    if(!root) return;
+    root.textContent = 'Chargement...';
+    try{
+      const r = await fetch('/api/leads/trash', { cache:'no-store' });
+      if(!r.ok) throw new Error('HTTP ' + r.status);
+      const leads = await r.json();
+      if(!Array.isArray(leads) || !leads.length){
+        root.className = 'adm-trash-empty';
+        root.textContent = 'Aucun lead supprimé.';
+        return;
+      }
+      root.className = '';
+      root.innerHTML = `
+        <table class="adm-trash-table">
+          <thead><tr><th>N°</th><th>Nom Prénom</th><th>Date de suppression</th><th>Actions</th></tr></thead>
+          <tbody>
+            ${leads.map(p => `
+              <tr data-numero="${adminEscape(p.numero)}">
+                <td>${adminEscape(p.numero || '—')}</td>
+                <td>${adminEscape(((p.nom || '') + ' ' + (p.prenom || '')).trim() || '—')}</td>
+                <td>${adminEscape(adminDate(p.deleted_at))}</td>
+                <td class="adm-trash-actions">
+                  <button type="button" class="adm-btn adm-btn-ghost adm-trash-restore">♻ Restaurer</button>
+                  <button type="button" class="adm-btn adm-btn-danger adm-trash-purge">🗑 Supprimer définitivement</button>
+                </td>
+              </tr>`).join('')}
+          </tbody>
+        </table>`;
+      root.querySelectorAll('.adm-trash-restore').forEach(btn=>{
+        btn.addEventListener('click', async ()=>{
+          const numero = btn.closest('tr')?.dataset.numero;
+          if(!numero) return;
+          const resp = await fetch('/api/leads/' + encodeURIComponent(numero) + '/restore', { method:'POST' });
+          if(!resp.ok) { adminToast('Restauration impossible', '#B91C1C'); return; }
+          adminToast('Lead restauré ✓', '#0D6B3B');
+          if(typeof window.hexaRefreshProspectsTable === 'function') window.hexaRefreshProspectsTable();
+          loadTrash();
+        });
+      });
+      root.querySelectorAll('.adm-trash-purge').forEach(btn=>{
+        btn.addEventListener('click', async ()=>{
+          const numero = btn.closest('tr')?.dataset.numero;
+          if(!numero) return;
+          const confirmFn = window.hexaConfirm || ((msg)=>Promise.resolve(window.confirm(msg)));
+          const ok = await confirmFn('Êtes-vous sûr ? Cette suppression est IRRÉVERSIBLE.', 'Supprimer définitivement');
+          if(!ok) return;
+          const resp = await fetch('/api/leads/' + encodeURIComponent(numero) + '/purge', { method:'DELETE' });
+          if(!resp.ok) { adminToast('Suppression définitive impossible', '#B91C1C'); return; }
+          adminToast('Lead supprimé définitivement', '#0D6B3B');
+          loadTrash();
+        });
+      });
+    }catch(e){
+      root.className = 'adm-trash-empty';
+      root.textContent = 'Corbeille indisponible.';
+    }
+  }
+
   async function hydrateCatalogueDefaults(){
     if (Array.isArray(window.__hexaCataloguePacCache) && window.__hexaCataloguePacCache.length) {
       return { source:'cache', models:window.__hexaCataloguePacCache.map(normalizeAdminModel) };
@@ -14126,6 +14287,9 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
               <div class="adm-legend-row"><span class="adm-dot adm-dot1"></span><span>Option 1 — vente directe : marge brute − CAC − visite − COFRAC − urbanisme.</span></div>
               <div class="adm-legend-row"><span class="adm-dot adm-dot2"></span><span>Option 2 — prix de cession : marge garantie au-dessus de (coût + visite + COFRAC + urbanisme). La régie revend au-dessus et garde le surplus ; la colonne « Commission régie » montre ce qu'elle gagne si elle revend à ton prix catalogue.</span></div>
             </div>
+
+            <div class="adm-section">Corbeille</div>
+            <div id="adm-trash" class="adm-trash-empty">Chargement...</div>
             </div>
           </div>
         </div>
@@ -14507,6 +14671,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       const wrap=document.createElement('div'); wrap.id='adm-root'; wrap.innerHTML=render();
       document.body.appendChild(wrap);
       bind();
+      loadTrash();
     });
   }
   function close(){ const r=document.getElementById('adm-root'); if(r) r.remove(); }
@@ -14668,6 +14833,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
   let leadsLoading = true;
   let leadsLoadError = '';
   let sortKey='date', sortDir=-1, query='';
+  let selectedNumeros = new Set();
 
   const fmtDate = d => { try{ return new Date(d).toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric'}); }catch(_){ return d; } };
   const arrowFor = k => sortKey!==k ? '\u2195' : (sortDir>0?'\u2191':'\u2193');
@@ -14692,6 +14858,116 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
 
   function escapeHtml(v){
     return String(v ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+  }
+  function hexaConfirm(message, confirmLabel) {
+    return new Promise(resolve => {
+      const modal = document.createElement('div');
+      modal.className = 'hexa-confirm-modal';
+      modal.innerHTML = `
+        <div class="hexa-confirm-box" role="dialog" aria-modal="true">
+          <div class="hexa-confirm-text">${escapeHtml(message)}</div>
+          <div class="hexa-confirm-actions">
+            <button type="button" class="adm-btn adm-btn-cancel" data-act="cancel">Annuler</button>
+            <button type="button" class="adm-btn adm-btn-danger" data-act="confirm">${escapeHtml(confirmLabel || 'Confirmer')}</button>
+          </div>
+        </div>`;
+      document.body.appendChild(modal);
+      modal.addEventListener('click', e => {
+        const act = e.target?.dataset?.act;
+        if (!act && e.target !== modal) return;
+        modal.remove();
+        resolve(act === 'confirm');
+      });
+    });
+  }
+  window.hexaConfirm = hexaConfirm;
+  function updateBulkDeleteButton() {
+    const btn = document.getElementById('pv-bulk-delete');
+    if (!btn) return;
+    const count = selectedNumeros.size;
+    btn.style.display = count ? 'inline-flex' : 'none';
+    btn.textContent = 'Supprimer la sélection' + (count ? ' (' + count + ')' : '');
+  }
+  function syncSelectionState(visibleRows) {
+    const visibleNums = visibleRows
+      ? visibleRows.map(p => p.numero).filter(Boolean)
+      : Array.from(document.querySelectorAll('.pv-row-select')).map(cb => cb.dataset.numero).filter(Boolean);
+    document.querySelectorAll('.pv-row-select').forEach(cb => {
+      cb.checked = selectedNumeros.has(cb.dataset.numero);
+    });
+    const master = document.getElementById('pv-master-checkbox');
+    if (master) {
+      const selectedVisible = visibleNums.filter(num => selectedNumeros.has(num)).length;
+      master.checked = visibleNums.length > 0 && selectedVisible === visibleNums.length;
+      master.indeterminate = selectedVisible > 0 && selectedVisible < visibleNums.length;
+    }
+    updateBulkDeleteButton();
+  }
+  async function softDeleteLead(numero) {
+    const resp = await fetch('/api/leads/' + encodeURIComponent(numero), { method:'DELETE' });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+  }
+  const HEXA_USERS = {
+    avi: 'Avi',
+    joelle: 'Joelle',
+    maurice: 'Maurice',
+  };
+  function currentHexaUser() {
+    try { return (localStorage.getItem('hexa_user') || '').trim(); } catch(_) { return ''; }
+  }
+  function setHexaUser(key) {
+    try { localStorage.setItem('hexa_user', key); } catch(_) {}
+    updateUserHeader();
+  }
+  function updateUserHeader() {
+    const btn = document.getElementById('hexa-user-btn');
+    if (!btn) return;
+    const key = currentHexaUser();
+    btn.textContent = '👤 ' + (HEXA_USERS[key] || '—') + ' ▾';
+  }
+  function showUserModal() {
+    document.getElementById('hexa-user-modal')?.remove();
+    const modal = document.createElement('div');
+    modal.id = 'hexa-user-modal';
+    modal.className = 'hexa-user-modal';
+    modal.innerHTML = `
+      <div class="hexa-user-box" role="dialog" aria-modal="true">
+        <div class="hexa-user-title">Qui utilise le CRM ?</div>
+        <div class="hexa-user-choices">
+          <button type="button" data-user="avi">Avi</button>
+          <button type="button" data-user="joelle">Joelle</button>
+          <button type="button" data-user="maurice">Maurice</button>
+        </div>
+      </div>`;
+    document.body.appendChild(modal);
+    modal.querySelectorAll('[data-user]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        setHexaUser(btn.dataset.user);
+        modal.remove();
+      });
+    });
+  }
+  function ensureUserSelected() {
+    if (!HEXA_USERS[currentHexaUser()]) showUserModal();
+    updateUserHeader();
+  }
+  function bindUserMenu() {
+    const btn = document.getElementById('hexa-user-btn');
+    const menu = document.getElementById('hexa-user-dropdown');
+    const change = document.getElementById('hexa-change-user');
+    if (!btn || !menu || !change) return;
+    btn.addEventListener('click', e => {
+      e.preventDefault();
+      menu.classList.toggle('open');
+    });
+    change.addEventListener('click', () => {
+      menu.classList.remove('open');
+      showUserModal();
+    });
+    document.addEventListener('click', e => {
+      if (!e.target.closest('#hexa-user-menu')) menu.classList.remove('open');
+    });
+    updateUserHeader();
   }
   function cleanVal(v){ return String(v ?? '').trim(); }
   function normTxt(v){
@@ -14871,11 +15147,13 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
           <input class="pv-search" id="pv-search" placeholder="Rechercher un nom, email, téléphone…">
           <label for="pv-import-file" class="pv-btn pv-btn-ghost" style="cursor:pointer">📥 Importer Excel</label>
           <input type="file" id="pv-import-file" accept=".xlsx,.xls,.csv" style="display:none">
+          <button type="button" class="pv-btn pv-bulk-delete" id="pv-bulk-delete">Supprimer la sélection</button>
           <span class="pv-count" id="pv-count"></span>
         </div>
         <div class="pv-card">
           <table class="pv-table">
             <thead><tr id="pv-thead">
+              <th class="pv-select-cell"><input type="checkbox" class="pv-select-checkbox" id="pv-master-checkbox" aria-label="Sélectionner toutes les lignes visibles"></th>
               <th data-k="numero"><div class="pv-th-inner">N° <span class="pv-arrow">\u2195</span></div></th>
               <th data-k="statut"><div class="pv-th-inner">Statut <span class="pv-arrow">\u2195</span></div></th>
               <th data-k="nomprenom"><div class="pv-th-inner">Nom Prénom <span class="pv-arrow">\u2195</span></div></th>
@@ -14888,6 +15166,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
               <th data-k="dernnrp" class="pv-center"><div class="pv-th-inner">Dern. NRP <span class="pv-arrow">\u2195</span></div></th>
               <th data-k="projet_initial"><div class="pv-th-inner">Projet initial <span class="pv-arrow">\u2195</span></div></th>
               <th data-k="source"><div class="pv-th-inner">Source <span class="pv-arrow">\u2195</span></div></th>
+              <th class="pv-action-cell">Actions</th>
             </tr></thead>
             <tbody id="pv-tbody"></tbody>
           </table>
@@ -14917,16 +15196,20 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     });
     const tb=document.getElementById('pv-tbody'), empty=document.getElementById('pv-empty');
     document.getElementById('pv-count').textContent = rows.length+' prospect'+(rows.length>1?'s':'');
+    const visibleSet = new Set(rows.map(p => p.numero).filter(Boolean));
+    selectedNumeros.forEach(num => { if (!visibleSet.has(num)) selectedNumeros.delete(num); });
     if(!rows.length){
       tb.innerHTML='';
       empty.textContent = leadsLoading ? 'Chargement des prospects…' : (leadsLoadError || 'Aucun prospect pour le moment.');
       empty.style.display='block';
+      syncSelectionState([]);
       return;
     }
     empty.style.display='none';
     tb.innerHTML = rows.map(p=>{
       const cnt=nrpCount(p); const last=nrpLast(p);
       return '<tr data-num="'+p.numero+'">'
+      +'<td class="pv-select-cell"><input type="checkbox" class="pv-select-checkbox pv-row-select" data-numero="'+p.numero+'" aria-label="Sélectionner '+(p.numero||'')+'"></td>'
       +'<td><span class="pv-pid">'+(p.numero||'—')+'</span></td>'
       +'<td>'+statutSelect(p)+'</td>'
       +'<td class="pv-nom"><span class="pv-nom-only">'+(p.nom||'')+'</span> '+(p.prenom||'')+'</td>'
@@ -14943,13 +15226,34 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       +'<td class="pv-center pv-muted'+(last?' pv-dernnrp':'')+'"'+(last?' title="'+new Date(last).toLocaleString('fr-FR')+'"':'')+'>'+relTime(last)+'</td>'
       +'<td>'+(p.projet_initial||'<span class="pv-muted">—</span>')+'</td>'
       +'<td>'+(p.source||'<span class="pv-muted">—</span>')+'</td>'
+      +'<td class="pv-action-cell"><button type="button" class="pv-delete-btn" data-numero="'+p.numero+'" title="Supprimer">🗑</button></td>'
       +'</tr>';
     }).join('');
+    syncSelectionState(rows);
     tb.querySelectorAll('tr').forEach(tr=>{
       const num=tr.dataset.num; const rec=data.find(p=>p.numero===num);
       tr.addEventListener('click', e=>{
-        if(e.target.closest('.pv-nrp-ctl')||e.target.closest('a')||e.target.closest('.pv-statut')) return;
+        if(e.target.closest('.pv-nrp-ctl')||e.target.closest('a')||e.target.closest('.pv-statut')||e.target.closest('.pv-select-checkbox')||e.target.closest('.pv-delete-btn')) return;
         openFiche(rec);
+      });
+      tr.querySelector('.pv-row-select')?.addEventListener('click', e=>{
+        e.stopPropagation();
+        if(e.currentTarget.checked) selectedNumeros.add(num);
+        else selectedNumeros.delete(num);
+        syncSelectionState(rows);
+      });
+      tr.querySelector('.pv-delete-btn')?.addEventListener('click', async e=>{
+        e.stopPropagation();
+        const fullName = ((rec?.prenom || '') + ' ' + (rec?.nom || '')).trim() || rec?.numero || '';
+        const ok = await hexaConfirm('Êtes-vous sûr de vouloir supprimer le lead ' + fullName + ' ?', 'Confirmer la suppression');
+        if(!ok) return;
+        try{
+          await softDeleteLead(num);
+          selectedNumeros.delete(num);
+          await refreshProspectsTable();
+        }catch(err){
+          alert('Suppression impossible : ' + err.message);
+        }
       });
       const stWrap=tr.querySelector('.pv-statut-wrap');
       if(stWrap){
@@ -14986,7 +15290,9 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
 
   function bindView(){
     document.querySelectorAll('#pv-thead th').forEach(th=>{
-      th.querySelector('.pv-th-inner').addEventListener('click', ()=>{
+      const inner = th.querySelector('.pv-th-inner');
+      if(!inner || !th.dataset.k) return;
+      inner.addEventListener('click', ()=>{
         const k=th.dataset.k;
         if(sortKey===k) sortDir*=-1; else { sortKey=k; sortDir=1; }
         renderRows();
@@ -15032,10 +15338,40 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
         computeStats();
       });
     }
+    const master = document.getElementById('pv-master-checkbox');
+    if(master){
+      master.addEventListener('change', ()=>{
+        document.querySelectorAll('.pv-row-select').forEach(cb=>{
+          cb.checked = master.checked;
+          if(master.checked) selectedNumeros.add(cb.dataset.numero);
+          else selectedNumeros.delete(cb.dataset.numero);
+        });
+        syncSelectionState();
+      });
+    }
+    const bulkDelete = document.getElementById('pv-bulk-delete');
+    if(bulkDelete){
+      bulkDelete.addEventListener('click', async ()=>{
+        const nums = Array.from(selectedNumeros);
+        if(!nums.length) return;
+        const ok = await hexaConfirm('Êtes-vous sûr de vouloir supprimer ces ' + nums.length + ' leads ?', 'Confirmer');
+        if(!ok) return;
+        try{
+          for(const numero of nums){
+            await softDeleteLead(numero);
+          }
+          selectedNumeros.clear();
+          await refreshProspectsTable();
+        }catch(err){
+          alert('Suppression impossible : ' + err.message);
+        }
+      });
+    }
     window.addEventListener('hexa:leads-imported', refreshAfterImport);
     document.addEventListener('hexa:leads-imported', refreshAfterImport);
     window.hexaRefreshStatsAfterImport = refreshAfterImport;
     window.hexaRefreshProspectsTable = refreshProspectsTable;
+    bindUserMenu();
   }
 
   // --- Menu statut : positionnement fixed (ne déborde pas) ---
@@ -15244,6 +15580,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     };
     applyBadge('psb-badge-dpe', /^[A-G]$/.test(dpe) ? ('DPE ' + dpe) : '', dpeColors[dpe]?.[0], dpeColors[dpe]?.[1]);
   }
+  window.updateIdentityBanner = updateIdentityBanner;
   function bindIdentityBannerLive(){
     const form = document.getElementById('form-prospect');
     if(!form || form.dataset.psbBound==='1') return;
@@ -15383,6 +15720,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     if(neu) neu.addEventListener('click', e=>{ e.preventDefault(); openNewProspect(); });
     bindIdentityBannerLive();
     updateIdentityBanner();
+    ensureUserSelected();
   }
   if(document.readyState!=='loading') init();
   else document.addEventListener('DOMContentLoaded', init);
