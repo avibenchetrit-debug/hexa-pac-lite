@@ -6413,6 +6413,7 @@ body.sim-left-open .hexa-app-shell__main{
 .sim-pnl-edit-wrap > *{ min-width:0; }
 .sim-model-select{ flex:1 1 220px; width:100%; max-width:100%; min-width:0; box-sizing:border-box; height:32px; border:1px solid var(--c-line,#E2E8F0); border-radius:6px; padding:0 8px; font-size:11px; color:var(--c-ink,#1A2233); background:#fff; font-family:inherit; text-overflow:ellipsis; overflow:hidden; white-space:nowrap; }
 .sim-model-select:focus{ outline:none; border-color:var(--c-navy,#002E5A); box-shadow:0 0 0 3px rgba(0,46,90,.12); }
+.sim-zone-select{ width:100%; max-width:100%; min-width:74px; border:1px solid var(--c-line,#E2E8F0); border-radius:6px; padding:4px 7px; font-size:12px; color:var(--c-navy,#002E5A); background:#fff; font-family:inherit; font-weight:700; }
 .sim-warn-badge{ display:inline-flex; align-items:center; height:24px; padding:0 8px; border-radius:999px; font-size:11px; font-weight:700; background:#FEF3C7; color:#B45309; border:1px solid #F59E0B; flex:0 0 auto; }
 .sim-strict-toggle{ display:inline-flex; align-items:center; gap:5px; font-size:11px; color:#4A5568; white-space:nowrap; }
 .sim-strict-toggle input{ margin:0; }
@@ -13210,6 +13211,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     iso_mur: 'isole',
     iso_menuiserie: 'double',
     phase_electrique: '',
+    altitude: null,
     hsp: null,
     hsp_fallback: true,
     puissance_requise_kw: null,
@@ -13272,23 +13274,41 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
 
   function temperatureExterieureBase(state){
     const cp = String(state.cp_chantier || '').replace(/\D/g, '').slice(0, 5);
+    let info;
     if (cp && Object.prototype.hasOwnProperty.call(TEMP_BASE_CP, cp)) {
-      return { temperature: TEMP_BASE_CP[cp], source: 'cp', zone: state.zone_detail || state.zone || '' };
-    }
-    const dept = cp.startsWith('97') || cp.startsWith('976') ? cp.slice(0, 3) : cp.slice(0, 2);
-    if (dept && DEPT_SOUS_ZONE[dept]) {
+      info = { temperature: TEMP_BASE_CP[cp], source: 'cp', zone: state.zone_detail || state.zone || '' };
+    } else {
+      const dept = cp.startsWith('97') || cp.startsWith('976') ? cp.slice(0, 3) : cp.slice(0, 2);
+      if (dept && DEPT_SOUS_ZONE[dept]) {
       const z = DEPT_SOUS_ZONE[dept];
-      return { temperature: TEMP_BASE_SOUS_ZONE[z], source: 'departement', zone: z };
+        info = { temperature: TEMP_BASE_SOUS_ZONE[z], source: 'departement', zone: z };
+      }
     }
-    const zDetail = normaliserZone(state.zone_detail);
-    if (zDetail && TEMP_BASE_SOUS_ZONE[zDetail] != null) {
-      return { temperature: TEMP_BASE_SOUS_ZONE[zDetail], source: 'zone', zone: zDetail };
+    if (!info) {
+      const zDetail = normaliserZone(state.zone_detail);
+      if (zDetail && TEMP_BASE_SOUS_ZONE[zDetail] != null) {
+        info = { temperature: TEMP_BASE_SOUS_ZONE[zDetail], source: 'zone', zone: zDetail };
+      }
     }
-    const z = zonePrincipale(state.zone);
-    if (z && TEMP_BASE_ZONE[z] != null) {
-      return { temperature: TEMP_BASE_ZONE[z], source: 'zone', zone: z };
+    if (!info) {
+      const z = zonePrincipale(state.zone);
+      if (z && TEMP_BASE_ZONE[z] != null) {
+        info = { temperature: TEMP_BASE_ZONE[z], source: 'zone', zone: z };
+      }
     }
-    return { temperature: -7, source: 'defaut', zone: 'H1' };
+    if (!info) {
+      info = { temperature: -7, source: 'defaut', zone: 'H1' };
+    }
+    const altitude = state.altitude == null || state.altitude === '' ? null : Number(state.altitude);
+    const correction = Number.isFinite(altitude) && altitude > 200 ? ((altitude - 200) / 100) * 0.5 : 0;
+    return {
+      ...info,
+      temperature_brute: info.temperature,
+      temperature: info.temperature - correction,
+      altitude,
+      correction_altitude: correction,
+      altitude_corrigee: correction > 0
+    };
   }
 
   function calculerPuissancePAC(state) {
@@ -13328,6 +13348,10 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       G_retenu: G_total,
       t_int: T_INT_DIM,
       t_ext_base,
+      t_ext_base_brute: tempInfo.temperature_brute,
+      altitude: tempInfo.altitude,
+      correction_altitude: tempInfo.correction_altitude,
+      altitude_corrigee: tempInfo.altitude_corrigee,
       delta_T,
       surface_chauffee,
       hsp,
@@ -13439,6 +13463,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     state.cp_chantier = '';
     state.energie_avant = '';
     state.phase_electrique = '';
+    state.altitude = null;
     state.surface_habitable = null;
     if (!state.surface_forcee) state.surface_chauffee = null;
     state.facture_avant = 200;
@@ -13473,6 +13498,8 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     const phase = document.getElementById('phase-input')?.value
       || document.querySelector('[name="phase_electrique"]')?.value;
     if (phase) state.phase_electrique = String(phase);
+    const altitudeVal = num(document.getElementById('altitude-input')?.value || document.querySelector('[name="altitude"]')?.value);
+    state.altitude = altitudeVal != null ? altitudeVal : null;
     // Surface habitable -> chauffée 90%
     const sh = num(document.getElementById('surface-input')?.value || document.querySelector('[name="surface_logement_m2"]')?.value);
     if (sh!=null){ state.surface_habitable=sh; if(!state.surface_forcee) state.surface_chauffee=sh*0.90; }
@@ -13585,6 +13612,10 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       ? '—'
       : `${anahLabel} (MPR) · ${ceeLabel} (CEE)`;
     const energieLbl = ENERGIE_LABEL[state.energie_avant] || '—';
+    const zoneValue = state.zone_detail || state.zone || '';
+    const zoneOptions = ['H1a','H1b','H1c','H2a','H2b','H2c','H2d','H3','H1','H2']
+      .map(z => `<option value="${z}" ${sel(zoneValue,z) || sel(normaliserZone(zoneValue), normaliserZone(z))}>${z}</option>`)
+      .join('');
 
     // mensualité affichée dans Avant/Après selon option
     const creditLine = state.option==='opt3'
@@ -13600,7 +13631,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
         <div class="sim-section-label">Repris de la fiche</div>
         <div class="sim-context">
           <div class="sim-ctx-item"><span class="sim-ctx-k">Catégorie</span><span class="sim-ctx-v">${catLabel}</span></div>
-          <div class="sim-ctx-item"><span class="sim-ctx-k">Zone clim.</span><span class="sim-ctx-v">${state.zone || '—'}</span></div>
+          <div class="sim-ctx-item"><span class="sim-ctx-k">Zone clim.</span><span class="sim-ctx-v"><select id="sim-zone-climatique" class="sim-zone-select">${zoneOptions}</select></span></div>
           <div class="sim-ctx-item"><span class="sim-ctx-k">Énergie act.</span><span class="sim-ctx-v">${energieLbl}</span></div>
           <div class="sim-ctx-item">
             <span class="sim-ctx-k">Surf. chauffée</span>
@@ -13791,6 +13822,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       const ev=el.tagName==='SELECT'?'change':'input'; el.addEventListener(ev,e=>{fn(e.target.value); refresh();}); };
     onIn('sim-etas',v=>{ state.etas=v; state.modele_force=false; });
     onIn('sim-service',v=>{ state.service=v; state.modele_force=false; });
+    onIn('sim-zone-climatique',v=>{ state.zone_detail=normaliserZone(v); state.zone=zonePrincipale(v); state.modele_force=false; });
     onIn('iso-toit',v=>{ state.iso_toit=v; state.modele_force=false; });
     onIn('iso-mur',v=>{ state.iso_mur=v; state.modele_force=false; });
     onIn('iso-menuiserie',v=>{ state.iso_menuiserie=v; state.modele_force=false; });
@@ -13981,6 +14013,11 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     const fmt0 = n => Number.isFinite(Number(n)) ? Math.round(Number(n)).toLocaleString('fr-FR') : '—';
     const zoneLabel = dim.zone_dimensionnement || state.zone_detail || state.zone || 'H1';
     const surfaceHab = Number.isFinite(Number(state.surface_habitable)) ? state.surface_habitable : 0;
+    const altitudeLabel = Number.isFinite(Number(dim.altitude)) ? fmt0(dim.altitude) : '—';
+    const altitudeLine = dim.altitude_corrigee
+      ? `Altitude : ${altitudeLabel} m → correction T_ext de -${fmt1(dim.correction_altitude)}°C`
+      : `Altitude : ${altitudeLabel} m (pas de correction)`;
+    const tempLabel = `${String(dim.t_ext_base).replace('.', ',')}°C${dim.altitude_corrigee ? ' (corrigée altitude)' : ''}`;
     const ecsLine = state.service === 'chauffage_ecs' || state.service === 'chauffage+ecs'
       ? `<p>Réserve ECS : ${fmt0(dim.p_ecs_w)} W</p>`
       : '';
@@ -14005,7 +14042,8 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
           État déclaré : toit ${getIsoLabel('toit', dim.iso_toit)}, murs ${getIsoLabel('mur', dim.iso_mur)}, menuiseries ${getIsoLabel('menuiserie', dim.iso_menuiserie)}</p>
 
           <p>Zone climatique : ${zoneLabel}<br>
-          Température extérieure de base : ${dim.t_ext_base}°C<br>
+          ${altitudeLine}<br>
+          Température extérieure de base : ${tempLabel}<br>
           Consigne intérieure : 20°C → ΔT = ${dim.delta_T}°C</p>
 
           <p>Puissance chauffage : G × V × ΔT = ${fmt0(dim.p_chauffage_w)} W</p>
@@ -14065,7 +14103,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     if (!force && !estOuvert()) return;
     // Relecture complète depuis le DOM actif de la fiche.
     lireContexteFiche();
-    if (force) state.modele_force = false;
+    state.modele_force = false;
     if (estOuvert()) refresh();
   }
   window.syncSimulateurDepuisFiche = syncDepuisFiche;
