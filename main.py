@@ -543,6 +543,11 @@ def get_catalogue_pac() -> JSONResponse:
     return JSONResponse(catalogue)
 
 
+@app.get("/api/gmaps-key")
+def get_gmaps_key() -> JSONResponse:
+    return JSONResponse({"key": os.environ.get("GMAPS_API_KEY", "")})
+
+
 @app.post("/api/catalogue-pac")
 async def post_catalogue_pac(request: Request) -> JSONResponse:
     try:

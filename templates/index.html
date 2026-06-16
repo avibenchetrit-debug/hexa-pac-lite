@@ -5957,7 +5957,7 @@ body.comments-panel-open {
   <style>
 /* Drawer gauche — carte cadastrale + pointage parcelle */
 :root {
-  --parcel-drawer-w: 480px;
+  --parcel-drawer-w: 420px;
 }
 
 .parcel-drawer-scrim {
@@ -5982,31 +5982,41 @@ body.comments-panel-open {
   position: fixed;
   top: var(--hexa-topbar-h, 56px);
   left: 0;
-  width: var(--parcel-drawer-w);
-  max-width: 100vw;
+  width: 0;
+  max-width: var(--parcel-drawer-w);
   height: calc(100dvh - var(--hexa-topbar-h, 56px));
   background: #fff;
   box-shadow: 4px 0 24px rgba(0, 46, 90, 0.12);
   z-index: var(--z-drawer, 900);
-  transform: translateX(-100%);
+  transform: none;
   visibility: hidden;
   pointer-events: none;
-  transition: transform 0.25s ease, visibility 0s linear 0.25s;
+  overflow: hidden;
+  transition: width 0.2s ease, visibility 0s linear 0.2s;
   display: flex;
   flex-direction: column;
 }
 
 .parcel-drawer.is-open {
-  transform: translateX(0);
+  width: var(--parcel-drawer-w);
   visibility: visible;
   pointer-events: auto;
-  transition: transform 0.25s ease;
+  transition: width 0.2s ease;
 }
 
-body.parcel-drawer-open .hexa-page-pending,
-body.parcel-drawer-open .hexa-main,
-body.parcel-drawer-open .container {
-  margin-left: 0;
+body.parcel-drawer-open #hexa-app-shell {
+  display: grid;
+  grid-template-columns: var(--parcel-drawer-w) minmax(0, 1fr) auto;
+}
+
+body.parcel-drawer-open #hexa-app-shell .hexa-app-shell__main {
+  grid-column: 2;
+  min-width: 0;
+}
+
+body.parcel-drawer-open .container,
+body.parcel-drawer-open .hexa-prospect-page {
+  min-width: 0;
 }
 
 .parcel-drawer-head {
@@ -6046,7 +6056,7 @@ body.parcel-drawer-open .container {
 }
 
 .parcel-drawer-map-wrap {
-  flex: 1 1 50%;
+  flex: 0 0 60%;
   min-height: 180px;
   position: relative;
   border-bottom: 1px solid #E2E8F0;
@@ -6075,7 +6085,7 @@ body.parcel-drawer-open .container {
 }
 
 .parcel-drawer-street {
-  flex: 1 1 50%;
+  flex: 0 0 40%;
   min-height: 120px;
   display: flex;
   align-items: center;
@@ -6084,6 +6094,12 @@ body.parcel-drawer-open .container {
   background: #F8FAFC;
   border-bottom: 1px solid #E2E8F0;
   text-align: center;
+}
+
+.parcel-drawer-street iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
 }
 
 .parcel-drawer-street-inner {
@@ -6142,10 +6158,26 @@ body.parcel-drawer-open .container {
   background: #c41c3f;
 }
 
-@media (max-width: 640px) {
+@media (min-width: 900px) {
+  .parcel-drawer-scrim {
+    display: none;
+  }
+}
+
+@media (max-width: 899px) {
+  body.parcel-drawer-open #hexa-app-shell {
+    display: block;
+  }
   .parcel-drawer {
-    width: 100vw;
+    width: min(var(--parcel-drawer-w), 100vw);
     max-width: 100vw;
+    transform: translateX(-100%);
+    transition: transform 0.2s ease, visibility 0s linear 0.2s;
+  }
+  .parcel-drawer.is-open {
+    width: min(var(--parcel-drawer-w), 100vw);
+    transform: translateX(0);
+    transition: transform 0.2s ease;
   }
 }
 
@@ -6391,6 +6423,15 @@ body.sim-left-open .hexa-app-shell__main{
 .sim-dim-head h3{ margin:0; font-size:15px; color:var(--c-navy,#002E5A); }
 .sim-dim-head button{ border:none; background:none; color:var(--c-subtle,#9CA3AF); font-size:24px; cursor:pointer; line-height:1; }
 .sim-dim-head button:hover{ color:var(--c-rouge,#E2214B); }
+.sim-dim-content{ padding:16px 18px 8px; color:var(--c-ink,#1A2233); font-size:13px; line-height:1.55; }
+.sim-dim-content p{ margin:0 0 14px; }
+.sim-dim-result{ margin:18px 0; padding:18px 20px; border-radius:12px; background:#002E5A; color:#fff; text-align:center; }
+.sim-dim-result span{ display:block; font-size:12px; font-weight:800; letter-spacing:.08em; margin-bottom:6px; }
+.sim-dim-result strong{ display:block; font-size:34px; line-height:1; font-weight:900; }
+.sim-dim-disclaimer{ font-size:11.5px; color:#64748B; border-top:1px solid var(--c-line,#E2E8F0); padding-top:12px; }
+.sim-dim-foot{ padding:12px 18px 16px; display:flex; justify-content:flex-end; border-top:1px solid var(--c-line,#E2E8F0); }
+.sim-dim-close-btn{ border:none; border-radius:8px; padding:9px 16px; background:#002E5A; color:#fff; font-family:inherit; font-weight:700; cursor:pointer; }
+.sim-dim-close-btn:hover{ background:#E2214B; }
 .sim-dim-table{ width:100%; border-collapse:collapse; font-size:12.5px; }
 .sim-dim-table th, .sim-dim-table td{ padding:9px 12px; border-bottom:1px solid var(--c-line-soft,#F0F5FA); text-align:left; vertical-align:top; }
 .sim-dim-table th{ width:38%; color:var(--c-navy,#002E5A); background:#F9FBFD; font-weight:600; }
@@ -8629,6 +8670,11 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
   let parcelLayer = null;
   let marker = null;
   let leafletLoaded = false;
+  let gmapsKeyPromise = null;
+  let lastParcelLookupKey = '';
+  let lastParcelLookupData = null;
+  let inFlightParcelLookup = null;
+  let lastReglementaireKey = '';
   let state = {
     lat: null,
     lon: null,
@@ -8666,6 +8712,28 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       s.onerror = reject;
       document.head.appendChild(s);
     });
+  }
+
+  function getGmapsKey() {
+    if (window.GMAPS_KEY) return Promise.resolve(window.GMAPS_KEY);
+    if (!gmapsKeyPromise) {
+      gmapsKeyPromise = fetch('/api/gmaps-key')
+        .then(r => r.ok ? r.json() : { key: '' })
+        .then(data => data.key || '')
+        .catch(() => '');
+    }
+    return gmapsKeyPromise;
+  }
+
+  async function updateStreetView(lat, lon) {
+    const root = $('parcel-drawer-street');
+    if (!root) return;
+    const key = await getGmapsKey();
+    if (!key) {
+      root.innerHTML = '<div class="parcel-drawer-street-inner"><strong>⚠ Street View indisponible</strong>Street View indisponible (clé Google Maps non configurée)</div>';
+      return;
+    }
+    root.innerHTML = `<iframe title="Street View" loading="lazy" allowfullscreen referrerpolicy="no-referrer-when-downgrade" src="https://www.google.com/maps/embed/v1/streetview?key=${encodeURIComponent(key)}&location=${encodeURIComponent(lat + ',' + lon)}&heading=210&pitch=10&fov=80"></iframe>`;
   }
 
   function ensureMap(lat, lon) {
@@ -8711,12 +8779,30 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
   }
 
   async function fetchParcelAt(lat, lon) {
+    const key = `${Number(lat).toFixed(4)},${Number(lon).toFixed(4)}`;
+    if (key === lastParcelLookupKey && lastParcelLookupData) return lastParcelLookupData;
+    if (key === lastParcelLookupKey && inFlightParcelLookup) return inFlightParcelLookup;
     const geom = JSON.stringify({ type: 'Point', coordinates: [lon, lat] });
-    const r = await fetch(
-      `https://apicarto.ign.fr/api/cadastre/parcelle?geom=${encodeURIComponent(geom)}&_limit=1`
-    );
-    if (!r.ok) throw new Error('Cadastre indisponible');
-    return r.json();
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
+    lastParcelLookupKey = key;
+    inFlightParcelLookup = fetch(
+      `https://apicarto.ign.fr/api/cadastre/parcelle?geom=${encodeURIComponent(geom)}&_limit=1`,
+      { signal: controller.signal }
+    )
+      .then((r) => {
+        if (!r.ok) throw new Error('Cadastre indisponible');
+        return r.json();
+      })
+      .then((data) => {
+        lastParcelLookupData = data;
+        return data;
+      })
+      .finally(() => {
+        clearTimeout(timeout);
+        inFlightParcelLookup = null;
+      });
+    return inFlightParcelLookup;
   }
 
   async function onMapClick(e) {
@@ -8724,6 +8810,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     const lon = e.latlng.lng;
     state.lat = lat;
     state.lon = lon;
+    updateStreetView(lat, lon);
     if (marker) marker.setLatLng([lat, lon]);
     else marker = L.marker([lat, lon]).addTo(map);
 
@@ -8775,7 +8862,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
         if (lonEl) lonEl.value = String(state.centroid.lon);
       }
     } catch {
-      if (refVal) refVal.textContent = 'Erreur cadastre';
+      if (refVal) refVal.textContent = 'Vérification impossible';
     }
   }
 
@@ -8796,6 +8883,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
         drawer.setAttribute('aria-hidden', 'false');
         document.body.classList.add('parcel-drawer-open');
         ensureMap(lat, lon);
+        updateStreetView(lat, lon);
         if (marker) {
           map.removeLayer(marker);
           marker = null;
@@ -9293,6 +9381,8 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     });
     if (cout != null) {
       el.value = cout;
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+      el.dispatchEvent(new Event('change', { bubbles: true }));
       if (u) marquerUrbsField('cout_energetique_mensuel_eur', 'badge-cout', u.source_dpe === 'officiel' ? 'officiel' : 'enrichi');
     }
   }
@@ -9527,7 +9617,11 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     input.classList.toggle('reg-auto-input', !forced);
   }
 
+  let lastReglementaireKey = '';
   async function rechercheReglementaireAuto(lat, lon, parcelleRef) {
+    const key = `${Number(lat).toFixed(4)},${Number(lon).toFixed(4)}|${parcelleRef || ''}`;
+    if (key === lastReglementaireKey) return;
+    lastReglementaireKey = key;
     await Promise.all([
       rechercheParcelleAuto(lat, lon, parcelleRef),
       rechercheCoproRnic(lat, lon, parcelleRef),
@@ -9543,10 +9637,14 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     try {
       const q = new URLSearchParams({ lat: String(lat), lon: String(lon) });
       if (parcelleRef) q.set("parcelle", parcelleRef);
-      const data = await fetch(`/api/copro?${q}`).then(r => r.json());
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 10000);
+      const data = await fetch(`/api/copro?${q}`, { signal: controller.signal })
+        .then(r => r.json())
+        .finally(() => clearTimeout(timeout));
       appliquerCopro(data);
     } catch {
-      if (statusEl) statusEl.innerHTML = '<span class="cadastre-status-warn">⚠ Non vérifié</span>';
+      if (statusEl) statusEl.innerHTML = '<span class="cadastre-status-warn">Vérification impossible</span>';
       if (sel) { sel.disabled = false; }
     }
   }
@@ -9617,7 +9715,11 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     }
     if (statusEl) statusEl.innerHTML = '<span class="cadastre-status-loading">⏳ Recherche parcelle…</span>';
     try {
-      const data = await fetch(`/api/parcelle?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}`).then(r => r.json());
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 10000);
+      const data = await fetch(`/api/parcelle?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}`, { signal: controller.signal })
+        .then(r => r.json())
+        .finally(() => clearTimeout(timeout));
       if (data.parcelle) {
         inputEl.value = data.parcelle;
         inputEl.classList.remove('parcelle-non-trouve');
@@ -9629,7 +9731,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
         if (statusEl) statusEl.innerHTML = '<span class="cadastre-status-warn">Parcelle non trouvée — saisie manuelle possible</span>';
       }
     } catch (e) {
-      if (statusEl) statusEl.innerHTML = '<span class="cadastre-status-warn">⚠ Non vérifié</span>';
+      if (statusEl) statusEl.innerHTML = '<span class="cadastre-status-warn">Vérification impossible</span>';
     }
   }
 
@@ -12844,8 +12946,8 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     </div>
     <div class="parcel-drawer-street" id="parcel-drawer-street">
       <div class="parcel-drawer-street-inner">
-        <strong>🔒 Street View — Bientôt disponible</strong>
-        Intégration Google Maps Street View à venir (clé API requise).
+        <strong>⚠ Street View indisponible</strong>
+        Street View indisponible (clé Google Maps non configurée)
       </div>
     </div>
     <div class="parcel-drawer-ref" id="parcel-drawer-ref" hidden>
@@ -12897,13 +12999,26 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
   let GRILLE = {};
   let CATALOGUE_PAC = [];
 
-  const COEF_ISO = {
-    toit: { tres_bien: 0.15, bien: 0.20, isole: 0.30, peu: 0.50, non: 0.80 },
-    mur: { tres_bien: 0.25, bien: 0.35, isole: 0.50, peu: 0.80, non: 1.20 },
-    menuiserie: { double: 2.0, sur_vitrage: 2.6, simple: 5.0 }
+  const TEMP_BASE_ZONE = { H1: -7, H2: -4, H3: 0 };
+  const TEMP_BASE_SOUS_ZONE = { H1A: -9, H1B: -8, H1C: -7, H2A: -4, H2B: -5, H2C: -3, H2D: -2, H3: 0 };
+  const TEMP_BASE_CP = {};
+  const DEPT_SOUS_ZONE = {
+    '02':'H1A','14':'H1A','27':'H1A','28':'H1A','50':'H1A','59':'H1A','60':'H1A','61':'H1A','62':'H1A','76':'H1A','80':'H1A',
+    '08':'H1B','10':'H1B','21':'H1B','25':'H1B','39':'H1B','51':'H1B','52':'H1B','54':'H1B','55':'H1B','57':'H1B','58':'H1B','67':'H1B','68':'H1B','70':'H1B','71':'H1B','88':'H1B','89':'H1B','90':'H1B',
+    '01':'H1C','03':'H1C','05':'H1C','15':'H1C','19':'H1C','23':'H1C','38':'H1C','42':'H1C','43':'H1C','63':'H1C','69':'H1C','73':'H1C','74':'H1C','87':'H1C',
+    '16':'H2A','17':'H2A','22':'H2A','29':'H2A','35':'H2A','44':'H2A','49':'H2A','53':'H2A','56':'H2A','72':'H2A','79':'H2A','85':'H2A','86':'H2A',
+    '09':'H2B','12':'H2B','24':'H2B','31':'H2B','32':'H2B','33':'H2B','40':'H2B','46':'H2B','47':'H2B','64':'H2B','65':'H2B','81':'H2B','82':'H2B',
+    '04':'H2C','07':'H2C','26':'H2C','48':'H2C','84':'H2C',
+    '06':'H2D','11':'H2D','13':'H2D','30':'H2D','34':'H2D','66':'H2D','83':'H2D',
+    '2A':'H3','2B':'H3'
   };
-  const DELTA_T = { H1: 28, H2: 25, H3: 22 };
-  const COEF_SECURITE = 1.2;
+  const COEF_G = {
+    toit: { tres_bien: 0.00, bien: 0.10, isole: 0.20, peu: 0.35, non: 0.50 },
+    mur: { tres_bien: 0.00, bien: 0.15, isole: 0.30, peu: 0.55, non: 0.80 },
+    menuiserie: { double: 0.05, sur_vitrage: 0.20, simple: 0.40 }
+  };
+  const T_INT_DIM = 20;
+  const FACTEUR_SECURITE_DIM = 1.10;
 
   function chargerCatalogueDepuisStorage(){
     try {
@@ -12957,7 +13072,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     const labels = {
       toit: { tres_bien:'Très bien isolé', bien:'Bien isolé', isole:'Isolé', peu:'Peu isolé', non:'Non isolé' },
       mur: { tres_bien:'Très bien isolé', bien:'Bien isolé', isole:'Isolé', peu:'Peu isolé', non:'Non isolé' },
-      menuiserie: { double:'Double vitrage', sur_vitrage:'Sur vitrage', simple:'Simple vitrage' }
+      menuiserie: { double:'Double vitrage', sur_vitrage:'Survitrage', simple:'Simple vitrage' }
     };
     return labels[type]?.[key] || key;
   }
@@ -12967,31 +13082,28 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
   }
 
   function isModeleDuo(modele){
-    const nom = String(modele?.nom || modele?.label || modele?.ref || '').toUpperCase();
-    const usage = String(modele?.usage || modele?.raw?.usage || '').toUpperCase();
-    return nom.includes('DUO') || usage.includes('ECS');
+    const nomRef = `${modele?.nom || modele?.label || ''} ${modele?.ref || ''}`.toUpperCase();
+    return nomRef.includes('DUO');
   }
 
   function isModeleTri(modele){
-    const nom = String(modele?.nom || modele?.label || modele?.ref || '').toUpperCase();
-    const usage = String(modele?.usage || modele?.raw?.usage || '').toUpperCase();
-    return nom.includes(' TRI') || nom.endsWith('TRI') || usage.includes('TRIPHASE');
+    const nomRef = `${modele?.nom || modele?.label || ''} ${modele?.ref || ''}`.toUpperCase();
+    return nomRef.includes('TRI');
   }
 
   function parsePhase(phaseValue){
     const p = String(phaseValue || '').toLowerCase();
     if (!p) return { hasPhase:false, isTri:false };
-    return { hasPhase:true, isTri: p.includes('tri') };
+    if (p.includes('tri')) return { hasPhase:true, isTri:true };
+    if (p.includes('mono')) return { hasPhase:true, isTri:false };
+    return { hasPhase:false, isTri:false };
   }
 
-  function getCatalogueCompatibles(simState, strictFilters = true){
+  function getCatalogueCompatibles(simState){
     const isEcs = simState.service === 'chauffage_ecs' || simState.service === 'chauffage+ecs';
     const phase = parsePhase(simState.phase_electrique);
     return CATALOGUE_PAC.filter((m) => {
       if (!m) return false;
-      if (m.etas && simState.etas && m.etas !== simState.etas) return false;
-      if (!strictFilters) return true;
-
       const duo = isModeleDuo(m);
       const tri = isModeleTri(m);
       if (isEcs && !duo) return false;
@@ -13006,15 +13118,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
   }
 
   function catalogueOptionsOrdonnees(simState){
-    const strict = simState.filtres_stricts !== false;
-    const compatibles = getCatalogueCompatibles(simState, strict).sort((a,b)=>puissanceModele(a)-puissanceModele(b));
-    if (strict) return compatibles;
-
-    const compatIds = new Set(compatibles.map((m)=>m.id));
-    const others = CATALOGUE_PAC
-      .filter((m)=>!compatIds.has(m.id))
-      .sort((a,b)=>puissanceModele(a)-puissanceModele(b));
-    return compatibles.concat(others);
+    return getCatalogueCompatibles(simState).sort((a,b)=>puissanceModele(a)-puissanceModele(b));
   }
 
   async function chargerBaremes() {
@@ -13051,6 +13155,8 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     numero: null,
     categorie: '',
     zone: '',
+    zone_detail: '',
+    cp_chantier: '',
     energie_avant: '',             // fioul | gaz | bois | electricite (lu fiche)
     surface_habitable: null,
     surface_chauffee: null,
@@ -13072,8 +13178,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     modele_pac_id: '',
     modele_force: false,
     sous_dimensionnement: false,
-    selection_alerte: null,
-    filtres_stricts: true
+    selection_alerte: null
   };
   const state = { ...DEFAULT_SIM_STATE };
 
@@ -13098,24 +13203,81 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
   }
   function labelTranche(k){ return {'<70':'≤ 69 m²','70-90':'70 à 89 m²','>=90':'≥ 90 m²'}[k]||k; }
 
+  function clamp(n, min, max){
+    return Math.max(min, Math.min(max, n));
+  }
+
+  function normaliserZone(z){
+    const raw = String(z || '').trim().toUpperCase().replace(/\s+/g, '');
+    if (!raw) return '';
+    if (raw.startsWith('H1A')) return 'H1A';
+    if (raw.startsWith('H1B')) return 'H1B';
+    if (raw.startsWith('H1C')) return 'H1C';
+    if (raw.startsWith('H2A')) return 'H2A';
+    if (raw.startsWith('H2B')) return 'H2B';
+    if (raw.startsWith('H2C')) return 'H2C';
+    if (raw.startsWith('H2D')) return 'H2D';
+    if (raw.startsWith('H1')) return 'H1';
+    if (raw.startsWith('H2')) return 'H2';
+    if (raw.startsWith('H3')) return 'H3';
+    return '';
+  }
+
+  function zonePrincipale(z){
+    const zone = normaliserZone(z);
+    if (zone.startsWith('H1')) return 'H1';
+    if (zone.startsWith('H2')) return 'H2';
+    if (zone.startsWith('H3')) return 'H3';
+    return '';
+  }
+
+  function temperatureExterieureBase(state){
+    const cp = String(state.cp_chantier || '').replace(/\D/g, '').slice(0, 5);
+    if (cp && Object.prototype.hasOwnProperty.call(TEMP_BASE_CP, cp)) {
+      return { temperature: TEMP_BASE_CP[cp], source: 'cp', zone: state.zone_detail || state.zone || '' };
+    }
+    const dept = cp.length >= 2 ? cp.slice(0, 2) : '';
+    if (dept && DEPT_SOUS_ZONE[dept]) {
+      const z = DEPT_SOUS_ZONE[dept];
+      return { temperature: TEMP_BASE_SOUS_ZONE[z], source: 'departement', zone: z };
+    }
+    const zDetail = normaliserZone(state.zone_detail);
+    if (zDetail && TEMP_BASE_SOUS_ZONE[zDetail] != null) {
+      return { temperature: TEMP_BASE_SOUS_ZONE[zDetail], source: 'zone', zone: zDetail };
+    }
+    const z = zonePrincipale(state.zone);
+    if (z && TEMP_BASE_ZONE[z] != null) {
+      return { temperature: TEMP_BASE_ZONE[z], source: 'zone', zone: z };
+    }
+    return { temperature: -7, source: 'defaut', zone: 'H1' };
+  }
+
   function calculerPuissancePAC(state) {
     const iso_toit = state.iso_toit || document.getElementById('iso-toit')?.value || 'isole';
     const iso_mur = state.iso_mur || document.getElementById('iso-mur')?.value || 'isole';
     const iso_menui = state.iso_menuiserie || document.getElementById('iso-menuiserie')?.value || 'double';
 
-    const G_toit = COEF_ISO.toit[iso_toit] ?? COEF_ISO.toit.isole;
-    const G_mur = COEF_ISO.mur[iso_mur] ?? COEF_ISO.mur.isole;
-    const G_menui = (COEF_ISO.menuiserie[iso_menui] ?? COEF_ISO.menuiserie.double) / 3;
-    const G_total = G_toit + G_mur + G_menui;
+    const G_toit = COEF_G.toit[iso_toit] ?? COEF_G.toit.isole;
+    const G_mur = COEF_G.mur[iso_mur] ?? COEF_G.mur.isole;
+    const G_menui = COEF_G.menuiserie[iso_menui] ?? COEF_G.menuiserie.double;
+    const G_total = clamp(0.75 + G_toit + G_mur + G_menui, 0.75, 2.50);
 
-    const surface_chauffee = Number(state.surface_chauffee || (state.surface_habitable ? state.surface_habitable * 0.9 : 0));
+    const surface_chauffee = state.surface_forcee
+      ? Number(state.surface_chauffee || 0)
+      : Number(state.surface_habitable ? state.surface_habitable * 0.9 : 0);
     const parsedHsp = Number(state.hsp);
     const hsp = Number.isFinite(parsedHsp) && parsedHsp > 0 ? parsedHsp : 2.5;
     const hspFallback = !(Number.isFinite(parsedHsp) && parsedHsp > 0);
     const volume_chauffe = surface_chauffee * hsp;
 
-    const delta_T = DELTA_T[state.zone] || 25;
-    const puissance_kw_raw = G_total * volume_chauffe * delta_T * COEF_SECURITE / 1000;
+    const tempInfo = temperatureExterieureBase(state);
+    const t_ext_base = tempInfo.temperature;
+    const delta_T = T_INT_DIM - t_ext_base;
+    const p_chauffage_w = G_total * volume_chauffe * delta_T;
+    const serviceEcs = state.service === 'chauffage_ecs' || state.service === 'chauffage+ecs';
+    const p_ecs_w = serviceEcs ? Math.min(Math.max(p_chauffage_w * 0.06, 500), 1000) : 0;
+    const p_pac_w = (p_chauffage_w * FACTEUR_SECURITE_DIM) + p_ecs_w;
+    const puissance_kw_raw = p_pac_w / 1000;
     const puissance_kw = Math.round((Number.isFinite(puissance_kw_raw) ? puissance_kw_raw : 0) * 10) / 10;
 
     return {
@@ -13124,11 +13286,20 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       G_mur,
       G_menui,
       G_total,
+      G_retenu: G_total,
+      t_int: T_INT_DIM,
+      t_ext_base,
       delta_T,
       surface_chauffee,
       hsp,
       hsp_fallback: hspFallback,
       volume_chauffe,
+      p_chauffage_w,
+      p_ecs_w,
+      p_pac_w,
+      facteur_securite: FACTEUR_SECURITE_DIM,
+      zone_dimensionnement: tempInfo.zone,
+      temp_source: tempInfo.source,
       iso_toit,
       iso_mur,
       iso_menuiserie: iso_menui,
@@ -13136,7 +13307,6 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
   }
 
   function selectionnerPAC(puissance_requise, catalogue, simState) {
-    const strict = simState.filtres_stricts !== false;
     const base = (Array.isArray(catalogue) ? catalogue : []).filter((m) => {
       if (!m) return false;
       const p = puissanceModele(m);
@@ -13144,26 +13314,21 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       if (!Number.isFinite(p) || p <= 0 || !Number.isFinite(prix) || prix <= 0) return false;
       return true;
     });
-    if (!base.length) return { modele: null, sous_dimensionnement: false, alerte: 'Catalogue PAC vide' };
+    if (!base.length) return { modele: null, sous_dimensionnement: false, alerte: '⚠ Aucun modèle catalogue compatible. Validation technique nécessaire.' };
 
-    const compatibles = getCatalogueCompatibles(simState, strict);
-    const pool = strict ? compatibles : (compatibles.length ? compatibles : base);
-    const sorted = [...pool].sort((a, b) => puissanceModele(a) - puissanceModele(b));
+    const sorted = getCatalogueCompatibles(simState).sort((a, b) => puissanceModele(a) - puissanceModele(b));
 
     if (!sorted.length) {
-      const phaseInfo = parsePhase(simState.phase_electrique);
-      const phaseTxt = phaseInfo.hasPhase ? (phaseInfo.isTri ? 'triphasé' : 'monophasé') : 'phase non renseignée';
-      const serviceTxt = (simState.service === 'chauffage_ecs' || simState.service === 'chauffage+ecs') ? 'DUO' : 'simple';
       return {
         modele: null,
         sous_dimensionnement: false,
-        alerte: `Catalogue à compléter — aucune PAC ${phaseTxt} ${serviceTxt} disponible`
+        alerte: '⚠ Aucun modèle catalogue compatible. Validation technique nécessaire.'
       };
     }
 
     const modele = sorted.find((m) => puissanceModele(m) >= puissance_requise);
     if (modele) return { modele, sous_dimensionnement: false, alerte: null };
-    return { modele: sorted[sorted.length - 1], sous_dimensionnement: true, alerte: 'Aucun modèle ne couvre la puissance requise' };
+    return { modele: null, sous_dimensionnement: false, alerte: '⚠ Aucun modèle catalogue compatible. Validation technique nécessaire.' };
   }
 
   function appliquerSelectionPac(selection){
@@ -13231,10 +13396,13 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
   function lireContexteFiche(){
     state.categorie = '';
     state.zone = '';
+    state.zone_detail = '';
+    state.cp_chantier = '';
     state.energie_avant = '';
     state.phase_electrique = '';
     state.surface_habitable = null;
     if (!state.surface_forcee) state.surface_chauffee = null;
+    state.facture_avant = 200;
     const categorieInput = document.getElementById('categorie-input')?.value || '';
     if (['tres_modeste', 'modeste', 'intermediaire', 'superieur'].includes(categorieInput)) {
       state.categorie = categorieInput;
@@ -13247,11 +13415,19 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       else if (t.startsWith('IN')) state.categorie='intermediaire';
       else if (t.startsWith('SU')) state.categorie='superieur';
     }
+    const cp = document.getElementById('cp-chantier')?.value
+      || document.querySelector('[name="code_postal_chantier"]')?.value
+      || document.querySelector('[name="cp"]')?.value;
+    state.cp_chantier = String(cp || '').replace(/\D/g, '').slice(0, 5);
     const zc = document.getElementById('zone-climatique-chantier')?.value
              || document.querySelector('[name="zone_climatique_chantier"]')?.value
+             || document.querySelector('[name="zone_climatique"]')?.value
              || window.__hexaZoneClim;
-    if (zc){ const z=String(zc).toUpperCase();
-      if (z.startsWith('H1')) state.zone='H1'; else if (z.startsWith('H3')) state.zone='H3'; else if (z.startsWith('H2')) state.zone='H2'; }
+    if (zc){
+      const z=normaliserZone(zc);
+      state.zone_detail = z;
+      state.zone = zonePrincipale(z);
+    }
     // Énergie avant (bloc 7)
     const mc = document.querySelector('select[name="mode_chauffage"]')?.value;
     if (mc) state.energie_avant = mc;
@@ -13260,16 +13436,24 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     if (phase) state.phase_electrique = String(phase);
     // Surface habitable -> chauffée 90%
     const sh = num(document.getElementById('surface-input')?.value || document.querySelector('[name="surface_logement_m2"]')?.value);
-    if (sh!=null){ state.surface_habitable=sh; if(!state.surface_forcee) state.surface_chauffee=Math.round(sh*0.90); }
+    if (sh!=null){ state.surface_habitable=sh; if(!state.surface_forcee) state.surface_chauffee=sh*0.90; }
     const hspRaw = document.getElementById('hsp')?.value
       || document.getElementById('hsp-input')?.value
       || document.querySelector('[name="hsp"]')?.value;
     const hspVal = parseFloat(String(hspRaw == null ? '' : hspRaw).replace(',', '.'));
     state.hsp = Number.isFinite(hspVal) && hspVal > 0 ? hspVal : 2.5;
     state.hsp_fallback = !(Number.isFinite(hspVal) && hspVal > 0);
-    // Facture avant
-    const cout = num(document.getElementById('cout-annuel-input')?.value || document.querySelector('[name="cout_energetique_annuel_eur"]')?.value);
-    if (cout!=null && cout>0) state.facture_avant=Math.round(cout/12);
+    // Facture avant : priorité au coût chauffage mensuel de la fiche.
+    const coutMensuel = num(document.getElementById('cout_chauffage')?.value
+      || document.getElementById('cout-energie-input')?.value
+      || document.querySelector('[name="cout_energetique_mensuel_eur"]')?.value
+      || document.querySelector('[name="cout_chauffage"]')?.value);
+    if (coutMensuel!=null && coutMensuel>0) {
+      state.facture_avant = coutMensuel;
+    } else {
+      const coutAnnuel = num(document.getElementById('cout-annuel-input')?.value || document.querySelector('[name="cout_energetique_annuel_eur"]')?.value);
+      if (coutAnnuel!=null && coutAnnuel>0) state.facture_avant=Math.round(coutAnnuel/12);
+    }
   }
 
   function pmt(tauxAnnuel, nMois, capital){
@@ -13416,7 +13600,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
           <label class="sim-field"><span>Menuiserie</span>
             <select id="iso-menuiserie" name="iso_menuiserie">
               <option value="double" ${sel(state.iso_menuiserie,'double')}>Double vitrage</option>
-              <option value="sur_vitrage" ${sel(state.iso_menuiserie,'sur_vitrage')}>Sur vitrage</option>
+              <option value="sur_vitrage" ${sel(state.iso_menuiserie,'sur_vitrage')}>Survitrage</option>
               <option value="simple" ${sel(state.iso_menuiserie,'simple')}>Simple vitrage</option>
             </select>
           </label>
@@ -13450,7 +13634,6 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
               <select id="sim-modele-select" class="sim-model-select">
                 ${catalogueOptionsOrdonnees(state).map(m => `<option value="${m.id}" ${m.id===state.modele_pac_id?'selected':''}>${m.label} · ${puissanceModele(m)} kW · ${eur(m.prix_ttc)}</option>`).join('')}
               </select>
-              <label class="sim-strict-toggle"><input type="checkbox" id="sim-strict-filters" ${state.filtres_stricts!==false ? 'checked' : ''}> Filtres stricts</label>
               ${state.sous_dimensionnement ? '<span class="sim-warn-badge">⚠ Vérifier</span>' : ''}
             </span>
           </div>
@@ -13552,6 +13735,10 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       prixInput.value = new Intl.NumberFormat('fr-FR').format(state.prix_pac||0);
     }
     const modelSelect = document.getElementById('sim-modele-select');
+    if (modelSelect) {
+      const options = catalogueOptionsOrdonnees(state);
+      modelSelect.innerHTML = options.map(m => `<option value="${m.id}" ${m.id===state.modele_pac_id?'selected':''}>${m.label} · ${puissanceModele(m)} kW · ${eur(m.prix_ttc)}</option>`).join('');
+    }
     if (modelSelect && state.modele_pac_id) {
       modelSelect.value = state.modele_pac_id;
     }
@@ -13595,20 +13782,11 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
         refresh();
       });
     }
-    const strictFilters = document.getElementById('sim-strict-filters');
-    if (strictFilters){
-      strictFilters.addEventListener('change', e => {
-        state.filtres_stricts = !!e.target.checked;
-        state.modele_force = false;
-        refresh();
-      });
-    }
-
     // Surface chauffée forçable : PATCH seulement (curseur intact)
     const sc=document.getElementById('sim-surf-chauffee');
     if (sc) sc.addEventListener('input',e=>{
       const raw=e.target.value;
-      if (raw==='') { state.surface_forcee=false; state.surface_chauffee = state.surface_habitable!=null?Math.round(state.surface_habitable*0.9):null; }
+      if (raw==='') { state.surface_forcee=false; state.surface_chauffee = state.surface_habitable!=null?state.surface_habitable*0.9:null; }
       else { const v=parseFloat(raw); if(!isNaN(v)){ state.surface_chauffee=v; state.surface_forcee=true; } }
       state.modele_force = false;
       patch();
@@ -13752,34 +13930,14 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
   function ouvrirNoteDim(){
     const dim = syncDimensionnement();
     const modele = getModeleActuel();
-    const phaseInfo = parsePhase(state.phase_electrique);
-    const phaseTxt = phaseInfo.hasPhase ? (phaseInfo.isTri ? 'Triphasé' : 'Monophasé') : 'Non renseignée';
     const serviceTxt = state.service === 'chauffage_ecs' ? 'Chauffage + ECS' : 'Chauffage seul';
-    const phaseShort = phaseInfo.hasPhase ? (phaseInfo.isTri ? 'tri' : 'mono') : 'phase non renseignée';
-    let warning = '';
-    if (state.selection_alerte) {
-      warning = `<p class="sim-dim-warn">⚠ ${state.selection_alerte}. Catalogue à compléter — aucune PAC ${phaseShort} ${serviceTxt === 'Chauffage + ECS' ? 'DUO' : 'simple'} avec puissance ≥ ${dim.puissance_kw} kW dans le catalogue actuel.</p>`;
-    } else if (state.sous_dimensionnement) {
-      warning = '<p class="sim-dim-warn">⚠ Aucun modèle du catalogue ne couvre la puissance requise. Le modèle le plus puissant a été retenu. Validation technique recommandée.</p>';
-    }
-    const rows = [
-      ['Surface habitable', `${state.surface_habitable ?? '—'} m²`],
-      ['Surface chauffée', `${dim.surface_chauffee ?? '—'} m²`],
-      ['HSP utilisé', `${dim.hsp} m${dim.hsp_fallback ? ' (valeur par défaut 2.5 m)' : ''}`],
-      ['Volume chauffé', `${Math.round((dim.volume_chauffe || 0) * 10) / 10} m³`],
-      ['Zone climatique', `${state.zone || '—'} (ΔT ${dim.delta_T}°C)`],
-      ['Toit / Comble', `${getIsoLabel('toit', dim.iso_toit)} (G=${dim.G_toit})`],
-      ['Mur', `${getIsoLabel('mur', dim.iso_mur)} (G=${dim.G_mur})`],
-      ['Menuiserie', `${getIsoLabel('menuiserie', dim.iso_menuiserie)} (G=${dim.G_menui.toFixed(2)})`],
-      ['Coefficient G global', dim.G_total.toFixed(2)],
-      ['Coefficient sécurité', `×${COEF_SECURITE}`],
-      ['Puissance requise', `${dim.puissance_kw} kW`],
-      ['Modèle sélectionné', modele ? `${modele.label} · ${modele.puissance_kw} kW` : '—'],
-      ['Prix TTC', modele ? eur(modele.prix_ttc) : eur(state.prix_pac || 0)],
-      ['Service demandé', serviceTxt],
-      ['Phase électrique demandée', phaseTxt]
-    ];
-    const htmlRows = rows.map(([k,v]) => `<tr><th>${k}</th><td>${v}</td></tr>`).join('');
+    const fmt1 = n => Number.isFinite(Number(n)) ? Number(n).toLocaleString('fr-FR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : '—';
+    const fmt0 = n => Number.isFinite(Number(n)) ? Math.round(Number(n)).toLocaleString('fr-FR') : '—';
+    const zoneLabel = dim.zone_dimensionnement || state.zone_detail || state.zone || 'H1';
+    const surfaceHab = Number.isFinite(Number(state.surface_habitable)) ? state.surface_habitable : 0;
+    const ecsLine = state.service === 'chauffage_ecs' || state.service === 'chauffage+ecs'
+      ? `<p>Réserve ECS : ${fmt0(dim.p_ecs_w)} W</p>`
+      : '';
     const old = document.getElementById('sim-dim-modal');
     if (old) old.remove();
     const wrap = document.createElement('div');
@@ -13791,12 +13949,43 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
           <h3>Note de dimensionnement</h3>
           <button type="button" id="sim-dim-close" aria-label="Fermer">×</button>
         </div>
-        <table class="sim-dim-table">${htmlRows}</table>
-        ${warning}
+        <div class="sim-dim-content">
+          <p>Méthode appliquée : NF EN 12831 — méthode simplifiée G × V × ΔT</p>
+
+          <p>Surface chauffée : ${fmt1(dim.surface_chauffee)} m² (sur ${fmt1(surfaceHab)} m² habitables)<br>
+          HSP : ${String(dim.hsp).replace('.', ',')} m → Volume chauffé : ${fmt0(dim.volume_chauffe)} m³</p>
+
+          <p>G retenu : ${dim.G_retenu.toFixed(2).replace('.', ',')} W/m³.°C<br>
+          État déclaré : toit ${getIsoLabel('toit', dim.iso_toit)}, murs ${getIsoLabel('mur', dim.iso_mur)}, menuiseries ${getIsoLabel('menuiserie', dim.iso_menuiserie)}</p>
+
+          <p>Zone climatique : ${zoneLabel}<br>
+          Température extérieure de base : ${dim.t_ext_base}°C<br>
+          Consigne intérieure : 20°C → ΔT = ${dim.delta_T}°C</p>
+
+          <p>Puissance chauffage : G × V × ΔT = ${fmt0(dim.p_chauffage_w)} W</p>
+
+          <p>Service : ${serviceTxt}</p>
+          ${ecsLine}
+          <p>Facteur sécurité : ×1,10</p>
+
+          <div class="sim-dim-result">
+            <span>PUISSANCE PAC RECOMMANDÉE :</span>
+            <strong>${fmt1(dim.puissance_kw)} kW</strong>
+          </div>
+
+          <p>Modèle proposé : ${modele ? modele.label : '—'}<br>
+          Prix TTC : ${modele ? eur(modele.prix_ttc) : eur(state.prix_pac || 0)}</p>
+
+          <p class="sim-dim-disclaimer">Ce calcul constitue un pré-dimensionnement simplifié basé sur les informations déclarées dans la fiche prospect et le simulateur. La puissance finale de la pompe à chaleur doit être vérifiée avec les données fabricant, la température extérieure de base réelle du projet et le régime d'eau des émetteurs.</p>
+        </div>
+        <div class="sim-dim-foot">
+          <button type="button" class="sim-dim-close-btn" id="sim-dim-close-bottom">Fermer</button>
+        </div>
       </div>`;
     document.body.appendChild(wrap);
     const close = () => wrap.remove();
     document.getElementById('sim-dim-close')?.addEventListener('click', close);
+    document.getElementById('sim-dim-close-bottom')?.addEventListener('click', close);
     wrap.addEventListener('click', (e)=>{ if (e.target === wrap) close(); });
   }
 
@@ -13809,14 +13998,21 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
   // Délégation sur le document (les champs de la fiche peuvent être recréés dynamiquement).
   const CHAMPS_FICHE = [
     'surface-input', 'cout-annuel-input', 'cat-anah-badge',
-    'zone-climatique-chantier', 'hsp', 'hsp-input', 'phase-input'
+    'zone-climatique-chantier', 'hsp', 'hsp-input', 'phase-input',
+    'input-adresse', 'cp-chantier', 'ville-chantier-select', 'altitude-input',
+    'cout-energie-input', 'cout_chauffage'
   ];
   const SELECTEURS_FICHE = [
     '#surface-input', '[name="surface_logement_m2"]',
     '#cout-annuel-input', '[name="cout_energetique_annuel_eur"]',
+    '#cout-energie-input', '#cout_chauffage', '[name="cout_energetique_mensuel_eur"]', '[name="cout_chauffage"]',
     'select[name="mode_chauffage"]', '#zone-climatique-chantier',
     '[name="zone_climatique_chantier"]', '#hsp', '#hsp-input', '[name="hsp"]',
-    '#phase-input', '[name="phase_electrique"]'
+    '#phase-input', '[name="phase_electrique"]',
+    '#input-adresse', '[name="adresse_chantier"]',
+    '#cp-chantier', '[name="code_postal_chantier"]',
+    '#ville-chantier-select', '[name="ville_chantier"]',
+    '#altitude-input', '[name="altitude"]'
   ].join(',');
 
   function syncDepuisFiche(force = false){
