@@ -865,6 +865,10 @@ body {
     linear-gradient(180deg, var(--bg-grad-1) 0%, var(--bg-grad-2) 100%);
   background-attachment: fixed;
 }
+
+/* Empêche tout bloc vide visible entre Bloc 3 et Bloc 4 */
+.fp-section + .fp-section:empty,
+.fp-section + div:empty { display: none !important; }
 body::before {
   content: '';
   position: fixed; inset: 0;
@@ -5195,6 +5199,56 @@ body.panel-is-open .prospect-shell-sticky {
 .comment-card-body a { color: var(--bleu); }
 .comment-card-body strong { font-weight: 700; }
 
+#notes-panel-list {
+  max-height: 60vh;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+.notes-accordion-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 8px 12px 0;
+}
+.notes-accordion-toolbar button {
+  border: 1px solid #E2E8F0;
+  background: #fff;
+  color: #475569;
+  border-radius: 6px;
+  padding: 5px 9px;
+  font-size: 11px;
+  font-family: inherit;
+  cursor: pointer;
+}
+.note-accordion {
+  background: #fff;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+  margin-bottom: 8px;
+  overflow: hidden;
+}
+.note-accordion-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  cursor: pointer;
+}
+.note-accordion-header:hover { background: #f8fafc; }
+.note-accordion-author { font-weight: 700; color: #1A202C; font-size: 13px; }
+.note-accordion-date { margin-left: auto; color: #718096; font-size: 11px; white-space: nowrap; }
+.note-accordion-icon { color: #64748B; font-size: 13px; transition: transform .15s; }
+.note-accordion.is-open .note-accordion-icon { transform: rotate(180deg); }
+.note-accordion-body {
+  display: none;
+  border-top: 1px solid #E2E8F0;
+  padding: 12px 16px;
+  color: #1A202C;
+  line-height: 1.55;
+  font-size: 13px;
+}
+.note-accordion.is-open .note-accordion-body { display: block; }
+
 /* Notes — auteur / horodatage identiques au panneau Échanges (Appel, SMS, etc.) */
 #notes-panel .hexa-meta-card-header {
   display: flex;
@@ -7016,7 +7070,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
 .pv-search:focus{ outline:none; border-color:#002E5A; box-shadow:0 0 0 3px rgba(0,46,90,.12); }
 .pv-count{ font-size:13px; color:#4A5568; white-space:nowrap; }
 
-.pv-card{ background:#fff; border:1px solid #E2E8F0; border-radius:14px; box-shadow:0 2px 4px rgba(16,32,64,.04),0 4px 16px rgba(16,32,64,.07); overflow-x:visible; overflow-y:hidden; }
+.pv-card{ background:#fff; border:1px solid #E2E8F0; border-radius:14px; box-shadow:0 2px 4px rgba(16,32,64,.04),0 4px 16px rgba(16,32,64,.07); overflow-x:hidden; overflow-y:hidden; }
 .pv-table{ width:100%; border-collapse:collapse; }
 .pv-table th{ background:linear-gradient(100deg,#002E5A,#013A72); color:#fff; text-align:left; font-size:11px;
   text-transform:uppercase; letter-spacing:.05em; padding:0; font-weight:600; }
@@ -7080,14 +7134,14 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
 /* ===== Tout sur une seule ligne ===== */
 .pv-table{ table-layout:auto; }
 .pv-table{ font-size:10.5px; }
-.pv-table th, .pv-table td{ white-space:nowrap; padding:7px 6px; }
-.pv-table td{ font-size:10.5px; padding:7px 6px; }
-.pv-th-inner{ padding:8px 6px; font-size:9.5px; }
+.pv-table th, .pv-table td{ white-space:nowrap; padding:7px 4px; }
+.pv-table td{ font-size:10.5px; padding:7px 4px; }
+.pv-th-inner{ padding:8px 4px; font-size:9.5px; }
 .pv-pid{ font-size:10.5px; padding:3px 7px; }
 .pv-nom{ font-weight:700; }
 .pv-nom-only{ text-transform:uppercase; }
 .pv-mail{ font-size:12.5px; }
-.pv-wrap{ max-width:1340px; }
+.pv-wrap{ max-width:1600px; }
 /* la cellule mail peut être longue : on autorise l'ellipse si besoin */
 .pv-table td:nth-child(7){ max-width:none; overflow:visible; text-overflow:clip; }
 
@@ -7415,13 +7469,6 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
         </div>
 
         
-        <div id="adresse-preview" class="adresse-preview-discret" style="margin-top: 6px;">
-          <a id="ouvrir-maps" href="#" target="_blank" rel="noopener" class="adresse-preview-link-discret" style="opacity: 0.45; pointer-events: none;">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-            <span>Voir sur Google Maps</span>
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:11px;height:11px;opacity:0.6;"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-          </a>
-        </div>
 
       <!-- Sous-bloc : Données réglementaires -->
       <div class="card-subtitle">Données réglementaires</div>
@@ -7436,7 +7483,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
         </div>
         <div class="field" data-label="Registre copropriété">
           <label><span class="label-row"><span>Registre copropriété</span><span id="badge-registre-copro" class="badge-auto-generic">Auto</span></span></label>
-          <select id="registre-copro-select" class="reg-auto-input" disabled>
+          <select id="registre-copro-select" class="reg-auto-input">
             <option value="">—</option>
             <option value="oui" >Oui</option>
             <option value="non" >Non</option>
@@ -8411,6 +8458,23 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     }
   }
 
+  const OPTIONAL_BACKEND_APIS_ENABLED = false;
+  async function fetchOptionalBackendApi(url) {
+    if (!OPTIONAL_BACKEND_APIS_ENABLED) {
+      console.debug('Endpoint pas encore branché:', url);
+      return null;
+    }
+    try {
+      const signal = AbortSignal.timeout ? AbortSignal.timeout(3000) : undefined;
+      const r = await fetch(url, { signal });
+      if (!r.ok) return null;
+      return await r.json();
+    } catch (e) {
+      console.debug('Endpoint pas encore branché:', e.message);
+      return null;
+    }
+  }
+
   function activerToggleAuditDpe(audit, dpe) {
     const pillAudit = document.querySelector('.dpe-source-pill[data-source="audit_officiel"]');
     const pillDpe = document.querySelector('.dpe-source-pill[data-source="dpe_officiel"]');
@@ -8438,7 +8502,8 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
         await window.lancerRechercheDpeSources(adresse, cp, lat, lon);
       } else {
         const q = new URLSearchParams({ adresse, cp, lat: String(lat), lon: String(lon) });
-        const data = await fetch(`/api/dpe-lookup?${q}`).then((r) => r.json());
+        const data = await fetchOptionalBackendApi(`/api/dpe-lookup?${q}`);
+        if (!data) return;
         const src = data.source;
         const row = (data.sources && data.sources[src]) || {};
         if (src === 'audit_officiel') appliquerAuditOfficiel(row);
@@ -8767,7 +8832,10 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       root.innerHTML = '<div class="parcel-drawer-street-inner"><strong>⚠ Street View indisponible</strong>Street View indisponible (clé Google Maps non configurée)</div>';
       return;
     }
-    root.innerHTML = `<iframe title="Street View" loading="lazy" allowfullscreen referrerpolicy="no-referrer-when-downgrade" src="https://www.google.com/maps/embed/v1/streetview?key=${encodeURIComponent(key)}&location=${encodeURIComponent(lat + ',' + lon)}&heading=210&pitch=10&fov=80"></iframe>`;
+    const heading = parseFloat(210) || 210;
+    const pitch = parseFloat(10) || 10;
+    const fov = parseFloat(80) || 80;
+    root.innerHTML = `<iframe title="Street View" loading="lazy" allow="accelerometer; gyroscope; fullscreen" allowfullscreen referrerpolicy="no-referrer-when-downgrade" src="https://www.google.com/maps/embed/v1/streetview?key=${encodeURIComponent(key)}&location=${encodeURIComponent(lat + ',' + lon)}&heading=${heading}&pitch=${pitch}&fov=${fov}"></iframe>`;
   }
 
   function ensureMap(lat, lon) {
@@ -9579,9 +9647,8 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       const urbsUrl = banId
         ? `/api/urbs?ban_id=${encodeURIComponent(banId)}&adresse=${encodeURIComponent(adresse)}&cp=${encodeURIComponent(cp5)}`
         : `/api/urbs?adresse=${encodeURIComponent(adresse)}&cp=${encodeURIComponent(cp5)}`;
-      const urbsResp = await fetch(urbsUrl);
-      const urbs = await urbsResp.json();
-      if (!urbs.error) {
+      const urbs = await fetchOptionalBackendApi(urbsUrl);
+      if (urbs && !urbs.error) {
         appliquerUrbs(urbs);
         if (dpeStatus) {
           dpeStatus.style.display = 'none';
@@ -9675,7 +9742,6 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     lastReglementaireKey = key;
     await Promise.all([
       rechercheParcelleAuto(lat, lon, parcelleRef),
-      rechercheCoproRnic(lat, lon, parcelleRef),
       rechercheBatimentClasse(lat, lon),
       rechercheZoneProtegee(lat, lon),
     ]);
@@ -9684,29 +9750,19 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
   async function rechercheCoproRnic(lat, lon, parcelleRef) {
     const statusEl = document.getElementById('registre-copro-status');
     const sel = document.getElementById('registre-copro-select');
-    if (statusEl) statusEl.innerHTML = '<span class="cadastre-status-loading">⏳ RNIC…</span>';
-    try {
-      const q = new URLSearchParams({ lat: String(lat), lon: String(lon) });
-      if (parcelleRef) q.set("parcelle", parcelleRef);
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 10000);
-      const data = await fetch(`/api/copro?${q}`, { signal: controller.signal })
-        .then(r => r.json())
-        .finally(() => clearTimeout(timeout));
-      appliquerCopro(data);
-    } catch {
-      if (statusEl) statusEl.innerHTML = '<span class="cadastre-status-warn">Vérification impossible</span>';
-      if (sel) { sel.disabled = false; }
-    }
+    if (statusEl) statusEl.textContent = '';
+    if (sel) sel.disabled = false;
   }
 
   async function rechercheBatimentClasse(lat, lon) {
     const statusEl = document.getElementById('batiment-classe-status');
     const sel = document.getElementById('batiment-classe-select');
     const hidden = document.getElementById('batiment-classe-hidden');
+    if (!OPTIONAL_BACKEND_APIS_ENABLED) return;
     if (statusEl) statusEl.textContent = '⏳ Mérimée…';
     try {
-      const data = await fetch(`/api/batiment-classe?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}`).then(r => r.json());
+      const data = await fetchOptionalBackendApi(`/api/batiment-classe?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}`);
+      if (!data) return;
       if (data.batiment_classe === true || data.batiment_classe === false || data.batiment_classe === 'Oui' || data.batiment_classe === 'Non') {
         const v = (data.batiment_classe === true || data.batiment_classe === 'Oui') ? 'oui' : 'non';
         if (sel) sel.value = v;
@@ -9729,9 +9785,11 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     const statusEl = document.getElementById('zone-protegee-status');
     const sel = document.getElementById('zone-protegee-select');
     const hidden = document.getElementById('zone-protegee-hidden');
+    if (!OPTIONAL_BACKEND_APIS_ENABLED) return;
     if (statusEl) statusEl.textContent = '⏳ Périmètre MH…';
     try {
-      const data = await fetch(`/api/zone-protegee?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}`).then(r => r.json());
+      const data = await fetchOptionalBackendApi(`/api/zone-protegee?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}`);
+      if (!data) return;
       if (data.zone_protegee === true || data.zone_protegee === false) {
         const v = data.zone_protegee ? 'oui' : 'non';
         if (sel) sel.value = v;
@@ -10364,8 +10422,8 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       if (lat && lon) { q.set('lat', lat); q.set('lon', lon); }
       const pNum = document.body.dataset.prospectNumero;
       if (pNum) q.set('prospect_numero', pNum);
-      const r = await fetch(`/api/dpe-lookup?${q.toString()}`);
-      const data = r.ok ? await r.json() : { source: 'manuel', sources: {} };
+      const data = await fetchOptionalBackendApi(`/api/dpe-lookup?${q.toString()}`);
+      if (!data) return;
       majPillsDpeSources(data);
     } catch {
       if (st) st.textContent = 'Recherche DPE indisponible — saisie manuelle';
@@ -11564,7 +11622,11 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     statusEl.innerHTML = '⏳ Calcul DPE enrichi URBS…';
     statusEl.style.background = '#E8EFF7'; statusEl.style.color = '#1A4A7A';
     try {
-      const u = await fetch(`/api/urbs?adresse=${encodeURIComponent(adresse)}&cp=${encodeURIComponent(cp)}`).then(r => r.json());
+      const u = await fetchOptionalBackendApi(`/api/urbs?adresse=${encodeURIComponent(adresse)}&cp=${encodeURIComponent(cp)}`);
+      if (!u) {
+        statusEl.style.display = 'none';
+        return;
+      }
       if (u.error) throw new Error(u.error);
       appliquerUrbs(u);
       statusEl.innerHTML = '✓ Données URBS appliquées à la fiche.';
@@ -11613,9 +11675,6 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
   /* Mentions @ dans le panel commentaires */
   (function() {
     let mentionUsers = [{ id: 'avi', label: 'Avi B.', mention: 'AviB' }];
-    fetch('/api/users').then(r => r.ok ? r.json() : mentionUsers).then(u => {
-      if (Array.isArray(u) && u.length) mentionUsers = u;
-    }).catch(() => {});
 
     const _ouvrir = window.ouvrirCommentaires;
     if (_ouvrir) {
@@ -11847,6 +11906,10 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
         <button type="button" class="comments-panel-submit" id="notes-panel-submit">+ AJOUTER</button>
       </div>
       <div class="comments-unified-divider">── NOTES ──</div>
+      <div class="notes-accordion-toolbar">
+        <button type="button" id="notes-expand-all">▸ Tout déplier</button>
+        <button type="button" id="notes-collapse-all">▾ Tout replier</button>
+      </div>
       <div class="comments-panel-list" id="notes-panel-list">
         <div class="comments-empty">Chargement…</div>
       </div>
@@ -11880,6 +11943,29 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       }
     });
     document.getElementById('notes-panel-submit')?.addEventListener('click', () => window.ajouterNoteInterne());
+    document.getElementById('notes-expand-all')?.addEventListener('click', () => setNotesAccordions(true));
+    document.getElementById('notes-collapse-all')?.addEventListener('click', () => setNotesAccordions(false));
+  }
+
+  function setNotesAccordions(open) {
+    document.querySelectorAll('#notes-panel-list .note-accordion').forEach(item => {
+      item.classList.toggle('is-open', !!open);
+      item.querySelector('.note-accordion-header')?.setAttribute('aria-expanded', open ? 'true' : 'false');
+    });
+  }
+
+  function bindNotesAccordions() {
+    const list = document.getElementById('notes-panel-list');
+    if (!list || list.dataset.accordionBound === '1') return;
+    list.dataset.accordionBound = '1';
+    list.addEventListener('click', (e) => {
+      const header = e.target.closest('.note-accordion-header');
+      if (!header) return;
+      const item = header.closest('.note-accordion');
+      const next = !item.classList.contains('is-open');
+      item.classList.toggle('is-open', next);
+      header.setAttribute('aria-expanded', next ? 'true' : 'false');
+    });
   }
 
   async function chargerNotes() {
@@ -11903,13 +11989,15 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
         return;
       }
       list.innerHTML = notes.map(n => `
-        <article class="comment-card hexa-meta-card comm-card">
-          <header class="hexa-meta-card-header">
-            <span class="hexa-meta-card-author">${escapeHtml(n.auteur || AUTEUR_DEFAUT)}</span>
-            <time class="hexa-meta-card-date">${formatParis(n.horodatage)}</time>
+        <article class="note-accordion">
+          <header class="note-accordion-header" aria-expanded="false">
+            <span class="note-accordion-author">${escapeHtml(n.auteur || AUTEUR_DEFAUT)}</span>
+            <time class="note-accordion-date">${formatParis(n.horodatage)}</time>
+            <span class="note-accordion-icon">▾</span>
           </header>
-          <div class="hexa-meta-card-body">${n.texte_html || ''}</div>
+          <div class="note-accordion-body">${n.texte_html || ''}</div>
         </article>`).join('');
+      bindNotesAccordions();
     } catch (err) {
       list.innerHTML = `<div class="comments-empty comments-empty-error">⚠ ${escapeHtml(err.message)}</div>`;
     }
