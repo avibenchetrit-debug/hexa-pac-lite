@@ -4,6 +4,8 @@ import json
 import os
 import re
 import shutil
+import urllib.parse
+import urllib.request
 import unicodedata
 from datetime import datetime
 
@@ -546,6 +548,30 @@ def get_catalogue_pac() -> JSONResponse:
 @app.get("/api/gmaps-key")
 def get_gmaps_key() -> JSONResponse:
     return JSONResponse({"key": os.environ.get("GMAPS_API_KEY", "")})
+
+
+@app.get("/api/parcelle")
+def get_parcelle(lat: float, lon: float) -> JSONResponse:
+    geom = json.dumps({"type": "Point", "coordinates": [lon, lat]})
+    qs = urllib.parse.urlencode({"geom": geom, "_limit": "1"})
+    url = f"https://apicarto.ign.fr/api/cadastre/parcelle?{qs}"
+    try:
+        with urllib.request.urlopen(url, timeout=10) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except Exception:
+        return JSONResponse({"parcelle": None})
+
+    feature = (payload.get("features") or [None])[0]
+    props = (feature or {}).get("properties") or {}
+    code_insee = str(props.get("code_insee") or props.get("commune") or "").strip()
+    raw_section = str(props.get("section") or "").strip()
+    raw_numero = str(props.get("numero") or "").strip()
+    if not (code_insee and raw_section and raw_numero):
+        return JSONResponse({"parcelle": None})
+    prefixe = str(props.get("prefixe") or "000").strip().zfill(3)
+    section = raw_section.zfill(2)
+    numero = raw_numero.zfill(4)
+    return JSONResponse({"parcelle": f"{code_insee}-{prefixe}-{section}-{numero}", "source": "ign"})
 
 
 @app.post("/api/catalogue-pac")

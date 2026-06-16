@@ -8741,6 +8741,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     if (!el || !window.L) return;
     if (!map) {
       map = L.map(el, { zoomControl: true }).setView([lat, lon], 19);
+      window.parcelMap = map;
       L.tileLayer(IGN_ORTHO, {
         attribution: '© IGN',
         maxZoom: 21,
@@ -8884,6 +8885,9 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
         document.body.classList.add('parcel-drawer-open');
         ensureMap(lat, lon);
         updateStreetView(lat, lon);
+        setTimeout(() => {
+          if (window.parcelMap) window.parcelMap.invalidateSize();
+        }, 280);
         if (marker) {
           map.removeLayer(marker);
           marker = null;
@@ -8939,6 +8943,9 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     $('parcel-drawer-close')?.addEventListener('click', closeDrawer);
     $('parcel-drawer-scrim')?.addEventListener('click', closeDrawer);
     $('parcel-drawer-confirm')?.addEventListener('click', confirmParcelle);
+    window.addEventListener('resize', () => {
+      if (window.parcelMap) window.parcelMap.invalidateSize();
+    });
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape' && document.body.classList.contains('parcel-drawer-open')) {
         closeDrawer();
@@ -9617,6 +9624,16 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     input.classList.toggle('reg-auto-input', !forced);
   }
 
+  function parcelleValide(value) {
+    return /^\d{5}-\d{3}-\d{2}-\d{4}$/.test(String(value || '').trim());
+  }
+  function parcelleDejaConfirmee() {
+    const input = document.getElementById('parcelle-cadastrale-input') || document.getElementById('parcelle_cadastrale');
+    const statusEl = document.getElementById('cadastre-status');
+    const status = (statusEl?.textContent || '').trim();
+    return parcelleValide(input?.value) || status.includes('✓ Parcelle confirmée') || status.includes('✓ Parcelle trouvée');
+  }
+
   let lastReglementaireKey = '';
   async function rechercheReglementaireAuto(lat, lon, parcelleRef) {
     const key = `${Number(lat).toFixed(4)},${Number(lon).toFixed(4)}|${parcelleRef || ''}`;
@@ -9706,6 +9723,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     const inputEl = document.getElementById('parcelle-cadastrale-input');
     const statusEl = document.getElementById('cadastre-status');
     if (!inputEl || lat == null || lon == null) return;
+    if (!parcelleRef && parcelleDejaConfirmee()) return;
     if (parcelleRef) {
       inputEl.value = parcelleRef;
       inputEl.classList.remove('parcelle-non-trouve');
@@ -9996,22 +10014,30 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
 
   // ===== ZONE CLIMATIQUE H1 / H2 / H3 (CP chantier) =====
   function normaliserZoneClimatique(zone) {
-    const z = String(zone || '').trim().toUpperCase();
-    if (z === 'H1A' || z === 'H1B') return 'H1';
-    if (z === 'H1' || z === 'H2' || z === 'H3') return z;
+    const z = String(zone || '').trim().toUpperCase().replace(/\s+/g, '');
+    const map = { H1A:'H1a', H1B:'H1b', H1C:'H1c', H2A:'H2a', H2B:'H2b', H2C:'H2c', H2D:'H2d', H1:'H1', H2:'H2', H3:'H3' };
+    if (map[z]) return map[z];
     return zone || null;
   }
   function zoneClimatiqueFromCp(cp) {
-    cp = (cp || '').replace(/\D/g, '').slice(0, 5);
-    if (cp.length < 2) return null;
-    const dept = cp.startsWith('97') ? cp.slice(0, 3) : cp.slice(0, 2);
-    const h1a = new Set(['75', '77', '78', '91', '92', '93', '94', '95']);
-    const h1b = new Set(['02', '08', '10', '51', '52', '54', '55', '57', '67', '68', '88']);
-    const h3 = new Set(['04', '06', '11', '13', '30', '34', '66', '83', '84']);
-    if (h1a.has(dept)) return 'H1';
-    if (h1b.has(dept)) return 'H1';
-    if (h3.has(dept)) return 'H3';
-    return 'H2';
+    const raw = String(cp || '').trim().toUpperCase();
+    const clean = raw.replace(/\s/g, '');
+    if (clean.length < 2) return null;
+    const dept = clean.startsWith('97') || clean.startsWith('976') ? clean.slice(0, 3) : clean.slice(0, 2);
+    const zones = {
+      H1a: ['01','03','05','07','10','21','25','39','42','43','45','51','52','54','55','57','58','67','68','69','70','71','73','74','88','89','90'],
+      H1b: ['02','08','14','18','27','28','36','41','50','53','59','60','61','62','75','76','77','78','80','91','92','93','94','95'],
+      H1c: ['22','29','35','44','49','56','72','85'],
+      H2a: ['17','24','33','37','79','86'],
+      H2b: ['16','19','23','26','38','46','47','48','63','81','82','87'],
+      H2c: ['09','11','12','15','31','32','40','64','65'],
+      H2d: ['04','06','13','30','34','66','83','84'],
+      H3: ['2A','2B','971','972','973','974','976']
+    };
+    for (const [zone, depts] of Object.entries(zones)) {
+      if (depts.includes(dept)) return zone;
+    }
+    return null;
   }
   function updateZoneClimatique(fromUrbs) {
     const zone = normaliserZoneClimatique(fromUrbs || zoneClimatiqueFromCp((cpChantier?.value || '').trim()));
@@ -10376,6 +10402,14 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
   // ===== VALIDATION EMAIL CÔTÉ CLIENT =====
   const emailInput = document.querySelector('input[name="email"]');
   if (emailInput) {
+    emailInput.addEventListener('input', function(e) {
+      const start = e.target.selectionStart;
+      const end = e.target.selectionEnd;
+      e.target.value = e.target.value.toLowerCase();
+      if (start != null && end != null) {
+        try { e.target.setSelectionRange(start, end); } catch (_) {}
+      }
+    });
     emailInput.addEventListener('blur', function() {
       this.value = this.value.toLowerCase().trim();
       const v = this.value;
@@ -10562,6 +10596,11 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       // Sélectionner celle-ci
       p.classList.add('selected');
       input.value = value;
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+      if (targetId === 'phase-input' && typeof window.syncSimulateurDepuisFiche === 'function') {
+        window.syncSimulateurDepuisFiche(true);
+      }
       // Retirer le state .error si présent
       const field = p.closest('.field');
       if (field) field.classList.remove('error');
@@ -13003,14 +13042,14 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
   const TEMP_BASE_SOUS_ZONE = { H1A: -9, H1B: -8, H1C: -7, H2A: -4, H2B: -5, H2C: -3, H2D: -2, H3: 0 };
   const TEMP_BASE_CP = {};
   const DEPT_SOUS_ZONE = {
-    '02':'H1A','14':'H1A','27':'H1A','28':'H1A','50':'H1A','59':'H1A','60':'H1A','61':'H1A','62':'H1A','76':'H1A','80':'H1A',
-    '08':'H1B','10':'H1B','21':'H1B','25':'H1B','39':'H1B','51':'H1B','52':'H1B','54':'H1B','55':'H1B','57':'H1B','58':'H1B','67':'H1B','68':'H1B','70':'H1B','71':'H1B','88':'H1B','89':'H1B','90':'H1B',
-    '01':'H1C','03':'H1C','05':'H1C','15':'H1C','19':'H1C','23':'H1C','38':'H1C','42':'H1C','43':'H1C','63':'H1C','69':'H1C','73':'H1C','74':'H1C','87':'H1C',
-    '16':'H2A','17':'H2A','22':'H2A','29':'H2A','35':'H2A','44':'H2A','49':'H2A','53':'H2A','56':'H2A','72':'H2A','79':'H2A','85':'H2A','86':'H2A',
-    '09':'H2B','12':'H2B','24':'H2B','31':'H2B','32':'H2B','33':'H2B','40':'H2B','46':'H2B','47':'H2B','64':'H2B','65':'H2B','81':'H2B','82':'H2B',
-    '04':'H2C','07':'H2C','26':'H2C','48':'H2C','84':'H2C',
-    '06':'H2D','11':'H2D','13':'H2D','30':'H2D','34':'H2D','66':'H2D','83':'H2D',
-    '2A':'H3','2B':'H3'
+    '01':'H1A','03':'H1A','05':'H1A','07':'H1A','10':'H1A','21':'H1A','25':'H1A','39':'H1A','42':'H1A','43':'H1A','45':'H1A','51':'H1A','52':'H1A','54':'H1A','55':'H1A','57':'H1A','58':'H1A','67':'H1A','68':'H1A','69':'H1A','70':'H1A','71':'H1A','73':'H1A','74':'H1A','88':'H1A','89':'H1A','90':'H1A',
+    '02':'H1B','08':'H1B','14':'H1B','18':'H1B','27':'H1B','28':'H1B','36':'H1B','41':'H1B','50':'H1B','53':'H1B','59':'H1B','60':'H1B','61':'H1B','62':'H1B','75':'H1B','76':'H1B','77':'H1B','78':'H1B','80':'H1B','91':'H1B','92':'H1B','93':'H1B','94':'H1B','95':'H1B',
+    '22':'H1C','29':'H1C','35':'H1C','44':'H1C','49':'H1C','56':'H1C','72':'H1C','85':'H1C',
+    '17':'H2A','24':'H2A','33':'H2A','37':'H2A','79':'H2A','86':'H2A',
+    '16':'H2B','19':'H2B','23':'H2B','26':'H2B','38':'H2B','46':'H2B','47':'H2B','48':'H2B','63':'H2B','81':'H2B','82':'H2B','87':'H2B',
+    '09':'H2C','11':'H2C','12':'H2C','15':'H2C','31':'H2C','32':'H2C','40':'H2C','64':'H2C','65':'H2C',
+    '04':'H2D','06':'H2D','13':'H2D','30':'H2D','34':'H2D','66':'H2D','83':'H2D','84':'H2D',
+    '2A':'H3','2B':'H3','971':'H3','972':'H3','973':'H3','974':'H3','976':'H3'
   };
   const COEF_G = {
     toit: { tres_bien: 0.00, bien: 0.10, isole: 0.20, peu: 0.35, non: 0.50 },
@@ -13236,7 +13275,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     if (cp && Object.prototype.hasOwnProperty.call(TEMP_BASE_CP, cp)) {
       return { temperature: TEMP_BASE_CP[cp], source: 'cp', zone: state.zone_detail || state.zone || '' };
     }
-    const dept = cp.length >= 2 ? cp.slice(0, 2) : '';
+    const dept = cp.startsWith('97') || cp.startsWith('976') ? cp.slice(0, 3) : cp.slice(0, 2);
     if (dept && DEPT_SOUS_ZONE[dept]) {
       const z = DEPT_SOUS_ZONE[dept];
       return { temperature: TEMP_BASE_SOUS_ZONE[z], source: 'departement', zone: z };
@@ -13604,7 +13643,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
               <option value="simple" ${sel(state.iso_menuiserie,'simple')}>Simple vitrage</option>
             </select>
           </label>
-          <button class="sim-btn-note-dim" type="button" onclick="ouvrirNoteDim()">📋 Voir la note de dimensionnement</button>
+          <button class="sim-btn-note-dim" type="button" onclick="event.stopPropagation(); window.ouvrirNoteDim(); return false;">📋 Voir la note de dimensionnement</button>
         </div>
 
         <div class="sim-section-label">Paramètres PAC</div>
@@ -13928,8 +13967,15 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
   }
 
   function ouvrirNoteDim(){
-    const dim = syncDimensionnement();
-    const modele = getModeleActuel();
+    lireContexteFiche();
+    const dim = calculerPuissancePAC(state);
+    let modele = state.modele_force ? getModeleActuel() : null;
+    if (!modele) {
+      const selection = selectionnerPAC(dim.puissance_kw, CATALOGUE_PAC, state);
+      appliquerSelectionPac(selection);
+      state.selection_alerte = selection?.alerte || null;
+      modele = selection?.modele || null;
+    }
     const serviceTxt = state.service === 'chauffage_ecs' ? 'Chauffage + ECS' : 'Chauffage seul';
     const fmt1 = n => Number.isFinite(Number(n)) ? Number(n).toLocaleString('fr-FR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : '—';
     const fmt0 = n => Number.isFinite(Number(n)) ? Math.round(Number(n)).toLocaleString('fr-FR') : '—';
