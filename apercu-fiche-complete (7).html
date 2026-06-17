@@ -689,7 +689,6 @@ body.panel-is-open {
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="preload" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" as="style">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <style>
 /* ========================================================================
@@ -2921,6 +2920,37 @@ body.panel-is-open {
       background: #FFFFFF;
     }
     .field input::placeholder { color: #94A3B8; }
+    .copy-input-wrap {
+      position: relative;
+      width: 100%;
+    }
+    .copy-input-wrap input {
+      padding-right: 96px !important;
+    }
+    .copy-icon {
+      position: absolute;
+      right: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      display: inline-block;
+      padding: 4px 8px;
+      background: #F8FAFC;
+      border: 1px solid #E2E8F0;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      color: #475569;
+      transition: all 0.15s;
+      font-family: inherit;
+      white-space: nowrap;
+    }
+    .copy-icon:hover {
+      background: #E2E8F0;
+      color: #002E5A;
+    }
+    .copy-icon:active {
+      transform: translateY(-50%) scale(0.95);
+    }
     .field input:disabled,
     .field input[readonly] {
       background: #E2E8F0; color: var(--gris-texte); cursor: not-allowed;
@@ -5232,7 +5262,9 @@ body.panel-is-open .prospect-shell-sticky {
   font-family: inherit;
   cursor: pointer;
 }
-.note-accordion {
+.note-accordion,
+.note-accordeon,
+.comment-item {
   background: #fff;
   border: 0.5px solid #E2E8F0;
   border-radius: 8px;
@@ -5240,7 +5272,9 @@ body.panel-is-open .prospect-shell-sticky {
   overflow: hidden;
   min-height: 48px;
 }
-.note-accordion-header {
+.note-accordion-header,
+.note-accordeon-header,
+.comment-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -5249,12 +5283,18 @@ body.panel-is-open .prospect-shell-sticky {
   padding: 12px 16px;
   cursor: pointer;
 }
-.note-accordion-header:hover { background: #f8fafc; }
+.note-accordion-header:hover,
+.note-accordeon-header:hover,
+.comment-header:hover { background: #f8fafc; }
 .note-accordion-author { font-weight: 600; color: #1A202C; font-size: 14px; }
 .note-accordion-date { margin-left: auto; color: #94A3B8; font-size: 12px; white-space: nowrap; }
 .note-accordion-icon { color: #64748B; font-size: 13px; transition: transform .15s; }
-.note-accordion.is-open .note-accordion-icon { transform: rotate(180deg); }
-.note-accordion-body {
+.note-accordion.is-open .note-accordion-icon,
+.note-accordeon.is-open .note-accordeon-icon,
+.comment-item.is-open .comment-icon { transform: rotate(180deg); }
+.note-accordion-body,
+.note-accordeon-body,
+.comment-body {
   max-height: 0;
   overflow: hidden;
   border-top: 1px solid #E2E8F0;
@@ -5264,7 +5304,9 @@ body.panel-is-open .prospect-shell-sticky {
   font-size: 13px;
   transition: max-height .2s ease, padding .2s ease;
 }
-.note-accordion.is-open .note-accordion-body { max-height: 1000px; padding: 12px 16px; }
+.note-accordion.is-open .note-accordion-body,
+.note-accordeon.is-open .note-accordeon-body,
+.comment-item.is-open .comment-body { max-height: 1000px; padding: 12px 16px; }
 
 /* Notes — auteur / horodatage identiques au panneau Échanges (Appel, SMS, etc.) */
 #notes-panel .hexa-meta-card-header {
@@ -7451,11 +7493,17 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       <div class="row row-2">
         <div class="field" data-required="telephone" data-label="Téléphone">
           <label>Téléphone <span class="req">*</span></label>
-          <input type="tel" name="telephone" id="telephone-input" required value="" autocomplete="tel" placeholder="06 11 12 13 14" inputmode="numeric">
+          <div class="copy-input-wrap">
+            <input type="tel" name="telephone" id="telephone-input" required value="" autocomplete="tel" placeholder="06 11 12 13 14" inputmode="numeric">
+            <button type="button" class="copy-icon" data-copy-target="telephone-input" data-copy-label="Téléphone">📋 Copier</button>
+          </div>
         </div>
         <div class="field" data-required="email" data-label="E-mail">
           <label>E-mail <span class="req">*</span></label>
-          <input type="email" name="email" required value="" autocomplete="email" placeholder="prenom.nom@email.fr">
+          <div class="copy-input-wrap">
+            <input type="email" name="email" id="email-input" required value="" autocomplete="email" placeholder="prenom.nom@email.fr">
+            <button type="button" class="copy-icon" data-copy-target="email-input" data-copy-label="Email">📋 Copier</button>
+          </div>
         </div>
       </div>
     </div>
@@ -10231,6 +10279,68 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
   };
 
   // ===== FORMAT TÉLÉPHONE : XX XX XX XX XX =====
+  window.showToast = window.showToast || function(message, type='success') {
+    const toast = document.createElement('div');
+    toast.className = 'hexa-toast hexa-toast-' + type;
+    toast.textContent = message;
+    toast.style.cssText = `
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: ${type === 'error' ? '#DC2626' : '#002E5A'};
+      color: white;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-weight: 600;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      z-index: 10000;
+      opacity: 0;
+      transform: translateY(8px);
+      transition: opacity 0.2s, transform 0.2s;
+    `;
+    document.body.appendChild(toast);
+    requestAnimationFrame(() => {
+      toast.style.opacity = '1';
+      toast.style.transform = 'translateY(0)';
+    });
+    setTimeout(() => {
+      toast.style.opacity = '0';
+      toast.style.transform = 'translateY(8px)';
+      setTimeout(() => toast.remove(), 200);
+    }, 2000);
+  };
+
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('.copy-icon');
+    if (!btn) return;
+    e.preventDefault();
+    const input = document.getElementById(btn.dataset.copyTarget);
+    const value = (input?.value || '').trim();
+    const label = btn.dataset.copyLabel || 'Valeur';
+    if (!value) {
+      window.showToast('Rien à copier', 'error');
+      return;
+    }
+    const done = () => window.showToast(label + ' copié !');
+    const fail = () => window.showToast('Erreur de copie', 'error');
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(value).then(done).catch(fail);
+    } else {
+      try {
+        const ta = document.createElement('textarea');
+        ta.value = value;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy') ? done() : fail();
+        ta.remove();
+      } catch (_) {
+        fail();
+      }
+    }
+  });
+
   function formatTelephone(input) {
     if (!input) return;
     let v = (input.value || '').replace(/\D/g, '');
@@ -11946,8 +12056,8 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       </div>
       <div class="comments-unified-divider">── NOTES ──</div>
       <div class="notes-accordion-toolbar">
-        <button type="button" id="notes-expand-all">▸ Tout déplier</button>
-        <button type="button" id="notes-collapse-all">▾ Tout replier</button>
+        <button type="button" id="notes-expand-all" class="btn-tout-deplier">▸ Tout déplier</button>
+        <button type="button" id="notes-collapse-all" class="btn-tout-replier">▾ Tout replier</button>
       </div>
       <div class="comments-panel-list" id="notes-panel-list">
         <div class="comments-empty">Chargement…</div>
@@ -11997,13 +12107,28 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     const list = document.getElementById('notes-panel-list');
     if (!list || list.dataset.accordionBound === '1') return;
     list.dataset.accordionBound = '1';
-    list.addEventListener('click', (e) => {
-      const header = e.target.closest('.note-accordion-header');
-      if (!header) return;
-      const item = header.closest('.note-accordion');
-      const next = !item.classList.contains('is-open');
-      item.classList.toggle('is-open', next);
-      header.setAttribute('aria-expanded', next ? 'true' : 'false');
+  }
+
+  if (!window.__hexaNotesAccordionDelegated) {
+    window.__hexaNotesAccordionDelegated = true;
+    document.addEventListener('click', function(e) {
+      const header = e.target.closest('.note-accordion-header, .note-accordeon-header, .comment-header');
+      if (header) {
+        const accordeon = header.closest('.note-accordion, .note-accordeon, .comment-item');
+        if (accordeon) {
+          const next = !accordeon.classList.contains('is-open');
+          accordeon.classList.toggle('is-open', next);
+          header.setAttribute('aria-expanded', next ? 'true' : 'false');
+        }
+      }
+      if (e.target.matches('.btn-tout-deplier')) {
+        document.querySelectorAll('#notes-panel-list .note-accordion, #notes-panel-list .note-accordeon, #notes-panel-list .comment-item')
+          .forEach(a => a.classList.add('is-open'));
+      }
+      if (e.target.matches('.btn-tout-replier')) {
+        document.querySelectorAll('#notes-panel-list .note-accordion, #notes-panel-list .note-accordeon, #notes-panel-list .comment-item')
+          .forEach(a => a.classList.remove('is-open'));
+      }
     });
   }
 
