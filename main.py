@@ -1,10 +1,14 @@
 import io
+import base64
+import hashlib
 import html
+import hmac
 import json
 import os
 import re
 import shutil
 import smtplib
+import time
 import urllib.parse
 import urllib.request
 import unicodedata
@@ -78,6 +82,23 @@ app = FastAPI(title="hexa-pac-lite")
 # Serve static assets (CSS/JS/images) under /static.
 os.makedirs(STATIC_DIR, exist_ok=True)
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
+
+def _admin_password() -> str:
+    pwd = os.environ.get("ADMIN_PASSWORD")
+    if not pwd:
+        print("WARNING: ADMIN_PASSWORD non défini, fallback hexarenov2026 utilisé")
+        return "hexarenov2026"
+    return pwd
+
+
+def _admin_secret() -> bytes:
+    return (os.environ.get("ADMIN_TOKEN_SECRET") or _admin_password()).encode("utf-8")
+
+
+def _sign_admin_token(payload: str) -> str:
+    sig = hmac.new(_admin_secret(), payload.encode("utf-8"), hashlib.sha256).digest()
+    return base64.urlsafe_b64encode(sig).decode("ascii").rstrip("=")
 
 
 # ---------------------------------------------------------------------------
@@ -490,6 +511,7 @@ def _migrate_leads_schema():
 async def startup_event():
     _init_storage()
     _migrate_leads_schema()
+    _admin_password()
 
 
 def _extract_texte(payload_form, payload_json):
@@ -1111,6 +1133,37 @@ def get_admin_m3() -> JSONResponse:
             "modeles_email": _read_modeles_email(),
         }
     )
+
+
+@app.post("/api/admin/auth")
+async def admin_auth(request: Request) -> JSONResponse:
+    payload = await _read_request_payload(request)
+    password = str(payload.get("password") or "")
+    if not hmac.compare_digest(password, _admin_password()):
+        raise HTTPException(status_code=401, detail="Mot de passe incorrect")
+    issued = str(int(time.time()))
+    token_payload = f"admin:{issued}"
+    token = f"{token_payload}.{_sign_admin_token(token_payload)}"
+    return JSONResponse({"ok": True, "token": token})
+
+
+@app.get("/api/admin/config")
+def get_admin_config() -> JSONResponse:
+    baremes = _read_json(BAREMES_PATH, {})
+    if not isinstance(baremes, dict):
+        baremes = {}
+    return JSONResponse({"script_notion_url": baremes.get("script_notion_url", "")})
+
+
+@app.post("/api/admin/config")
+async def post_admin_config(request: Request) -> JSONResponse:
+    payload = await _read_request_payload(request)
+    baremes = _read_json(BAREMES_PATH, {})
+    if not isinstance(baremes, dict):
+        baremes = {}
+    baremes["script_notion_url"] = str(payload.get("script_notion_url") or "").strip()
+    _atomic_write_json(BAREMES_PATH, baremes)
+    return JSONResponse({"ok": True, "script_notion_url": baremes["script_notion_url"]})
 
 
 @app.post("/api/admin/m3")

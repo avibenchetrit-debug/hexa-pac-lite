@@ -2791,20 +2791,21 @@ body.panel-is-open {
     }
 
     /* ===== CHAMPS — FOND VISIBLE ===== */
-    .row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; margin-bottom: 12px; width: 100%; min-width: 0; }
+    .row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 16px; width: 100%; min-width: 0; }
     .row:last-child { margin-bottom: 0; }
     .row > .field { min-width: 0; margin-left: 0; margin-right: 0; }
-    .row-2 { grid-template-columns: 1fr 1fr; gap: 14px; }
-    .row-3 { grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
-    .row-civilite-nom { grid-template-columns: 130px 1fr 1fr; gap: 14px; }
-    .row-4 { grid-template-columns: 1fr 1fr 1fr 1fr; }
+    .row-1 { grid-template-columns: 1fr; gap: 16px; }
+    .row-2 { grid-template-columns: repeat(2, 1fr); gap: 16px; }
+    .row-3 { grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    .row-civilite-nom { grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    .row-4 { grid-template-columns: repeat(4, 1fr); }
     .row-2-1 { grid-template-columns: 2fr 1fr; }
     .row-1-2 { grid-template-columns: 1fr 2fr; }
 
     .field { display: flex; flex-direction: column; min-width: 0; }
     .field > label {
-      font-size: 13px; font-weight: 500; color: #4A5568;
-      margin-bottom: 6px; display: block;
+      font-size: 13px; font-weight: 500; color: #475569;
+      margin-bottom: 4px; display: block;
     }
     .field label .req { font-weight: 500; }
     /* Champs auto-remplis API — vert / jaune / bleu */
@@ -2893,11 +2894,11 @@ body.panel-is-open {
     .field input[type=email],
     .field input[type=number],
     .field select {
-      height: 46px;
-      min-height: 46px;
-      padding: 0 14px;
-      border: 1.5px solid #D1D9E0;
-      border-radius: 7px;
+      height: 40px;
+      min-height: 40px;
+      padding: 8px 12px;
+      border: 1px solid #E2E8F0;
+      border-radius: 6px;
       font-family: inherit; font-size: 14px; font-weight: 400;
       color: #1A202C;
       background: #FFFFFF;
@@ -2909,7 +2910,7 @@ body.panel-is-open {
     }
     .field input:hover,
     .field select:hover {
-      border-color: var(--input-hover);
+      border-color: #002E5A;
       background: var(--bg-panel);
     }
     .field input:focus,
@@ -3174,16 +3175,27 @@ body.panel-is-open {
 
     /* ===== DPE (badge-like) ===== */
     .dpe-buttons {
-      display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px;
+      display: grid; grid-template-columns: repeat(8, 1fr); gap: 8px;
     }
     .dpe-btn {
-      padding: 8px 4px; border: 1.5px solid var(--input-border);
-      border-radius: 5px; background: var(--input-bg);
+      width: 44px; height: 36px; border: none;
+      border-radius: 4px;
       cursor: pointer; text-align: center;
       font-family: inherit; font-weight: 700; font-size: 13px;
-      transition: all 0.15s; color: var(--gris-texte);
+      transition: all 0.15s; color: white;
+      display:flex; align-items:center; justify-content:center;
     }
-    .dpe-btn:hover { border-color: var(--input-hover); }
+    .dpe-buttons.has-selected .dpe-btn:not(.selected){ opacity:0.5; }
+    .dpe-btn.selected { box-shadow: inset 0 0 0 3px #002E5A; opacity:1 !important; }
+    .dpe-btn[data-dpe="A"]{ background:#009460; color:white; }
+    .dpe-btn[data-dpe="B"]{ background:#51A851; color:white; }
+    .dpe-btn[data-dpe="C"]{ background:#B5CF45; color:#1F2937; }
+    .dpe-btn[data-dpe="D"]{ background:#F0E619; color:#1F2937; }
+    .dpe-btn[data-dpe="E"]{ background:#F0AF19; color:white; }
+    .dpe-btn[data-dpe="F"]{ background:#E6531D; color:white; }
+    .dpe-btn[data-dpe="G"]{ background:#C5161A; color:white; }
+    .dpe-btn[data-dpe=""]{ width:auto; min-width:74px; background:#F1F5F9; color:#475569; border:1px solid #CBD5E1; }
+    .dpe-btn:hover { filter: brightness(1.03); }
     /* Couleurs DPE : static/dpe_official.css */
     .field-audit-readonly {
       background: #f5f6f8;
@@ -4040,7 +4052,7 @@ body.panel-is-open {
     @media (max-width: 920px) {
       .row-2, .row-3, .row-4, .row-2-1, .row-1-2, .row-chauffage-ecs, .row-isolation { grid-template-columns: 1fr; }
       .row-chauffage-ecs .chauffage-col { grid-template-rows: none; }
-      .dpe-buttons { grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+      .dpe-buttons { grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 8px; }
       .container { max-width: 100%; }
     }
     @media (max-width: 600px) {
@@ -5202,7 +5214,7 @@ body.panel-is-open .prospect-shell-sticky {
 #notes-panel-list {
   max-height: 60vh;
   overflow-y: auto;
-  padding-right: 4px;
+  padding-right: 8px;
 }
 .notes-accordion-toolbar {
   display: flex;
@@ -5213,41 +5225,46 @@ body.panel-is-open .prospect-shell-sticky {
 .notes-accordion-toolbar button {
   border: 1px solid #E2E8F0;
   background: #fff;
-  color: #475569;
+  color: #64748B;
   border-radius: 6px;
   padding: 5px 9px;
-  font-size: 11px;
+  font-size: 12px;
   font-family: inherit;
   cursor: pointer;
 }
 .note-accordion {
   background: #fff;
-  border: 1px solid #E2E8F0;
+  border: 0.5px solid #E2E8F0;
   border-radius: 8px;
   margin-bottom: 8px;
   overflow: hidden;
+  min-height: 48px;
 }
 .note-accordion-header {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 10px;
+  min-height: 48px;
   padding: 12px 16px;
   cursor: pointer;
 }
 .note-accordion-header:hover { background: #f8fafc; }
-.note-accordion-author { font-weight: 700; color: #1A202C; font-size: 13px; }
-.note-accordion-date { margin-left: auto; color: #718096; font-size: 11px; white-space: nowrap; }
+.note-accordion-author { font-weight: 600; color: #1A202C; font-size: 14px; }
+.note-accordion-date { margin-left: auto; color: #94A3B8; font-size: 12px; white-space: nowrap; }
 .note-accordion-icon { color: #64748B; font-size: 13px; transition: transform .15s; }
 .note-accordion.is-open .note-accordion-icon { transform: rotate(180deg); }
 .note-accordion-body {
-  display: none;
+  max-height: 0;
+  overflow: hidden;
   border-top: 1px solid #E2E8F0;
-  padding: 12px 16px;
+  padding: 0 16px;
   color: #1A202C;
   line-height: 1.55;
   font-size: 13px;
+  transition: max-height .2s ease, padding .2s ease;
 }
-.note-accordion.is-open .note-accordion-body { display: block; }
+.note-accordion.is-open .note-accordion-body { max-height: 1000px; padding: 12px 16px; }
 
 /* Notes — auteur / horodatage identiques au panneau Échanges (Appel, SMS, etc.) */
 #notes-panel .hexa-meta-card-header {
@@ -6516,6 +6533,8 @@ body.sim-left-open .hexa-app-shell__main{
 .sim-dim-warn{ margin:12px 14px 14px; padding:9px 11px; border:1px solid #F59E0B; border-radius:8px; background:#FEF3C7; color:#8A4B00; font-size:12px; }
 
 .dpe-meta-lines { margin-top:12px; display:flex; flex-direction:column; gap:6px; }
+.dpe-meta-lines { display:grid; grid-template-columns:1fr 1fr; gap:16px; width:100%; }
+.dpe-meta-lines .dpe-info-line { width:100%; }
 .dpe-info-line { display:flex; gap:8px; font-size:13px; padding:4px 0; border-bottom:0.5px solid #F0F5FA; }
 .dpe-info-line:last-child { border-bottom:none; }
 .dpe-info-label { color:#4A5568; font-weight:500; min-width:90px; }
@@ -7245,6 +7264,19 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     background:none; border:none; cursor:pointer; font-family:inherit;
   }
   .hexa-lite-nav .hexa-nav-link:hover { background: #EEF2F7; }
+  .hexa-header-btn {
+    background: #fff;
+    color: #002E5A;
+    border: 1px solid #002E5A;
+    padding: 8px 16px;
+    font-weight: 600;
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: inherit;
+    margin-right: 8px;
+  }
+  .hexa-header-btn:hover:not(:disabled) { background: #F8FAFC; }
+  .hexa-header-btn:disabled { opacity: 0.5; cursor: not-allowed; }
   .psb-actions a[href="/dashboard"],
   .psb-actions a[title="Accueil"],
   .psb-actions a[title="Modifier la fiche"],
@@ -7271,6 +7303,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       <button type="button" id="hexa-change-user">Changer d'utilisateur</button>
     </div>
   </div>
+  <button type="button" id="btn-script-appel" class="hexa-header-btn" title="Configurer dans Admin" disabled>📞 Script d'appel</button>
   <a href="#" class="topbar-btn-primary hexa-topbar-new" id="hexa-nav-new">+ Nouveau</a>
 </header>
 
@@ -7335,7 +7368,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       <div class="card">
         <div class="card-title"><span class="num-card">1</span> Origine &amp; Statut</div>
         <input type="hidden" name="statut" id="statut-input" value="">
-        <div class="row">
+        <div class="row row-1">
           <div class="field" data-required="source" data-label="Source du prospect">
             <label>Provenance <span class="req">*</span></label>
             <select name="source" required>
@@ -7381,7 +7414,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
             </select>
           </div>
         </div>
-        <div class="row" id="date-acquisition-row" style="display:none; margin-top: 12px;">
+        <div class="row row-1" id="date-acquisition-row" style="display:none; margin-top: 12px;">
           <div class="field">
             <label>Date d'acquisition prévue</label>
             <input type="date" name="date_acquisition" id="date-acquisition" value="">
@@ -7556,7 +7589,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
             <button type="button" class="dpe-btn " data-dpe="F">F</button>
             
             <button type="button" class="dpe-btn " data-dpe="G">G</button>
-            
+            <button type="button" class="dpe-btn dpe-btn-none" data-dpe="">Pas de DPE</button>
           </div>
           <div id="dpe-autofill-status" style="display:none;margin-top:8px;padding:8px 12px;border-radius:5px;font-size:12px;line-height:1.45;"></div>
           <div id="dpe-multi-panel" style="display:none;margin-top:8px;">
@@ -7930,7 +7963,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     if (blockPerso) {
       setCardTitle(blockPerso, 2, 'Informations personnelles');
       const rowCivilite = q('.row-civilite-nom', blockPerso);
-      if (rowCivilite) rowCivilite.classList.add('row', 'row-3');
+      if (rowCivilite) rowCivilite.className = 'row row-3';
       const telRow = qa('.row', blockPerso).find(r => r.querySelector('[name="telephone"]') && r.querySelector('[name="email"]'));
       if (telRow) telRow.className = 'row row-2';
     }
@@ -8058,7 +8091,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       sb1.className = 'sub-bloc-title';
       sb1.textContent = 'Source DPE';
       const rowS = document.createElement('div');
-      rowS.className = 'row';
+      rowS.className = 'row row-1';
       [dpeField].forEach(f => { if (f) rowS.appendChild(f); });
       const dpeMetaLines = document.createElement('div');
       dpeMetaLines.className = 'dpe-meta-lines';
@@ -8077,14 +8110,17 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       rowA.className = 'row row-3';
       [typeField, surfaceField, hspField].forEach(f => { if (f) rowA.appendChild(f); });
       const rowB = document.createElement('div');
-      rowB.className = 'row row-3';
-      [anneeField, modeField, ecsField].forEach(f => { if (f) rowB.appendChild(f); });
+      rowB.className = 'row row-2';
+      [anneeField, altitudeField].forEach(f => { if (f) rowB.appendChild(f); });
       const rowC = document.createElement('div');
       rowC.className = 'row row-3';
-      [coutField, phaseField, puissanceField].forEach(f => { if (f) rowC.appendChild(f); });
+      [modeField, ecsField, coutField].forEach(f => { if (f) rowC.appendChild(f); });
       const rowD = document.createElement('div');
-      rowD.className = 'row row-3';
-      [altitudeField, panneauField].forEach(f => { if (f) rowD.appendChild(f); });
+      rowD.className = 'row row-2';
+      [phaseField, puissanceField].forEach(f => { if (f) rowD.appendChild(f); });
+      const rowE = document.createElement('div');
+      rowE.className = 'row row-1';
+      [panneauField].forEach(f => { if (f) rowE.appendChild(f); });
 
       blockCarac.appendChild(sb1);
       blockCarac.appendChild(rowS);
@@ -8095,6 +8131,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       blockCarac.appendChild(rowB);
       blockCarac.appendChild(rowC);
       blockCarac.appendChild(rowD);
+      blockCarac.appendChild(rowE);
       if (typeof window.syncDpeMetaDisplay === 'function') window.syncDpeMetaDisplay();
     }
 
@@ -8193,6 +8230,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     document.querySelectorAll('.dpe-btn').forEach((b) => {
       b.classList.toggle('selected', b.dataset.dpe === lettre);
     });
+    document.querySelector('.dpe-buttons')?.classList.toggle('has-selected', !!lettre);
     syncDpeLettre(lettre);
     const badge = document.getElementById('badge-dpe-label');
     if (badge) {
@@ -10669,8 +10707,9 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       } else {
         dpeInput.value = v;
         document.querySelectorAll('.dpe-btn').forEach(b => b.classList.remove('selected'));
-        btn.classList.add('selected');
+        if (v) btn.classList.add('selected');
       }
+      document.querySelector('.dpe-buttons')?.classList.toggle('has-selected', !!dpeInput.value);
     });
   });
 
@@ -14576,11 +14615,17 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       }
       root.className = '';
       root.innerHTML = `
+        <div class="adm-trash-bulk" style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap">
+          <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:#002E5A"><input type="checkbox" id="adm-trash-master"> Tout sélectionner</label>
+          <button type="button" class="adm-btn adm-btn-ghost" id="adm-trash-restore-selected" hidden>♻ Restaurer la sélection (0)</button>
+          <button type="button" class="adm-btn adm-btn-danger" id="adm-trash-purge-selected" hidden>🗑 Supprimer définitivement la sélection (0)</button>
+        </div>
         <table class="adm-trash-table">
-          <thead><tr><th>N°</th><th>Nom Prénom</th><th>Date de suppression</th><th>Actions</th></tr></thead>
+          <thead><tr><th></th><th>N°</th><th>Nom Prénom</th><th>Date de suppression</th><th>Actions</th></tr></thead>
           <tbody>
             ${leads.map(p => `
               <tr data-numero="${adminEscape(p.numero)}">
+                <td><input type="checkbox" class="adm-trash-check" data-numero="${adminEscape(p.numero)}"></td>
                 <td>${adminEscape(p.numero || '—')}</td>
                 <td>${adminEscape(((p.nom || '') + ' ' + (p.prenom || '')).trim() || '—')}</td>
                 <td>${adminEscape(adminDate(p.deleted_at))}</td>
@@ -14591,6 +14636,40 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
               </tr>`).join('')}
           </tbody>
         </table>`;
+      function selectedTrashNumeros(){
+        return Array.from(root.querySelectorAll('.adm-trash-check:checked')).map(cb=>cb.dataset.numero).filter(Boolean);
+      }
+      function updateBulkTrash(){
+        const nums = selectedTrashNumeros();
+        const restoreBtn = document.getElementById('adm-trash-restore-selected');
+        const purgeBtn = document.getElementById('adm-trash-purge-selected');
+        const visible = nums.length > 0;
+        if (restoreBtn) { restoreBtn.hidden = !visible; restoreBtn.textContent = `♻ Restaurer la sélection (${nums.length})`; }
+        if (purgeBtn) { purgeBtn.hidden = !visible; purgeBtn.textContent = `🗑 Supprimer définitivement la sélection (${nums.length})`; }
+      }
+      document.getElementById('adm-trash-master')?.addEventListener('change', e=>{
+        root.querySelectorAll('.adm-trash-check').forEach(cb=>{ cb.checked = e.target.checked; });
+        updateBulkTrash();
+      });
+      root.querySelectorAll('.adm-trash-check').forEach(cb=>cb.addEventListener('change', updateBulkTrash));
+      document.getElementById('adm-trash-restore-selected')?.addEventListener('click', async ()=>{
+        const nums = selectedTrashNumeros();
+        if (!nums.length) return;
+        const confirmFn = window.hexaConfirm || ((msg)=>Promise.resolve(window.confirm(msg)));
+        if (!await confirmFn(`Restaurer ${nums.length} leads ?`, 'Confirmer')) return;
+        for (const numero of nums) await fetch('/api/leads/' + encodeURIComponent(numero) + '/restore', { method:'POST' });
+        if(typeof window.hexaRefreshProspectsTable === 'function') window.hexaRefreshProspectsTable();
+        loadTrash();
+      });
+      document.getElementById('adm-trash-purge-selected')?.addEventListener('click', async ()=>{
+        const nums = selectedTrashNumeros();
+        if (!nums.length) return;
+        const confirmFn = window.hexaConfirm || ((msg)=>Promise.resolve(window.confirm(msg)));
+        if (!await confirmFn(`Supprimer définitivement ${nums.length} leads ? IRRÉVERSIBLE.`, 'Confirmer')) return;
+        for (const numero of nums) await fetch('/api/leads/' + encodeURIComponent(numero) + '/purge', { method:'DELETE' });
+        if(typeof window.hexaRefreshProspectsTable === 'function') window.hexaRefreshProspectsTable();
+        loadTrash();
+      });
       root.querySelectorAll('.adm-trash-restore').forEach(btn=>{
         btn.addEventListener('click', async ()=>{
           const numero = btn.closest('tr')?.dataset.numero;
@@ -14612,6 +14691,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
           const resp = await fetch('/api/leads/' + encodeURIComponent(numero) + '/purge', { method:'DELETE' });
           if(!resp.ok) { adminToast('Suppression définitive impossible', '#B91C1C'); return; }
           adminToast('Lead supprimé définitivement', '#0D6B3B');
+          if(typeof window.hexaRefreshProspectsTable === 'function') window.hexaRefreshProspectsTable();
           loadTrash();
         });
       });
@@ -14624,8 +14704,13 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
   let M3_ADMIN = null;
   async function fetchAdminM3(){
     if (M3_ADMIN) return M3_ADMIN;
-    const r = await fetch('/api/admin/m3', { cache:'no-store' });
+    const [r, cfgR] = await Promise.all([
+      fetch('/api/admin/m3', { cache:'no-store' }),
+      fetch('/api/admin/config', { cache:'no-store' })
+    ]);
     M3_ADMIN = r.ok ? await r.json() : {};
+    const cfg = cfgR.ok ? await cfgR.json() : {};
+    M3_ADMIN.script_notion_url = cfg.script_notion_url || '';
     return M3_ADMIN;
   }
   function renderAdminM3Section(){
@@ -14869,11 +14954,20 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
           <div class="adm-head">
             <div class="adm-title">⚙ Administration — pilotage tarifaire</div>
             <div class="adm-head-actions">
+              <button type="button" class="adm-btn adm-btn-ghost" id="adm-lock">🔒 Verrouiller Admin</button>
               <button type="button" class="adm-btn adm-btn-primary" id="adm-save">Enregistrer</button>
               <button type="button" class="adm-close" id="adm-close" aria-label="Fermer">&times;</button>
             </div>
           </div>
           <div class="adm-body">
+
+            <div class="adm-section">Configuration générale</div>
+            <div class="adm-card">
+              <label>URL du script d'appel (Notion)
+                <input type="text" id="adm-script-url" placeholder="https://www.notion.so/..." value="${adminEscape(M3_ADMIN?.script_notion_url || '')}" style="width:100%">
+              </label>
+              <button type="button" class="adm-btn adm-btn-primary" id="adm-save-script-url">Sauvegarder l'URL</button>
+            </div>
 
             <div class="adm-section">Réglages généraux</div>
             <div class="adm-params">
@@ -15030,6 +15124,23 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       el.addEventListener('blur', ()=>{ const v=Math.round(num(el.value)); el.value = v? new Intl.NumberFormat('fr-FR').format(v):''; });
     });
     document.getElementById('adm-close').addEventListener('click', close);
+    document.getElementById('adm-lock')?.addEventListener('click', ()=>{
+      localStorage.removeItem('hexa_admin_unlocked');
+      close();
+      adminToast('Admin verrouillé', '#002E5A');
+    });
+    document.getElementById('adm-save-script-url')?.addEventListener('click', async ()=>{
+      const url = document.getElementById('adm-script-url')?.value || '';
+      const r = await fetch('/api/admin/config', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ script_notion_url:url }) });
+      if (r.ok) {
+        M3_ADMIN = M3_ADMIN || {};
+        M3_ADMIN.script_notion_url = url;
+        window.updateScriptAppelButton?.(url);
+        adminToast('URL sauvegardée', '#0D6B3B');
+      } else {
+        adminToast('Erreur sauvegarde URL', '#B91C1C');
+      }
+    });
     document.getElementById('adm-overlay').addEventListener('click', e=>{ if(e.target.id==='adm-overlay') close(); });
     document.getElementById('adm-save').addEventListener('click', async ()=>{
       const b=document.getElementById('adm-save');
@@ -15464,7 +15575,66 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
   document.addEventListener('mouseout', e=>{ if(e.target.closest('.adm-tip')) hideTip(); });
   document.addEventListener('click', e=>{ const t=e.target.closest('.adm-tip'); if(t){ showTip(t); setTimeout(hideTip,3500); } });
 
-  window.HexaAdmin = { open, close, loadConfig, calcModel, openRegie };
+  const ADMIN_UNLOCK_MS = 60 * 60 * 1000;
+  function adminUnlocked(){
+    try {
+      const raw = localStorage.getItem('hexa_admin_unlocked');
+      if (!raw) return false;
+      const data = JSON.parse(raw);
+      return !!data.token && Date.now() - Number(data.unlocked_at || 0) < ADMIN_UNLOCK_MS;
+    } catch(_) { return false; }
+  }
+  function getAdminAttempts(){
+    try { return JSON.parse(localStorage.getItem('hexa_admin_failed_attempts') || '[]'); } catch(_) { return []; }
+  }
+  function setAdminAttempts(attempts){
+    localStorage.setItem('hexa_admin_failed_attempts', JSON.stringify(attempts));
+  }
+  function openAdminPasswordModal(){
+    document.getElementById('admin-auth-modal')?.remove();
+    const attempts = getAdminAttempts().filter(ts => Date.now() - ts < 5 * 60 * 1000);
+    const locked = attempts.length >= 3;
+    const minutes = locked ? Math.max(1, Math.ceil((5 * 60 * 1000 - (Date.now() - attempts[0])) / 60000)) : 0;
+    const wrap = document.createElement('div');
+    wrap.id = 'admin-auth-modal';
+    wrap.className = 'hexa-confirm-modal';
+    wrap.innerHTML = `
+      <div class="hexa-confirm-box">
+        <div class="hexa-confirm-text"><b>Accès Admin</b></div>
+        <input type="password" id="admin-auth-password" autocomplete="off" ${locked?'disabled':''} style="width:100%;padding:10px;border:1px solid #E2E8F0;border-radius:8px;margin-bottom:8px">
+        <div id="admin-auth-error" style="min-height:18px;color:#DC2626;font-size:12px;margin-bottom:12px">${locked ? 'Trop de tentatives, réessayez dans ' + minutes + ' minutes' : ''}</div>
+        <div class="hexa-confirm-actions">
+          <button type="button" class="adm-btn adm-btn-cancel" data-act="cancel">Annuler</button>
+          <button type="button" class="adm-btn adm-btn-primary" data-act="unlock" ${locked?'disabled':''}>Déverrouiller</button>
+        </div>
+      </div>`;
+    document.body.appendChild(wrap);
+    const input = document.getElementById('admin-auth-password');
+    setTimeout(()=>input?.focus(), 0);
+    wrap.addEventListener('click', async e=>{
+      const act = e.target?.dataset?.act;
+      if (!act && e.target !== wrap) return;
+      if (act !== 'unlock') { wrap.remove(); return; }
+      const r = await fetch('/api/admin/auth', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ password: input.value }) });
+      const body = await r.json().catch(()=>({}));
+      if (!r.ok || !body.token) {
+        const next = getAdminAttempts().filter(ts => Date.now() - ts < 5 * 60 * 1000).concat(Date.now());
+        setAdminAttempts(next);
+        document.getElementById('admin-auth-error').textContent = next.length >= 3 ? 'Trop de tentatives, réessayez dans 5 minutes' : 'Mot de passe incorrect';
+        return;
+      }
+      localStorage.setItem('hexa_admin_unlocked', JSON.stringify({ token: body.token, unlocked_at: Date.now() }));
+      localStorage.removeItem('hexa_admin_failed_attempts');
+      wrap.remove();
+      open();
+    });
+  }
+  function openProtected(){
+    if (adminUnlocked()) open();
+    else openAdminPasswordModal();
+  }
+
+  window.HexaAdmin = { open: openProtected, close, loadConfig, calcModel, openRegie };
 
   // Le bouton d'accès à l'admin est désormais "Admin" dans le header (géré par app_shell.js).
 })();
@@ -15677,6 +15847,29 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       if (!e.target.closest('#hexa-user-menu')) menu.classList.remove('open');
     });
     updateUserHeader();
+  }
+  window.updateScriptAppelButton = function(url) {
+    const btn = document.getElementById('btn-script-appel');
+    if (!btn) return;
+    const value = String(url || '').trim();
+    btn.disabled = !value;
+    btn.dataset.url = value;
+    btn.title = value ? "Ouvrir le script d'appel" : 'Configurer dans Admin';
+  };
+  async function initScriptAppelButton() {
+    const btn = document.getElementById('btn-script-appel');
+    if (!btn) return;
+    btn.addEventListener('click', () => {
+      if (btn.disabled || !btn.dataset.url) return;
+      window.open(btn.dataset.url, '_blank');
+    });
+    try {
+      const r = await fetch('/api/admin/config', { cache:'no-store' });
+      const data = r.ok ? await r.json() : {};
+      window.updateScriptAppelButton(data.script_notion_url || '');
+    } catch (_) {
+      window.updateScriptAppelButton('');
+    }
   }
   function cleanVal(v){ return String(v ?? '').trim(); }
   function normTxt(v){
@@ -16091,6 +16284,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     window.hexaRefreshStatsAfterImport = refreshAfterImport;
     window.hexaRefreshProspectsTable = refreshProspectsTable;
     bindUserMenu();
+    initScriptAppelButton();
   }
 
   // --- Menu statut : positionnement fixed (ne déborde pas) ---
