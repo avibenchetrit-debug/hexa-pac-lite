@@ -12089,10 +12089,6 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
         <button type="button" class="comments-panel-submit" id="notes-panel-submit">+ AJOUTER</button>
       </div>
       <div class="comments-unified-divider">── NOTES ──</div>
-      <div class="notes-accordion-toolbar">
-        <button type="button" id="notes-expand-all" class="btn-tout-deplier">▸ Tout déplier</button>
-        <button type="button" id="notes-collapse-all" class="btn-tout-replier">▾ Tout replier</button>
-      </div>
       <div class="comments-panel-list" id="notes-panel-list">
         <div class="comments-empty">Chargement…</div>
       </div>
@@ -12126,8 +12122,6 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       }
     });
     document.getElementById('notes-panel-submit')?.addEventListener('click', () => window.ajouterNoteInterne());
-    document.getElementById('notes-expand-all')?.addEventListener('click', () => setNotesAccordions(true));
-    document.getElementById('notes-collapse-all')?.addEventListener('click', () => setNotesAccordions(false));
   }
 
   function setNotesAccordions(open) {
