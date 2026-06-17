@@ -12213,18 +12213,15 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
         return;
       }
       list.innerHTML = notes.map(n => `
-        <article class="note-accordion" data-note-id="${n.commentaire_id}">
-          <header class="note-accordion-header" aria-expanded="false">
-            <span class="note-accordion-author">${escapeHtml(n.auteur || AUTEUR_DEFAUT)}</span>
-            <time class="note-accordion-date">${formatParis(n.horodatage)}</time>
-            <span class="note-accordion-icon">▾</span>
+        <article style="margin-bottom:8px;background:white;border:0.5px solid #E2E8F0;border-radius:8px;padding:12px 16px;" data-note-id="${n.commentaire_id}">
+          <header style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid #F1F5F9;">
+            <span style="font-weight:600;color:#1A202C;font-size:13px;">${escapeHtml(n.auteur || AUTEUR_DEFAUT)}</span>
+            <time style="color:#94A3B8;font-size:11px;">${formatParis(n.horodatage)}</time>
           </header>
-          <div class="note-accordion-body">
-            <div class="note-content">${n.texte_html || ''}</div>
-            <div class="note-actions">
-              <button type="button" class="note-action-btn note-copy-btn" data-note-copy="${encodeURIComponent(plainTextFromHtml(n.texte || n.texte_html || ''))}">📋 Copier</button>
-              <button type="button" class="note-action-btn note-delete-btn" data-note-id="${n.commentaire_id}">🗑</button>
-            </div>
+          <div style="color:#1A202C;font-size:13px;line-height:1.55;margin-bottom:8px;">${n.texte_html || ''}</div>
+          <div style="display:flex;justify-content:flex-end;gap:8px;">
+            <button type="button" class="note-action-btn note-copy-btn" data-note-copy="${encodeURIComponent((n.texte || n.texte_html || '').replace(/<[^>]*>/g, ''))}" style="background:none;border:none;color:#64748B;cursor:pointer;font-size:12px;padding:4px 8px;">📋 Copier</button>
+            <button type="button" class="note-action-btn note-delete-btn" data-note-id="${n.commentaire_id}" style="background:none;border:none;color:#DC2626;cursor:pointer;font-size:12px;padding:4px 8px;">🗑</button>
           </div>
         </article>`).join('');
       bindNotesAccordions();
@@ -12234,7 +12231,6 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       list.scrollTop = scrollTop;
     }
   }
-
   window.ouvrirNotesInternes = async function (numero) {
     if (!numero) return;
     injectNotesPanel();
