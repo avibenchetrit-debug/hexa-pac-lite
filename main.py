@@ -532,7 +532,7 @@ def _extract_auteur(payload_form, payload_json):
     return "Anonyme"
 
 
-def _note_for_front(entry):
+def _note_for_front(entry, commentaire_id=None):
     """Return a note dict carrying both the stored keys and the keys the
     existing front-end (chargerNotes) reads (texte_html / horodatage)."""
     texte = entry.get("texte", "")
@@ -544,6 +544,7 @@ def _note_for_front(entry):
         "date": date,
         "horodatage": date,
         "auteur": auteur,
+        "commentaire_id": commentaire_id,
     }
 
 
@@ -1041,7 +1042,7 @@ def commentaires_json(numero: str) -> JSONResponse:
     notes = _read_notes()
     entries = notes.get(numero, [])
     return JSONResponse(
-        {"numero": numero, "commentaires": [_note_for_front(e) for e in entries]}
+        {"numero": numero, "commentaires": [_note_for_front(e, idx) for idx, e in enumerate(entries)]}
     )
 
 
@@ -1076,6 +1077,18 @@ async def commentaire_ajax(numero: str, request: Request) -> JSONResponse:
     _atomic_write_json(NOTES_PATH, notes)
 
     return JSONResponse({"ok": True, "count": len(notes[numero])})
+
+
+@app.delete("/prospect/{numero}/commentaire/{commentaire_id}")
+def supprimer_commentaire(numero: str, commentaire_id: int) -> JSONResponse:
+    notes = _read_notes()
+    entries = notes.get(numero, [])
+    if not isinstance(entries, list) or commentaire_id < 0 or commentaire_id >= len(entries):
+        raise HTTPException(status_code=404, detail="Note introuvable")
+    del entries[commentaire_id]
+    notes[numero] = entries
+    _atomic_write_json(NOTES_PATH, notes)
+    return JSONResponse({"ok": True, "count": len(entries)})
 
 
 @app.get("/prospect/{numero}/echanges-json")
