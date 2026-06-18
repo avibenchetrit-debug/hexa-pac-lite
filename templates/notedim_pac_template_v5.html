@@ -1,0 +1,834 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Note de dimensionnement {{ numero_notedim }}</title>
+<link href="https://fonts.googleapis.com" rel="preconnect">
+<link crossorigin href="https://fonts.gstatic.com" rel="preconnect">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  @page { size: A4; margin: 14mm 0 16mm 0; }
+  :root {
+    --rouge: #E2214B;
+    --rouge-dark: #B81A3D;
+    --bleu: #002E5A;
+    --bleu-light: #1A4775;
+    --bleu-pale: #F0F4F9;
+    --gris-fond: #F8F9FB;
+    --gris-fond-2: #F3F5F8;
+    --gris-ligne: #E1E5EB;
+    --gris-ligne-soft: #EDF0F4;
+    --gris-texte: #4A5567;
+    --gris-mute: #8A92A0;
+    --noir: #1A2233;
+    --vert: #2D7A4F;
+    --vert-pale: #E8F5EE;
+    --jaune-warn: #FFF4E5;
+    --jaune-warn-border: #E6A23C;
+    --paper: #FFFFFF;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    background: #E8EBF0;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    color: var(--noir);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-feature-settings: 'tnum' 1;
+    line-height: 1.5;
+  }
+  body { padding: 0; }
+  
+  .document {
+    max-width: 880px;
+    margin: 0 auto;
+    background: var(--paper);
+    padding: 28px 42px;
+    border-radius: 6px;
+    box-shadow: none;
+  }
+
+  /* ===== HEADER ===== */
+  .doc-header {
+    display: table;
+    width: 100%;
+    padding-bottom: 24px;
+    border-bottom: 2px solid var(--bleu);
+    margin-bottom: 20px;
+  }
+  .doc-logo {
+    display: table-cell;
+    vertical-align: top;
+    width: 50%;
+  }
+  .doc-ref {
+    display: table-cell;
+    vertical-align: top;
+    text-align: right;
+    width: 50%;
+  }
+  .doc-logo svg.logo-hexa {
+    height: 44px;
+    width: auto;
+    display: block;
+  }
+  .doc-ref {
+    text-align: right;
+  }
+  .doc-ref-label {
+    font-size: 9px;
+    color: var(--gris-mute);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    font-weight: 700;
+  }
+  .doc-ref-num {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--bleu);
+    margin-top: 6px;
+    font-variant-numeric: tabular-nums;
+  }
+  .doc-ref-date {
+    font-size: 11px;
+    color: var(--gris-mute);
+    margin-top: 6px;
+  }
+
+  /* ===== TITRE ===== */
+  .doc-title-row {
+    text-align: center;
+    margin-bottom: 20px;
+    padding: 0 24px;
+  }
+  .doc-subtitle {
+    font-size: 10px;
+    color: var(--rouge);
+    text-transform: uppercase;
+    letter-spacing: 3px;
+    font-weight: 700;
+    margin-bottom: 14px;
+  }
+  .doc-title {
+    font-size: 24px;
+    font-weight: 800;
+    color: var(--bleu);
+    letter-spacing: -0.8px;
+    line-height: 1.15;
+    margin-bottom: 12px;
+  }
+  .doc-title-sub {
+    font-size: 12px;
+    color: var(--gris-texte);
+    line-height: 1.6;
+  }
+  .doc-title-sub strong { color: var(--bleu); font-weight: 700; }
+
+  /* ===== BADGES CONFORMITÉ (sous le titre) ===== */
+  .compliance-row {
+    display: block;
+    text-align: center;
+    margin-bottom: 20px;
+  }
+  .compliance-badge {
+    display: inline-block;
+    margin: 0 2px;
+  }
+  .compliance-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--bleu-pale);
+    border: 1px solid var(--gris-ligne);
+    color: var(--bleu);
+    font-size: 10px;
+    font-weight: 600;
+    padding: 6px 12px;
+    border-radius: 50px;
+    letter-spacing: 0.3px;
+  }
+  .compliance-badge::before {
+    content: "✓";
+    color: var(--vert);
+    font-weight: 800;
+  }
+
+  /* ===== BLOCS GÉNÉRIQUES ===== */
+  .section {
+    margin-bottom: 20px;
+  }
+  .section-card {
+    background: var(--gris-fond);
+    border-left: 3px solid var(--rouge);
+    padding: 20px 24px;
+    border-radius: 0 6px 6px 0;
+  }
+  .section-card-title {
+    font-size: 10px;
+    color: var(--rouge);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    font-weight: 700;
+    margin-bottom: 16px;
+  }
+  .info-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px 24px;
+    width: 100%;
+  }
+  .info-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    padding: 5px 0;
+    align-items: baseline;
+  }
+  .info-label {
+    color: var(--gris-mute);
+    font-weight: 500;
+    min-width: 110px;
+  }
+  .info-value {
+    color: var(--noir);
+    font-weight: 600;
+    text-align: right;
+  }
+
+  /* ===== SECTION TITLE ===== */
+  .section-title {
+    font-size: 11px;
+    color: var(--bleu);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    font-weight: 700;
+    margin-bottom: 16px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--gris-ligne);
+  }
+
+  /* ===== CARDS DONNÉES LOGEMENT ===== */
+  .cards-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+    gap: 10px;
+    width: 100%;
+  }
+  .data-card {
+    width: 100%;
+  }
+  .data-card {
+    background: var(--bleu-pale);
+    border: 1px solid var(--gris-ligne);
+    border-radius: 6px;
+    padding: 12px 12px;
+    position: relative;
+    overflow: hidden;
+    min-height: 92px;
+  }
+  .data-card::before {
+    content: "";
+    position: absolute;
+    top: 0; left: 0;
+    width: 4px;
+    height: 100%;
+    background: var(--bleu);
+  }
+  .data-card-label {
+    font-size: 9px;
+    color: var(--bleu-light);
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    font-weight: 700;
+    margin-bottom: 10px;
+    padding-left: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .data-card-value {
+    font-size: 17px;
+    font-weight: 800;
+    color: var(--bleu);
+    letter-spacing: -0.5px;
+    padding-left: 4px;
+  }
+  .data-card-sub {
+    font-size: 10px;
+    color: var(--gris-mute);
+    font-weight: 500;
+    margin-top: auto;
+    padding-left: 4px;
+    padding-top: 8px;
+  }
+
+  /* ===== ISOLATION TABLE ===== */
+  .iso-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--gris-fond);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  .iso-table th {
+    background: var(--bleu);
+    color: white;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    padding: 10px 16px;
+    text-align: left;
+  }
+  .iso-table th:last-child { text-align: right; }
+  .iso-table td {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--gris-ligne);
+    font-size: 12px;
+  }
+  .iso-table tr:last-child td { border-bottom: none; }
+  .iso-table td:first-child { color: var(--gris-texte); font-weight: 500; }
+  .iso-table td:nth-child(2) {
+    color: var(--noir);
+    font-weight: 600;
+    text-align: center;
+  }
+  .iso-table td:last-child {
+    text-align: right;
+    color: var(--rouge);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ===== PARAMÈTRES DE CALCUL ===== */
+  .params-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px 24px;
+    background: var(--gris-fond);
+    padding: 16px 20px;
+    border-radius: 6px;
+    width: 100%;
+  }
+  .param-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    padding: 6px 0;
+    border-bottom: 1px dashed var(--gris-ligne-soft);
+    align-items: baseline;
+  }
+  .param-row:nth-last-child(-n+2) { border-bottom: none; }
+  .param-label {
+    color: var(--gris-texte);
+    font-weight: 500;
+  }
+  .param-value {
+    color: var(--noir);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+  }
+  .param-unit { font-weight: 500; color: var(--gris-mute); font-size: 11px; }
+
+  /* ===== FORMULE MONOSPACE ===== */
+  .calc-section { margin-bottom: 20px; }
+  .calc-intro {
+    font-size: 12px;
+    color: var(--gris-texte);
+    margin-bottom: 12px;
+    font-style: italic;
+  }
+  .calc-formula {
+    background: var(--noir);
+    color: #E8EEF7;
+    border-left: 4px solid var(--rouge);
+    padding: 20px 24px;
+    font-family: 'JetBrains Mono', 'Consolas', 'Monaco', monospace;
+    font-size: 10.5px;
+    line-height: 1.7;
+    border-radius: 0 6px 6px 0;
+    white-space: pre;
+    font-feature-settings: 'tnum' 1;
+    overflow-x: auto;
+  }
+  .calc-formula .accent { color: #FFB95A; font-weight: 600; }
+  .calc-formula .result { color: #6FE6A8; font-weight: 700; }
+  .calc-formula .var { color: #A1C9F7; }
+  .calc-formula .comment { color: #707A8F; font-style: italic; }
+
+  /* ===== RÉSULTAT FINAL (encadré vert renforcé) ===== */
+  .result-box {
+    background: var(--vert-pale);
+    border: 2px solid var(--vert);
+    border-radius: 10px;
+    padding: 20px 24px;
+    text-align: center;
+    margin-bottom: 20px;
+    position: relative;
+    overflow: hidden;
+  }
+  .result-box::before {
+    content: "";
+    position: absolute;
+    top: -50%; right: -10%;
+    width: 200px; height: 200px;
+    background: radial-gradient(circle, rgba(45,122,79,0.08) 0%, transparent 70%);
+  }
+  .result-label {
+    font-size: 10px;
+    color: var(--vert);
+    text-transform: uppercase;
+    letter-spacing: 3px;
+    font-weight: 700;
+    margin-bottom: 16px;
+    position: relative;
+  }
+  .result-value-wrap { position: relative; }
+  .result-value {
+    font-size: 42px;
+    font-weight: 800;
+    color: var(--noir);
+    letter-spacing: -2px;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+  .result-unit {
+    font-size: 24px;
+    font-weight: 600;
+    color: var(--gris-texte);
+    margin-left: 6px;
+  }
+  .result-gamme {
+    font-size: 12px;
+    color: var(--gris-texte);
+    margin-top: 12px;
+    position: relative;
+  }
+  .result-gamme strong { color: var(--vert); font-weight: 700; }
+
+  /* ===== MODÈLE PROPOSÉ ===== */
+  .modele-box {
+    background: var(--paper);
+    border: 1px solid var(--gris-ligne);
+    border-left: 3px solid var(--bleu);
+    border-radius: 0 6px 6px 0;
+    padding: 18px 24px;
+    margin-bottom: 20px;
+    display: table;
+    width: 100%;
+  }
+  .modele-box > div {
+    display: table-cell;
+    vertical-align: middle;
+  }
+  .modele-box > div:last-child {
+    text-align: right;
+    width: 200px;
+  }
+  .modele-info-label {
+    font-size: 10px;
+    color: var(--gris-mute);
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+  .modele-info-value {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--bleu);
+  }
+  .modele-info-tech {
+    font-size: 10px;
+    color: var(--gris-mute);
+    margin-top: 4px;
+  }
+  .modele-prix {
+    text-align: right;
+  }
+  .modele-prix-value {
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--rouge);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.5px;
+  }
+
+  /* ===== RECOMMANDATIONS TECHNIQUES ===== */
+  .reco-list {
+    background: var(--bleu-pale);
+    border-radius: 6px;
+    padding: 20px 24px;
+    margin-bottom: 20px;
+  }
+  .reco-row {
+    display: block;
+    padding: 8px 0;
+    font-size: 12px;
+    line-height: 1.5;
+    border-bottom: 1px solid rgba(0,46,90,0.08);
+  }
+  .reco-icon {
+    display: inline;
+    margin-right: 8px;
+  }
+  .reco-row:last-child { border-bottom: none; }
+  .reco-icon {
+    color: var(--bleu);
+    flex-shrink: 0;
+    font-weight: 700;
+    width: 20px;
+  }
+  .reco-row strong { color: var(--bleu); font-weight: 700; }
+
+  /* ===== DISCLAIMER ===== */
+  .disclaimer-box {
+    background: var(--jaune-warn);
+    border-left: 4px solid var(--jaune-warn-border);
+    padding: 16px 20px;
+    border-radius: 0 4px 4px 0;
+    margin-bottom: 20px;
+  }
+  .disclaimer-title {
+    font-size: 10px;
+    color: var(--jaune-warn-border);
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+  .disclaimer-text {
+    font-size: 11px;
+    color: var(--gris-texte);
+    line-height: 1.6;
+  }
+
+  /* ===== MÉTHODE & RÉFÉRENCES ===== */
+  .method-block {
+    background: var(--gris-fond-2);
+    padding: 18px 24px;
+    border-radius: 6px;
+    margin-bottom: 20px;
+  }
+  .method-title {
+    font-size: 10px;
+    color: var(--bleu);
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    font-weight: 700;
+    margin-bottom: 8px;
+  }
+  .method-text {
+    font-size: 11px;
+    color: var(--gris-texte);
+    line-height: 1.6;
+  }
+  .method-text strong { color: var(--noir); font-weight: 600; }
+
+  /* ===== FOOTER ===== */
+  .doc-footer {
+    border-top: 2px solid var(--bleu);
+    padding-top: 16px;
+    margin-top: 32px;
+    display: table;
+    width: 100%;
+    font-size: 9px;
+    color: var(--gris-mute);
+    line-height: 1.6;
+  }
+  .doc-footer > div {
+    display: table-cell;
+    vertical-align: top;
+    width: 50%;
+  }
+  .doc-footer > div:last-child {
+    text-align: right;
+  }
+  .footer-right { text-align: right; }
+  .doc-footer strong { color: var(--bleu); font-weight: 700; }
+  .footer-emit {
+    text-align: center;
+    margin-top: 16px;
+    padding-top: 12px;
+    border-top: 1px solid var(--gris-ligne-soft);
+    font-size: 9px;
+    color: var(--gris-mute);
+    font-style: italic;
+  }
+</style>
+</head>
+<body>
+<div class="document">
+
+  <!-- ============ HEADER ============ -->
+  <div class="doc-header">
+    <div class="doc-logo">
+      <!-- LOGO SVG INLINE OFFICIEL HEXA RÉNOV' -->
+      <svg class="logo-hexa" fill="none" viewBox="0 0 845 200" xmlns="http://www.w3.org/2000/svg">
+        <path d="M26.9122 64.3983L89.1361 27.4004L151.36 62.7166V136.712L89.1361 172.029L25.2305 135.031L26.9122 64.3983Z" stroke="#E2214B" stroke-width="6.7269"></path>
+        <path d="M3.36328 51.0645L88.5708 3.85352L171.536 50.668V148.756L88.5708 195.57L3.36328 146.526V51.0645Z" stroke="#E2214B" stroke-width="6.7269"></path>
+        <path d="M89.1289 3.85352V27.3977" stroke="#E2214B" stroke-width="6.7269"></path>
+        <path d="M5.04297 52.6211L26.9054 64.3932" stroke="#E2214B" stroke-width="6.7269"></path>
+        <path d="M3.36328 146.798L25.2257 135.026" stroke="#E2214B" stroke-width="6.7269"></path>
+        <path d="M89.1289 195.568V172.023" stroke="#E2214B" stroke-width="6.7269"></path>
+        <path d="M151.354 136.709L171.534 148.481" stroke="#E2214B" stroke-width="6.7269"></path>
+        <path d="M151.354 62.7135L171.534 50.9414" stroke="#E2214B" stroke-width="6.7269"></path>
+        <path d="M275.39 45.2301V124.937H264.984V88.8002H224.387V124.937H213.98V45.2301H224.387V80.2234H264.984V45.2301H275.39Z" fill="#002E5A"></path>
+        <path d="M345.764 91.2018C345.764 93.1839 345.65 95.2805 345.421 97.4914H295.332C295.713 103.667 297.81 108.508 301.622 112.015C305.51 115.445 310.199 117.161 315.688 117.161C320.186 117.161 323.922 116.132 326.895 114.073C329.944 111.939 332.079 109.118 333.299 105.611H344.506C342.829 111.634 339.474 116.551 334.443 120.363C329.411 124.099 323.159 125.966 315.688 125.966C309.741 125.966 304.405 124.632 299.678 121.964C295.027 119.296 291.368 115.522 288.7 110.642C286.031 105.687 284.697 99.9691 284.697 93.4889C284.697 87.0087 285.993 81.3289 288.585 76.4497C291.177 71.5704 294.799 67.8348 299.449 65.2427C304.176 62.5743 309.589 61.2401 315.688 61.2401C321.634 61.2401 326.895 62.5362 331.469 65.1283C336.044 67.7204 339.55 71.3036 341.99 75.8779C344.506 80.3759 345.764 85.4839 345.764 91.2018ZM335.014 89.029C335.014 85.0646 334.138 81.672 332.384 78.8512C330.631 75.9541 328.229 73.7813 325.18 72.3328C322.206 70.808 318.89 70.0457 315.23 70.0457C309.97 70.0457 305.472 71.7229 301.736 75.0774C298.077 78.4319 295.98 83.0824 295.447 89.029H335.014Z" fill="#002E5A"></path>
+        <path d="M387.632 124.937L372.766 101.608L358.471 124.937H347.607L367.848 93.832L347.607 62.2694H359.386L374.252 85.4839L388.433 62.2694H399.297L379.17 93.2602L399.411 124.937H387.632Z" fill="#002E5A"></path>
+        <path d="M401.185 93.3745C401.185 86.9705 402.481 81.367 405.073 76.564C407.666 71.6848 411.211 67.911 415.709 65.2427C420.283 62.5743 425.353 61.2401 430.918 61.2401C436.407 61.2401 441.172 62.4218 445.213 64.7852C449.254 67.1486 452.265 70.1219 454.247 73.7051V62.2694H464.768V124.937H454.247V113.273C452.189 116.932 449.101 119.982 444.984 122.421C440.944 124.785 436.217 125.966 430.804 125.966C425.238 125.966 420.207 124.594 415.709 121.849C411.211 119.105 407.666 115.255 405.073 110.299C402.481 105.344 401.185 99.7023 401.185 93.3745ZM454.247 93.4889C454.247 88.7621 453.294 84.6453 451.388 81.1383C449.482 77.6314 446.89 74.963 443.612 73.1333C440.41 71.2273 436.865 70.2744 432.977 70.2744C429.088 70.2744 425.543 71.1892 422.341 73.0189C419.139 74.8487 416.585 77.517 414.679 81.024C412.773 84.5309 411.82 88.6478 411.82 93.3745C411.82 98.1775 412.773 102.371 414.679 105.954C416.585 109.461 419.139 112.167 422.341 114.073C425.543 115.903 429.088 116.818 432.977 116.818C436.865 116.818 440.41 115.903 443.612 114.073C446.89 112.167 449.482 109.461 451.388 105.954C453.294 102.371 454.247 98.2157 454.247 93.4889Z" fill="#002E5A"></path>
+        <path d="M545.662 124.937L526.679 92.3453H514.1V124.937H503.693V45.2301H529.424C535.447 45.2301 540.516 46.2593 544.633 48.3178C548.826 50.3762 551.952 53.1589 554.011 56.6659C556.069 60.1728 557.098 64.1753 557.098 68.6734C557.098 74.1625 555.497 79.0036 552.295 83.1967C549.169 87.3898 544.443 90.1725 538.115 91.5448L558.127 124.937H545.662ZM514.1 83.9972H529.424C535.065 83.9972 539.297 82.625 542.117 79.8804C544.938 77.0596 546.349 73.3239 546.349 68.6734C546.349 63.9466 544.938 60.2872 542.117 57.6951C539.373 55.103 535.142 53.8069 529.424 53.8069H514.1V83.9972Z" fill="#002E5A"></path>
+        <path d="M625.873 91.2018C625.873 93.1839 625.758 95.2805 625.53 97.4914H575.441C575.822 103.667 577.919 108.508 581.731 112.015C585.619 115.445 590.307 117.161 595.797 117.161C600.295 117.161 604.03 116.132 607.004 114.073C610.053 111.939 612.188 109.118 613.408 105.611H624.615C622.937 111.634 619.583 116.551 614.551 120.363C609.52 124.099 603.268 125.966 595.797 125.966C589.85 125.966 584.513 124.632 579.787 121.964C575.136 119.296 571.477 115.522 568.808 110.642C566.14 105.687 564.806 99.9691 564.806 93.4889C564.806 87.0087 566.102 81.3289 568.694 76.4497C571.286 71.5704 574.907 67.8348 579.558 65.2427C584.285 62.5743 589.698 61.2401 595.797 61.2401C601.743 61.2401 607.004 62.5362 611.578 65.1283C616.152 67.7204 619.659 71.3036 622.099 75.8779C624.615 80.3759 625.873 85.4839 625.873 91.2018ZM615.123 89.029C615.123 85.0646 614.246 81.672 612.493 78.8512C610.739 75.9541 608.338 73.7813 605.288 72.3328C602.315 70.808 598.999 70.0457 595.339 70.0457C590.079 70.0457 585.581 71.7229 581.845 75.0774C578.186 78.4319 576.089 83.0824 575.555 89.029H615.123ZM606.546 44.544L582.188 57.5807V49.8044L606.546 35.5098V44.544Z" fill="#002E5A"></path>
+        <path d="M665.568 61.1258C673.192 61.1258 679.367 63.4511 684.094 68.1016C688.821 72.6759 691.184 79.3086 691.184 87.9997V124.937H680.892V89.4864C680.892 83.2349 679.329 78.47 676.203 75.1917C673.078 71.8373 668.808 70.16 663.395 70.16C657.906 70.16 653.522 71.8754 650.244 75.3061C647.042 78.7368 645.441 83.7304 645.441 90.2869V124.937H635.035V62.2694H645.441V71.1892C647.5 67.9872 650.282 65.5095 653.789 63.756C657.372 62.0025 661.299 61.1258 665.568 61.1258Z" fill="#002E5A"></path>
+        <path d="M730.94 125.966C725.07 125.966 719.733 124.632 714.93 121.964C710.203 119.296 706.468 115.522 703.723 110.642C701.055 105.687 699.721 99.9691 699.721 93.4889C699.721 87.0849 701.093 81.4433 703.838 76.564C706.658 71.6085 710.47 67.8348 715.273 65.2427C720.076 62.5743 725.451 61.2401 731.398 61.2401C737.344 61.2401 742.719 62.5743 747.522 65.2427C752.325 67.8348 756.099 71.5704 758.844 76.4497C761.664 81.3289 763.075 87.0087 763.075 93.4889C763.075 99.9691 761.626 105.687 758.729 110.642C755.908 115.522 752.058 119.296 747.179 121.964C742.3 124.632 736.887 125.966 730.94 125.966ZM730.94 116.818C734.676 116.818 738.183 115.941 741.461 114.188C744.739 112.434 747.37 109.804 749.352 106.297C751.41 102.79 752.439 98.5206 752.439 93.4889C752.439 88.4572 751.448 84.1878 749.466 80.6809C747.484 77.1739 744.892 74.5818 741.69 72.9046C738.488 71.1511 735.019 70.2744 731.283 70.2744C727.471 70.2744 723.964 71.1511 720.762 72.9046C717.637 74.5818 715.121 77.1739 713.215 80.6809C711.309 84.1878 710.356 88.4572 710.356 93.4889C710.356 98.5969 711.271 102.904 713.1 106.411C715.006 109.918 717.522 112.548 720.648 114.302C723.774 115.979 727.205 116.818 730.94 116.818Z" fill="#002E5A"></path>
+        <path d="M795.512 115.331L814.953 62.2694H826.045L801.459 124.937H789.337L764.75 62.2694H775.957L795.512 115.331Z" fill="#002E5A"></path>
+        <path d="M833.313 45.2301H844.863L833.884 71.1892H826.565L833.313 45.2301Z" fill="#002E5A"></path>
+      </svg>
+    </div>
+    <div class="doc-ref">
+      <div class="doc-ref-label">Référence dossier</div>
+      <div class="doc-ref-num">N° {{ numero_notedim }}</div>
+      <div class="doc-ref-date">Émis le {{ date_emission }}</div>
+    </div>
+  </div>
+
+  <!-- ============ TITRE & SOUS-TITRE ============ -->
+  <div class="doc-title-row">
+    <div class="doc-subtitle">— Note technique de dimensionnement —</div>
+    <div class="doc-title">Dimensionnement Pompe à Chaleur Air/Eau</div>
+    <div class="doc-title-sub">Document à valeur <strong>justificative</strong> pour l'éligibilité aux aides <strong>MaPrimeRénov'</strong>, <strong>CEE BAR-TH-171</strong> et dossier <strong>ANAH</strong>.</div>
+  </div>
+
+  <!-- ============ BADGES CONFORMITÉ ============ -->
+  <div class="compliance-row">
+    <div class="compliance-badge">NF EN 12831</div>
+    <div class="compliance-badge">RT 2012 / RE 2020</div>
+    <div class="compliance-badge">Réf. ADEME · ATEE</div>
+    <div class="compliance-badge">BAR-TH-171 conforme</div>
+    <div class="compliance-badge">RGE CertiRénov'</div>
+  </div>
+
+  <!-- ============ 1. BÉNÉFICIAIRE ET CHANTIER ============ -->
+  <div class="section">
+    <div class="section-card">
+      <div class="section-card-title">Bénéficiaire et chantier</div>
+      <div class="info-grid">
+        <div class="info-row"><span class="info-label">Bénéficiaire</span><span class="info-value">{{ nom }} {{ prenom }}</span></div>
+        <div class="info-row"><span class="info-label">N° prospect</span><span class="info-value">{{ numero_prospect }}</span></div>
+        <div class="info-row"><span class="info-label">Téléphone</span><span class="info-value">{{ telephone }}</span></div>
+        <div class="info-row"><span class="info-label">Email</span><span class="info-value">{{ email }}</span></div>
+        <div class="info-row"><span class="info-label">Adresse chantier</span><span class="info-value">{{ adresse_chantier }}, {{ cp_chantier }} {{ ville_chantier }}</span></div>
+        <div class="info-row"><span class="info-label">Type logement</span><span class="info-value">{{ type_logement }}</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ 2. DONNÉES DU LOGEMENT ============ -->
+  <div class="section">
+    <div class="section-title">Données du logement</div>
+    <div class="cards-row">
+      <div class="data-card">
+        <div class="data-card-label">Surface habitable</div>
+        <div class="data-card-value">{{ surface_habitable }} m²</div>
+        <div class="data-card-sub">Surface au sol déclarée</div>
+      </div>
+      <div class="data-card">
+        <div class="data-card-label">Zone climatique</div>
+        <div class="data-card-value">{{ zone_climatique }}</div>
+        <div class="data-card-sub">T° base extérieure : {{ temperature_base }}°C</div>
+      </div>
+      <div class="data-card">
+        <div class="data-card-label">Chauffage actuel</div>
+        <div class="data-card-value">{{ chauffage_actuel }}</div>
+        <div class="data-card-sub">Énergie principale du logement</div>
+      </div>
+      <div class="data-card">
+        <div class="data-card-label">HSP</div>
+        <div class="data-card-value">{{ hsp }} m</div>
+        <div class="data-card-sub">Hauteur sous plafond moyenne</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ 3. ISOLATION DU LOGEMENT ============ -->
+  <div class="section">
+    <div class="section-title">Isolation du logement (état déclaré)</div>
+    <table class="iso-table">
+      <thead>
+        <tr>
+          <th>Composant</th>
+          <th style="text-align:center;">État</th>
+          <th>Coefficient d'ajustement G</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>Toiture / Combles</td><td>{{ iso_toit_label }}</td><td>{{ iso_toit_coeff }} W/m³·°C</td></tr>
+        <tr><td>Murs extérieurs</td><td>{{ iso_mur_label }}</td><td>{{ iso_mur_coeff }} W/m³·°C</td></tr>
+        <tr><td>Menuiseries (fenêtres)</td><td>{{ iso_menuiserie_label }}</td><td>{{ iso_menuiserie_coeff }} W/m³·°C</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ============ 4. PARAMÈTRES DE CALCUL ============ -->
+  <div class="section">
+    <div class="section-title">Paramètres de calcul retenus</div>
+    <div class="params-grid">
+      <div class="param-row">
+        <span class="param-label">Méthode appliquée</span>
+        <span class="param-value">{{ methode_calcul }}</span>
+      </div>
+      <div class="param-row">
+        <span class="param-label">Coefficient G de base</span>
+        <span class="param-value">{{ g_base }} <span class="param-unit">W/m³·°C</span></span>
+      </div>
+      <div class="param-row">
+        <span class="param-label">Surface chauffée</span>
+        <span class="param-value">{{ surface_chauffee }} <span class="param-unit">m²</span></span>
+      </div>
+      <div class="param-row">
+        <span class="param-label">Coefficient G retenu</span>
+        <span class="param-value">{{ g_retenu }} <span class="param-unit">W/m³·°C</span></span>
+      </div>
+      <div class="param-row">
+        <span class="param-label">Volume chauffé</span>
+        <span class="param-value">{{ volume_chauffe }} <span class="param-unit">m³</span></span>
+      </div>
+      <div class="param-row">
+        <span class="param-label">T° extérieure de base</span>
+        <span class="param-value">{{ temperature_base }} <span class="param-unit">°C ({{ zone_climatique }})</span></span>
+      </div>
+      <div class="param-row">
+        <span class="param-label">Altitude du chantier</span>
+        <span class="param-value">{{ altitude }} <span class="param-unit">m ({{ correction_altitude_label }})</span></span>
+      </div>
+      <div class="param-row">
+        <span class="param-label">Consigne intérieure</span>
+        <span class="param-value">{{ temperature_consigne }} <span class="param-unit">°C → ΔT = {{ delta_t }}°C</span></span>
+      </div>
+      <div class="param-row">
+        <span class="param-label">Service demandé</span>
+        <span class="param-value">{{ service }}</span>
+      </div>
+      <div class="param-row">
+        <span class="param-label">Réserve ECS</span>
+        <span class="param-value">{{ p_ecs }} <span class="param-unit">W</span></span>
+      </div>
+      <div class="param-row">
+        <span class="param-label">Facteur de sécurité</span>
+        <span class="param-value">× 1,10</span>
+      </div>
+      <div class="param-row">
+        <span class="param-label">Type d'émetteurs</span>
+        <span class="param-value">{{ type_emetteurs_label }}</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ 5. CALCUL DES DÉPERDITIONS ============ -->
+  <div class="section calc-section">
+    <div class="section-title">Calcul des déperditions thermiques</div>
+    <div class="calc-intro">Application de la formule normative NF EN 12831 simplifiée par coefficient G :</div>
+    <div class="calc-formula"><span class="comment"># Étape 1 — Déperditions de chauffage</span>
+<span class="var">P_chauffage</span> = G × V × ΔT
+            = {{ g_retenu }} × {{ volume_chauffe }} × {{ delta_t }}
+            = <span class="accent">{{ p_chauffage }} W</span>
+
+<span class="comment"># Étape 2 — Puissance totale (incluant ECS)</span>
+<span class="var">P_totale</span>    = P_chauffage + P_ECS
+            = {{ p_chauffage }} + {{ p_ecs }}
+            = <span class="accent">{{ p_totale }} W</span>
+
+<span class="comment"># Étape 3 — Application du facteur de sécurité</span>
+<span class="var">P_PAC_reco</span>  = P_totale × Facteur_sécurité
+            = {{ p_totale }} × 1,10
+            = <span class="result">{{ p_pac_reco_w }} W ≈ {{ p_pac_reco_kw }} kW</span></div>
+  </div>
+
+  <!-- ============ 6. RÉSULTAT ============ -->
+  <div class="result-box">
+    <div class="result-label">Puissance PAC recommandée</div>
+    <div class="result-value-wrap">
+      <span class="result-value">{{ p_pac_reco_kw }}</span><span class="result-unit">kW</span>
+    </div>
+    <div class="result-gamme">Gamme cible : <strong>{{ gamme_min }} à {{ gamme_max }} kW</strong> · Tolérance ± 20%</div>
+  </div>
+
+  <!-- ============ 7. MODÈLE PROPOSÉ (sans prix) ============ -->
+  <div class="modele-box">
+    <div>
+      <div class="modele-info-label">Modèle catalogue proposé</div>
+      <div class="modele-info-value">{{ modele_pac }}</div>
+      <div class="modele-info-tech">{{ modele_pac_specs }}</div>
+    </div>
+    <div class="modele-prix">
+      <div class="modele-info-label">Conformité</div>
+      <div class="modele-info-value" style="font-size:13px;">BAR-TH-171</div>
+    </div>
+  </div>
+
+  <!-- ============ 8. RECOMMANDATIONS TECHNIQUES ============ -->
+  <div class="section">
+    <div class="section-title">Recommandations techniques</div>
+    <div class="reco-list">
+      <div class="reco-row">
+        <span class="reco-icon">▸</span>
+        <span><strong>Puissance nominale :</strong> sélectionner un modèle compris entre {{ gamme_min }} et {{ gamme_max }} kW (mesure à -7°C ou en conditions du projet)</span>
+      </div>
+      <div class="reco-row">
+        <span class="reco-icon">▸</span>
+        <span><strong>COP minimum :</strong> ≥ 3,0 à température extérieure de base ({{ temperature_base }}°C) — éligibilité BAR-TH-171</span>
+      </div>
+      <div class="reco-row">
+        <span class="reco-icon">▸</span>
+        <span><strong>SCOP minimum :</strong> ≥ 3,4 sur saison de chauffe — éligibilité MaPrimeRénov' et CEE</span>
+      </div>
+      <div class="reco-row">
+        <span class="reco-icon">▸</span>
+        <span><strong>Émetteurs existants :</strong> {{ type_emetteurs_label }} — compatibilité validée pour pompe à chaleur air/eau</span>
+      </div>
+      <div class="reco-row">
+        <span class="reco-icon">▸</span>
+        <span><strong>Installation :</strong> par professionnel <strong>RGE QualiPAC</strong> uniquement — obligatoire pour bénéficier des aides publiques</span>
+      </div>
+    </div>
+  </div>
+
+    <!-- ============ 9. AVERTISSEMENT ============ -->
+  <div class="disclaimer-box">
+    <div class="disclaimer-title">⚠ Avertissement technique</div>
+    <div class="disclaimer-text">
+      Cette note constitue un <strong>pré-dimensionnement simplifié</strong> basé sur les informations déclarées par le bénéficiaire dans la fiche prospect (surface, isolation, hauteur sous plafond, mode de chauffage). La puissance finale de la pompe à chaleur doit être <strong>confirmée lors de la visite technique</strong>, en croisant les données fabricant, la température extérieure de base réelle du projet et le régime d'eau effectif des émetteurs. Toute modification du périmètre des travaux d'isolation impose une réévaluation du calcul.
+    </div>
+  </div>
+
+  <!-- ============ 10. MÉTHODE & RÉFÉRENCES ============ -->
+  <div class="method-block">
+    <div class="method-title">Méthode &amp; références normatives</div>
+    <div class="method-text">
+      Calcul basé sur la norme <strong>NF EN 12831</strong> (calcul des besoins thermiques des bâtiments) — méthode simplifiée par coefficient G adaptée aux PAC résidentielles. Coefficient G : référentiel <strong>ADEME / ATEE</strong>. Facteurs de réduction de l'enveloppe thermique : retours d'expérience terrain validés selon le niveau d'isolation déclaré. Référence règlementaire : <strong>BAR-TH-171</strong> (fiche d'opération standardisée CEE) et <strong>arrêté du 30 mars 2009</strong> relatif aux critères de qualification RGE QualiPAC.
+    </div>
+  </div>
+
+  <!-- ============ FOOTER ============ -->
+  <div class="doc-footer">
+    <div>
+      <strong>SAS HEXA RÉNOV'</strong><br>
+      58 Rue de la Sablière, 92600 Asnières-sur-Seine<br>
+      RCS Nanterre 845 229 152 · SIRET 845 229 152 00028<br>
+      TVA FR 89 845 229 152
+    </div>
+    <div class="footer-right">
+      <strong>RGE CertiRénov'</strong><br>
+      Assurance Décennale &amp; RC Pro — MIC Insurance n° AXE2502159<br>
+      Validité des garanties : du 19/03/2026 au 18/03/2027<br>
+      info@hexa-renov.fr · 09 70 70 25 11
+    </div>
+  </div>
+  <div class="footer-emit">
+    Document généré le {{ date_emission }} à {{ heure_emission }} par Hexa Rénov' · Système certifié RGE
+  </div>
+
+</div>
+</body>
+</html>

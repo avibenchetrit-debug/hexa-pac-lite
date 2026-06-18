@@ -1,0 +1,3948 @@
+<!DOCTYPE html>
+
+<html lang="fr">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Devis №{{ numero_devis }} — Pompe à chaleur air/eau · {{ nom }} {{ prenom }} · Hexa Rénov'</title>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<style>
+  /* Marges de page cohérentes pour l'impression PDF (haut/bas).
+     L'horizontal reste géré par le padding 56px des sections. */
+  @page {
+    size: A4;
+    margin: 14mm 0 16mm 0;
+  }
+
+  :root {
+    --rouge: #E2214B;
+    --rouge-dark: #B81A3D;
+    --bleu: #002E5A;
+    --bleu-light: #1A4775;
+    --bleu-pale: #F0F4F9;
+    --gris-fond: #F8F9FB;
+    --gris-fond-2: #F3F5F8;
+    --gris-ligne: #E1E5EB;
+    --gris-ligne-soft: #EDF0F4;
+    --gris-texte: #4A5567;
+    --gris-mute: #8A92A0;
+    --noir: #1A2233;
+    --vert: #2D7A4F;
+    --paper: #FFFFFF;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body {
+    background: #E8EBF0;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    color: var(--noir);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-feature-settings: 'tnum' 1;
+    max-width: 100%;
+    overflow-x: clip;
+  }
+
+  body {
+    padding: 32px 16px;
+    min-height: 100vh;
+  }
+
+  @media screen and (min-width: 769px) {
+    .document { zoom: 1.2; }
+  }
+
+  .document {
+    max-width: 820px;
+    margin: 0 auto;
+    background: var(--paper);
+    box-shadow: 0 4px 24px rgba(0, 46, 90, 0.08), 0 1px 3px rgba(0, 46, 90, 0.04);
+    min-height: 1100px;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+  }
+
+  /* ========== EN-TÊTE FIN ========== */
+  .cover-header {
+    padding: 28px 56px 24px;
+    border-bottom: 1px solid var(--gris-ligne);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .cover-logo-block {
+    display: flex;
+    align-items: center;
+  }
+
+  /* Logo Hexa Rénov' (SVG inline, viewBox 845×200) */
+  .logo-hexa-cover {
+    height: 52px;
+    width: auto;
+    display: block;
+  }
+
+  .cover-ref {
+    text-align: right;
+  }
+  .cover-ref-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    color: var(--gris-mute);
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+  .cover-ref-value {
+    font-size: 13px;
+    color: var(--noir);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ========== TITRE PRINCIPAL ========== */
+  .cover-title-block {
+    padding: 44px 56px 32px;
+    text-align: center;
+  }
+
+  .cover-eyebrow {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.32em;
+    color: var(--rouge);
+    font-weight: 700;
+    margin-bottom: 22px;
+  }
+
+  .cover-title {
+    font-size: 38px;
+    font-weight: 700;
+    color: var(--bleu);
+    letter-spacing: -0.025em;
+    line-height: 1.1;
+    margin-bottom: 16px;
+  }
+
+  .cover-subtitle {
+    font-size: 14px;
+    color: var(--gris-texte);
+    font-weight: 400;
+    line-height: 1.55;
+    max-width: 580px;
+    margin: 0 auto;
+  }
+
+  .cover-subtitle strong {
+    color: var(--bleu);
+    font-weight: 600;
+  }
+
+  /* ========== BLOC BÉNÉFICIAIRE ========== */
+  .cover-recipient {
+    margin: 0 56px 28px;
+    padding: 22px 28px;
+    background: var(--gris-fond);
+    border-left: 3px solid var(--rouge);
+  }
+
+  .cover-recipient-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.22em;
+    color: var(--rouge);
+    font-weight: 700;
+    margin-bottom: 14px;
+  }
+
+  .cover-recipient-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px 32px;
+  }
+
+  .cover-recipient-row {
+    display: flex;
+    gap: 12px;
+    font-size: 12px;
+    line-height: 1.5;
+    align-items: baseline;
+  }
+
+  .cover-recipient-key {
+    color: var(--gris-mute);
+    font-weight: 500;
+    min-width: 130px;
+    flex-shrink: 0;
+  }
+
+  .cover-recipient-val {
+    color: var(--noir);
+    font-weight: 600;
+    flex: 1;
+  }
+
+  /* ========== PARCOURS DU DOSSIER ========== */
+  .cover-journey {
+    padding: 0 56px 32px;
+  }
+
+  .cover-section-title {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.22em;
+    color: var(--rouge);
+    font-weight: 700;
+    margin-bottom: 22px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .cover-section-title::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--gris-ligne);
+  }
+
+  .journey-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    position: relative;
+  }
+
+  /* Ligne verticale qui relie les étapes */
+  .journey-list::before {
+    content: '';
+    position: absolute;
+    left: 13px;
+    top: 14px;
+    bottom: 14px;
+    width: 1px;
+    background: var(--gris-ligne);
+    z-index: 0;
+  }
+
+  .journey-step {
+    display: grid;
+    grid-template-columns: 28px 1fr auto;
+    gap: 16px;
+    padding: 8px 0;
+    align-items: center;
+    position: relative;
+    z-index: 1;
+  }
+
+  .journey-step-marker {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--paper);
+    border: 2px solid var(--gris-ligne);
+    flex-shrink: 0;
+    position: relative;
+  }
+
+  /* État accompli */
+  .journey-step.done .journey-step-marker {
+    background: var(--bleu);
+    border-color: var(--bleu);
+  }
+  .journey-step.done .journey-step-marker svg {
+    width: 12px;
+    height: 12px;
+    color: white;
+  }
+
+  /* État actuel : entouré rouge avec halo + point central blanc */
+  .journey-step.current .journey-step-marker {
+    background: var(--rouge);
+    border-color: var(--rouge);
+    box-shadow: 0 0 0 4px rgba(226, 33, 75, 0.15);
+  }
+  .journey-step.current .journey-step-marker::after {
+    content: '';
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: white;
+  }
+
+  /* État futur */
+  .journey-step.todo .journey-step-marker {
+    background: var(--paper);
+    border-color: var(--gris-ligne);
+  }
+  .journey-step.todo .journey-step-marker::after {
+    content: '';
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--gris-ligne);
+  }
+
+  .journey-step-content {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .journey-step-label {
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--noir);
+    line-height: 1.35;
+  }
+  .journey-step.todo .journey-step-label {
+    color: var(--gris-mute);
+    font-weight: 500;
+  }
+  .journey-step.current .journey-step-label {
+    color: var(--rouge);
+    font-weight: 700;
+  }
+
+  .journey-step-detail {
+    font-size: 11px;
+    color: var(--gris-mute);
+    line-height: 1.4;
+  }
+
+  .journey-step-status {
+    font-size: 9.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: var(--gris-mute);
+    font-weight: 600;
+    text-align: right;
+    align-self: center;
+  }
+  .journey-step.done .journey-step-status {
+    color: var(--bleu);
+  }
+  .journey-step.current .journey-step-status {
+    color: var(--rouge);
+  }
+
+  /* ========== BLOC LOGOS INSTITUTIONNELS ========== */
+  .cover-partners {
+    margin: auto 56px 0;
+    padding: 26px 0 22px;
+    border-top: 1px solid var(--gris-ligne);
+    border-bottom: 1px solid var(--gris-ligne);
+    text-align: center;
+  }
+
+  .cover-partners-logos {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+  }
+
+  .cover-partners-logos svg {
+    width: 100%;
+    height: auto;
+    max-width: none;
+    display: block;
+  }
+
+  /* ========== PIED DE PAGE COVER ========== */
+  .cover-footer {
+    padding: 22px 56px 28px;
+    background: var(--gris-fond);
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 24px;
+    font-size: 11px;
+    color: var(--gris-mute);
+    line-height: 1.6;
+  }
+
+  .cover-footer .right { text-align: right; }
+  .cover-footer strong { color: var(--noir); font-weight: 600; }
+
+  /* ========== RESPONSIVE ========== */
+  @media (max-width: 768px) {
+    body { padding: 0; }
+    .document { box-shadow: none; min-height: 100vh; }
+    .cover-header,
+    .cover-title-block,
+    .cover-recipient,
+    .cover-journey,
+    .cover-partners,
+    .cover-footer { padding-left: 24px; padding-right: 24px; margin-left: 0; margin-right: 0; }
+    .cover-header { flex-direction: column; gap: 16px; align-items: flex-start; }
+    .cover-ref { text-align: left; }
+    .cover-title { font-size: 28px; }
+    .cover-recipient-grid { grid-template-columns: 1fr; gap: 8px; }
+    .cover-footer { flex-direction: column; gap: 14px; }
+    .cover-footer .right { text-align: left; }
+    .cover-partners-logos svg { width: 100%; height: auto; }
+  }
+
+  @media print {
+    body { background: white; padding: 0; }
+    .document { box-shadow: none; max-width: 100%; }
+  }
+
+
+  /* ============== STYLES DEVIS COMPLET (syn+dev+cgv) ============== */
+
+  :root {
+    --rouge: #E2214B;
+    --rouge-dark: #B81A3D;
+    --bleu: #002E5A;
+    --bleu-light: #1A4775;
+    --bleu-pale: #F0F4F9;
+    --gris-fond: #F8F9FB;
+    --gris-ligne: #E1E5EB;
+    --gris-ligne-soft: #EDF0F4;
+    --gris-texte: #4A5567;
+    --gris-mute: #8A92A0;
+    --noir: #1A2233;
+    --vert: #2D7A4F;
+    --paper: #FFFFFF;
+
+    --dpe-A: #319834;
+    --dpe-B: #33A537;
+    --dpe-C: #C9D200;
+    --dpe-D: #FFCC00;
+    --dpe-E: #FF9933;
+    --dpe-F: #FF6600;
+    --dpe-G: #FF0000;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body {
+    background: #E8EBF0;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    color: var(--noir);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-feature-settings: 'tnum' 1, 'cv11' 1;
+  }
+
+  body { padding: 32px 16px; min-height: 100vh; }
+
+  .document {
+    max-width: 820px;
+    margin: 0 auto;
+    background: var(--paper);
+    box-shadow: 0 4px 24px rgba(0, 46, 90, 0.08), 0 1px 3px rgba(0, 46, 90, 0.04);
+  }
+
+  .header {
+    padding: 28px 56px 22px;
+    border-bottom: 2px solid var(--bleu);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .logo-hexa { height: 52px; width: auto; display: block; }
+
+  .doc-type { text-align: right; }
+  .doc-type-label {
+    font-size: 10px; text-transform: uppercase; letter-spacing: 0.2em;
+    color: var(--gris-mute); font-weight: 600; margin-bottom: 4px;
+  }
+  .doc-type-value {
+    font-size: 26px; font-weight: 700; color: var(--bleu);
+    letter-spacing: -0.02em; line-height: 1;
+  }
+  .doc-type-num {
+    font-size: 12px; color: var(--noir); margin-top: 8px;
+    font-weight: 600; font-variant-numeric: tabular-nums;
+  }
+  .doc-type-num-label { color: var(--gris-mute); font-weight: 500; }
+
+  .infos {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 40px;
+    padding: 22px 56px 22px;
+    background: var(--gris-fond);
+    border-bottom: 1px solid var(--gris-ligne);
+  }
+
+  .infos-col { display: flex; flex-direction: column; gap: 4px; }
+
+  .infos-col-title {
+    font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.2em;
+    color: var(--rouge); font-weight: 700;
+    margin-bottom: 10px; padding-bottom: 8px;
+    border-bottom: 1px solid var(--gris-ligne);
+  }
+
+  .infos-row {
+    display: flex; gap: 12px; font-size: 12.5px; line-height: 1.45;
+    align-items: baseline; padding: 2px 0;
+  }
+  .infos-label { color: var(--gris-mute); font-weight: 500; min-width: 145px; flex-shrink: 0; }
+  .infos-value { color: var(--noir); font-weight: 600; flex: 1; }
+
+  .hero {
+    padding: 36px 56px 36px;
+    background: var(--paper);
+    border-bottom: 1px solid var(--gris-ligne);
+  }
+
+  .hero-header { margin-bottom: 28px; }
+
+  .hero-eyebrow {
+    font-size: 10px; text-transform: uppercase; letter-spacing: 0.22em;
+    color: var(--rouge); font-weight: 700; margin-bottom: 14px;
+  }
+
+  .hero-title {
+    font-size: 32px; font-weight: 700; color: var(--bleu);
+    letter-spacing: -0.025em; line-height: 1.05; margin-bottom: 24px;
+  }
+
+  /* ===== BLOC PERFORMANCE — alignement par le haut, DPE centré ===== */
+  .perf-block {
+    display: grid;
+    grid-template-columns: 1fr 1px 1fr 1px 1fr;
+    gap: 24px;
+    align-items: stretch;
+    padding: 22px 24px;
+    background: var(--gris-fond);
+    border-left: 3px solid var(--rouge);
+  }
+
+  .perf-divider {
+    width: 1px;
+    background: var(--gris-ligne);
+    align-self: stretch;
+    margin: 4px 0;
+  }
+
+  /* Sections perf : grid 2 lignes — label en haut (aligné entre sections) / contenu centré dans l'espace restant */
+  .perf-section {
+    display: grid;
+    grid-template-rows: auto 1fr;
+    align-items: stretch;
+    justify-items: center;
+    text-align: center;
+    gap: 14px;
+  }
+  .perf-section-dpe { /* hérite du même comportement */ }
+
+  /* Tous les enfants directs (sauf le label) sont centrés dans l'espace restant */
+  .perf-section > .perf-stat-content,
+  .perf-section > .dpe-arrow {
+    align-self: start;
+    justify-self: center;
+  }
+
+  .perf-label {
+    font-size: 9.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    color: var(--gris-mute);
+    font-weight: 600;
+    line-height: 1.4;
+    text-align: center;
+    width: 100%;
+    /* Aligné en haut de sa cellule grid pour synchroniser les 3 sections */
+    align-self: start;
+    /* Hauteur uniforme pour que le contenu en dessous démarre au même niveau */
+    min-height: 32px;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+  }
+
+  .perf-section-dpe .perf-label {
+    text-align: center;
+    width: 100%;
+    justify-content: center;
+  }
+
+  .dpe-arrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .dpe-block {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .dpe-block-caption {
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--gris-mute);
+    font-weight: 600;
+  }
+
+  .dpe-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    border-radius: 6px;
+    color: white;
+    font-weight: 800;
+    font-size: 22px;
+    letter-spacing: -0.02em;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.12);
+  }
+
+  .dpe-badge-from { background: var(--dpe-G); }
+  .dpe-badge-to { background: var(--dpe-B); }
+
+  .dpe-arrow-icon {
+    color: var(--gris-mute);
+    margin-top: 17px;
+    margin-bottom: 0;
+  }
+
+  .perf-stat-content {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    align-items: center;
+    text-align: center;
+    justify-content: flex-start;
+  }
+
+  .perf-stat-value {
+    font-size: 32px;
+    font-weight: 800;
+    color: var(--rouge);
+    letter-spacing: -0.03em;
+    line-height: 1;
+  }
+
+  .perf-stat-detail {
+    font-size: 10.5px;
+    color: var(--gris-texte);
+    line-height: 1.4;
+  }
+
+  .perf-stat-disclaimer {
+    font-size: 9.5px;
+    color: var(--gris-mute);
+    font-style: italic;
+    margin-top: 4px;
+  }
+
+  .perf-stat-detail-yearly {
+    font-size: 10px;
+    color: var(--gris-mute);
+    line-height: 1.4;
+    font-weight: 500;
+  }
+
+  .hero-grid {
+    display: grid;
+    grid-template-columns: 1.2fr 1fr;
+    gap: 32px;
+    align-items: stretch;
+    margin-top: 28px;
+  }
+
+  .breakdown { display: flex; flex-direction: column; gap: 0; }
+
+  .breakdown-eyebrow {
+    font-size: 9.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    color: var(--gris-mute);
+    font-weight: 700;
+    margin-bottom: 10px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--gris-ligne);
+  }
+
+  .benefits {
+    margin-top: 18px;
+    padding-top: 16px;
+    border-top: 1px solid var(--gris-ligne-soft);
+  }
+  .benefits-title {
+    font-size: 11px;
+    color: var(--bleu);
+    font-weight: 700;
+    margin-bottom: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+  .benefits-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .benefits-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    font-size: 11px;
+    color: var(--gris-texte);
+    line-height: 1.4;
+  }
+  .benefits-item svg {
+    width: 14px;
+    height: 14px;
+    color: var(--rouge);
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+
+  .breakdown-line {
+    display: flex; justify-content: space-between; align-items: baseline;
+    padding: 11px 0; border-bottom: 1px solid var(--gris-ligne-soft);
+    font-size: 13px;
+  }
+
+  .breakdown-line:last-child { border-bottom: none; }
+
+  .breakdown-line.total {
+    border-top: 1px solid var(--gris-ligne);
+    border-bottom: 1px solid var(--gris-ligne);
+    padding: 14px 0; margin-top: 4px; margin-bottom: 12px;
+    font-weight: 600;
+  }
+
+  .breakdown-line.aide { color: var(--vert); }
+  .breakdown-line .label { color: var(--gris-texte); }
+  .breakdown-line .amount {
+    font-weight: 600; font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+  }
+  .breakdown-line.total .label,
+  .breakdown-line.total .amount {
+    color: var(--noir); font-weight: 700; font-size: 14px;
+  }
+
+  .remise-note {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 12px; background: var(--bleu-pale);
+    border-left: 2px solid var(--bleu);
+    font-size: 11px; color: var(--bleu); margin-top: 8px;
+  }
+  .remise-note-icon { width: 14px; height: 14px; flex-shrink: 0; }
+  .remise-note strong { font-weight: 700; }
+
+  .rac-block {
+    background: var(--bleu); color: white;
+    padding: 32px 28px;
+    display: grid;
+    grid-template-rows: 1fr auto 1fr;
+    align-items: center;
+    position: relative; overflow: hidden;
+    text-align: left;
+    gap: 18px;
+  }
+
+  /* Sous-blocs (aides + RAC) : alignés à GAUCHE et centrés verticalement */
+  .rac-financement-pct,
+  .rac-restant-zone {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    text-align: left;
+    width: 100%;
+  }
+
+  .rac-block::before {
+    content: ''; position: absolute; top: 0; right: 0;
+    width: 4px; height: 100%; background: var(--rouge);
+  }
+
+  .rac-financement-label {
+    font-size: 11px; text-transform: uppercase; letter-spacing: 0.18em;
+    color: rgba(255,255,255,0.7); font-weight: 600; margin-bottom: 8px;
+    text-align: left;
+  }
+  .rac-financement-value {
+    font-size: 38px; font-weight: 800; letter-spacing: -0.025em; line-height: 1;
+    text-align: left;
+  }
+  .rac-financement-detail {
+    font-size: 12px; color: rgba(255,255,255,0.78);
+    margin-top: 8px; line-height: 1.45;
+    text-align: left;
+  }
+  .rac-divider { height: 1px; background: rgba(255,255,255,0.22); width: 60%; justify-self: start; margin: 0; }
+
+  .rac-restant-label {
+    font-size: 11px; text-transform: uppercase; letter-spacing: 0.18em;
+    color: rgba(255,255,255,0.7); font-weight: 600; margin-bottom: 10px;
+    text-align: left;
+  }
+  .rac-restant-amount {
+    font-size: 44px; font-weight: 800; letter-spacing: -0.03em; line-height: 1;
+    text-align: left;
+    white-space: nowrap;
+  }
+  .rac-restant-detail {
+    font-size: 11.5px; color: rgba(255,255,255,0.78);
+    margin-top: 10px; line-height: 1.5;
+    text-align: left;
+  }
+
+  .lots { padding: 36px 56px 24px; }
+
+  .section-title {
+    font-size: 11px; text-transform: uppercase; letter-spacing: 0.22em;
+    color: var(--rouge); font-weight: 700; margin-bottom: 18px;
+    display: flex; align-items: center; gap: 12px;
+  }
+  .section-title::after {
+    content: ''; flex: 1; height: 1px; background: var(--gris-ligne);
+  }
+
+  .lots-table { width: 100%; border-collapse: separate; border-spacing: 0; }
+
+  .lots-table thead th {
+    font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em;
+    color: var(--gris-mute); font-weight: 600;
+    text-align: left; padding: 8px 0 12px;
+    border-bottom: 2px solid var(--bleu);
+    position: sticky; top: 0; z-index: 12; background: var(--paper, #fff);
+  }
+  .lots-table thead th.right { text-align: right; }
+
+  /* Family row : bandeau bleu marine avec bord rouge à gauche (cohérent avec devis) */
+  .lots-table tbody .family-row td {
+    padding: 0; border: none;
+    position: sticky; top: 34px; z-index: 11; background: var(--paper, #fff);
+  }
+  .lots-table tbody .family-row .family-band {
+    background: var(--bleu);
+    color: white;
+    padding: 12px 18px;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    font-weight: 700;
+    border-left: 4px solid var(--rouge);
+    margin-top: 12px;
+    margin-bottom: 4px;
+  }
+  .lots-table tbody .family-row.first .family-band {
+    margin-top: 4px;
+  }
+
+  /* Lot name : languette rouge (comme devis) */
+  .lots-table tbody .lot-name td {
+    padding: 16px 0 8px;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--bleu);
+    letter-spacing: -0.005em;
+  }
+  .lots-table tbody .lot-name td::before {
+    content: '';
+    display: inline-block;
+    width: 3px;
+    height: 14px;
+    background: var(--rouge);
+    vertical-align: middle;
+    margin-right: 10px;
+    transform: translateY(-1px);
+  }
+
+  
+
+  .lots-table tbody .lot-line td {
+    padding: 6px 0; font-size: 13.5px; color: var(--gris-texte);
+    font-variant-numeric: tabular-nums;
+  }
+  .lots-table tbody .lot-line td.designation {
+    padding-left: 16px; color: var(--gris-mute);
+  }
+  .lots-table tbody .lot-line td.right {
+    text-align: right; font-weight: 500;
+  }
+
+  .lots-table tbody .lot-subtotal td {
+    padding: 10px 0 14px; font-size: 14px; font-weight: 600;
+    color: var(--noir); border-bottom: 1px dashed var(--gris-ligne);
+    font-variant-numeric: tabular-nums;
+  }
+  .lots-table tbody .lot-subtotal td.right { text-align: right; }
+  .lots-table tbody .lot-subtotal td.label-st {
+    padding-left: 0; color: var(--gris-texte); font-weight: 500;
+    text-transform: uppercase; font-size: 10px; letter-spacing: 0.1em;
+  }
+
+  /* Override : annule les effets de la règle générique .lot-subtotal (du devis)
+     qui utilise display:flex et padding pour des <div>, et casserait les <tr> du tableau */
+  .lots-table tbody tr.lot-subtotal {
+    display: table-row;
+    padding: 0;
+    background: transparent;
+    border-top: none;
+  }
+  .lots-table tbody tr.lot-subtotal td {
+    background: transparent;
+  }
+
+  .total-block {
+    margin-top: 32px; padding: 22px 56px 26px;
+    background: var(--gris-fond);
+    border-top: 2px solid var(--bleu);
+    border-bottom: 2px solid var(--bleu);
+    margin-left: -56px; margin-right: -56px;
+  }
+
+  .total-grid {
+    display: grid; grid-template-columns: auto auto;
+    gap: 6px 24px; justify-content: end; align-items: baseline;
+  }
+
+  .total-grid .label {
+    text-align: right; font-size: 11.5px;
+    color: var(--gris-texte); font-weight: 500;
+  }
+  .total-grid .label.bold {
+    font-weight: 700; color: var(--bleu); font-size: 13px;
+    text-transform: uppercase; letter-spacing: 0.05em; padding-top: 8px;
+  }
+  .total-grid .amount {
+    text-align: right; font-size: 13px; font-weight: 600;
+    color: var(--noir); font-variant-numeric: tabular-nums;
+    min-width: 130px; letter-spacing: -0.01em;
+  }
+  .total-grid .amount.bold {
+    font-size: 18px; color: var(--bleu); font-weight: 700; padding-top: 8px;
+  }
+
+  /* === Bloc total : 2 colonnes (visuel + chiffres) === */
+  .total-block-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 40px;
+    align-items: center;
+  }
+
+  .financing-viz {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .financing-viz-title {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    color: var(--gris-mute);
+    font-weight: 700;
+  }
+
+  .financing-bar {
+    display: flex;
+    height: 14px;
+    border-radius: 3px;
+    overflow: hidden;
+    box-shadow: inset 0 0 0 1px rgba(0, 46, 90, 0.06);
+  }
+
+  .financing-bar-anah {
+    background: linear-gradient(90deg, #1A4775 0%, #002E5A 100%);
+    transition: width 0.8s ease;
+  }
+
+  .financing-bar-rac {
+    background: var(--rouge);
+    transition: width 0.8s ease;
+  }
+
+  .financing-legend {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .financing-legend-item {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 10px;
+    align-items: start; /* alignés en haut : le % est sur la ligne du label */
+    font-size: 11.5px;
+    opacity: 0;
+    transform: translateX(-8px);
+    transition: opacity 0.5s ease, transform 0.5s ease;
+  }
+
+  .financing-legend-item.show {
+    opacity: 1;
+    transform: translateX(0);
+  }
+
+  .financing-legend-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    margin-top: 4px; /* aligne le dot avec la ligne du label */
+  }
+
+  .dot-anah { background: var(--bleu); }
+  .dot-rac { background: var(--rouge); }
+
+  .financing-legend-text {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
+
+  .financing-legend-label {
+    color: var(--gris-texte);
+    font-weight: 500;
+    font-size: 11.5px;
+    line-height: 1.3;
+  }
+
+  .financing-legend-amount {
+    color: var(--gris-mute);
+    font-weight: 500;
+    font-size: 10.5px;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.005em;
+  }
+
+  .financing-legend-pct {
+    color: var(--noir);
+    font-weight: 700;
+    font-size: 12.5px;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+    line-height: 1.3; /* aligné sur le label */
+  }
+
+  /* === Histogramme financement : animation séquentielle premium === */
+  /* La barre a un fond gris (placeholder) sur lequel les segments colorés se déploient */
+  .financing-bar {
+    position: relative;
+    background: var(--gris-ligne);
+    overflow: hidden;
+  }
+
+  /* Segments démarrent à width 0, s'étendent de gauche à droite */
+  .financing-bar-anah,
+  .financing-bar-rac {
+    width: 0;
+    height: 100%;
+    transition: width 0.9s cubic-bezier(0.65, 0, 0.35, 1);
+    position: relative;
+  }
+
+  /* Le segment aides publiques démarre en premier */
+  .financing-bar.animate .financing-bar-anah {
+    width: var(--anah-width, 85.3%);
+  }
+
+  /* Le segment RAC démarre APRÈS (delay) */
+  .financing-bar.animate .financing-bar-rac {
+    width: var(--rac-width, 14.7%);
+    transition-delay: 0.7s;
+  }
+
+  /* Effet shimmer / brillance qui traverse la barre une fois après l'animation */
+  .financing-bar::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -50%;
+    width: 50%;
+    height: 100%;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgba(255, 255, 255, 0.5) 50%,
+      transparent 100%
+    );
+    pointer-events: none;
+    opacity: 0;
+  }
+
+  .financing-bar.animate::after {
+    animation: barShimmer 0.9s ease-out 1.6s 1 forwards;
+  }
+
+  @keyframes barShimmer {
+    0% {
+      left: -50%;
+      opacity: 0;
+    }
+    20% {
+      opacity: 1;
+    }
+    80% {
+      opacity: 1;
+    }
+    100% {
+      left: 110%;
+      opacity: 0;
+    }
+  }
+
+  /* Petit pulse subtil sur les % une fois la barre finie */
+  @keyframes pctPulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.08); }
+    100% { transform: scale(1); }
+  }
+  .financing-legend-pct.pulse {
+    display: inline-block;
+    animation: pctPulse 0.5s ease;
+  }
+
+  .financement { padding: 36px 56px 32px; }
+
+  .financement-grid {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 16px; margin-top: 18px;
+  }
+
+  .financement-card {
+    border: 1px solid var(--gris-ligne);
+    padding: 22px 24px;
+    background: var(--paper);
+    position: relative;
+    transition: all 0.2s ease;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .financement-card .option-num {
+    position: absolute; top: -1px; left: -1px;
+    background: var(--bleu); color: white;
+    font-size: 10px; font-weight: 700; letter-spacing: 0.1em;
+    padding: 4px 10px; text-transform: uppercase;
+  }
+  .financement-card.featured .option-num { background: var(--rouge); }
+
+  /* Picto en haut à droite */
+  .card-picto {
+    position: absolute;
+    top: 18px;
+    right: 22px;
+    width: 36px;
+    height: 36px;
+    color: var(--bleu);
+    opacity: 0.85;
+  }
+  .financement-card.featured .card-picto {
+    color: var(--rouge);
+  }
+  /* Le titre doit avoir un peu de marge à droite pour ne pas chevaucher le picto */
+  .financement-card-title {
+    padding-right: 50px;
+  }
+
+  /* Titre - hauteur fixe pour alignement */
+  .financement-card-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--bleu);
+    letter-spacing: -0.01em;
+    margin-top: 14px;
+    min-height: 42px;
+  }
+
+  /* Description - hauteur fixe pour alignement */
+  .financement-card-desc {
+    font-size: 12px;
+    color: var(--gris-texte);
+    line-height: 1.55;
+    margin-top: 8px;
+    min-height: 64px;
+  }
+
+  .financement-card-desc strong {
+    font-weight: 700;
+    color: var(--bleu);
+  }
+
+  /* Ligne mensualité - alignée par le haut */
+  .financement-monthly {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    padding-top: 14px;
+    margin-top: 18px;
+    border-top: 1px solid var(--gris-ligne-soft);
+  }
+
+  .financement-monthly-amount {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--noir);
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .financement-monthly-unit {
+    font-size: 11px;
+    color: var(--gris-mute);
+    font-weight: 500;
+  }
+
+  /* Détail bas */
+  .financement-monthly-detail {
+    font-size: 10.5px;
+    color: var(--gris-mute);
+    margin-top: 8px;
+    line-height: 1.45;
+  }
+
+  .certifications {
+    padding: 28px 56px;
+    border-top: 1px solid var(--gris-ligne);
+    background: var(--paper);
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 32px;
+  }
+
+  .certif-text {
+    font-size: 11px; color: var(--gris-texte);
+    line-height: 1.5; flex: 1;
+  }
+  .certif-text strong { color: var(--bleu); font-weight: 700; }
+
+  .logo-certirenov {
+    width: 110px; height: auto; display: block; flex-shrink: 0;
+  }
+
+  .footer {
+    padding: 16px 56px 20px;
+    border-top: 1px solid var(--gris-ligne);
+    background: var(--gris-fond);
+  }
+
+  .footer-mention {
+    font-size: 11px; color: var(--gris-mute); line-height: 1.65;
+    margin-bottom: 14px; padding-bottom: 14px;
+    border-bottom: 1px solid var(--gris-ligne);
+  }
+  .footer-mention strong { color: var(--bleu); font-weight: 600; }
+  .certif-mention {
+    padding: 18px 56px 16px;
+    background: var(--gris-fond);
+    border-top: 1px solid var(--gris-ligne);
+    font-size: 11px; color: var(--gris-mute); line-height: 1.65;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+  .certif-mention strong { color: var(--bleu); font-weight: 600; }
+
+
+  .footer-info {
+    display: flex; justify-content: space-between; align-items: flex-start;
+    gap: 24px; font-size: 11px; color: var(--gris-mute); line-height: 1.6;
+  }
+  /* Footer synthèse fusionné : RGE + raison sociale en un seul bloc en bas de page */
+  .footer-with-cert {
+    margin-top: auto;
+  }
+  .footer-with-cert .certifications {
+    background: var(--gris-fond);
+    padding: 22px 0 18px;
+    margin: 0;
+    border-top: none;
+    border-bottom: 1px solid var(--gris-ligne);
+    margin-bottom: 14px;
+  }
+  .footer-with-cert .certifications .certif-text {
+    font-size: 11.5px;
+  }
+  .footer-with-cert .certifications .logo-certirenov {
+    width: 95px;
+  }
+
+  .footer-info .right { text-align: right; }
+  .footer-info strong { color: var(--noir); font-weight: 600; }
+  /* Spacer flexible : pousse le footer-with-cert en bas de la page synthèse */
+  .footer-spacer {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+  @media print {
+    .footer-spacer { min-height: 100px; }
+  }
+
+  
+  /* Synthèse : Estimation Prime reste solidaire du bloc suivant */
+  .certif-mention { break-after: avoid; page-break-after: avoid; break-inside: avoid; page-break-inside: avoid; }
+
+  /* Devis : éviter que le bloc final (Estimation Prime + footer) saute sur une page vide */
+  .certif-mention-devis {
+    page-break-before: avoid;
+    break-before: avoid;
+  }
+
+  /* Footer du devis : éviter qu'il soit isolé sur une page */
+  .footer-devis {
+    page-break-inside: avoid;
+    break-inside: avoid;
+    page-break-before: avoid;
+    break-before: avoid;
+  }
+
+  /* ==================================================================
+     AJUSTEMENTS PDF (v4 — aides publiques-LIGHT 06/06/2026)
+     1. Hero aéré + descendu en page 2
+     2. Bloc CertiRénov RGE collé au-dessus du footer (sans élargissement)
+     3. Conditions paiement / Acceptation : peut se séparer pour remonter
+     4. Bloc CNIL 12.4 non coupé
+     ================================================================== */
+  @media print {
+    /* (1) Hero (Votre projet en un coup d'œil) : rester sur la page des infos, aéré */
+    .document .hero {
+      break-before: avoid !important;
+      page-break-before: avoid !important;
+    }
+    /* Header compacté */
+    .document > header.header { padding-top: 20px !important; padding-bottom: 16px !important; }
+    /* Bloc infos : aération modérée pour tenir avec hero sur même page */
+    .document .infos { padding-top: 10px !important; padding-bottom: 12px !important; gap: 28px !important; }
+    .document .infos-row { padding: 1px 0 !important; font-size: 10.5px !important; line-height: 1.3 !important; }
+    .document .infos-col-title { margin-bottom: 7px !important; padding-bottom: 5px !important; font-size: 10.5px !important; }
+    /* Bloc hero : aération équilibrée */
+    .document .hero { padding-top: 12px !important; padding-bottom: 10px !important; }
+    .document .hero-header { margin-bottom: 10px !important; }
+    .document .hero-title { margin-bottom: 8px !important; font-size: 21px !important; }
+    .document .hero-eyebrow { margin-bottom: 6px !important; }
+    .document .perf-block { padding: 12px 16px !important; gap: 12px !important; }
+    .document .perf-stat-value { font-size: 22px !important; }
+    .document .hero-grid { margin-top: 12px !important; gap: 16px !important; }
+    .document .breakdown-line { padding: 6px 0 !important; font-size: 11.5px !important; }
+
+    /* (2) v5 : bloc CertiRénov RGE masqué en print → supprime la page 4 du PDF
+       (le HTML reste visible dans le browser, seul le PDF est concerné) */
+    .footer-with-cert {
+      display: none !important;
+    }
+
+    /* (3) Conditions de paiement : permettre la séparation d'Acceptation */
+    .payment-terms {
+      break-after: auto !important;
+      page-break-after: auto !important;
+    }
+    .signature {
+      break-before: auto !important;
+      page-break-before: auto !important;
+    }
+    /* Compactage du recap pour libérer de la place page 13 */
+    .recap { padding-top: 24px !important; padding-bottom: 20px !important; }
+    /* Compactage payment-terms pour faciliter remontée page 13 */
+    .payment-terms { padding-top: 20px !important; padding-bottom: 20px !important; }
+    .payment-card { padding: 14px 16px !important; }
+
+    /* (4) Bloc CNIL 12.4 : titre + paragraphe + tableau DPO non coupés (wrapper dédié) */
+    .cgv-section-12-4 {
+      break-inside: avoid !important;
+      page-break-inside: avoid !important;
+    }
+    .cgv-info-box {
+      break-inside: avoid !important;
+      page-break-inside: avoid !important;
+      break-before: avoid !important;
+      page-break-before: avoid !important;
+    }
+    /* Garder paragraphe 12.4 collé à son tableau */
+    .cgv-subtitle { break-after: avoid !important; page-break-after: avoid !important; }
+  }
+
+
+  @media (max-width: 768px) {
+    body { padding: 0; }
+    .document { box-shadow: none; }
+    .header, .infos, .hero, .lots, .financement, .certifications, .footer { padding-left: 24px; padding-right: 24px; }
+    .total-block { margin-left: -24px; margin-right: -24px; padding-left: 24px; padding-right: 24px; }
+    .total-block-grid { grid-template-columns: 1fr; gap: 24px; }
+    .financing-viz { padding-bottom: 16px; border-bottom: 1px solid var(--gris-ligne); }
+    .header { flex-direction: column; gap: 20px; align-items: flex-start; }
+    .doc-type { text-align: left; }
+    .logo-hexa { height: 44px; }
+    .infos { grid-template-columns: 1fr; gap: 24px; }
+    .infos-row { font-size: 10.5px; }
+    .hero-title { font-size: 24px; }
+    .perf-block { grid-template-columns: 1fr; gap: 16px; padding: 16px; }
+    .perf-divider { display: none; }
+    .perf-stat-value { font-size: 28px; }
+    .hero-grid { grid-template-columns: 1fr; gap: 20px; }
+    .dpe-badge { width: 36px; height: 36px; font-size: 18px; }
+    .rac-restant-amount { font-size: 32px; }
+    .rac-financement-value { font-size: 24px; }
+    .financement-grid { grid-template-columns: 1fr; }
+    .certifications { flex-direction: column; align-items: flex-start; gap: 16px; }
+    .lots-table thead { display: table-header-group; }
+    .lots-table thead th { font-size: 8px; padding: 6px 0 8px; top: 0; }
+    .lots-table .family-row td { top: 28px; }
+    .lots-table .family-row .family-band { margin-top: 0; font-size: 9px; padding: 9px 12px; }
+    .lots-table tbody .lot-line td { font-size: 11.5px; }
+    .lots-table tbody .lot-subtotal td { font-size: 11px; white-space: nowrap; }
+  }
+
+
+
+  /* ============== ANIMATIONS APPARITION + COMPTEURS ============== */
+  .reveal {
+    opacity: 0;
+    transform: translateY(16px);
+    transition: opacity 0.7s ease, transform 0.7s ease;
+  }
+  .reveal.show {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  /* Pulse animation pour les chiffres clés au moment du compteur */
+  @keyframes counterPulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.04); }
+    100% { transform: scale(1); }
+  }
+  .counter-active {
+    animation: counterPulse 0.4s ease;
+  }
+
+  @media (max-width: 768px) {
+    .esign-section { padding: 28px 24px; }
+    .esign-card { padding: 22px 20px; }
+    .esign-thanks-title { font-size: 20px; }
+  }
+
+  @media print {
+    body { background: white; padding: 0; }
+    .document { box-shadow: none; max-width: 100%; }
+    .esign-section { display: none; }
+    .reveal { opacity: 1 !important; transform: none !important; }
+    /* Forcer l'état final des éléments animés pour un export PDF/impression fidèle */
+    .financing-bar-anah { width: var(--anah-width, 85.3%) !important; transition: none !important; }
+    .financing-bar-rac  { width: var(--rac-width, 14.7%) !important; transition: none !important; transition-delay: 0s !important; }
+    .financing-bar::after { display: none !important; }
+    .financing-legend-item { opacity: 1 !important; transform: none !important; }
+    .counter-active { animation: none !important; }
+    /* Éviter les coupures disgracieuses en milieu de bloc */
+    .payment-card, .financement-card, .family-header,
+    .recap-block, .signature-box { break-inside: avoid; page-break-inside: avoid; }
+    /* Lots et sous-lignes sécables pour remplir les pages au maximum */
+    .lot { break-inside: auto; page-break-inside: auto; }
+    .lot-header { break-after: avoid; page-break-after: avoid; break-inside: avoid; }
+    .sub-line { break-inside: auto; page-break-inside: auto; }
+    /* Le titre de sous-ligne (montant) reste collé au début de ses specs */
+    .sub-line-header { break-inside: avoid; page-break-inside: avoid; break-after: avoid; page-break-after: avoid; }
+    /* Le bloc specs peut se couper, mais pas au milieu d'une ligne */
+    .specs { break-inside: auto; page-break-inside: auto; orphans: 2; widows: 2; }
+    .specs-row { break-inside: avoid; page-break-inside: avoid; }
+    .specs-block { break-inside: auto; page-break-inside: auto; }
+    .specs-block-title { break-after: avoid; page-break-after: avoid; }
+    .specs-list { break-inside: auto; page-break-inside: auto; }
+    .specs-list li { break-inside: avoid; page-break-inside: avoid; }
+    /* Le sous-traitant (bloc court) reste insécable */
+    .subcontractor { break-inside: avoid; page-break-inside: avoid; }
+    /* Le sous-total ne doit jamais être seul en haut d'une page : il colle à ce qui précède */
+    .lot-subtotal { break-inside: avoid; page-break-inside: avoid; break-before: avoid; page-break-before: avoid; }
+    .family-header, .section-title { break-after: avoid; page-break-after: avoid; }
+
+    /* Footers société gérés en overlay PDF : on masque uniquement les strips footer-info + spacer.
+       Le bloc certifications RGE reste en flux (visible en PDF comme en HTML). */
+    .footer-with-cert .footer-info, .footer-devis .footer-info { display: none !important; }
+    .footer.footer-devis { display: none !important; }
+    footer.footer:not(.cover-footer):not(.footer-with-cert) { display: none !important; }
+    .footer-spacer { display: none !important; }
+    /* v6 : retirer fond gris des footers résiduels en print (zone vide en dernière page) */
+    .footer { background: transparent !important; border-top: none !important; }
+    /* v5 : footer-with-cert masqué en print (page CertiRénov supprimée du PDF) */
+    .footer-with-cert { display: none !important; }
+    .footer-with-cert .certifications { display: flex !important; }
+
+    /* En-tête de colonnes du devis : reste collé au 1er lot, pas de page vide en dessous */
+    .lots-table-header { break-after: avoid; page-break-after: avoid; break-inside: avoid; }
+    .lots-detail .section-title { break-after: avoid; page-break-after: avoid; }
+    .lots-detail .family:first-of-type { break-before: avoid; page-break-before: avoid; }
+    .family { break-before: auto; }
+    .family-header { break-before: auto; }
+
+    /* Solutions de financement : titre solidaire des cartes */
+    .financing-options .section-title { break-after: avoid; page-break-after: avoid; }
+    .financing-options { break-inside: avoid; page-break-inside: avoid; }
+    /* Récapitulatif général : reste d'un seul tenant (reste à payer + remises sur la même page) */
+    .recap { break-inside: avoid; page-break-inside: avoid; }
+    /* Page 12 : Conditions de paiement démarre une nouvelle page,
+       puis Acceptation du devis et Solutions de financement enchaînent solidairement */
+    .payment-terms { break-before: auto; page-break-before: auto; break-after: avoid; page-break-after: avoid; break-inside: avoid; page-break-inside: avoid; }
+    .signature { break-before: avoid; page-break-before: avoid; }
+    /* Acceptation + Solutions de financement restent solidaires sur une même page */
+    .signature { break-inside: avoid; page-break-inside: avoid; break-after: avoid; page-break-after: avoid; }
+    /* La mention aides publiques peut suivre sur la page suivante */
+    .anah-mention { break-before: auto; page-break-before: auto; }
+    /* Le bloc encadré aides publiques reste d'un seul tenant (évite la phrase coupée p12/p13) */
+    .anah-mention-block { break-inside: avoid; page-break-inside: avoid; }
+
+    /* ===== SYNTHÈSE : page 2 = infos + vue globale, page 3 = détail par poste ===== */
+    /* Le détail par poste démarre toujours sur une nouvelle page */
+    .document .lots { break-before: page; page-break-before: always; }
+    /* Le bloc "Répartition du financement" + chiffres reste d'un seul tenant (bas p3 ou haut p4) */
+    .total-block { break-inside: avoid; page-break-inside: avoid; }
+    .total-block-grid { break-inside: avoid; page-break-inside: avoid; }
+    /* Tableau récap compacté en impression pour tenir sur une seule page */
+    .lots-table tbody .lot-line td { padding: 3.5px 0; font-size: 12.5px; }
+    .lots-table tbody .lot-subtotal td { padding: 6px 0 8px; font-size: 13px; }
+    .lots-table tbody .family-row .family-band { padding: 7px 14px; }
+    .lots-table tbody .lot-name td { padding-top: 9px; padding-bottom: 5px; }
+    /* Vue globale : infos + hero réunis sur une page A4, aérés (espace libre redistribué) */
+    .document .infos { padding-top: 10px; padding-bottom: 10px; gap: 28px; }
+    .document .infos-row { padding: 1px 0; font-size: 11px; line-height: 1.32; }
+    .document .infos-col-title { margin-bottom: 8px; padding-bottom: 6px; font-size: 10.5px; }
+    .document .hero { padding-top: 9px; padding-bottom: 8px; }
+    .document .hero-header { margin-bottom: 10px; }
+    .document .hero-title { margin-bottom: 9px; font-size: 22px; }
+    .document .hero-eyebrow { margin-bottom: 6px; }
+    .document .perf-block { padding: 11px 16px; gap: 12px; }
+    .document .perf-stat-value { font-size: 23px; }
+    .document .hero-grid { margin-top: 10px; gap: 18px; }
+    /* Récap financier et RAC : aération modérée */
+    .document .breakdown-line { padding: 6px 0; font-size: 12px; }
+    .document .breakdown-eyebrow { margin-bottom: 9px; }
+    .document .rac-block { padding: 15px 17px; }
+    .document.document-synthese, .document:has(.hero) { min-height: 0 !important; }
+    /* Le hero reste entier (jamais coupé) */
+    .document .hero { break-inside: avoid; page-break-inside: avoid; }
+  }
+
+
+  /* ============== STYLES DEVIS (issus de devis V7) ============== */
+
+  :root {
+    --rouge: #E2214B;
+    --rouge-dark: #B81A3D;
+    --bleu: #002E5A;
+    --bleu-light: #1A4775;
+    --bleu-pale: #F0F4F9;
+    --gris-fond: #F8F9FB;
+    --gris-fond-2: #F3F5F8;
+    --gris-ligne: #E1E5EB;
+    --gris-ligne-soft: #EDF0F4;
+    --gris-texte: #4A5567;
+    --gris-mute: #8A92A0;
+    --noir: #1A2233;
+    --vert: #2D7A4F;
+    --paper: #FFFFFF;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body {
+    background: #E8EBF0;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    color: var(--noir);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-feature-settings: 'tnum' 1, 'cv11' 1;
+  }
+
+  body { padding: 32px 16px; min-height: 100vh; }
+
+  .document {
+    max-width: 820px;
+    margin: 0 auto;
+    background: var(--paper);
+    box-shadow: 0 4px 24px rgba(0, 46, 90, 0.08), 0 1px 3px rgba(0, 46, 90, 0.04);
+  }
+
+  /* HEADER */
+  .header {
+    padding: 28px 56px 22px;
+    border-bottom: 2px solid var(--bleu);
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .logo-hexa { height: 52px; width: auto; display: block; }
+  .doc-type { text-align: right; }
+  .doc-type-label {
+    font-size: 10px; text-transform: uppercase; letter-spacing: 0.2em;
+    color: var(--gris-mute); font-weight: 600; margin-bottom: 4px;
+  }
+  .doc-type-value {
+    font-size: 26px; font-weight: 700; color: var(--bleu);
+    letter-spacing: -0.02em; line-height: 1;
+  }
+  .doc-type-num {
+    font-size: 12px; color: var(--noir); margin-top: 8px;
+    font-weight: 600; font-variant-numeric: tabular-nums;
+  }
+  .doc-type-num-label { color: var(--gris-mute); font-weight: 500; }
+
+  /* INFOS */
+  .infos {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 40px;
+    padding: 22px 56px 22px;
+    background: var(--gris-fond);
+    border-bottom: 1px solid var(--gris-ligne);
+  }
+  .infos-col { display: flex; flex-direction: column; gap: 4px; }
+  .infos-col-title {
+    font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.2em;
+    color: var(--rouge); font-weight: 700;
+    margin-bottom: 10px; padding-bottom: 8px;
+    border-bottom: 1px solid var(--gris-ligne);
+  }
+  .infos-row {
+    display: flex; gap: 12px; font-size: 12.5px; line-height: 1.45;
+    align-items: baseline; padding: 2px 0;
+  }
+  .infos-label { color: var(--gris-mute); font-weight: 500; min-width: 145px; flex-shrink: 0; }
+  .infos-value { color: var(--noir); font-weight: 600; flex: 1; }
+
+  /* LOTS DÉTAILLÉS */
+  .lots-detail { padding: 36px 56px 32px; }
+
+  .section-title {
+    font-size: 11px; text-transform: uppercase; letter-spacing: 0.22em;
+    color: var(--rouge); font-weight: 700; margin-bottom: 24px;
+    display: flex; align-items: center; gap: 12px;
+  }
+  .section-title::after {
+    content: ''; flex: 1; height: 1px; background: var(--gris-ligne);
+  }
+
+  /* En-tête colonnes (apparaît une fois en haut du tableau lots) */
+  .lots-table-header {
+    display: grid;
+    grid-template-columns: 1fr 70px 100px 70px 110px;
+    gap: 14px;
+    padding: 0 22px 10px;
+    border-bottom: 2px solid var(--bleu);
+    margin-bottom: 4px;
+    position: sticky; top: 0; z-index: 12; background: var(--paper, #fff);
+    font-size: 9.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--gris-mute);
+    font-weight: 600;
+  }
+  .lots-table-header span:not(:first-child) { text-align: right; }
+
+  /* Famille */
+  .family { margin-bottom: 36px; } /* AÉRÉ : était 26px */
+  .family:last-child { margin-bottom: 0; }
+
+  /* Famille header : conservé en bleu marine pour la hiérarchie de plus haut niveau */
+  .family-header {
+    background: var(--bleu); color: white;
+    padding: 13px 22px;
+    position: sticky; top: 36px; z-index: 11;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    border-left: 4px solid var(--rouge);
+    margin-top: 8px;
+  }
+
+  /* Lot */
+  .lot {
+    background: var(--paper);
+    border: 1px solid var(--gris-ligne);
+    border-top: none;
+  }
+  .lot + .lot {
+    margin-top: 20px;
+    border-top: 1px solid var(--gris-ligne);
+  }
+
+  /* Lot header : épuré, fond blanc, juste de la typo */
+  .lot-header {
+    background: var(--paper);
+    padding: 18px 22px 14px;
+    border-bottom: 1px solid var(--gris-ligne-soft);
+  }
+  .lot-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--bleu);
+    letter-spacing: -0.015em;
+    line-height: 1.3;
+  }
+  .lot-title::before {
+    content: '';
+    display: inline-block;
+    width: 3px;
+    height: 14px;
+    background: var(--rouge);
+    vertical-align: middle;
+    margin-right: 10px;
+    transform: translateY(-1px);
+  }
+
+  /* Sous-ligne : padding compact pour économiser de l'espace */
+  .sub-line {
+    padding: 12px 22px 14px;
+    border-bottom: 1px solid var(--gris-ligne-soft);
+  }
+  .sub-line:last-of-type { border-bottom: none; }
+
+  .sub-line-header {
+    display: grid;
+    grid-template-columns: 1fr 70px 100px 70px 110px;
+    gap: 14px;
+    align-items: baseline;
+    padding-bottom: 10px;
+    border-bottom: 1px dashed var(--gris-ligne-soft);
+    margin-bottom: 10px;
+  }
+
+  .sub-line-name {
+    font-weight: 700;
+    color: var(--noir);
+    font-size: 12.5px;
+    /* Force sur une seule ligne */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .sub-line-qt { color: var(--gris-mute); font-size: 10.5px; font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+  .sub-line-pu { color: var(--gris-texte); font-size: 11px; font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+  .sub-line-remise { color: var(--rouge); font-weight: 700; font-size: 10.5px; text-align: right; white-space: nowrap; }
+  .sub-line-remise.empty { color: var(--gris-mute); font-weight: 400; }
+  .sub-line-tva { color: var(--gris-mute); font-size: 10px; text-align: right; white-space: nowrap; }
+  .sub-line-total {
+    font-weight: 700; color: var(--noir); font-size: 12px;
+    font-variant-numeric: tabular-nums; text-align: right;
+    letter-spacing: -0.01em; white-space: nowrap;
+  }
+
+  /* Caractéristiques — fond très très léger, compact */
+  .specs {
+    background: #FAFBFC;
+    padding: 10px 14px;
+    margin-top: 2px;
+    font-size: 9px;
+    line-height: 1.55;
+    color: var(--gris-texte);
+    border-radius: 4px;
+  }
+  .specs-row {
+    display: grid;
+    grid-template-columns: 290px 1fr;
+    gap: 10px;
+    padding: 1px 0;
+    align-items: baseline;
+  }
+  .specs-row .key { color: var(--gris-mute); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .specs-row .val { color: var(--noir); font-weight: 600; }
+  .pac-desc-block { padding: 8px 14px; }
+  .pac-desc-text { font-size: 10.5px; line-height: 1.55; color: var(--gris-texte); white-space: pre-line; }
+  .specs-block { padding: 4px 0; }
+  .specs-block + .specs-block { margin-top: 6px; }
+  .specs-block-title {
+    color: var(--bleu); font-weight: 700;
+    margin-bottom: 4px; font-size: 9.5px;
+    text-transform: uppercase; letter-spacing: 0.1em;
+  }
+  .specs-list { margin: 3px 0 3px 16px; list-style: none; }
+  .specs-list li {
+    color: var(--gris-texte); line-height: 1.45;
+    padding: 0; font-size: 10.5px; position: relative;
+  }
+  .specs-list li::before {
+    content: '—'; position: absolute; left: -16px; color: var(--gris-mute);
+  }
+
+  /* Sous-traitant RGE — uniformisé, compact */
+  .subcontractor {
+    background: var(--bleu-pale);
+    padding: 11px 16px;
+    margin-top: 8px;
+    border-left: 2px solid var(--bleu);
+    font-size: 10.5px;
+  }
+  .subcontractor-title {
+    color: var(--bleu); font-weight: 700;
+    text-transform: uppercase; font-size: 9.5px;
+    letter-spacing: 0.15em; margin-bottom: 10px;
+  }
+  /* Sous-traitant : tout à la ligne, ordre fixe — Entreprise / Adresse / SIRET / RGE / Validité / Assurance */
+  .subcontractor-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .sc-row {
+    display: grid;
+    grid-template-columns: 130px 1fr;
+    gap: 12px;
+    font-size: 10.5px;
+    line-height: 1.45;
+    align-items: baseline;
+  }
+  .sc-row.full {
+    /* obsolète mais conservé pour compatibilité */
+    grid-column: unset;
+  }
+  .sc-row .key {
+    color: var(--gris-mute);
+    font-weight: 500;
+  }
+  .sc-row .val {
+    color: var(--noir);
+    font-weight: 600;
+  }
+
+  /* Bloc équipement (groupe d'éléments dans un même lot, ex: chaque fenêtre) */
+  .equipment-group {
+    border-bottom: 1px solid var(--gris-ligne-soft);
+  }
+  .equipment-group:last-of-type { border-bottom: none; }
+  .equipment-title {
+    background: var(--gris-fond);
+    padding: 10px 22px;
+    font-size: 11.5px;
+    font-weight: 700;
+    color: var(--bleu);
+    letter-spacing: -0.005em;
+    border-top: 1px solid var(--gris-ligne-soft);
+  }
+  .equipment-group:first-of-type .equipment-title {
+    border-top: none;
+  }
+
+  /* Mention légale d'intro : titre fort + texte normal */
+  .legal-intro {
+    padding: 24px 56px 22px;
+    background: var(--paper);
+    border-bottom: 1px solid var(--gris-ligne);
+  }
+  .legal-intro-headline {
+    font-size: 16px;
+    color: var(--bleu);
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    margin-bottom: 8px;
+    line-height: 1.3;
+  }
+  .legal-intro-text {
+    font-size: 11.5px;
+    color: var(--gris-texte);
+    line-height: 1.6;
+    max-width: 680px;
+  }
+
+  .pac-heating-note {
+    margin-top: 14px;
+    padding: 12px 16px;
+    background: var(--bleu-pale);
+    border-left: 3px solid var(--rouge);
+  }
+  .pac-heating-note-label {
+    font-size: 9.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    color: var(--rouge);
+    font-weight: 700;
+    margin-bottom: 5px;
+  }
+  .pac-heating-note-title {
+    font-size: 12.5px;
+    color: var(--bleu);
+    font-weight: 700;
+    line-height: 1.45;
+  }
+  .pac-heating-note-text {
+    font-size: 10.5px;
+    color: var(--gris-texte);
+    line-height: 1.5;
+    margin-top: 3px;
+  }
+
+  /* Sous-total lot : épuré, fond blanc, hiérarchie typographique */
+  .lot-subtotal {
+    background: var(--paper);
+    color: var(--noir);
+    padding: 16px 22px;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    border-top: 2px solid var(--bleu);
+  }
+  .lot-subtotal-label {
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--bleu);
+    line-height: 1.4;
+    padding-right: 16px;
+  }
+  .lot-subtotal-amounts {
+    display: flex;
+    gap: 24px;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+    align-items: baseline;
+  }
+  .lot-subtotal-amounts .label {
+    font-size: 9px;
+    color: var(--gris-mute);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-right: 5px;
+    font-weight: 600;
+  }
+  .lot-subtotal-amounts .ht {
+    color: var(--gris-mute);
+    font-size: 12px;
+    font-weight: 500;
+  }
+  .lot-subtotal-amounts .ttc {
+    color: var(--bleu);
+    font-size: 16px;
+    font-weight: 700;
+  }
+
+  /* RÉCAP */
+  .recap {
+    padding: 36px 56px 32px;
+    border-top: 1px solid var(--gris-ligne);
+    background: var(--paper);
+  }
+  .recap-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 40px;
+  }
+  .recap-block-title {
+    font-size: 10px; text-transform: uppercase; letter-spacing: 0.2em;
+    color: var(--rouge); font-weight: 700; margin-bottom: 16px;
+    padding-bottom: 8px; border-bottom: 1px solid var(--gris-ligne);
+  }
+
+  .recap-line {
+    display: table; width: 100%;
+    padding: 10px 0; border-bottom: 1px solid var(--gris-ligne-soft);
+    font-size: 12px;
+  }
+  .recap-line:last-child { border-bottom: none; }
+  .recap-line .label {
+    color: var(--gris-texte);
+    display: table-cell;
+    text-align: left;
+    vertical-align: top;
+    line-height: 1.35;
+    padding-right: 16px;
+  }
+  .recap-line .label {
+    display: table-cell;
+    text-align: left;
+    vertical-align: top;
+    line-height: 1.35;
+  }
+  .recap-line .label .estim {
+    display: block;
+    font-style: italic;
+    opacity: 0.85;
+    font-size: 10.5px;
+    margin-left: 0;
+    margin-top: 2px;
+  }
+  .recap-line .amount {
+    font-weight: 600; font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em; color: var(--noir);
+    display: table-cell; text-align: right; white-space: nowrap;
+    vertical-align: top; width: 1%;
+  }
+  .recap-line.subtotal {
+    border-top: 1px solid var(--gris-ligne);
+    padding: 13px 0; margin-top: 4px; font-weight: 700;
+  }
+  .recap-line.total {
+    border-top: 2px solid var(--bleu); border-bottom: 2px solid var(--bleu);
+    padding: 14px 0; margin-top: 6px;
+  }
+  .recap-line.total .label, .recap-line.total .amount {
+    color: var(--bleu); font-size: 15px; font-weight: 700;
+  }
+  .recap-line.aide { color: var(--vert); }
+  .recap-line.aide .amount { color: var(--vert); font-weight: 700; }
+
+  .recap-rac {
+    background: var(--bleu); color: white;
+    padding: 20px 24px; margin-top: 18px;
+    display: flex; justify-content: space-between; align-items: baseline;
+    border-left: 4px solid var(--rouge);
+  }
+  .recap-rac-label {
+    text-transform: uppercase; font-size: 11px;
+    letter-spacing: 0.18em; font-weight: 700;
+  }
+  .recap-rac-amount {
+    font-size: 24px; font-weight: 700;
+    letter-spacing: -0.02em; font-variant-numeric: tabular-nums;
+  }
+
+  /* TVA récap */
+  .tva-table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+  .tva-table thead th {
+    font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.1em;
+    color: var(--gris-mute); font-weight: 600;
+    text-align: left; padding: 6px 4px 8px;
+    border-bottom: 1px solid var(--gris-ligne);
+  }
+  .tva-table thead th.right { text-align: right; }
+  .tva-table tbody td {
+    padding: 8px 4px; font-size: 11px;
+    color: var(--gris-texte);
+    border-bottom: 1px solid var(--gris-ligne-soft);
+    font-variant-numeric: tabular-nums;
+  }
+  .tva-table tbody td.right {
+    text-align: right; font-weight: 600; color: var(--noir);
+  }
+  .tva-table tfoot td {
+    padding: 9px 4px; font-size: 11px; font-weight: 700;
+    color: var(--bleu); border-top: 1px solid var(--bleu);
+    font-variant-numeric: tabular-nums;
+  }
+  .tva-table tfoot td.right { text-align: right; }
+
+  /* Mention TVA CGI */
+  .tva-cgi {
+    margin-top: 10px;
+    font-size: 9.5px;
+    color: var(--gris-mute);
+    font-style: italic;
+    line-height: 1.5;
+  }
+
+  /* Remises récap */
+  .remises-recap {
+    margin-top: 16px;
+    padding: 14px 16px;
+    background: var(--bleu-pale);
+    border-left: 2px solid var(--bleu);
+  }
+  .remises-recap-title {
+    font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.15em;
+    color: var(--bleu); font-weight: 700; margin-bottom: 10px;
+  }
+  .remises-recap-line {
+    display: flex; justify-content: space-between;
+    font-size: 10.5px; color: var(--gris-texte);
+    padding: 4px 0; line-height: 1.4;
+  }
+  .remises-recap-line .label { flex: 1; margin-right: 12px; }
+  .remises-recap-line.total {
+    border-top: 1px solid rgba(0,46,90,0.18);
+    margin-top: 6px; padding-top: 8px;
+    font-weight: 700; color: var(--bleu);
+  }
+  .remises-recap-line .amount {
+    font-variant-numeric: tabular-nums; font-weight: 600; flex-shrink: 0;
+  }
+
+  /* SIGNATURE — UN SEUL GROS BLOC */
+  .signature {
+    padding: 36px 56px;
+    border-top: 1px solid var(--gris-ligne);
+    background: var(--gris-fond);
+  }
+  .signature-title {
+    font-size: 11px; text-transform: uppercase; letter-spacing: 0.22em;
+    color: var(--rouge); font-weight: 700; margin-bottom: 16px;
+  }
+  .signature-box {
+    background: var(--paper);
+    border: 1px solid var(--gris-ligne);
+    padding: 24px 28px;
+    min-height: 240px;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+  }
+  .signature-box-label {
+    font-size: 10px; text-transform: uppercase; letter-spacing: 0.18em;
+    color: var(--gris-mute); font-weight: 600;
+    margin-bottom: 10px;
+  }
+  .signature-box-mention {
+    font-size: 11px; color: var(--gris-texte);
+    line-height: 1.55; margin-bottom: 18px; font-style: italic;
+  }
+  .signature-box-mention strong {
+    color: var(--bleu);
+    font-weight: 700;
+    font-style: normal;
+  }
+  .signature-box-zone {
+    flex: 1;
+    border: 1px dashed var(--gris-ligne);
+    border-radius: 4px;
+    margin-bottom: 12px;
+    background: var(--gris-fond-2);
+  }
+  .signature-box-date {
+    font-size: 10.5px;
+    color: var(--gris-mute);
+    font-weight: 500;
+  }
+  .signature-box-date strong {
+    color: var(--gris-texte);
+    margin-right: 8px;
+    font-weight: 600;
+  }
+
+  /* aides publiques MENTION */
+  .anah-mention {
+    padding: 24px 56px;
+    background: var(--paper);
+    border-top: 1px solid var(--gris-ligne);
+  }
+  .anah-mention-block {
+    background: var(--gris-fond);
+    padding: 16px 20px;
+    border-left: 3px solid var(--rouge);
+    font-size: 10.5px;
+    line-height: 1.7;
+    color: var(--gris-texte);
+  }
+  .recap > .anah-mention-block-full {
+    width: 100%;
+    margin-top: 22px;
+  }
+  .anah-mention-block strong {
+    color: var(--bleu); font-weight: 700;
+  }
+
+  /* CERTIFICATIONS */
+  .certifications {
+    padding: 26px 56px;
+    border-top: 1px solid var(--gris-ligne);
+    background: var(--paper);
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 32px;
+  }
+  .certif-text {
+    font-size: 11px; color: var(--gris-texte);
+    line-height: 1.5; flex: 1;
+  }
+  .certif-text strong { color: var(--bleu); font-weight: 700; }
+  .logo-certirenov { width: 110px; height: auto; display: block; flex-shrink: 0; }
+
+  /* FOOTER */
+  .footer {
+    padding: 16px 56px 20px;
+    border-top: 1px solid var(--gris-ligne);
+    background: var(--gris-fond);
+  }
+  .footer-info {
+    display: flex; justify-content: space-between; align-items: flex-start;
+    gap: 24px; font-size: 11px; color: var(--gris-mute); line-height: 1.6;
+  }
+  .footer-info .right { text-align: right; }
+  .footer-info strong { color: var(--noir); font-weight: 600; }
+
+  /* RESPONSIVE */
+  @media (max-width: 768px) {
+    body { padding: 0; }
+    .document { box-shadow: none; }
+    .header, .infos, .lots-detail, .recap, .signature,
+    .anah-mention, .certifications, .footer {
+      padding-left: 24px; padding-right: 24px;
+    }
+    .header { flex-direction: column; gap: 20px; align-items: flex-start; }
+    .doc-type { text-align: left; }
+    .logo-hexa { height: 44px; }
+    .infos { grid-template-columns: 1fr; gap: 24px; }
+    .infos-row { font-size: 10.5px; }
+    .recap-grid { grid-template-columns: 1fr; gap: 24px; }
+    .certifications { flex-direction: column; align-items: flex-start; gap: 16px; }
+    .subcontractor-grid { grid-template-columns: 1fr; }
+    .lots-table-header { display: grid; grid-template-columns: 1fr 34px 48px 32px 66px; gap: 2px; font-size: 7px; padding: 8px 12px; border-bottom-width: 1.5px; top: 0; }
+    .lots-table-header span { vertical-align: top; align-self: start; }
+    .lots-table-header span:not(:first-child) { text-align: center; }
+    .family-header { top: 26px; padding: 10px 16px; font-size: 10px; }
+    .sub-line { padding: 10px 12px 12px; }
+    .sub-line-header { grid-template-columns: 1fr 34px 48px 32px 66px; gap: 2px; align-items: start; }
+    .sub-line-name { font-size: 10px; }
+    .sub-line-qt, .sub-line-pu, .sub-line-remise, .sub-line-tva { font-size: 8px; text-align: right; }
+    .sub-line-total { font-size: 9px; text-align: right; }
+    .lot-subtotal { padding: 12px 12px; flex-wrap: nowrap; gap: 8px; }
+    .lot-subtotal-label { font-size: 8px; white-space: nowrap; padding-right: 8px; }
+    .lot-subtotal-amounts { gap: 12px; flex-wrap: nowrap; }
+    .lot-subtotal-amounts .label { font-size: 7px; margin-right: 2px; }
+    .lot-subtotal-amounts .ht { font-size: 10px; white-space: nowrap; }
+    .lot-subtotal-amounts .ttc { font-size: 13px; white-space: nowrap; }
+    .specs-row { grid-template-columns: 1fr; gap: 2px; }
+    .recap-rac-amount { font-size: 20px; }
+    .signature-box { min-height: 200px; }
+  }
+
+  @media print {
+    body { background: white; padding: 0; }
+    .document { box-shadow: none; max-width: 100%; }
+    /* v6 : forcer fond blanc (sinon le body gris #E8EBF0 réapparaît en bas de page si .document ne s'étend pas) */
+    html, body { background: white !important; }
+  }
+
+  /* ========== CONDITIONS DE PAIEMENT ========== */
+  .payment-terms {
+    padding: 22px 56px 20px;
+    background: var(--paper);
+    border-top: 1px solid var(--gris-ligne);
+  }
+
+  .payment-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 16px;
+    margin-top: 18px;
+  }
+
+  .payment-card {
+    background: var(--gris-fond);
+    padding: 20px;
+    border-radius: 4px;
+    border-left: 3px solid var(--rouge);
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+    min-height: 130px;
+  }
+
+  .payment-card-icon {
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    color: var(--bleu);
+    background: white;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .payment-card-icon svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  .payment-card-content {
+    flex: 1;
+  }
+
+  .payment-card-title {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--bleu);
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+
+  .payment-card-text {
+    font-size: 11px;
+    color: var(--gris-texte);
+    line-height: 1.55;
+  }
+
+  .payment-card-text strong {
+    color: var(--bleu);
+    font-weight: 700;
+  }
+
+  /* ========== OPTIONS DE FINANCEMENT ========== */
+  .financing-options {
+    padding: 22px 56px 20px;
+    background: var(--paper);
+    border-top: 1px solid var(--gris-ligne);
+  }
+
+  .financing-intro {
+    font-size: 11.5px;
+    color: var(--gris-texte);
+    line-height: 1.55;
+    margin: 12px 0 22px;
+    max-width: 720px;
+  }
+
+  .financing-form {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 26px;
+  }
+
+  .financing-option {
+    cursor: pointer;
+    position: relative;
+  }
+
+  .financing-option input[type="radio"] {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .financing-option-inner {
+    border: 2px solid var(--gris-ligne);
+    background: var(--paper);
+    padding: 22px 24px;
+    border-radius: 4px;
+    transition: border-color 0.2s ease, background 0.2s ease;
+    position: relative;
+    height: 100%;
+  }
+
+  .financing-option:hover .financing-option-inner {
+    border-color: var(--bleu-light);
+  }
+
+  .financing-option input[type="radio"]:checked + .financing-option-inner {
+    border-color: var(--rouge);
+    background: #FFF8FA;
+  }
+
+  .financing-option input[type="radio"]:checked + .financing-option-inner::after {
+    content: '✓';
+    position: absolute;
+    top: 12px;
+    right: 14px;
+    width: 24px;
+    height: 24px;
+    background: var(--rouge);
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 700;
+  }
+
+  .financing-option-num {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: var(--rouge);
+    font-weight: 700;
+    margin-bottom: 8px;
+  }
+
+  .financing-option-picto {
+    width: 32px;
+    height: 32px;
+    color: var(--bleu);
+    margin-bottom: 12px;
+    display: block;
+  }
+
+  .financing-option-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--bleu);
+    letter-spacing: -0.01em;
+    margin-bottom: 8px;
+    padding-right: 30px;
+  }
+
+  .financing-option-desc {
+    font-size: 11.5px;
+    color: var(--gris-texte);
+    line-height: 1.5;
+    margin-bottom: 14px;
+  }
+  .financing-option-desc strong {
+    color: var(--bleu);
+    font-weight: 700;
+  }
+
+  .financing-option-monthly {
+    padding-top: 12px;
+    border-top: 1px solid var(--gris-ligne-soft);
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+  }
+  .financing-option-amount {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--noir);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+  }
+  .financing-option-unit {
+    font-size: 11px;
+    color: var(--gris-mute);
+    font-weight: 500;
+  }
+
+  /* Bloc rappel téléphonique */
+  .financing-callback {
+    background: var(--gris-fond);
+    padding: 20px 24px;
+    border-radius: 4px;
+    border-left: 3px solid var(--bleu);
+  }
+
+  .financing-callback-title {
+    font-size: 12px;
+    color: var(--bleu);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    margin-bottom: 12px;
+  }
+
+  .financing-callback-form {
+    display: grid;
+    grid-template-columns: 1fr 1fr auto;
+    gap: 10px;
+    align-items: center;
+  }
+
+  .financing-input {
+    padding: 10px 14px;
+    border: 1px solid var(--gris-ligne);
+    background: var(--paper);
+    font-family: inherit;
+    font-size: 12px;
+    color: var(--noir);
+    border-radius: 4px;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+  .financing-input:focus {
+    outline: none;
+    border-color: var(--bleu);
+    box-shadow: 0 0 0 3px rgba(0, 46, 90, 0.08);
+  }
+
+  .financing-btn {
+    padding: 10px 18px;
+    background: var(--rouge);
+    color: white;
+    border: none;
+    border-radius: 4px;
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    cursor: pointer;
+    transition: background 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    white-space: nowrap;
+      text-decoration: none;
+  }
+  .financing-btn:hover { background: var(--rouge-dark); }
+  .financing-btn:disabled { background: var(--gris-mute); cursor: not-allowed; opacity: 0.6; }
+  .financing-btn svg { width: 14px; height: 14px; }
+
+  .financing-callback-hint {
+    font-size: 10.5px;
+    color: var(--gris-mute);
+    font-style: italic;
+    margin-top: 10px;
+  }
+
+  .financing-callback-success {
+    display: none;
+    margin-top: 12px;
+    padding: 12px 16px;
+    background: rgba(45, 122, 79, 0.1);
+    color: var(--vert);
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    border-left: 3px solid var(--vert);
+  }
+  .financing-callback-success.show { display: block; }
+
+  /* RESPONSIVE */
+  @media (max-width: 768px) {
+    .payment-terms, .financing-options { padding: 24px; }
+    .payment-grid { grid-template-columns: 1fr; }
+    .financing-form { grid-template-columns: 1fr; }
+    .financing-callback-form { grid-template-columns: 1fr; }
+    .financing-btn { width: 100%; justify-content: center; }
+  }
+
+
+  /* ========== ANNEXE CGV ========== */
+  .cgv-section {
+    padding: 30px 56px 28px;
+    background: var(--paper);
+    border-top: 4px solid var(--bleu);
+    page-break-before: always;
+  }
+
+  .cgv-header {
+    margin-bottom: 36px;
+    padding-bottom: 22px;
+    border-bottom: 2px solid var(--bleu);
+  }
+
+  .cgv-header-eyebrow {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.22em;
+    color: var(--rouge);
+    font-weight: 700;
+    margin-bottom: 10px;
+  }
+
+  .cgv-header-title {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--bleu);
+    letter-spacing: -0.025em;
+    line-height: 1.1;
+    margin-bottom: 12px;
+  }
+
+  .cgv-header-meta {
+    font-size: 10px;
+    color: var(--gris-mute);
+    line-height: 1.6;
+  }
+
+  .cgv-article {
+    margin-bottom: 22px;
+    padding-bottom: 18px;
+    border-bottom: 1px solid var(--gris-ligne-soft);
+  }
+
+  .cgv-article:last-of-type {
+    border-bottom: none;
+  }
+
+  .cgv-article-num {
+    display: inline-block;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    color: var(--rouge);
+    font-weight: 700;
+    margin-bottom: 8px;
+    padding: 3px 10px;
+    background: rgba(226, 33, 75, 0.08);
+    border-radius: 3px;
+  }
+
+  .cgv-article-title {
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--bleu);
+    letter-spacing: -0.015em;
+    margin-bottom: 14px;
+    line-height: 1.3;
+  }
+
+  .cgv-article-body p {
+    font-size: 11px;
+    color: var(--gris-texte);
+    line-height: 1.65;
+    margin-bottom: 10px;
+    text-align: justify;
+  }
+
+  .cgv-article-body p:last-child {
+    margin-bottom: 0;
+  }
+
+  .cgv-article-body strong {
+    color: var(--bleu);
+    font-weight: 700;
+  }
+
+  .cgv-article-body a {
+    color: var(--rouge);
+    text-decoration: underline;
+  }
+
+  .cgv-subtitle {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--bleu);
+    margin-top: 16px;
+    margin-bottom: 8px;
+    letter-spacing: -0.005em;
+  }
+
+  .cgv-list {
+    margin: 8px 0 12px 0;
+    padding-left: 20px;
+  }
+
+  .cgv-list li {
+    font-size: 11px;
+    color: var(--gris-texte);
+    line-height: 1.65;
+    margin-bottom: 6px;
+    text-align: justify;
+  }
+
+  .cgv-list li::marker {
+    color: var(--rouge);
+  }
+
+  
+  /* Glossaire inline */
+  abbr[title] { text-decoration: none; border-bottom: 1px dotted var(--gris-mute); cursor: help; }
+  .glossaire-inline {
+    font-size: 9.5px; color: var(--gris-mute); line-height: 1.5;
+    margin-top: 6px; font-style: italic;
+  }
+
+  /* Boîte info (assureur, médiateur, etc.) */
+  .cgv-info-box {
+    background: var(--gris-fond);
+    border-left: 3px solid var(--bleu);
+    padding: 12px 16px;
+    margin: 12px 0;
+  }
+
+  .cgv-info-row {
+    display: grid;
+    grid-template-columns: 130px 1fr;
+    gap: 12px;
+    padding: 3px 0;
+    font-size: 10.5px;
+    line-height: 1.5;
+  }
+
+  .cgv-info-row .cgv-info-key {
+    color: var(--gris-mute);
+    font-weight: 600;
+  }
+
+  .cgv-info-row .cgv-info-val {
+    color: var(--noir);
+    font-weight: 500;
+  }
+
+  .cgv-note {
+    font-size: 10.5px;
+    color: var(--gris-mute);
+    font-style: italic;
+    margin-top: 10px;
+  }
+
+  /* Formulaire d'annulation */
+  .cgv-form-article {
+    background: var(--gris-fond);
+    padding: 22px 24px;
+    border-radius: 4px;
+    border-left: 4px solid var(--rouge);
+    border-bottom: none;
+    margin-top: 24px;
+    margin-bottom: 0;
+  }
+
+  .cgv-note-intro {
+    font-size: 11px;
+    color: var(--gris-texte);
+    line-height: 1.6;
+    margin-bottom: 18px;
+  }
+
+  .cgv-cancel-box {
+    background: var(--paper);
+    border: 1px solid var(--gris-ligne);
+    padding: 22px 24px;
+  }
+
+  .cgv-cancel-recipient {
+    font-size: 11px;
+    color: var(--gris-texte);
+    line-height: 1.55;
+    padding-bottom: 18px;
+    margin-bottom: 18px;
+    border-bottom: 1px solid var(--gris-ligne-soft);
+  }
+
+  .cgv-cancel-recipient strong {
+    color: var(--bleu);
+    font-weight: 700;
+  }
+
+  .cgv-cancel-form {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .cgv-cancel-row {
+    display: flex;
+    gap: 12px;
+    align-items: baseline;
+    flex-wrap: wrap;
+  }
+
+  .cgv-cancel-label {
+    font-size: 10.5px;
+    color: var(--gris-texte);
+    font-weight: 500;
+    flex-shrink: 0;
+  }
+
+  .cgv-cancel-line {
+    flex: 1;
+    min-width: 100px;
+    height: 1px;
+    border-bottom: 1px dashed var(--gris-ligne);
+    align-self: end;
+    margin-bottom: 4px;
+  }
+
+  .cgv-cancel-line.short {
+    flex: 0 0 90px;
+  }
+
+  /* RESPONSIVE CGV */
+  @media (max-width: 768px) {
+    .cgv-section { padding: 28px 24px; }
+    .cgv-header-title { font-size: 22px; }
+    .cgv-info-row { grid-template-columns: 1fr; gap: 2px; }
+    .cgv-cancel-row { flex-direction: column; align-items: stretch; gap: 6px; }
+    .cgv-cancel-line { min-width: 0; }
+  }
+
+  @media print {
+    .cgv-section { page-break-before: always; }
+    /* Articles sécables : on enchaîne sans laisser de vide en bas de page */
+    .cgv-article { break-inside: auto; page-break-inside: auto; }
+    /* Le titre/numéro reste collé au début du corps de l'article */
+    .cgv-article-num { break-after: avoid; page-break-after: avoid; }
+    .cgv-article-title { break-after: avoid; page-break-after: avoid; break-inside: avoid; }
+    /* Pas de coupure au milieu d'un paragraphe trop court, mais on autorise la coupure entre paragraphes */
+    .cgv-article-body p { orphans: 2; widows: 2; }
+    /* Le formulaire d'annulation reste insécable (bloc court à garder entier) */
+    .cgv-form-article { break-inside: avoid; page-break-inside: avoid; }
+  }
+
+
+  /* === SOLUTIONS DE FINANCEMENT — design conforme à la synthèse === */
+  .financing-options .financement-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-top: 18px;
+  }
+
+  .financement-card {
+    border: 1px solid var(--gris-ligne);
+    padding: 22px 24px;
+    background: var(--paper);
+    position: relative;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Le radio caché à l'intérieur de la card */
+  .financement-card input[type="radio"] {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+    width: 0;
+    height: 0;
+  }
+
+  /* Numéro Option 1 / 2 */
+  .financement-card .option-num {
+    position: absolute; top: -1px; left: -1px;
+    background: var(--bleu); color: white;
+    font-size: 10px; font-weight: 700; letter-spacing: 0.1em;
+    padding: 4px 10px; text-transform: uppercase;
+  }
+  .financement-card.featured .option-num { background: var(--rouge); }
+
+  /* Picto en haut à droite */
+  .financement-card .card-picto {
+    position: absolute;
+    top: 18px;
+    right: 22px;
+    width: 36px;
+    height: 36px;
+    color: var(--bleu);
+    opacity: 0.85;
+  }
+  .financement-card.featured .card-picto {
+    color: var(--rouge);
+  }
+
+  /* Titre - hauteur fixe pour alignement */
+  .financement-card-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--bleu);
+    letter-spacing: -0.01em;
+    margin-top: 14px;
+    min-height: 42px;
+    padding-right: 50px;
+  }
+
+  /* Description - hauteur fixe pour alignement */
+  .financement-card-desc {
+    font-size: 12px;
+    color: var(--gris-texte);
+    line-height: 1.55;
+    margin-top: 8px;
+    min-height: 64px;
+  }
+
+  .financement-card-desc strong {
+    font-weight: 700;
+    color: var(--bleu);
+  }
+
+  /* Ligne mensualité */
+  .financement-monthly {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    padding-top: 14px;
+    margin-top: 18px;
+    border-top: 1px solid var(--gris-ligne-soft);
+  }
+
+  .financement-monthly-amount {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--noir);
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .financement-monthly-unit {
+    font-size: 11px;
+    color: var(--gris-mute);
+    font-weight: 500;
+  }
+
+  /* Détail bas */
+  .financement-monthly-detail {
+    font-size: 10.5px;
+    color: var(--gris-mute);
+    margin-top: 8px;
+    line-height: 1.45;
+  }
+
+  /* Hover : indication subtile que c'est cliquable */
+  /* Cartes financement : purement informatives, non cliquables */
+
+  /* (bloc rappel supprimé) */
+  .financing-callback {
+    background: var(--gris-fond);
+    padding: 18px 24px;
+    border-radius: 4px;
+    border-left: 3px solid var(--bleu);
+    margin-top: 22px;
+  }
+
+  .financing-callback-cta-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+
+  .financing-callback-hint {
+    font-size: 11px;
+    color: var(--gris-mute);
+    font-style: italic;
+    flex: 1;
+  }
+
+  .financing-btn {
+    padding: 12px 20px;
+    background: var(--rouge);
+    color: white;
+    border: none;
+    border-radius: 4px;
+    font-family: inherit;
+    font-size: 11.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    cursor: pointer;
+    transition: background 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    white-space: nowrap;
+  }
+  .financing-btn:hover { background: var(--rouge-dark); }
+  .financing-btn:disabled { background: var(--gris-mute); cursor: not-allowed; opacity: 0.6; }
+  .financing-btn svg { width: 14px; height: 14px; }
+
+  .financing-callback-success {
+    display: none;
+    margin-top: 12px;
+    padding: 12px 16px;
+    background: rgba(45, 122, 79, 0.1);
+    color: var(--vert);
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    border-left: 3px solid var(--vert);
+  }
+  .financing-callback-success.show { display: block; }
+
+  @media (max-width: 768px) {
+    .financing-options .financement-grid { grid-template-columns: 1fr; }
+    .financing-callback-cta-row { flex-direction: column; align-items: stretch; }
+    .financing-btn { width: 100%; justify-content: center; }
+  }
+
+
+
+  /* ========== SÉPARATION SYNTHÈSE / DEVIS ========== */
+  /* Espace entre les 2 documents fusionnés */
+  .document-devis {
+    margin-top: 32px;
+  }
+
+  /* À l'impression : forcer un saut de page entre la synthèse et le devis */
+  @media print {
+    .document-devis {
+      margin-top: 0;
+      page-break-before: always;
+    }
+  }
+
+
+
+  /* ========== SÉPARATION PAGE DE GARDE ========== */
+  /* Forcer la page de garde à occuper toute la hauteur d'une page A4
+     pour que le footer (raison sociale) soit toujours collé en bas */
+  .document-cover {
+    min-height: 1180px;
+  }
+
+  /* À l'écran : espace entre page de garde et synthèse */
+  .document-cover + .document {
+    margin-top: 32px;
+  }
+
+  /* À l'impression : forcer un saut de page après la page de garde
+     et garantir que la cover occupe une page entière */
+  @media print {
+    .document-cover {
+      page-break-after: always;
+      min-height: 100vh;
+      height: 100vh;
+    }
+    .document-cover + .document {
+      margin-top: 0;
+    }
+  }
+
+</style>
+<style>
+  /* === PDF aides publiques : sections masquées === */
+  .financing-options { display: none !important; }
+  
+  /* Supprimer aussi les styles inline du graphique tooltip */
+  
+  /* Remonter le certif + footer pour combler l'espace */
+  .footer-with-cert { margin-top: 0 !important; }
+  .synthese-spacer { display: none !important; }
+</style>
+
+<style>
+  .rac-block-centered {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    text-align: center !important;
+    min-height: 260px;
+    grid-template-rows: none !important;
+  }
+  .rac-block-centered .rac-restant-zone-centered {
+    align-items: center !important;
+    justify-content: center !important;
+    text-align: center !important;
+  }
+  .rac-block-centered .rac-restant-label,
+  .rac-block-centered .rac-restant-amount,
+  .rac-block-centered .rac-restant-detail {
+    text-align: center !important;
+  }
+</style>
+
+<style id="final-nowrap-and-print-fixes">
+  .amount,
+  .right,
+  .recap-rac-amount,
+  .rac-restant-amount,
+  .breakdown-line .amount,
+  .total-grid .amount,
+  .financing-legend-amount,
+  .financing-legend-pct,
+  .perf-stat-value,
+  .perf-stat-detail,
+  .rentabilite-hyp-cell-value,
+  .g-tt-val,
+  .sub-line-pu,
+  .sub-line-total,
+  .sub-line-remise,
+  .sub-line-tva,
+  .lot-subtotal-amounts .ht,
+  .lot-subtotal-amounts .ttc,
+  .remises-recap-line .amount,
+  .recap-line .amount,
+  .payment-amount,
+  .doc-type-num,
+  .cover-ref-value {
+    white-space: nowrap !important;
+    word-break: keep-all !important;
+    overflow-wrap: normal !important;
+    flex-shrink: 0 !important;
+  }
+  .recap-rac {
+    gap: 18px !important;
+    align-items: center !important;
+  }
+  .recap-rac-label {
+    line-height: 1.35 !important;
+  }
+  .rac-block-centered .rac-restant-amount {
+    display: block !important;
+    white-space: nowrap !important;
+  }
+  @media print {
+    .recap-rac-amount { font-size: 22px !important; }
+    .recap-rac { padding-left: 20px !important; padding-right: 20px !important; }
+    .rentabilite-hyp-cell-value { font-size: 16px !important; }
+  }
+</style>
+
+
+<style id="compact-print-final-fixes">
+@media print{
+  .lots{padding-top:24px!important;padding-bottom:8px!important}
+  .lots-table tbody .lot-line td{padding:3px 0!important;font-size:12.5px!important}
+  .lots-table tbody .lot-name td{padding:10px 0 4px!important;font-size:13.5px!important}
+  .lots-table tbody .lot-subtotal td{padding:6px 0 8px!important;font-size:12.5px!important}
+  .lots-table tbody .family-row .family-band{padding:9px 14px!important;margin-top:8px!important;margin-bottom:2px!important}
+  .total-block{margin-top:14px!important;padding-top:14px!important;padding-bottom:14px!important}
+  .financing-viz{gap:8px!important}
+  .financing-legend{gap:4px!important}
+  .total-grid .label{font-size:10.5px!important}
+  .total-grid .amount{font-size:12px!important}
+  .total-grid .amount.bold{font-size:16px!important}
+}
+</style>
+
+<style id="giblain-v2-layout-fixes">
+/* Bloc DPE / gain / économies : harmonisation HTML + PDF */
+.perf-block {
+  grid-template-columns: minmax(0, 1.05fr) 1px minmax(0, 0.9fr) 1px minmax(0, 1.12fr) !important;
+  gap: 16px !important;
+  padding: 20px 18px !important;
+  overflow: hidden !important;
+}
+.perf-section { min-width: 0 !important; }
+.perf-label {
+  min-height: 44px !important;
+  font-size: 9px !important;
+  letter-spacing: 0.14em !important;
+  line-height: 1.25 !important;
+  align-items: center !important;
+}
+.dpe-arrow { gap: 12px !important; }
+.dpe-badge { width: 42px !important; height: 42px !important; font-size: 21px !important; }
+.dpe-arrow-icon { margin-top: 15px !important; }
+.perf-stat-content { min-width: 0 !important; max-width: 100% !important; }
+.perf-stat-value {
+  white-space: nowrap !important;
+  font-size: 29px !important;
+  line-height: 1.05 !important;
+  letter-spacing: -0.035em !important;
+}
+.perf-block > .perf-section:last-child .perf-stat-value { font-size: 26px !important; }
+.perf-stat-detail,
+.perf-stat-detail-yearly,
+.perf-stat-disclaimer {
+  max-width: 165px !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+  white-space: normal !important;
+  flex-shrink: 1 !important;
+  overflow-wrap: normal !important;
+  word-break: normal !important;
+  hyphens: none !important;
+}
+.perf-stat-detail { font-size: 10.2px !important; line-height: 1.32 !important; }
+.perf-stat-detail-yearly { font-size: 9.7px !important; line-height: 1.32 !important; }
+.perf-stat-disclaimer { font-size: 9.1px !important; line-height: 1.28 !important; }
+
+/* Tous les montants restent sur une ligne */
+.amount,
+.total-grid .amount,
+.breakdown-line .amount,
+.rac-restant-amount,
+.financement-monthly-amount,
+.rentabilite-hyp-cell-value,
+.rentabilite-val-value,
+.perf-stat-value {
+  white-space: nowrap !important;
+}
+
+/* Graphique : la légende orange est volontairement abaissée pour ne pas chevaucher les hypothèses. */
+#ecoChart .g-rac-label text { dominant-baseline: auto; }
+
+@media print {
+  /* PDF allégé : suppression de la section longue rentabilité (ancienne p. 4-5). */
+  .rentabilite-section { display: none !important; }
+
+  .document .perf-block {
+    grid-template-columns: minmax(0, 1.04fr) 1px minmax(0, 0.86fr) 1px minmax(0, 1.10fr) !important;
+    gap: 9px !important;
+    padding: 10px 12px !important;
+  }
+  .document .perf-label {
+    min-height: 38px !important;
+    font-size: 7.8px !important;
+    letter-spacing: 0.105em !important;
+    line-height: 1.20 !important;
+  }
+  .document .dpe-arrow { gap: 8px !important; }
+  .document .dpe-badge { width: 37px !important; height: 37px !important; font-size: 19px !important; }
+  .document .dpe-block-caption { font-size: 8px !important; letter-spacing: 0.08em !important; line-height: 1.15 !important; }
+  .document .dpe-arrow-icon { width: 18px !important; height: 16px !important; margin-top: 13px !important; }
+  .document .perf-stat-value { font-size: 21px !important; }
+  .document .perf-block > .perf-section:last-child .perf-stat-value { font-size: 18.5px !important; }
+  .document .perf-stat-detail { font-size: 9.2px !important; line-height: 1.22 !important; max-width: 150px !important; white-space: normal !important; flex-shrink: 1 !important; }
+  .document .perf-stat-detail-yearly { font-size: 8.7px !important; line-height: 1.22 !important; max-width: 150px !important; white-space: normal !important; flex-shrink: 1 !important; }
+  .document .perf-stat-disclaimer { font-size: 8.2px !important; line-height: 1.18 !important; max-width: 145px !important; white-space: normal !important; flex-shrink: 1 !important; }
+}
+</style>
+
+<meta name="giblain-energy-assumption" content="gas-natural-5.5-electricity-4">
+</head>
+<body>
+<style>
+  /* Barre d'actions — visible à l'écran uniquement, jamais à l'impression/PDF */
+  .dl-bar {
+    position: fixed; top: 18px; right: 18px; z-index: 9999;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .dl-btn {
+    display: inline-flex; align-items: center; gap: 9px;
+    text-decoration: none; cursor: pointer;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: 13px; font-weight: 600; letter-spacing: 0.01em;
+    padding: 11px 18px; border-radius: 8px;
+    border: 1px solid transparent;
+    transition: transform .12s ease, box-shadow .12s ease, background .12s ease;
+  }
+  /* Bouton principal : Signer (accent rouge Hexa) */
+  .dl-btn-sign {
+    background: #E2214B; color: #fff;
+    box-shadow: 0 4px 16px rgba(226,33,75,0.28), 0 1px 3px rgba(226,33,75,0.20);
+  }
+  .dl-btn-sign:hover { background: #c81b40; transform: translateY(-1px); box-shadow: 0 6px 22px rgba(226,33,75,0.34); }
+  .dl-btn-sign svg { stroke: #fff; }
+  /* Bouton secondaire : Télécharger (bleu Hexa) */
+  .dl-btn-dl {
+    background: #002E5A; color: #fff;
+    box-shadow: 0 4px 16px rgba(0,46,90,0.22), 0 1px 3px rgba(0,46,90,0.18);
+    border-color: rgba(255,255,255,0.08);
+  }
+  .dl-btn-dl:hover { background: #013a72; transform: translateY(-1px); box-shadow: 0 6px 22px rgba(0,46,90,0.28); }
+  .dl-btn-dl svg { stroke: #E2214B; }
+  .dl-btn:active { transform: translateY(0); }
+  .dl-btn svg { width: 17px; height: 17px; stroke-width: 2.2; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+  /* Placeholder de signature non encore branché : bouton grisé non cliquable */
+  .dl-btn-sign[href="__PANDADOC_SIGN_URL__"] {
+    background: #9AA3B2; box-shadow: none; cursor: not-allowed; pointer-events: none;
+  }
+  .dl-btn-sign[href="__PANDADOC_SIGN_URL__"] svg { stroke: #fff; }
+  @media print { .dl-bar { display: none !important; } }
+  @media (max-width: 600px) {
+    .dl-bar { top: auto; bottom: 16px; right: 16px; left: 16px; justify-content: center; }
+    .dl-btn { font-size: 13px; padding: 13px 16px; border-radius: 50px; flex: 1; justify-content: center; }
+  }
+</style>
+<div class="document document-devis">
+<!-- HEADER -->
+<header class="header">
+<svg class="logo-hexa" fill="none" viewBox="0 0 845 200" xmlns="http://www.w3.org/2000/svg">
+<path d="M26.9122 64.3983L89.1361 27.4004L151.36 62.7166V136.712L89.1361 172.029L25.2305 135.031L26.9122 64.3983Z" stroke="#E2214B" stroke-width="6.7269"></path>
+<path d="M3.36328 51.0645L88.5708 3.85352L171.536 50.668V148.756L88.5708 195.57L3.36328 146.526V51.0645Z" stroke="#E2214B" stroke-width="6.7269"></path>
+<path d="M89.1289 3.85352V27.3977" stroke="#E2214B" stroke-width="6.7269"></path>
+<path d="M5.04297 52.6211L26.9054 64.3932" stroke="#E2214B" stroke-width="6.7269"></path>
+<path d="M3.36328 146.798L25.2257 135.026" stroke="#E2214B" stroke-width="6.7269"></path>
+<path d="M89.1289 195.568V172.023" stroke="#E2214B" stroke-width="6.7269"></path>
+<path d="M151.354 136.709L171.534 148.481" stroke="#E2214B" stroke-width="6.7269"></path>
+<path d="M151.354 62.7135L171.534 50.9414" stroke="#E2214B" stroke-width="6.7269"></path>
+<path d="M275.39 45.2301V124.937H264.984V88.8002H224.387V124.937H213.98V45.2301H224.387V80.2234H264.984V45.2301H275.39Z" fill="#002E5A"></path>
+<path d="M345.764 91.2018C345.764 93.1839 345.65 95.2805 345.421 97.4914H295.332C295.713 103.667 297.81 108.508 301.622 112.015C305.51 115.445 310.199 117.161 315.688 117.161C320.186 117.161 323.922 116.132 326.895 114.073C329.944 111.939 332.079 109.118 333.299 105.611H344.506C342.829 111.634 339.474 116.551 334.443 120.363C329.411 124.099 323.159 125.966 315.688 125.966C309.741 125.966 304.405 124.632 299.678 121.964C295.027 119.296 291.368 115.522 288.7 110.642C286.031 105.687 284.697 99.9691 284.697 93.4889C284.697 87.0087 285.993 81.3289 288.585 76.4497C291.177 71.5704 294.799 67.8348 299.449 65.2427C304.176 62.5743 309.589 61.2401 315.688 61.2401C321.634 61.2401 326.895 62.5362 331.469 65.1283C336.044 67.7204 339.55 71.3036 341.99 75.8779C344.506 80.3759 345.764 85.4839 345.764 91.2018ZM335.014 89.029C335.014 85.0646 334.138 81.672 332.384 78.8512C330.631 75.9541 328.229 73.7813 325.18 72.3328C322.206 70.808 318.89 70.0457 315.23 70.0457C309.97 70.0457 305.472 71.7229 301.736 75.0774C298.077 78.4319 295.98 83.0824 295.447 89.029H335.014Z" fill="#002E5A"></path>
+<path d="M387.632 124.937L372.766 101.608L358.471 124.937H347.607L367.848 93.832L347.607 62.2694H359.386L374.252 85.4839L388.433 62.2694H399.297L379.17 93.2602L399.411 124.937H387.632Z" fill="#002E5A"></path>
+<path d="M401.185 93.3745C401.185 86.9705 402.481 81.367 405.073 76.564C407.666 71.6848 411.211 67.911 415.709 65.2427C420.283 62.5743 425.353 61.2401 430.918 61.2401C436.407 61.2401 441.172 62.4218 445.213 64.7852C449.254 67.1486 452.265 70.1219 454.247 73.7051V62.2694H464.768V124.937H454.247V113.273C452.189 116.932 449.101 119.982 444.984 122.421C440.944 124.785 436.217 125.966 430.804 125.966C425.238 125.966 420.207 124.594 415.709 121.849C411.211 119.105 407.666 115.255 405.073 110.299C402.481 105.344 401.185 99.7023 401.185 93.3745ZM454.247 93.4889C454.247 88.7621 453.294 84.6453 451.388 81.1383C449.482 77.6314 446.89 74.963 443.612 73.1333C440.41 71.2273 436.865 70.2744 432.977 70.2744C429.088 70.2744 425.543 71.1892 422.341 73.0189C419.139 74.8487 416.585 77.517 414.679 81.024C412.773 84.5309 411.82 88.6478 411.82 93.3745C411.82 98.1775 412.773 102.371 414.679 105.954C416.585 109.461 419.139 112.167 422.341 114.073C425.543 115.903 429.088 116.818 432.977 116.818C436.865 116.818 440.41 115.903 443.612 114.073C446.89 112.167 449.482 109.461 451.388 105.954C453.294 102.371 454.247 98.2157 454.247 93.4889Z" fill="#002E5A"></path>
+<path d="M545.662 124.937L526.679 92.3453H514.1V124.937H503.693V45.2301H529.424C535.447 45.2301 540.516 46.2593 544.633 48.3178C548.826 50.3762 551.952 53.1589 554.011 56.6659C556.069 60.1728 557.098 64.1753 557.098 68.6734C557.098 74.1625 555.497 79.0036 552.295 83.1967C549.169 87.3898 544.443 90.1725 538.115 91.5448L558.127 124.937H545.662ZM514.1 83.9972H529.424C535.065 83.9972 539.297 82.625 542.117 79.8804C544.938 77.0596 546.349 73.3239 546.349 68.6734C546.349 63.9466 544.938 60.2872 542.117 57.6951C539.373 55.103 535.142 53.8069 529.424 53.8069H514.1V83.9972Z" fill="#002E5A"></path>
+<path d="M625.873 91.2018C625.873 93.1839 625.758 95.2805 625.53 97.4914H575.441C575.822 103.667 577.919 108.508 581.731 112.015C585.619 115.445 590.307 117.161 595.797 117.161C600.295 117.161 604.03 116.132 607.004 114.073C610.053 111.939 612.188 109.118 613.408 105.611H624.615C622.937 111.634 619.583 116.551 614.551 120.363C609.52 124.099 603.268 125.966 595.797 125.966C589.85 125.966 584.513 124.632 579.787 121.964C575.136 119.296 571.477 115.522 568.808 110.642C566.14 105.687 564.806 99.9691 564.806 93.4889C564.806 87.0087 566.102 81.3289 568.694 76.4497C571.286 71.5704 574.907 67.8348 579.558 65.2427C584.285 62.5743 589.698 61.2401 595.797 61.2401C601.743 61.2401 607.004 62.5362 611.578 65.1283C616.152 67.7204 619.659 71.3036 622.099 75.8779C624.615 80.3759 625.873 85.4839 625.873 91.2018ZM615.123 89.029C615.123 85.0646 614.246 81.672 612.493 78.8512C610.739 75.9541 608.338 73.7813 605.288 72.3328C602.315 70.808 598.999 70.0457 595.339 70.0457C590.079 70.0457 585.581 71.7229 581.845 75.0774C578.186 78.4319 576.089 83.0824 575.555 89.029H615.123ZM606.546 44.544L582.188 57.5807V49.8044L606.546 35.5098V44.544Z" fill="#002E5A"></path>
+<path d="M665.568 61.1258C673.192 61.1258 679.367 63.4511 684.094 68.1016C688.821 72.6759 691.184 79.3086 691.184 87.9997V124.937H680.892V89.4864C680.892 83.2349 679.329 78.47 676.203 75.1917C673.078 71.8373 668.808 70.16 663.395 70.16C657.906 70.16 653.522 71.8754 650.244 75.3061C647.042 78.7368 645.441 83.7304 645.441 90.2869V124.937H635.035V62.2694H645.441V71.1892C647.5 67.9872 650.282 65.5095 653.789 63.756C657.372 62.0025 661.299 61.1258 665.568 61.1258Z" fill="#002E5A"></path>
+<path d="M730.94 125.966C725.07 125.966 719.733 124.632 714.93 121.964C710.203 119.296 706.468 115.522 703.723 110.642C701.055 105.687 699.721 99.9691 699.721 93.4889C699.721 87.0849 701.093 81.4433 703.838 76.564C706.658 71.6085 710.47 67.8348 715.273 65.2427C720.076 62.5743 725.451 61.2401 731.398 61.2401C737.344 61.2401 742.719 62.5743 747.522 65.2427C752.325 67.8348 756.099 71.5704 758.844 76.4497C761.664 81.3289 763.075 87.0087 763.075 93.4889C763.075 99.9691 761.626 105.687 758.729 110.642C755.908 115.522 752.058 119.296 747.179 121.964C742.3 124.632 736.887 125.966 730.94 125.966ZM730.94 116.818C734.676 116.818 738.183 115.941 741.461 114.188C744.739 112.434 747.37 109.804 749.352 106.297C751.41 102.79 752.439 98.5206 752.439 93.4889C752.439 88.4572 751.448 84.1878 749.466 80.6809C747.484 77.1739 744.892 74.5818 741.69 72.9046C738.488 71.1511 735.019 70.2744 731.283 70.2744C727.471 70.2744 723.964 71.1511 720.762 72.9046C717.637 74.5818 715.121 77.1739 713.215 80.6809C711.309 84.1878 710.356 88.4572 710.356 93.4889C710.356 98.5969 711.271 102.904 713.1 106.411C715.006 109.918 717.522 112.548 720.648 114.302C723.774 115.979 727.205 116.818 730.94 116.818Z" fill="#002E5A"></path>
+<path d="M795.512 115.331L814.953 62.2694H826.045L801.459 124.937H789.337L764.75 62.2694H775.957L795.512 115.331Z" fill="#002E5A"></path>
+<path d="M833.313 45.2301H844.863L833.884 71.1892H826.565L833.313 45.2301Z" fill="#002E5A"></path>
+<path d="M221.979 175.389L216.954 166.762H213.624V175.389H210.869V154.29H217.68C219.274 154.29 220.616 154.562 221.706 155.107C222.816 155.652 223.644 156.389 224.188 157.317C224.733 158.245 225.006 159.305 225.006 160.496C225.006 161.949 224.582 163.23 223.734 164.34C222.907 165.45 221.656 166.186 219.981 166.55L225.278 175.389H221.979ZM213.624 164.552H217.68C219.174 164.552 220.294 164.189 221.04 163.462C221.787 162.715 222.16 161.727 222.16 160.496C222.16 159.244 221.787 158.276 221.04 157.589C220.314 156.903 219.194 156.56 217.68 156.56H213.624V164.552Z" fill="#E2214B"></path>
+<path d="M230.981 156.53V163.583H238.67V165.853H230.981V173.119H239.578V175.389H228.227V154.26H239.578V156.53H230.981ZM236.551 149.719L230.103 153.17V151.111L236.551 147.328V149.719Z" fill="#E2214B"></path>
+<path d="M259.275 175.389H256.521L245.442 158.588V175.389H242.687V154.26H245.442L256.521 171.03V154.26H259.275V175.389Z" fill="#E2214B"></path>
+<path d="M272.477 175.601C270.52 175.601 268.734 175.147 267.119 174.239C265.505 173.31 264.224 172.029 263.275 170.394C262.347 168.739 261.883 166.883 261.883 164.824C261.883 162.766 262.347 160.919 263.275 159.285C264.224 157.63 265.505 156.348 267.119 155.44C268.734 154.512 270.52 154.048 272.477 154.048C274.455 154.048 276.251 154.512 277.866 155.44C279.48 156.348 280.752 157.62 281.68 159.254C282.608 160.889 283.072 162.746 283.072 164.824C283.072 166.903 282.608 168.76 281.68 170.394C280.752 172.029 279.48 173.31 277.866 174.239C276.251 175.147 274.455 175.601 272.477 175.601ZM272.477 173.209C273.951 173.209 275.272 172.866 276.443 172.18C277.634 171.494 278.562 170.515 279.228 169.244C279.914 167.972 280.257 166.499 280.257 164.824C280.257 163.129 279.914 161.656 279.228 160.405C278.562 159.133 277.644 158.155 276.473 157.468C275.303 156.782 273.971 156.439 272.477 156.439C270.984 156.439 269.652 156.782 268.482 157.468C267.311 158.155 266.383 159.133 265.697 160.405C265.031 161.656 264.698 163.129 264.698 164.824C264.698 166.499 265.031 167.972 265.697 169.244C266.383 170.515 267.311 171.494 268.482 172.18C269.672 172.866 271.004 173.209 272.477 173.209Z" fill="#E2214B"></path>
+<path d="M303.086 154.29L295.124 175.389H291.946L283.984 154.29H286.921L293.55 172.483L300.179 154.29H303.086Z" fill="#E2214B"></path>
+<path d="M314.612 175.601C312.655 175.601 310.869 175.147 309.254 174.239C307.64 173.31 306.358 172.029 305.41 170.394C304.481 168.739 304.017 166.883 304.017 164.824C304.017 162.766 304.481 160.919 305.41 159.285C306.358 157.63 307.64 156.348 309.254 155.44C310.869 154.512 312.655 154.048 314.612 154.048C316.59 154.048 318.386 154.512 320 155.44C321.615 156.348 322.886 157.62 323.815 159.254C324.743 160.889 325.207 162.746 325.207 164.824C325.207 166.903 324.743 168.76 323.815 170.394C322.886 172.029 321.615 173.31 320 174.239C318.386 175.147 316.59 175.601 314.612 175.601ZM314.612 173.209C316.085 173.209 317.407 172.866 318.578 172.18C319.768 171.494 320.697 170.515 321.363 169.244C322.049 167.972 322.392 166.499 322.392 164.824C322.392 163.129 322.049 161.656 321.363 160.405C320.697 159.133 319.778 158.155 318.608 157.468C317.437 156.782 316.106 156.439 314.612 156.439C313.119 156.439 311.787 156.782 310.616 157.468C309.446 158.155 308.518 159.133 307.831 160.405C307.165 161.656 306.833 163.129 306.833 164.824C306.833 166.499 307.165 167.972 307.831 169.244C308.518 170.515 309.446 171.494 310.616 172.18C311.807 172.866 313.139 173.209 314.612 173.209Z" fill="#E2214B"></path>
+<path d="M344.373 175.389H341.618L330.539 158.588V175.389H327.784V154.26H330.539L341.618 171.03V154.26H344.373V175.389Z" fill="#E2214B"></path>
+<path d="M354.699 175.601C353.306 175.601 352.055 175.359 350.945 174.874C349.856 174.37 348.998 173.684 348.372 172.816C347.747 171.928 347.424 170.909 347.404 169.758H350.34C350.441 170.747 350.844 171.585 351.551 172.271C352.277 172.937 353.327 173.27 354.699 173.27C356.011 173.27 357.04 172.947 357.787 172.301C358.553 171.635 358.937 170.788 358.937 169.758C358.937 168.951 358.715 168.295 358.271 167.791C357.827 167.286 357.272 166.903 356.606 166.641C355.94 166.378 355.042 166.096 353.912 165.793C352.519 165.43 351.399 165.066 350.552 164.703C349.724 164.34 349.008 163.775 348.403 163.008C347.817 162.221 347.525 161.172 347.525 159.86C347.525 158.71 347.817 157.69 348.403 156.802C348.988 155.914 349.805 155.228 350.854 154.744C351.924 154.26 353.145 154.018 354.517 154.018C356.495 154.018 358.109 154.512 359.361 155.501C360.632 156.49 361.348 157.801 361.51 159.436H358.483C358.382 158.629 357.958 157.922 357.211 157.317C356.465 156.691 355.476 156.379 354.245 156.379C353.095 156.379 352.156 156.681 351.43 157.287C350.703 157.872 350.34 158.699 350.34 159.769C350.34 160.536 350.552 161.161 350.976 161.646C351.42 162.13 351.954 162.503 352.58 162.766C353.226 163.008 354.124 163.291 355.274 163.613C356.667 163.997 357.787 164.38 358.634 164.764C359.482 165.127 360.208 165.702 360.814 166.489C361.419 167.256 361.722 168.305 361.722 169.637C361.722 170.667 361.449 171.635 360.904 172.543C360.36 173.452 359.552 174.188 358.483 174.753C357.413 175.318 356.152 175.601 354.699 175.601Z" fill="#E2214B"></path>
+<path d="M374.482 173.149H381.868V175.389H371.727V154.29H374.482V173.149Z" fill="#E2214B"></path>
+<path d="M385.126 151.293L384.763 157.317H382.856L382.462 151.293H385.126Z" fill="#E2214B"></path>
+<path d="M399.964 170.697H390.762L389.067 175.389H386.161L393.789 154.411H396.968L404.566 175.389H401.66L399.964 170.697ZM399.177 168.457L395.363 157.801L391.549 168.457H399.177Z" fill="#E2214B"></path>
+<path d="M424.267 154.29L416.306 175.389H413.127L405.166 154.29H408.102L414.731 172.483L421.361 154.29H424.267Z" fill="#E2214B"></path>
+<path d="M428.982 156.53V163.583H436.671V165.853H428.982V173.119H437.579V175.389H426.228V154.26H437.579V156.53H428.982Z" fill="#E2214B"></path>
+<path d="M457.277 175.389H454.522L443.443 158.588V175.389H440.688V154.26H443.443L454.522 171.03V154.26H457.277V175.389Z" fill="#E2214B"></path>
+<path d="M463.668 154.29V175.389H460.913V154.29H463.668Z" fill="#E2214B"></path>
+<path d="M478.413 175.389L473.388 166.762H470.058V175.389H467.303V154.29H474.114C475.708 154.29 477.05 154.562 478.14 155.107C479.25 155.652 480.077 156.389 480.622 157.317C481.167 158.245 481.44 159.305 481.44 160.496C481.44 161.949 481.016 163.23 480.168 164.34C479.341 165.45 478.09 166.186 476.415 166.55L481.712 175.389H478.413ZM470.058 164.552H474.114C475.607 164.552 476.728 164.189 477.474 163.462C478.221 162.715 478.594 161.727 478.594 160.496C478.594 159.244 478.221 158.276 477.474 157.589C476.748 156.903 475.628 156.56 474.114 156.56H470.058V164.552Z" fill="#E2214B"></path>
+<path d="M487.506 171.575L484.116 179.718H482.269L484.479 171.575H487.506Z" fill="#E2214B"></path>
+<path d="M499.368 156.53V163.583H507.056V165.853H499.368V173.119H507.965V175.389H496.613V154.26H507.965V156.53H499.368ZM504.937 149.719L498.49 153.17V151.111L504.937 147.328V149.719Z" fill="#E2214B"></path>
+<path d="M510.044 164.824C510.044 162.766 510.508 160.919 511.436 159.285C512.365 157.63 513.626 156.338 515.22 155.41C516.835 154.482 518.621 154.018 520.578 154.018C522.879 154.018 524.887 154.572 526.602 155.682C528.318 156.792 529.569 158.366 530.356 160.405H527.056C526.471 159.133 525.624 158.155 524.514 157.468C523.424 156.782 522.112 156.439 520.578 156.439C519.105 156.439 517.783 156.782 516.613 157.468C515.442 158.155 514.524 159.133 513.858 160.405C513.192 161.656 512.859 163.129 512.859 164.824C512.859 166.499 513.192 167.972 513.858 169.244C514.524 170.495 515.442 171.464 516.613 172.15C517.783 172.836 519.105 173.179 520.578 173.179C522.112 173.179 523.424 172.846 524.514 172.18C525.624 171.494 526.471 170.515 527.056 169.244H530.356C529.569 171.262 528.318 172.826 526.602 173.936C524.887 175.026 522.879 175.57 520.578 175.57C518.621 175.57 516.835 175.116 515.22 174.208C513.626 173.28 512.365 171.999 511.436 170.364C510.508 168.729 510.044 166.883 510.044 164.824Z" fill="#E2214B"></path>
+<path d="M542.963 175.601C541.005 175.601 539.219 175.147 537.605 174.239C535.99 173.31 534.709 172.029 533.76 170.394C532.832 168.739 532.368 166.883 532.368 164.824C532.368 162.766 532.832 160.919 533.76 159.285C534.709 157.63 535.99 156.348 537.605 155.44C539.219 154.512 541.005 154.048 542.963 154.048C544.94 154.048 546.736 154.512 548.351 155.44C549.965 156.348 551.237 157.62 552.165 159.254C553.093 160.889 553.557 162.746 553.557 164.824C553.557 166.903 553.093 168.76 552.165 170.394C551.237 172.029 549.965 173.31 548.351 174.239C546.736 175.147 544.94 175.601 542.963 175.601ZM542.963 173.209C544.436 173.209 545.758 172.866 546.928 172.18C548.119 171.494 549.047 170.515 549.713 169.244C550.399 167.972 550.742 166.499 550.742 164.824C550.742 163.129 550.399 161.656 549.713 160.405C549.047 159.133 548.129 158.155 546.958 157.468C545.788 156.782 544.456 156.439 542.963 156.439C541.469 156.439 540.137 156.782 538.967 157.468C537.796 158.155 536.868 159.133 536.182 160.405C535.516 161.656 535.183 163.129 535.183 164.824C535.183 166.499 535.516 167.972 536.182 169.244C536.868 170.515 537.796 171.494 538.967 172.18C540.158 172.866 541.489 173.209 542.963 173.209Z" fill="#E2214B"></path>
+<path d="M572.723 175.389H569.968L558.889 158.588V175.389H556.135V154.26H558.889L569.968 171.03V154.26H572.723V175.389Z" fill="#E2214B"></path>
+<path d="M585.925 175.601C583.968 175.601 582.182 175.147 580.567 174.239C578.953 173.31 577.671 172.029 576.723 170.394C575.794 168.739 575.33 166.883 575.33 164.824C575.33 162.766 575.794 160.919 576.723 159.285C577.671 157.63 578.953 156.348 580.567 155.44C582.182 154.512 583.968 154.048 585.925 154.048C587.903 154.048 589.699 154.512 591.313 155.44C592.928 156.348 594.199 157.62 595.128 159.254C596.056 160.889 596.52 162.746 596.52 164.824C596.52 166.903 596.056 168.76 595.128 170.394C594.199 172.029 592.928 173.31 591.313 174.239C589.699 175.147 587.903 175.601 585.925 175.601ZM585.925 173.209C587.398 173.209 588.72 172.866 589.891 172.18C591.081 171.494 592.01 170.515 592.676 169.244C593.362 167.972 593.705 166.499 593.705 164.824C593.705 163.129 593.362 161.656 592.676 160.405C592.01 159.133 591.091 158.155 589.921 157.468C588.75 156.782 587.418 156.439 585.925 156.439C584.432 156.439 583.1 156.782 581.929 157.468C580.759 158.155 579.831 159.133 579.144 160.405C578.478 161.656 578.145 163.129 578.145 164.824C578.145 166.499 578.478 167.972 579.144 169.244C579.831 170.515 580.759 171.494 581.929 172.18C583.12 172.866 584.452 173.209 585.925 173.209Z" fill="#E2214B"></path>
+<path d="M620.499 154.441V175.389H617.744V159.769L610.782 175.389H608.844L601.852 159.739V175.389H599.097V154.441H602.064L609.813 171.756L617.562 154.441H620.499Z" fill="#E2214B"></path>
+<path d="M626.866 154.29V175.389H624.111V154.29H626.866Z" fill="#E2214B"></path>
+<path d="M637.191 175.601C635.798 175.601 634.547 175.359 633.437 174.874C632.347 174.37 631.49 173.684 630.864 172.816C630.239 171.928 629.916 170.909 629.896 169.758H632.832C632.933 170.747 633.336 171.585 634.043 172.271C634.769 172.937 635.819 173.27 637.191 173.27C638.503 173.27 639.532 172.947 640.278 172.301C641.045 171.635 641.429 170.788 641.429 169.758C641.429 168.951 641.207 168.295 640.763 167.791C640.319 167.286 639.764 166.903 639.098 166.641C638.432 166.378 637.534 166.096 636.404 165.793C635.011 165.43 633.891 165.066 633.044 164.703C632.216 164.34 631.5 163.775 630.894 163.008C630.309 162.221 630.017 161.172 630.017 159.86C630.017 158.71 630.309 157.69 630.894 156.802C631.48 155.914 632.297 155.228 633.346 154.744C634.416 154.26 635.637 154.018 637.009 154.018C638.987 154.018 640.601 154.512 641.853 155.501C643.124 156.49 643.84 157.801 644.002 159.436H640.975C640.874 158.629 640.45 157.922 639.703 157.317C638.957 156.691 637.968 156.379 636.737 156.379C635.586 156.379 634.648 156.681 633.922 157.287C633.195 157.872 632.832 158.699 632.832 159.769C632.832 160.536 633.044 161.161 633.467 161.646C633.911 162.13 634.446 162.503 635.072 162.766C635.718 163.008 636.616 163.291 637.766 163.613C639.158 163.997 640.278 164.38 641.126 164.764C641.974 165.127 642.7 165.702 643.306 166.489C643.911 167.256 644.214 168.305 644.214 169.637C644.214 170.667 643.941 171.635 643.396 172.543C642.852 173.452 642.044 174.188 640.975 174.753C639.905 175.318 638.644 175.601 637.191 175.601Z" fill="#E2214B"></path>
+<path d="M656.774 175.601C654.816 175.601 653.03 175.147 651.416 174.239C649.801 173.31 648.52 172.029 647.571 170.394C646.643 168.739 646.179 166.883 646.179 164.824C646.179 162.766 646.643 160.919 647.571 159.285C648.52 157.63 649.801 156.348 651.416 155.44C653.03 154.512 654.816 154.048 656.774 154.048C658.751 154.048 660.547 154.512 662.162 155.44C663.776 156.348 665.048 157.62 665.976 159.254C666.904 160.889 667.368 162.746 667.368 164.824C667.368 166.903 666.904 168.76 665.976 170.394C665.048 172.029 663.776 173.31 662.162 174.239C660.547 175.147 658.751 175.601 656.774 175.601ZM656.774 173.209C658.247 173.209 659.569 172.866 660.739 172.18C661.93 171.494 662.858 170.515 663.524 169.244C664.21 167.972 664.553 166.499 664.553 164.824C664.553 163.129 664.21 161.656 663.524 160.405C662.858 159.133 661.94 158.155 660.769 157.468C659.599 156.782 658.267 156.439 656.774 156.439C655.28 156.439 653.948 156.782 652.778 157.468C651.607 158.155 650.679 159.133 649.993 160.405C649.327 161.656 648.994 163.129 648.994 164.824C648.994 166.499 649.327 167.972 649.993 169.244C650.679 170.515 651.607 171.494 652.778 172.18C653.969 172.866 655.3 173.209 656.774 173.209Z" fill="#E2214B"></path>
+<path d="M686.534 175.389H683.779L672.7 158.588V175.389H669.946V154.26H672.7L683.779 171.03V154.26H686.534V175.389Z" fill="#E2214B"></path>
+<path d="M696.86 175.601C695.468 175.601 694.217 175.359 693.107 174.874C692.017 174.37 691.159 173.684 690.534 172.816C689.908 171.928 689.585 170.909 689.565 169.758H692.501C692.602 170.747 693.006 171.585 693.712 172.271C694.439 172.937 695.488 173.27 696.86 173.27C698.172 173.27 699.201 172.947 699.948 172.301C700.715 171.635 701.098 170.788 701.098 169.758C701.098 168.951 700.876 168.295 700.432 167.791C699.988 167.286 699.433 166.903 698.767 166.641C698.101 166.378 697.203 166.096 696.073 165.793C694.681 165.43 693.561 165.066 692.713 164.703C691.886 164.34 691.169 163.775 690.564 163.008C689.979 162.221 689.686 161.172 689.686 159.86C689.686 158.71 689.979 157.69 690.564 156.802C691.149 155.914 691.967 155.228 693.016 154.744C694.086 154.26 695.306 154.018 696.679 154.018C698.656 154.018 700.271 154.512 701.522 155.501C702.794 156.49 703.51 157.801 703.671 159.436H700.644C700.543 158.629 700.12 157.922 699.373 157.317C698.626 156.691 697.637 156.379 696.406 156.379C695.256 156.379 694.318 156.681 693.591 157.287C692.865 157.872 692.501 158.699 692.501 159.769C692.501 160.536 692.713 161.161 693.137 161.646C693.581 162.13 694.116 162.503 694.741 162.766C695.387 163.008 696.285 163.291 697.436 163.613C698.828 163.997 699.948 164.38 700.796 164.764C701.643 165.127 702.37 165.702 702.975 166.489C703.581 167.256 703.883 168.305 703.883 169.637C703.883 170.667 703.611 171.635 703.066 172.543C702.521 173.452 701.714 174.188 700.644 174.753C699.575 175.318 698.313 175.601 696.86 175.601Z" fill="#E2214B"></path>
+<path d="M716.643 173.149H724.029V175.389H713.888V154.29H716.643V173.149Z" fill="#E2214B"></path>
+<path d="M727.288 151.293L726.924 157.317H725.017L724.624 151.293H727.288Z" fill="#E2214B"></path>
+<path d="M732.409 156.53V163.583H740.098V165.853H732.409V173.119H741.006V175.389H729.654V154.26H741.006V156.53H732.409ZM737.979 149.719L731.531 153.17V151.111L737.979 147.328V149.719Z" fill="#E2214B"></path>
+<path d="M760.703 175.389H757.948L746.869 158.588V175.389H744.114V154.26H746.869L757.948 171.03V154.26H760.703V175.389Z" fill="#E2214B"></path>
+<path d="M767.094 156.53V163.583H774.783V165.853H767.094V173.119H775.691V175.389H764.339V154.26H775.691V156.53H767.094Z" fill="#E2214B"></path>
+<path d="M789.909 175.389L784.884 166.762H781.554V175.389H778.8V154.29H785.611C787.205 154.29 788.547 154.562 789.637 155.107C790.747 155.652 791.574 156.389 792.119 157.317C792.664 158.245 792.936 159.305 792.936 160.496C792.936 161.949 792.513 163.23 791.665 164.34C790.838 165.45 789.586 166.186 787.911 166.55L793.209 175.389H789.909ZM781.554 164.552H785.611C787.104 164.552 788.224 164.189 788.971 163.462C789.718 162.715 790.091 161.727 790.091 160.496C790.091 159.244 789.718 158.276 788.971 157.589C788.244 156.903 787.124 156.56 785.611 156.56H781.554V164.552Z" fill="#E2214B"></path>
+<path d="M812.14 160.405C811.555 159.174 810.707 158.225 809.597 157.559C808.488 156.873 807.196 156.53 805.723 156.53C804.25 156.53 802.918 156.873 801.727 157.559C800.557 158.225 799.628 159.194 798.942 160.465C798.276 161.716 797.943 163.169 797.943 164.824C797.943 166.479 798.276 167.932 798.942 169.183C799.628 170.435 800.557 171.403 801.727 172.089C802.918 172.755 804.25 173.088 805.723 173.088C807.781 173.088 809.476 172.473 810.808 171.242C812.14 170.011 812.917 168.346 813.139 166.247H804.724V164.007H816.075V166.126C815.914 167.861 815.369 169.456 814.441 170.909C813.513 172.342 812.292 173.482 810.778 174.329C809.264 175.157 807.579 175.57 805.723 175.57C803.765 175.57 801.979 175.116 800.365 174.208C798.75 173.28 797.469 171.999 796.52 170.364C795.592 168.729 795.128 166.883 795.128 164.824C795.128 162.766 795.592 160.919 796.52 159.285C797.469 157.63 798.75 156.348 800.365 155.44C801.979 154.512 803.765 154.048 805.723 154.048C807.963 154.048 809.941 154.603 811.656 155.713C813.391 156.823 814.653 158.387 815.44 160.405H812.14Z" fill="#E2214B"></path>
+<path d="M821.413 154.29V175.389H818.658V154.29H821.413Z" fill="#E2214B"></path>
+<path d="M827.803 156.53V163.583H835.492V165.853H827.803V173.119H836.4V175.389H825.048V154.26H836.4V156.53H827.803Z" fill="#E2214B"></path>
+</svg>
+<div class="doc-type">
+<div class="doc-type-value">Devis</div>
+<div class="doc-type-num"><span class="doc-type-num-label">N° de devis :</span> {{ numero_devis }}</div>
+</div>
+</header>
+<!-- INFOS -->
+
+<section class="infos">
+<div class="infos-col">
+<div class="infos-col-title">Bénéficiaire</div>
+<div class="infos-row"><span class="infos-label">Numéro de dossier</span><span class="infos-value">{{ numero_dossier }}</span></div>
+<div class="infos-row"><span class="infos-label">Civilité</span><span class="infos-value">{{ civilite }}</span></div>
+<div class="infos-row"><span class="infos-label">Nom</span><span class="infos-value">{{ nom }}</span></div>
+<div class="infos-row"><span class="infos-label">Prénom</span><span class="infos-value">{{ prenom }}</span></div>
+<div class="infos-row"><span class="infos-label">Téléphone</span><span class="infos-value">{{ telephone }}</span></div>
+<div class="infos-row"><span class="infos-label">Email</span><span class="infos-value">{{ email }}</span></div>
+<div class="infos-row"><span class="infos-label">Adresse</span><span class="infos-value">{{ adresse_personne }}</span></div>
+<div class="infos-row"><span class="infos-label">Code postal</span><span class="infos-value">{{ cp_personne }}</span></div>
+<div class="infos-row"><span class="infos-label">Ville</span><span class="infos-value">{{ ville_personne }}</span></div>
+<div class="infos-row"><span class="infos-label">Propriétaire occupant</span><span class="infos-value">{{ "Oui" if usage_bien == "occupant" else "Non (bailleur)" }}</span></div>
+<div class="infos-row"><span class="infos-label">Catégorie de revenu</span><span class="infos-value">{{ categorie_revenu_label }}</span></div>
+<div class="infos-row"><span class="infos-label">Précarité</span><span class="infos-value">{{ categorie_CEE_label }}</span></div>
+</div>
+<div class="infos-col">
+<div class="infos-col-title">Dossier</div>
+<div class="infos-row"><span class="infos-label">Date d'émission</span><span class="infos-value">{{ date_emission }}</span></div>
+<div class="infos-row"><span class="infos-label">Durée de validité</span><span class="infos-value">{{ date_validite }}</span></div>
+<div class="infos-row"><span class="infos-label">Visite technique</span><span class="infos-value">{{ date_visite_technique }}</span></div>
+<div class="infos-row"><span class="infos-label">Début travaux</span><span class="infos-value">{{ date_debut_travaux }}</span></div>
+<div class="infos-row"><span class="infos-label">Adresse chantier</span><span class="infos-value">{{ adresse_chantier }}</span></div>
+<div class="infos-row"><span class="infos-label">CP chantier</span><span class="infos-value">{{ cp_chantier }}</span></div>
+<div class="infos-row"><span class="infos-label">Ville chantier</span><span class="infos-value">{{ ville_chantier }}</span></div>
+<div class="infos-row"><span class="infos-label">Type de logement</span><span class="infos-value">{{ type_logement }}</span></div>
+<div class="infos-row"><span class="infos-label">Surface habitable</span><span class="infos-value">{{ surface_habitable }} m²</span></div>
+<div class="infos-row"><span class="infos-label">Type de chauffage</span><span class="infos-value">{{ chauffage_actuel }}</span></div>
+<div class="infos-row"><span class="infos-label">Parcelle cadastrale</span><span class="infos-value">{{ parcelle_cadastrale }}</span></div>
+<div class="infos-row"><span class="infos-label">Zone clim.</span><span class="infos-value">{{ zone_climatique }}</span></div>
+</div>
+</section>
+
+<!-- MENTION LÉGALE INTRO -->
+<section class="legal-intro">
+<div class="legal-intro-headline">Devis gratuit et sans engagement.</div>
+<div class="legal-intro-text">Sous réserve de la conformité électrique, l'entité s'engage à respecter la réglementation technique et les règles de l'art applicables aux travaux sur l'existant.</div>
+<div class="pac-heating-note">
+<div class="pac-heating-note-label">Solution chauffage</div>
+<div class="pac-heating-note-title">Opération n° BAR-TH-171&nbsp;&nbsp;Pompe à chaleur de type air/eau</div>
+<div class="pac-heating-note-text">Mise en place d’une pompe à chaleur (PAC) de type air/eau pour le chauffage ou pour le chauffage et la production d’eau chaude sanitaire.</div>
+</div>
+</section>
+<!-- LOTS DÉTAILLÉS -->
+<section class="lots-detail"><div class="section-title">Détail technique par poste de travaux</div><div class="lots-table-header"><span>Désignation</span><span>Qt.</span><span>P.U. H.T.</span><span>TVA appli.</span><span>Total T.T.C.</span></div><div class="family">
+<div class="lot">
+<div class="lot-header"><div class="lot-title">{{ lot_titre }}</div></div>
+<div class="sub-line">
+<div class="sub-line-header"><span class="sub-line-name">Fourniture</span><span class="sub-line-qt">{{ qt_fourniture }}</span><span class="sub-line-pu">{{ prix_fourniture_ht }}</span><span class="sub-line-tva">{{ tva_taux }}</span><span class="sub-line-total">{{ prix_fourniture_ttc }}</span></div>
+<div class="specs pac-desc-block"><div class="pac-desc-text">{{ description_pac }}</div></div>
+</div>
+<div class="sub-line">
+<div class="sub-line-header"><span class="sub-line-name">Pose</span><span class="sub-line-qt">{{ qt_pose }}</span><span class="sub-line-pu">{{ prix_pose_ht }}</span><span class="sub-line-tva">{{ tva_taux }}</span><span class="sub-line-total">{{ prix_pose_ttc }}</span></div>
+<div class="specs"><div class="specs-block"><div class="specs-block-title">Système mis en œuvre</div><ul class="specs-list"><li>Installation et mise en service d'une pompe à chaleur air - eau</li></ul></div><div class="specs-block"><div class="specs-block-title">Aménagements et sujétions</div><ul class="specs-list"><li>Fourniture et pose des unités intérieure et extérieure</li><li>Liaison hydraulique et liaison frigorifique</li><li>Raccordement aux réseaux existants</li><li>Câblage d'alimentation et connexions électriques</li><li>Protection électrique par dispositif adapté</li><li>Mise sous pression d'azote</li><li>Contrôle de l'étanchéité du circuit frigorifique</li><li>Contrôle du circuit hydraulique et de son étanchéité</li><li>Mise en service et programmation</li><li>Évacuation des déchets en filière agréée</li></ul></div><div class="specs-block"><div class="specs-block-title">Système de finition</div><ul class="specs-list"><li>Vannes d'arrêt et organes d'isolement</li><li>Calorifugeage des réseaux hydrauliques accessibles</li><li>Disconnecteur</li><li>Ballon tampon adapté à l'installation</li><li>Circulateur</li><li>Pot à boue</li><li>Interrupteur de proximité</li><li>Supports antivibratiles type Rubberfoot</li><li>Réglage et optimisation des paramètres de fonctionnement</li></ul></div></div>
+<div class="subcontractor"><div class="subcontractor-title">Travaux sous-traités</div><div class="subcontractor-grid"><div class="sc-row"><span class="key">Entreprise</span><span class="val">{{ sous_traitant.entreprise }}</span></div><div class="sc-row"><span class="key">SIRET</span><span class="val">{{ sous_traitant.siret }}</span></div><div class="sc-row"><span class="key">Adresse</span><span class="val">{{ sous_traitant.adresse }}</span></div><div class="sc-row"><span class="key">Certificat RGE</span><span class="val">{{ sous_traitant.rge }}</span></div><div class="sc-row"><span class="key">Validité RGE</span><span class="val">{{ sous_traitant.rge_validite }}</span></div><div class="sc-row"><span class="key">Assurance</span><span class="val">{{ sous_traitant.assurance }}</span></div></div></div>
+</div>
+<div class="sub-line">
+<div class="sub-line-header"><span class="sub-line-name">Travaux induits</span><span class="sub-line-qt">{{ qt_travaux_induits }}</span><span class="sub-line-pu">{{ prix_travaux_induits_ht }}</span><span class="sub-line-tva">{{ tva_taux }}</span><span class="sub-line-total">{{ prix_travaux_induits_ttc }}</span></div>
+<div class="specs"><div class="specs-block"><div class="specs-block-title">Travaux induits</div><ul class="specs-list"><li>Protection et sécurisation des zones d'intervention</li><li>Création ou adaptation des passages techniques</li><li>Reprises localisées d'étanchéité et de calfeutrement</li><li>Adaptation ponctuelle des réseaux et équipements existants</li><li>Dépose et évacuation des équipements remplacés</li></ul></div><div class="specs-block"><div class="specs-block-title">Non inclus</div><ul class="specs-list"><li>Renforcement ou mise en conformité complète de l'installation électrique</li><li>Modification des émetteurs ou réseaux hors descriptif</li><li>Travaux de maçonnerie ou de couverture lourde</li><li>Prestations de décoration et reprises complètes de finition</li></ul></div></div>
+</div>
+<div class="lot-subtotal"><span class="lot-subtotal-label">Sous-total lot</span><div class="lot-subtotal-amounts"><span class="ht"><span class="label">HT</span>{{ total_ht }}</span><span class="ttc"><span class="label">TTC</span>{{ total_ttc }}</span></div></div>
+</div>
+</div></section>
+<!-- RÉCAPITULATIF GÉNÉRAL -->
+
+<section class="recap">
+<div class="section-title">Récapitulatif général</div>
+<div class="recap-grid">
+<div>
+<div class="recap-block-title">Totaux du projet</div>
+<div class="recap-line"><span class="label">Fourniture HT</span><span class="amount">{{ prix_fourniture_ht }}</span></div>
+<div class="recap-line"><span class="label">Pose HT</span><span class="amount">{{ prix_pose_ht }}</span></div>
+<div class="recap-line"><span class="label">Travaux induits HT</span><span class="amount">{{ prix_travaux_induits_ht }}</span></div>
+<div class="recap-line subtotal"><span class="label">Total HT</span><span class="amount">{{ total_ht }}</span></div>
+<div class="recap-line"><span class="label">TVA {{ tva_taux }}</span><span class="amount">{{ total_tva }}</span></div>
+<div class="recap-line total"><span class="label">Total TTC</span><span class="amount">{{ total_ttc }}</span></div>
+<div class="recap-line aide"><span class="label">Estimation aide MaPrimeRénov' (Sous réserve de l'accord de l'ANAH)</span><span class="amount">- {{ montant_mpr }}</span></div>
+<div class="recap-line aide"><span class="label">Estimation aide Prime CEE</span><span class="amount">- {{ montant_cee }}</span></div>
+<div style="font-size: 9.5px; color: var(--gris-mute); padding: 2px 0 4px; margin-top: 0; line-height: 1.4;">Le reste à payer correspond au total TTC diminué des estimations d'aides MaPrimeRénov' et Prime CEE.</div>
+<div class="recap-rac"><span class="recap-rac-label">Montant total à régler</span><span class="recap-rac-amount">{{ reste_a_charge }}</span></div>
+
+</div>
+<div>
+<div class="recap-block-title">Récapitulatif de l'assiette de TVA</div>
+<table class="tva-table">
+<thead><tr><th>Taux</th><th class="right">Base HT</th><th class="right">TVA</th></tr></thead>
+<tbody>
+<tr><td>TVA {{ tva_taux }}</td><td class="right">{{ total_ht }}</td><td class="right">{{ total_tva }}</td></tr>
+<tr><td>TVA intermédiaire 10,00 %</td><td class="right">—</td><td class="right">—</td></tr>
+<tr><td>TVA normale 20,00 %</td><td class="right">—</td><td class="right">—</td></tr>
+</tbody>
+<tfoot><tr><td>Total</td><td class="right">{{ total_ht }}</td><td class="right">{{ total_tva }}</td></tr></tfoot>
+</table>
+<div class="tva-cgi">Taux de TVA applicable selon la réglementation en vigueur (articles 278 et s. du CGI).</div>
+
+</div>
+</div>
+<div class="anah-mention-block anah-mention-block-full">
+<strong>Condition MaPrimeRénov'</strong><br>
+Dans le cas où l'aide notifiée au client est inférieure au montant de l'aide prévisionnelle, l'usager n'est pas lié par le devis et l'entreprise s'engage à proposer un devis rectificatif. Le client conserve alors un droit de rétractation d'une durée de quatorze jours à partir de la date de présentation du devis rectificatif. L'aide MaPrimeRénov' est conditionnelle et soumise à la conformité des pièces justificatives et informations déclarées par le bénéficiaire. En cas de fausse déclaration, de manoeuvre frauduleuse ou de changement du projet de travaux subventionné, le bénéficiaire s'expose au retrait et au reversement de tout ou partie de l'aide. Les services de l'ANAH pourront faire procéder à tout contrôle des engagements et sanctionner le bénéficiaire et son mandataire éventuel des manquements constatés.<br><br>
+<strong>Mention RAI — Partenaire ACE Énergie</strong><br>
+« La présente offre comprend une Prime d'un montant de {{ montant_cee_lettres }} euros, qui vous est offerte par ACE ÉNERGIE (SIREN : 848 595 336) dans le cadre de son rôle actif et incitatif, au titre du dispositif des certificats d'économies d'énergie »<br><br>
+<strong>Mention RAI — Partenaire Picoty</strong><br>
+« Prime liée à la valorisation des certificats d'économies d'énergie versée par PICOTY, représentée par ECAIR (MRA GROUPE) en qualité de mandataire, pour la somme de {{ montant_cee_lettres }} euros »
+</div>
+</section>
+
+<!-- CONDITIONS DE PAIEMENT -->
+<section class="payment-terms">
+<div class="section-title">Conditions de paiement</div>
+<div class="payment-grid">
+<div class="payment-card">
+<div class="payment-card-icon">
+<svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24">
+<rect height="14" rx="2" width="18" x="3" y="6"></rect>
+<path d="M3 10h18"></path>
+<path d="M7 15h2"></path>
+</svg>
+</div>
+<div class="payment-card-content">
+<div class="payment-card-title">Acompte à la commande</div>
+<div class="payment-card-text">
+<strong>30 % du montant TTC</strong> du présent devis.
+          </div>
+</div>
+</div>
+<div class="payment-card">
+<div class="payment-card-icon">
+<svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24">
+<path d="M3 7h18v10a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"></path>
+<path d="M3 7l3-3h12l3 3"></path>
+<path d="M9 12h6"></path>
+</svg>
+</div>
+<div class="payment-card-content">
+<div class="payment-card-title">Solde du prix</div>
+<div class="payment-card-text">
+<strong>Solde restant dû</strong> exigible préalablement à l'achèvement complet des travaux, au plus tard lors de la phase finale du chantier.
+          </div>
+</div>
+</div>
+<div class="payment-card">
+<div class="payment-card-icon">
+<svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24">
+<path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"></path>
+<polyline points="14 2 14 8 20 8"></polyline>
+<line x1="9" x2="15" y1="13" y2="13"></line>
+<line x1="9" x2="13" y1="17" y2="17"></line>
+</svg>
+</div>
+<div class="payment-card-content">
+<div class="payment-card-title">Coordonnées bancaires</div>
+<div class="payment-card-text">
+<strong>Le relevé d'identité bancaire (RIB)</strong> de la société est joint en annexe au présent devis.
+          </div>
+</div>
+</div>
+</div>
+</section>
+<!-- ZONE SIGNATURE — UN SEUL GROS BLOC POUR LE CLIENT -->
+<section class="signature">
+<div class="signature-title">Acceptation du devis</div>
+<div class="signature-box" style="min-height: 260px;">
+<div class="signature-box-label">Le client</div>
+<div class="signature-box-mention" style="font-size: 10.5px;">
+        Apposer la signature précédée de la mention <strong>« Lu et approuvé, bon pour accord. Devis reçu avant l'exécution des travaux. »</strong>
+</div>
+<div class="signature-box-zone"></div>
+<div class="signature-box-date"><strong>Date :</strong> ___ / ___ / ______</div>
+</div>
+</section>
+<!-- MENTION aides publiques -->
+
+<!-- CERTIFICATIONS -->
+
+<footer class="footer footer-devis">
+<div class="footer-info">
+<div>
+<span style="white-space:nowrap">58 Rue de la Sablière, 92600 Asnières-sur-Seine</span><br/>
+        RCS Nanterre 845 229 152<br/>
+        SIRET 845 229 152 00028<br/>
+        TVA FR 89 845 229 152
+      </div>
+<div class="right"><div>RGE CertiRénov' n° CR-2025-92-0052</div>
+<div>Assurance Décennale &amp; RC Pro — MIC Insurance n° AXE2502159</div>
+<div>Validité des garanties : du 19/03/2026 au 18/03/2027</div>
+<div>info@hexa-renov.fr · 09 70 70 25 11</div></div>
+</div>
+</footer>
+<!-- ========== ANNEXE : CONDITIONS GÉNÉRALES DE VENTE ========== -->
+<section class="cgv-section">
+<div class="cgv-header">
+<div class="cgv-header-eyebrow">Annexe au présent devis</div>
+<h2 class="cgv-header-title">Conditions Générales de Vente</h2>
+<div class="cgv-header-meta">
+        SAS HEXA RÉNOV' · 58 Rue de la Sablière, 92600 Asnières-sur-Seine · RCS Nanterre 845 229 152 · SIRET 845 229 152 00028 · TVA FR 89 845 229 152
+      </div>
+</div>
+<article class="cgv-article">
+<div class="cgv-article-num">Article 1</div>
+<h3 class="cgv-article-title">Champ d'application</h3>
+<div class="cgv-article-body">
+<p>Les présentes Conditions Générales de Vente s'appliquent sans restriction ni réserve à l'ensemble des ventes et prestations de services conclues par la société HEXA RÉNOV', exerçant sous l'enseigne HEXA RÉNOV' (« le Vendeur ») auprès d'acheteurs consommateurs (« Les Clients ou le Client »), désirant acquérir les produits ou services proposés par le Vendeur (« Les Produits ») au moyen de la passation d'une commande effectuée hors établissement au sens du code de la consommation.</p>
+<p>Une commande hors établissement s'entend tout contrat conclu entre un professionnel et un consommateur :</p>
+<ul class="cgv-list">
+<li>Dans un lieu qui n'est pas celui où le professionnel exerce son activité en permanence ou de manière habituelle, en la présence physique simultanée des parties, y compris à la suite d'une sollicitation ou d'une offre faite par le consommateur ;</li>
+<li>Ou dans le lieu où le professionnel exerce son activité en permanence ou de manière habituelle ou au moyen d'une technique de communication à distance, immédiatement après que le consommateur a été sollicité personnellement et individuellement dans un lieu différent de celui où le professionnel exerce en permanence ou de manière habituelle son activité et où les parties étaient, physiquement et simultanément, présentes ;</li>
+<li>Ou pendant une excursion organisée par le professionnel ayant pour but ou pour effet de promouvoir et de vendre des biens ou des services au consommateur.</li>
+</ul>
+<p>Elles précisent notamment les conditions de commande, de paiement, de livraison et d'installation des Produits commandés par les Clients. Les caractéristiques essentielles des Produits et notamment les spécifications, illustrations et indications de dimensions ou de capacité des Produits, sont présentées au Client à l'aide de catalogues. Les offres des produits s'entendent dans la limite des stocks disponibles.</p>
+<p>Le Client déclare avoir pris connaissance des présentes Conditions Générales de Ventes et les avoir acceptées avant la passation de sa commande. Ces Conditions Générales de Vente pouvant faire l'objet de modifications ultérieures, la version applicable à l'achat du Client est celle en vigueur à la date de signature de la commande. La validation de la commande par le Client vaut acceptation sans restriction ni réserve des présentes Conditions Générales de Vente.</p>
+</div>
+</article>
+<article class="cgv-article">
+<div class="cgv-article-num">Article 2</div>
+<h3 class="cgv-article-title">Commandes</h3>
+<div class="cgv-article-body">
+<p>La commande de Produits et services est effectuée par la signature du devis par le Client. Sous réserve du droit de rétractation défini ci-après, la vente de Produit ne sera considérée comme définitive qu'après la réalisation des conditions suspensives suivantes :</p>
+<ul class="cgv-list">
+<li><strong>Pour les installations photovoltaïques :</strong> obtention par le Client ou son mandataire de l'autorisation administrative requise pour l'installation du Produit après instruction de la demande de travaux et absence de recours sur cette autorisation dans les délais légaux.</li>
+<li><strong>En cas de recours à une aide aide publique parcours de rénovation :</strong> obtention par le Client de la décision d'octroi de l'aide par l'aides publiques, pour un montant au moins égal au montant prévisionnel indiqué au devis.</li>
+<li><strong>En cas de recours à un financement bancaire</strong> auprès d'un partenaire financier de la société HEXA RÉNOV' suivant option prévue à cet effet sur le devis : obtention par le Client de ce prêt.</li>
+</ul>
+<p>En cas de non-réalisation de l'une des deux conditions suspensives évoquées ci-dessus, le contrat sera caduc et la vente automatiquement annulée, sans que cela ouvre droit à indemnité pour le client, qui reconnaît, de ce fait, n'avoir subi aucun préjudice.</p>
+<p>Dans le cadre des prestations de services proposées au Client, ce dernier, par le présent devis, donne mandat à la société de réaliser l'ensemble des démarches administratives nécessaires à la réalisation et à la conformité des travaux d'installation. Dans ces circonstances, le Client doit faire parvenir au Vendeur dans les meilleurs délais une copie de toute correspondance reçue des diverses administrations dans le cadre de cette installation, et plus généralement, répondre à toute demande de communication de documents de la société HEXA RÉNOV' à cette fin.</p>
+<p>La société HEXA RÉNOV' procédera à l'installation du matériel soit directement, soit par l'intermédiaire d'un installateur agréé, toujours dans le respect des conditions prévues par l'article 7 des présentes conditions générales. La société HEXA RÉNOV' se réserve la possibilité de faire intervenir tout sous-traitant qualifié et assuré pour l'exécution des prestations, sous sa responsabilité.</p>
+<p>Le Client est informé que les aides financières (aides publiques, CEE, collectivités, etc.) sont communiquées à titre estimatif et sur la base des informations disponibles au moment de l'étude. Leur obtention, leur montant et leurs délais de versement dépendent notamment de l'instruction des organismes compétents et ne peuvent être garantis par la société HEXA RÉNOV'.</p>
+<p>En cas de refus total ou partiel des aides, les parties s'engagent à se rapprocher afin d'examiner les solutions possibles, incluant notamment l'adaptation du projet, la recherche de financements complémentaires ou, le cas échéant, la résiliation du contrat d'un commun accord. En cas de résiliation liée au refus des aides, aucune pénalité ne sera due par le Client, sous réserve des prestations déjà réalisées qui pourront être facturées au prorata.</p>
+</div>
+</article>
+<article class="cgv-article">
+<div class="cgv-article-num">Article 3</div>
+<h3 class="cgv-article-title">Droit de rétractation</h3>
+<div class="cgv-article-body">
+<h4 class="cgv-subtitle">3.1 Délais</h4>
+<p>Conformément aux dispositions de l'article L221-18 du Code de la Consommation, le Client dispose d'un délai de <strong>quatorze jours</strong> pour exercer son droit de rétractation sans avoir à motiver sa décision ni à supporter d'autres coûts que ceux prévus aux articles L221-23 à L221-25 du même Code. Le délai de rétractation court à compter du jour de la conclusion du contrat ou dès la réception du bien par le consommateur. Lorsque ce délai expire un samedi, un dimanche ou un jour férié ou chômé, ce dernier est prolongé au prochain jour ouvrable suivant.</p>
+<h4 class="cgv-subtitle">3.2 Modalités d'exercice</h4>
+<p>Pour exercer son droit de rétractation, le Client doit notifier à la société HEXA RÉNOV' sa décision de rétractation du présent contrat au moyen d'une déclaration dénuée d'ambiguïté (par exemple, par courrier recommandé avec accusé/réception, cachet de la poste faisant foi, télécopie ou courrier électronique à l'adresse suivante : <strong>info@hexa-renov.fr</strong>). Pour que le délai de rétractation soit respecté, il suffit que le Client envoie sa communication relative à l'exercice de son droit de rétractation avant l'expiration du délai de rétractation prévu à l'article L221-18 du code de la consommation. La société HEXA RÉNOV' accusera, dès réception, réception de la déclaration de rétractation, sur tout support durable.</p>
+<h4 class="cgv-subtitle">3.3 Effets de la rétractation</h4>
+<p>En cas de rétractation, la société HEXA RÉNOV' remboursera au Client tous les paiements reçus, y compris l'acompte, au plus tard quatorze jours à compter du jour où la société aura été informée de la décision de rétractation. Le remboursement sera effectué en utilisant le même moyen de paiement que celui utilisé pour la transaction initiale. La société HEXA RÉNOV' récupérera à ses frais les Produits, qui ne pourront être repris que s'ils sont conformes à leur état d'origine, sans dépréciation de valeur autres que celles nécessaires pour établir la nature, les caractéristiques et le bon fonctionnement du Produit.</p>
+<h4 class="cgv-subtitle">3.4 Demande d'exécution avant l'expiration du délai</h4>
+<p>Conformément aux dispositions de l'article L221-25 du code de la consommation, le Client a la possibilité de demander à la société HEXA RÉNOV' l'exécution de prestations de services visant à l'installation de Produits, avant la fin du délai de rétractation visé ci-dessus. La société recueillera sur papier et sur tout autre support durable cette demande expresse du Client. Cette faculté ne prive pas le Client de son droit de rétractation. Toutefois, en cas de demande expresse d'exécution avant la fin du délai de rétractation, le Client devra verser un montant correspondant au service fourni jusqu'à la communication de sa décision de se rétracter. Ce montant sera proportionné au prix total et ne pourra excéder <strong>35 % du prix TTC du contrat</strong>.</p>
+</div>
+</article>
+<article class="cgv-article">
+<div class="cgv-article-num">Article 4</div>
+<h3 class="cgv-article-title">Responsabilité du Vendeur — Garanties</h3>
+<div class="cgv-article-body">
+<p>Les Produits proposés à la vente sont conformes à la réglementation en vigueur en France et ont des performances compatibles avec des usages non professionnels.</p>
+<h4 class="cgv-subtitle">4.1 Garanties légales</h4>
+<p>Les Produits fournis à la vente par le Vendeur bénéficient de plein droit et sans paiement complémentaire :</p>
+<ul class="cgv-list">
+<li>De la <strong>garantie légale de conformité</strong>, pour les Produits apparemment défectueux, abîmés ou endommagés ou ne correspondant pas à la commande ;</li>
+<li>De la <strong>garantie légale contre les vices cachés</strong> provenant d'un défaut de matière, de conception ou de fabrication affectant les produits livrés et les rendant impropres à l'utilisation.</li>
+</ul>
+<p>Dans le cadre de la garantie légale de conformité, le Client bénéficie d'un délai de deux ans à compter de la délivrance du bien pour agir, peut choisir entre la réparation ou le remplacement du Produit, et est dispensé de rapporter la preuve de l'existence du défaut de conformité durant les vingt-quatre mois suivant la délivrance.</p>
+<p>Le Vendeur remplacera ou fera réparer les Produits ou pièces sous garantie jugés non conformes ou défectueux dans les meilleurs délais et au plus tard dans les 30 jours suivant la constatation. La responsabilité du Vendeur ne saurait être engagée en cas de mauvaise utilisation, d'utilisation non conforme aux prescriptions, d'utilisation à des fins professionnelles, négligence ou défaut d'entretien, comme en cas d'usure normale, d'accident ou de force majeure.</p>
+<h4 class="cgv-subtitle">4.2 Garantie de parfait achèvement (1 an)</h4>
+<p>L'installateur du Produit sera tenu de réparer les malfaçons survenues au cours de l'année qui suit la réception des travaux, quelles que soient leur importance et leur nature. La garantie ne s'étend pas aux travaux nécessaires pour remédier aux effets de l'usure normale ou de l'usage.</p>
+<h4 class="cgv-subtitle">4.2 bis Garantie biennale de bon fonctionnement (2 ans)</h4>
+<p>Conformément à l'article 1792-3 du Code civil, les éléments d'équipement dissociables de l'ouvrage bénéficient d'une garantie de bon fonctionnement d'une durée de deux ans à compter de la réception des travaux. Cette garantie couvre les dysfonctionnements affectant ces éléments, hors usure normale.</p>
+<h4 class="cgv-subtitle">4.3 Garantie du fabricant</h4>
+<p>Les garanties contractuelles relatives aux Produits, et leurs conditions d'application, sont fixées par le fournisseur du Produit. Elles sont susceptibles de varier selon la nature du Produit et la marque choisie. Le détail figure sur la fiche de présentation du Produit remise au Client avant la commande, dont ce dernier déclare avoir pris connaissance. Cette fiche a un caractère contractuel.</p>
+<h4 class="cgv-subtitle">4.4 Garantie décennale</h4>
+<p>Conformément à la loi n° 78-12 du 4 janvier 1978 concernant l'assurance des travaux de bâtiment, le Vendeur a souscrit une police d'assurance au titre de sa responsabilité, susceptible d'être engagée sur le fondement des articles 1792 et suivants du Code civil.</p>
+<div class="cgv-info-box">
+<div class="cgv-info-row"><span class="cgv-info-key">N° Police</span><span class="cgv-info-val">AXE2502159</span></div>
+<div class="cgv-info-row"><span class="cgv-info-key">Période de validité</span><span class="cgv-info-val">19/03/2026 au 18/03/2027</span></div>
+<div class="cgv-info-row"><span class="cgv-info-key">Activité assurée</span><span class="cgv-info-val">Contractant général (classe 1)</span></div>
+<div class="cgv-info-row"><span class="cgv-info-key">Territorialité</span><span class="cgv-info-val">France Métropolitaine, Guadeloupe, Martinique, Guyane et La Réunion</span></div>
+<div class="cgv-info-row"><span class="cgv-info-key">Assureur</span><span class="cgv-info-val">MIC INSURANCE COMPANY · RCS Paris 885 241 208 · 29 rue de Bassano, 75008 Paris · www.micinsurance.fr</span></div>
+<div class="cgv-info-row"><span class="cgv-info-key">Garanties</span><span class="cgv-info-val">Responsabilité Civile Décennale + Responsabilité Civile Professionnelle + Protection Juridique</span></div>
+</div>
+</div>
+</article>
+<article class="cgv-article">
+<div class="cgv-article-num">Article 5</div>
+<h3 class="cgv-article-title">Prix</h3>
+<div class="cgv-article-body">
+<p>Les prix correspondant à la vente et à l'installation du matériel sont indiqués en euros et toutes taxes comprises dans le devis.</p>
+<p>Le Client reconnaît que le Vendeur est libre de fixer le prix du matériel, sans que le Client ne puisse formuler aucune contestation à cet égard, à l'encontre du Vendeur, à la suite de la signature du devis. Par ailleurs, le Client reconnaît avoir pris connaissance de l'ensemble des prix indiqués sur le devis, qu'ils soient unitaires ou globaux, et qu'il a été suffisamment informé pour ne formuler aucune contestation à cet égard.</p>
+</div>
+</article>
+<article class="cgv-article">
+<div class="cgv-article-num">Article 6</div>
+<h3 class="cgv-article-title">Paiement</h3>
+<div class="cgv-article-body">
+<p>Le Client reconnaît avoir été informé des différents modes et conditions de règlement mentionnés sur le devis. Il est notamment informé qu'il conserve la possibilité de recourir à un organisme de financement de son choix, distinct des partenaires financiers proposés par la société HEXA RÉNOV'.</p>
+<p>En cas de recours à un financement auprès d'un établissement bancaire partenaire de la société HEXA RÉNOV', la totalité du prix TTC de la vente sera réglée directement à la société HEXA RÉNOV' par l'établissement financier, après réalisation complète des travaux, réception de l'installation et signature par le Client d'un certificat de livraison.</p>
+<p>En cas de paiement comptant :</p>
+<ul class="cgv-list">
+<li>Un acompte de <strong>30 % du montant TTC total du devis</strong> hors fourniture des menuiseries extérieures (fenêtres, portes-fenêtres, fenêtres de toit, portes d'entrée et portes de garage) sera exigé.</li>
+<li>Concernant les éléments de menuiseries extérieures, un acompte complémentaire de <strong>50 % du montant TTC</strong> correspondant à ces fournitures sera demandé.</li>
+</ul>
+<p>Le montant total de l'acompte sera précisé dans le devis. Conformément à l'article L221-10 du Code de la consommation, aucun paiement ne pourra être exigé ou encaissé avant l'expiration d'un délai de 15 jours à compter de la signature du contrat.</p>
+<p>L'exécution des prestations est conditionnée à l'encaissement effectif de cet acompte. Le solde du prix, correspondant au montant restant dû, devra être réglé avant l'achèvement complet des travaux, et au plus tard lors de la phase finale du chantier. La finalisation des travaux et la remise des documents de fin de chantier (notamment procès-verbal de réception, attestations, notices et garanties) sont conditionnées au paiement intégral du prix.</p>
+<p>Toute somme non réglée à son échéance, y compris l'acompte, pourra entraîner l'application de pénalités de retard calculées au taux d'intérêt légal en vigueur, l'exigibilité immédiate de l'intégralité des sommes restantes dues ainsi que la suspension des prestations en cours jusqu'au complet paiement. Une indemnité forfaitaire pour frais de recouvrement d'un montant de <strong>40 €</strong> pourra également être appliquée, conformément à la réglementation en vigueur.</p>
+</div>
+</article>
+<article class="cgv-article">
+<div class="cgv-article-num">Article 7</div>
+<h3 class="cgv-article-title">Livraison — Délais</h3>
+<div class="cgv-article-body">
+<p>Sauf stipulation contraire, le lieu de livraison ou de réalisation de la prestation interviendra à l'adresse du client visé au recto du devis. La société HEXA RÉNOV' s'engage à assurer la livraison et à procéder aux travaux commandés, comprenant le cas échéant, l'installation du matériel dans les délais prévus dans le devis.</p>
+<p>Ces délais pourront toutefois être modifiés en cas de survenance d'un cas fortuit, d'un cas de force majeure, ou de suspension, en raison d'une cause légitime. Dans cette hypothèse, le délai sera prorogé du nombre de jours pendant lesquels l'exécution du contrat aura été suspendue.</p>
+<p>Sont considérés comme causes légitimes de suspension du délai : les intempéries entraînant un arrêt des travaux, les difficultés techniques imprévisibles rencontrées au cours de la réalisation, les travaux à la charge du Client qui n'auraient pas été réalisés dans les délais (ex : remise en l'état de la toiture, dépose de matériaux nécessaires au raccordement, etc.).</p>
+<p>Le Client s'engage à garantir un accès libre, sécurisé et continu au chantier. En cas d'impossibilité d'accès, d'absence ou de blocage imputable au Client, les délais seront suspendus et les frais supplémentaires éventuels (déplacement, immobilisation, reprogrammation) pourront être facturés.</p>
+</div>
+</article>
+<article class="cgv-article">
+<div class="cgv-article-num">Article 8</div>
+<h3 class="cgv-article-title">Réception</h3>
+<div class="cgv-article-body">
+<p>À l'issue de l'installation du matériel, le Client régularisera un procès-verbal de réception de l'installation. Lorsque la réception est assortie de réserves techniquement justifiées, la société HEXA RÉNOV' disposera d'un délai de <strong>30 jours</strong> pour procéder à leur levée. Immédiatement après le constat contradictoire de levée de réserves, la réception sera prononcée et constatée par l'établissement d'un procès-verbal établi puis signé par le Client et le Vendeur.</p>
+<p>Le refus de signature du Client doit reposer sur des motifs justifiés, réels et sérieux. Dans tous les cas, le Client devra indiquer par écrit les motifs de refus de réception. Si le Client utilise tout ou partie de l'installation sans en avoir prononcé la réception, il est réputé avoir prononcé la réception sans réserve.</p>
+</div>
+</article>
+<article class="cgv-article">
+<div class="cgv-article-num">Article 9</div>
+<h3 class="cgv-article-title">Résiliation</h3>
+<div class="cgv-article-body">
+<p>Si les Produits ou services commandés n'ont pas été livrés et/ou réalisés dans un délai de <strong>30 jours</strong> à compter des dates prévues initialement, la vente ou la prestation pourra être résolue à la demande écrite du Client dans les conditions prévues aux articles L216-2 et L216-3 du Code de la consommation, indépendamment de l'exercice du droit de rétractation. Les sommes versées par le Client lui seront alors restituées au plus tard dans les quatorze jours qui suivent la date de dénonciation du contrat, à l'exclusion de toute indemnisation ou retenue.</p>
+<p>Aucune résiliation pour retard ne pourra être retenue si ce retard est justifié par l'une des hypothèses visées à l'article 7 ci-dessus.</p>
+<p>En cas de changement de circonstances imprévisibles lors de la conclusion du contrat conformément aux dispositions de l'article 1195 du Code civil, les parties n'entendent pas assumer un risque d'exécution excessivement onéreux. En ces circonstances, à la demande de l'une d'entre elles, le contrat pourra être renégocié.</p>
+</div>
+</article>
+<article class="cgv-article">
+<div class="cgv-article-num">Article 10</div>
+<h3 class="cgv-article-title">Règlement des litiges</h3>
+<div class="cgv-article-body">
+<p>Toutes les clauses figurant dans les présentes CGV, ainsi que toutes les opérations de vente qui y sont visées sont soumises au droit français. Tous les litiges auxquels les opérations d'achat et de vente conclues en application des présentes conditions générales de vente pourraient donner lieu seront soumis aux tribunaux compétents dans les conditions de droit commun.</p>
+<p>Le Client est informé qu'en application des articles L612-1 du Code de la consommation, tout consommateur a le droit de recourir gratuitement à un médiateur de la Consommation en vue de la résolution amiable du litige qui l'oppose à un professionnel.</p>
+<p>En cas de persistance d'un litige malgré une réclamation écrite préalable directement adressée à la société HEXA RÉNOV', le Client peut saisir gratuitement le médiateur de la consommation dont relève le professionnel, à savoir l'<strong>Association des Médiateurs Européens (AME CONSO)</strong>, dans un délai d'un an à compter de la réclamation écrite adressée au professionnel.</p>
+<div class="cgv-info-box">
+<div class="cgv-info-row"><span class="cgv-info-key">Site web</span><span class="cgv-info-val"><a href="https://www.mediationconso-ame.com" target="_blank">www.mediationconso-ame.com</a></span></div>
+<div class="cgv-info-row"><span class="cgv-info-key">Adresse postale</span><span class="cgv-info-val">AME CONSO, 11 Place Dauphine, 75001 Paris</span></div>
+</div>
+<p class="cgv-note">Il est expressément rappelé que la saisine du médiateur de la Consommation est une faculté.</p>
+</div>
+</article>
+<article class="cgv-article">
+<div class="cgv-article-num">Article 11</div>
+<h3 class="cgv-article-title">Informations pré-contractuelles — Acceptation du Client</h3>
+<div class="cgv-article-body">
+<p>Le Client reconnaît avoir eu communication, préalablement à la passation de sa commande, d'une manière lisible et compréhensible, des présentes Conditions Générales de Vente et de toutes les informations et renseignements visés aux articles L111-1 et L111-2 du Code de la consommation ainsi que ceux visés à l'article L221-5 du même Code, et en particulier :</p>
+<ul class="cgv-list">
+<li>Les caractéristiques essentielles du Produit ;</li>
+<li>Le prix des Produits et des frais annexes (livraison, par exemple) ;</li>
+<li>La date ou le délai auquel le Vendeur s'engage à livrer le Produit ;</li>
+<li>Les informations relatives à l'identité du Vendeur, à ses coordonnées postales, téléphoniques et électroniques, et à ses activités ;</li>
+<li>Les informations relatives aux garanties légales et contractuelles et à leurs modalités de mise en œuvre ;</li>
+<li>La possibilité de recourir à une médiation conventionnelle en cas de litige ;</li>
+<li>Les informations relatives au droit de rétractation (existence, conditions, délai, modalités d'exercice et formulaire type), aux frais de renvoi des Produits, aux modalités de résiliation et autres conditions contractuelles importantes.</li>
+</ul>
+<p>Le fait pour une personne physique de commander un Produit auprès de la société HEXA RÉNOV' par le biais d'un devis emporte adhésion et acceptation pleine et entière des présentes Conditions Générales de Vente, ce qui est expressément reconnu par le Client.</p>
+</div>
+</article>
+<article class="cgv-article">
+<div class="cgv-article-num">Article 12</div>
+<h3 class="cgv-article-title">Protection des données à caractère personnel</h3>
+<div class="cgv-article-body">
+<h4 class="cgv-subtitle">12.1 Responsable de traitement et finalités</h4>
+<p>Vos données à caractère personnel sont collectées par la société HEXA RÉNOV', en sa qualité de responsable de traitement, pour les besoins de la relation qui vous lie dans le cadre de ce contrat et afin de :</p>
+<ul class="cgv-list">
+<li>Pouvoir établir ce devis ;</li>
+<li>Exécuter le présent contrat ;</li>
+<li>Établir votre dossier client ;</li>
+<li>Faciliter les prestations d'assistance assurées par le service Clientèle.</li>
+</ul>
+<p>Le Client reconnaît que le présent devis constitue la base légale de son consentement.</p>
+<h4 class="cgv-subtitle">12.2 Destinataires des données</h4>
+<p>Vos données ne seront transférées ou rendues accessibles à aucun tiers sous réserve : (i) des sous-traitants de la société HEXA RÉNOV' pour des raisons exclusivement liées à l'exécution de ce contrat ainsi que dans le cadre d'intervention de nos installateurs agréés, et (ii) des organismes financiers pour la demande de financement, de la société ENEDIS (ou des régies d'électricité) pour les raccordements électriques, et des administrations délivrant les autorisations nécessaires à l'installation du Produit.</p>
+<h4 class="cgv-subtitle">12.3 Durée de conservation</h4>
+<p>Les données relatives à ce contrat ne seront conservées que pour une durée n'excédant pas les délais de prescriptions légales applicables et strictement nécessaires pour son exécution. Suite à l'exécution de votre contrat et pour satisfaire les obligations légales et fiscales, vos données seront conservées pour une durée de <strong>5 ans</strong>. Les documents comptables (facturation et preuves de paiement) seront conservés pendant <strong>10 ans</strong>.</p>
+<div class="cgv-section-12-4">
+<h4 class="cgv-subtitle">12.4 Exercice des droits</h4>
+<p>Conformément à la réglementation en vigueur, vous disposez d'un droit d'accès, de modification, de limitation, de portabilité, de retrait du consentement et de suppression des données vous concernant ainsi que d'un droit d'opposition au traitement. Vous pouvez également définir des directives relatives au sort de vos données à caractère personnel en cas de décès. Vous bénéficiez enfin du droit d'introduire une réclamation auprès d'une autorité de contrôle. Pour plus d'informations : <a href="https://www.cnil.fr" target="_blank">www.cnil.fr</a></p>
+<div class="cgv-info-box">
+<div class="cgv-info-row"><span class="cgv-info-key">Email</span><span class="cgv-info-val">info@hexa-renov.fr</span></div>
+<div class="cgv-info-row"><span class="cgv-info-key">Courrier</span><span class="cgv-info-val">Société HEXA RÉNOV' — À l'attention du Délégué à la Protection des Données personnelles<br/>58 rue de la Sablière, 92600 Asnières-sur-Seine</span></div>
+<div class="cgv-info-row"><span class="cgv-info-key">Téléphone</span><span class="cgv-info-val">09 70 70 25 11</span></div>
+</div>
+</div>
+</div>
+</article>
+<!-- FORMULAIRE D'ANNULATION -->
+<article class="cgv-article cgv-form-article">
+<div class="cgv-article-num">Annexe</div>
+<h3 class="cgv-article-title">Formulaire d'annulation de commande</h3>
+<div class="cgv-article-body">
+<p class="cgv-note-intro"><strong>Articles L121-21 et suivants du Code de la consommation.</strong> Compléter et signer ce formulaire puis l'envoyer par lettre recommandée avec avis de réception. L'expédier au plus tard le 14<sup>ème</sup> jour à partir du jour de la commande ou, si ce délai expire un samedi, dimanche ou jour férié, le premier jour ouvrable suivant.</p>
+<div class="cgv-cancel-box">
+<div class="cgv-cancel-recipient">
+<strong>À adresser à :</strong><br/>
+            Société HEXA RÉNOV'<br/>
+            58 rue de la Sablière, 92600 Asnières-sur-Seine
+          </div>
+<div class="cgv-cancel-form">
+<div class="cgv-cancel-row">
+<span class="cgv-cancel-label">Je soussigné(e)</span>
+<div class="cgv-cancel-line"></div>
+</div>
+<div class="cgv-cancel-row">
+<span class="cgv-cancel-label">Déclare annuler la commande ci-après</span>
+<div class="cgv-cancel-line"></div>
+</div>
+<div class="cgv-cancel-row">
+<span class="cgv-cancel-label">Nature du bien ou du service commandé</span>
+<div class="cgv-cancel-line"></div>
+</div>
+<div class="cgv-cancel-row">
+<span class="cgv-cancel-label">Date de la commande</span>
+<div class="cgv-cancel-line"></div>
+</div>
+<div class="cgv-cancel-row">
+<span class="cgv-cancel-label">Nom du client</span>
+<div class="cgv-cancel-line"></div>
+</div>
+<div class="cgv-cancel-row">
+<span class="cgv-cancel-label">Adresse du client</span>
+<div class="cgv-cancel-line"></div>
+</div>
+<div class="cgv-cancel-row">
+<span class="cgv-cancel-label">Date</span>
+<div class="cgv-cancel-line short"></div>
+<span class="cgv-cancel-label">Signature</span>
+<div class="cgv-cancel-line"></div>
+</div>
+</div>
+</div>
+</div>
+</article>
+<div class="glossaire-inline" style="margin: 24px 0 0; padding-top: 16px; border-top: 1px solid var(--gris-ligne);">
+      ITE = Isolation Thermique par l'Extérieur · PAC = Pompe à Chaleur · VMC = Ventilation Mécanique Contrôlée · SCOP = Coefficient de Performance Saisonnier · ETAS = Efficacité Énergétique Saisonnière · R = Résistance thermique (m².K/W) · DPE = Diagnostic de Performance Énergétique · Éco-PTZ = Éco-Prêt à Taux Zéro · CEE = Certificats d'Économies d'Énergie
+    </div>
+</section>
+<!-- FOOTER -->
+<footer class="footer">
+<div class="footer-info">
+<div>
+<strong>SAS HEXA RÉNOV'</strong><br/>
+        58 Rue de la Sablière, 92600 Asnières-sur-Seine<br/>
+        RCS Nanterre 845 229 152 · SIRET 845 229 152 00028<br/>TVA FR 89 845 229 152
+      </div>
+<div class="right"><div>RGE CertiRénov' n° CR-2025-92-0052</div>
+<div>Assurance Décennale &amp; RC Pro — MIC Insurance n° AXE2502159</div>
+<div>Validité des garanties : du 19/03/2026 au 18/03/2027</div>
+<div>info@hexa-renov.fr · 09 70 70 25 11</div></div>
+</div>
+</footer>
+</div>
+<script>
+(function() {
+  'use strict';
+
+  // ============ ANIMATIONS APPARITION (IntersectionObserver) ============
+  const revealEls = document.querySelectorAll('.reveal');
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        const delay = parseInt(entry.target.dataset.reveal || '0', 10) * 80;
+        setTimeout(() => {
+          entry.target.classList.add('show');
+          // Lancer les compteurs à l'intérieur
+          startCountersIn(entry.target);
+        }, delay);
+        observer.unobserve(entry.target);
+      }
+    });
+  }, { threshold: 0.2 });
+  revealEls.forEach(el => observer.observe(el));
+
+  // ============ COMPTEURS ANIMÉS ============
+  function formatNumber(num, decimals) {
+    const d = decimals || 0;
+    return num.toFixed(d).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+  }
+
+  function animateCounter(el) {
+    if (el.dataset.counted) return;
+    el.dataset.counted = 'true';
+
+    const fromVal = parseFloat(el.dataset.counterFrom);
+    const toVal = parseFloat(el.dataset.counterTo);
+    const target = parseFloat(el.dataset.counter);
+    const decimal = parseInt(el.dataset.decimal || '0', 10);
+    const prefix = el.dataset.prefix || '';
+    const suffix = el.dataset.suffix || '';
+    const duration = 1700;
+    const startTime = performance.now();
+
+    let start, end;
+    if (!isNaN(fromVal) && !isNaN(toVal)) {
+      // Compteur "à l'envers" (de fromVal vers toVal)
+      start = fromVal;
+      end = toVal;
+    } else {
+      start = 0;
+      end = target;
+    }
+
+    el.classList.add('counter-active');
+
+    function step(now) {
+      const elapsed = now - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      // easeOutCubic
+      const eased = 1 - Math.pow(1 - progress, 3);
+      const current = start + (end - start) * eased;
+      el.textContent = prefix + formatNumber(current, decimal) + suffix;
+      if (progress < 1) {
+        requestAnimationFrame(step);
+      } else {
+        el.textContent = prefix + formatNumber(end, decimal) + suffix;
+        setTimeout(() => el.classList.remove('counter-active'), 300);
+      }
+    }
+    requestAnimationFrame(step);
+  }
+
+  function startCountersIn(container) {
+    const counters = container.querySelectorAll('[data-counter], [data-counter-from]');
+    counters.forEach((el) => animateCounter(el));
+
+    // Animation de la barre de financement (si présente)
+    const bar = container.querySelector('[data-financing-anim]');
+    const legendItems = container.querySelectorAll('.financing-legend-item');
+
+    if (bar) {
+      const segs = bar.querySelectorAll('[data-target-width]');
+      segs.forEach(seg => {
+        const w = seg.dataset.targetWidth;
+        if (seg.classList.contains('financing-bar-anah')) {
+          bar.style.setProperty('--anah-width', w + '%');
+        } else if (seg.classList.contains('financing-bar-rac')) {
+          bar.style.setProperty('--rac-width', w + '%');
+        }
+      });
+
+      // Phase 1 : déclencher la séquence (aides publiques 0.9s + délai 0.7s + RAC 0.9s = ~2.5s)
+      requestAnimationFrame(() => {
+        setTimeout(() => bar.classList.add('animate'), 200);
+      });
+
+      // Phase 2 : les % font un pulse une fois les segments en place
+      // 200ms (départ) + 700ms (délai RAC) + 900ms (durée RAC) = 1800ms
+      setTimeout(() => {
+        const pcts = container.querySelectorAll('.financing-legend-pct');
+        pcts.forEach((p, i) => {
+          setTimeout(() => {
+            p.classList.add('pulse');
+            setTimeout(() => p.classList.remove('pulse'), 500);
+          }, i * 250);
+        });
+      }, 1800);
+
+      // Phase 3 : les légendes apparaissent en cascade, après le shimmer
+      setTimeout(() => {
+        legendItems.forEach((item, i) => {
+          setTimeout(() => item.classList.add('show'), i * 200);
+        });
+      }, 2500);
+    } else if (legendItems.length) {
+      // Pas de barre, on affiche la légende directement
+      legendItems.forEach((item, i) => {
+        setTimeout(() => item.classList.add('show'), i * 180);
+      });
+    }
+  }
+
+  function settleAll() {
+    // Compteurs : afficher immédiatement la valeur finale
+    document.querySelectorAll('[data-counter], [data-counter-from]').forEach((el) => {
+      el.dataset.counted = 'true';
+      const decimal = parseInt(el.dataset.decimal || '0', 10);
+      const prefix = el.dataset.prefix || '';
+      const suffix = el.dataset.suffix || '';
+      const toVal = parseFloat(el.dataset.counterTo);
+      const target = parseFloat(el.dataset.counter);
+      const end = !isNaN(toVal) ? toVal : target;
+      if (!isNaN(end)) el.textContent = prefix + formatNumber(end, decimal) + suffix;
+      el.classList.remove('counter-active');
+    });
+    // Barre + légendes : état final
+    document.querySelectorAll('[data-financing-anim]').forEach((bar) => {
+      bar.querySelectorAll('[data-target-width]').forEach(seg => {
+        const w = seg.dataset.targetWidth;
+        if (seg.classList.contains('financing-bar-anah')) bar.style.setProperty('--anah-width', w + '%');
+        else if (seg.classList.contains('financing-bar-rac')) bar.style.setProperty('--rac-width', w + '%');
+      });
+      bar.classList.add('animate');
+    });
+    document.querySelectorAll('.financing-legend-item').forEach(i => i.classList.add('show'));
+    document.querySelectorAll('.reveal').forEach(r => r.classList.add('show'));
+  }
+  window.addEventListener('beforeprint', settleAll);
+
+})();
+</script>
+<style>
+  .rentabilite-graph-wrap { position: relative; }
+  .g-tooltip {
+    position: absolute; pointer-events: none; opacity: 0; transform: translateY(4px);
+    background: #fff; color: #1A2233;
+    border: 1px solid #E1E5EB; border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0,46,90,0.12), 0 1px 3px rgba(0,46,90,0.06);
+    padding: 12px 14px; font-family: 'Inter', sans-serif; font-size: 11.5px;
+    min-width: 230px; max-width: 270px;
+    transition: opacity .15s ease, transform .15s ease;
+    z-index: 10;
+  }
+  .g-tooltip.show { opacity: 1; transform: translateY(0); }
+  .g-tt-year { font-size: 10px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #E2214B; margin-bottom: 8px; }
+  .g-tt-row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 4px 0; border-top: 1px solid #F0F2F6; }
+  .g-tt-row:first-of-type { border-top: none; }
+  .g-tt-label { color: #4A5567; font-size: 10.5px; }
+  .g-tt-val { color: #002E5A; font-weight: 700; white-space: nowrap; font-feature-settings: 'tnum' 1; }
+  .g-tt-gain .g-tt-label { color: #2D7A4F; font-weight: 600; }
+  .g-tt-gain .g-tt-val { color: #2D7A4F; }
+  .g-tt-note { margin-top: 8px; font-size: 9.5px; color: #8A92A0; font-style: italic; line-height: 1.4; }
+  /* Animation de tracé au chargement */
+  #ecoChart .g-high, #ecoChart .g-low {
+    stroke-dasharray: 1400;
+    stroke-dashoffset: 1400;
+    animation: gDraw 2s ease-out 0.3s forwards;
+  }
+  #ecoChart .g-low { animation-delay: 0.6s; }
+  #ecoChart .g-area {
+    opacity: 0;
+    animation: gFade 1.2s ease-out 1.4s forwards;
+  }
+  @keyframes gDraw { to { stroke-dashoffset: 0; } }
+  @keyframes gFade { to { opacity: 1; } }
+  /* En print : pas d'animation, courbes visibles directement */
+  @media print {
+    #ecoChart .g-high, #ecoChart .g-low { stroke-dasharray: none; stroke-dashoffset: 0; animation: none; }
+    #ecoChart .g-low { stroke-dasharray: 5,3; }
+    #ecoChart .g-area { opacity: 1; animation: none; }
+    }
+  .g-hover { cursor: default; }
+</style>
+<script>
+(function(){
+  var svg = document.getElementById('ecoChart');
+  if (!svg) return;
+  var wrap = svg.parentElement; // rentabilite-graph-wrap
+  var tt = document.getElementById('ecoChartTooltip');
+  var cursor = document.getElementById('g-cursor');
+  var dotH = document.getElementById('g-dot-hi');
+  var dotL = document.getElementById('g-dot-lo');
+  var fmt = function(n){ return new Intl.NumberFormat('fr-FR').format(n) + ' €'; };
+
+  function show(p) {
+    document.getElementById('tt-year').textContent  = p.year;
+    document.getElementById('tt-fioul').textContent = fmt(p.f_lo) + ' à ' + fmt(p.f_hi);
+    document.getElementById('tt-elec').textContent  = fmt(p.e_lo) + ' à ' + fmt(p.e_hi);
+    document.getElementById('tt-gain').textContent  = fmt(p.g_lo) + ' à ' + fmt(p.g_hi);
+    document.getElementById('tt-cum').textContent   = fmt(p.cu_lo) + ' à ' + fmt(p.cu_hi);
+    var svgRect = svg.getBoundingClientRect();
+    var wrapRect = wrap.getBoundingClientRect();
+    var pxPerSvg = svgRect.width / 720;
+    var ptX = svgRect.left + p.cx * pxPerSvg;
+    var ttLeft = ptX - wrapRect.left + 18;
+    var ttTop  = svgRect.top - wrapRect.top + 30;
+    if (ttLeft + 280 > wrap.offsetWidth) { ttLeft = ptX - wrapRect.left - 270; }
+    if (ttLeft < 0) ttLeft = 8;
+    tt.style.left = ttLeft + 'px';
+    tt.style.top  = ttTop  + 'px';
+    tt.classList.add('show');
+    cursor.setAttribute('x1', p.cx); cursor.setAttribute('x2', p.cx);
+    cursor.setAttribute('opacity', 1);
+    dotH.setAttribute('cx', p.cx); dotH.setAttribute('cy', p.yh); dotH.setAttribute('opacity', 1);
+    dotL.setAttribute('cx', p.cx); dotL.setAttribute('cy', p.yl); dotL.setAttribute('opacity', 1);
+  }
+  function hide() {
+    tt.classList.remove('show');
+    cursor.setAttribute('opacity', 0);
+    dotH.setAttribute('opacity', 0);
+    dotL.setAttribute('opacity', 0);
+  }
+
+  svg.querySelectorAll('.g-hover').forEach(function(el){
+    var p = {
+      year: parseInt(el.dataset.year),
+      f_lo: parseInt(el.dataset.fLo),  f_hi: parseInt(el.dataset.fHi),
+      e_lo: parseInt(el.dataset.eLo),  e_hi: parseInt(el.dataset.eHi),
+      g_lo: parseInt(el.dataset.gLo),  g_hi: parseInt(el.dataset.gHi),
+      cu_lo: parseInt(el.dataset.cuLo), cu_hi: parseInt(el.dataset.cuHi),
+      cx: parseFloat(el.dataset.cx),
+      yh: parseFloat(el.dataset.yh),
+      yl: parseFloat(el.dataset.yl)
+    };
+    el.addEventListener('mouseenter', function(){ show(p); });
+    el.addEventListener('mousemove',  function(){ show(p); });
+    el.addEventListener('mouseleave', hide);
+  });
+})();
+</script>
+</body>
+</html>
