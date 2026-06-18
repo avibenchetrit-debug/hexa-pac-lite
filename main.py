@@ -52,6 +52,7 @@ MODELES_EMAIL_PATH = os.path.join(DATA_DIR, "modeles_email.json")
 PARAMETRES_ADMIN_PATH = os.path.join(DATA_DIR, "parametres_admin.json")
 COUNTERS_PATH = os.path.join(DATA_DIR, "counters.json")
 DEVIS_ENVOYES_PATH = os.path.join(DATA_DIR, "devis_envoyes.json")
+STATES_SIMULATEUR_DIR = os.path.join(DATA_DIR, "states_simulateur")
 DEVIS_DIR = os.path.join(DATA_DIR, "devis")
 DEVIS_META_PATH = os.path.join(DEVIS_DIR, "devis_meta.json")
 REPO_CATALOGUE_PATH = os.path.join(REPO_DATA_DIR, "catalogue_pac.json")
@@ -120,8 +121,6 @@ DEFAULT_PARAMETRES_ADMIN = {
         "prix_pose_ht": 3500,
         "prix_travaux_induits_ht": 1200,
         "frais_ecair_pct": 12,
-        "description_pose_defaut": "Pose et mise en service de la pompe à chaleur, raccordements hydrauliques et électriques, dépose et évacuation de l'ancien système, contrôle d'étanchéité, paramétrage de la régulation.",
-        "description_travaux_induits_defaut": "Adaptation du circuit chauffage existant, modification de la ligne électrique dédiée, mise en place des éléments de sécurité, protections et reprises nécessaires à la bonne intégration de la pompe à chaleur.",
     },
     "sous_traitants": DEFAULT_SOUS_TRAITANTS,
 }
@@ -284,6 +283,7 @@ def _init_storage():
     _seed_json_file(CATALOGUE_PATH, DEFAULT_CATALOGUE_PAC, REPO_CATALOGUE_PATH)
     _seed_json_file(BAREMES_PATH, {}, REPO_BAREMES_PATH)
     os.makedirs(DEVIS_DIR, exist_ok=True)
+    os.makedirs(STATES_SIMULATEUR_DIR, exist_ok=True)
     _seed_json_file(DEVIS_META_PATH, {})
     save_parametres_admin_atomic(load_parametres_admin())
     _migrate_catalogue_pac_schema()
@@ -322,6 +322,25 @@ def _read_devis_meta():
 def _read_devis_envoyes():
     sent = _read_json(DEVIS_ENVOYES_PATH, [])
     return sent if isinstance(sent, list) else []
+
+
+def _state_simulateur_path(numero: str) -> str:
+    safe = re.sub(r"[^A-Za-z0-9_.-]", "_", str(numero or ""))
+    return os.path.join(STATES_SIMULATEUR_DIR, f"{safe}.json")
+
+
+def load_state_simulateur(numero: str) -> dict:
+    state = _read_json(_state_simulateur_path(numero), {})
+    return state if isinstance(state, dict) else {}
+
+
+def save_state_simulateur_atomic(numero: str, payload: dict) -> dict:
+    state = payload if isinstance(payload, dict) else {}
+    state = dict(state)
+    state["numero_prospect"] = numero
+    state["updated_at"] = _now_iso()
+    _atomic_write_json(_state_simulateur_path(numero), state)
+    return state
 
 
 async def _read_request_payload(request: Request) -> dict:
@@ -504,6 +523,7 @@ FIELD_ALIASES = {
     "ville": "ville_chantier",
     "code_postal_chantier": "cp",
     "cp_personne": "code_postal_personne",
+    "phase_electrique": "alimentation_electrique",
 }
 
 PROSPECT_FIELDS = [
@@ -567,7 +587,6 @@ PROSPECT_FIELDS = [
     "date_visite_technique",
     "date_visite_technique_date",
     "type_emetteurs",
-    "prix_pac_force",
     "modele_pac_id",
     "modele_pac",
     "surface_chauffee",
@@ -575,6 +594,7 @@ PROSPECT_FIELDS = [
     "iso_mur",
     "iso_menuiserie",
     "service",
+    "alimentation_electrique",
 
     # Bloc 5 (Informations fiscales)
     "rfr",
@@ -587,7 +607,6 @@ PROSPECT_FIELDS = [
 
 DEFAULT_PROSPECT_VALUES = {
     "date_visite_technique": "À déterminer",
-    "prix_pac_force": None,
     "nrp_log": [],
 }
 
@@ -642,6 +661,39 @@ def _lead_for_response(lead: dict) -> dict:
     for field in PROSPECT_FIELDS:
         normalized.setdefault(field, DEFAULT_PROSPECT_VALUES.get(field, ""))
     return normalized
+
+
+def _validate_required_prospect_payload(prospect: dict) -> list[str]:
+    missing = []
+    required = [
+        ("civilite", "Civilité"),
+        ("nom", "Nom"),
+        ("prenom", "Prénom"),
+        ("telephone", "Téléphone"),
+        ("email", "Email"),
+        ("adresse_chantier", "Adresse chantier"),
+        ("code_postal_chantier", "Code postal chantier"),
+        ("ville_chantier", "Ville chantier"),
+        ("type_logement", "Type de logement"),
+        ("surface_logement_m2", "Surface habitable"),
+        ("hsp", "Hauteur sous plafond (HSP)"),
+        ("mode_chauffage", "Chauffage actuel"),
+        ("type_emetteurs", "Type d'émetteurs"),
+        ("alimentation_electrique", "Type d'alimentation électrique"),
+        ("categorie", "Catégorie de revenu"),
+    ]
+    for key, label in required:
+        if not str(devis_value(prospect, key, default="")).strip():
+            missing.append(label)
+    if devis_value(prospect, "usage_bien") == "bailleur":
+        for key, label in (
+            ("adresse_personne", "Adresse du propriétaire"),
+            ("code_postal_personne", "CP du propriétaire"),
+            ("ville_personne", "Ville du propriétaire"),
+        ):
+            if not str(devis_value(prospect, key, default="")).strip():
+                missing.append(label)
+    return missing
 
 
 def _migrate_leads_schema():
@@ -1042,6 +1094,9 @@ async def post_catalogue_pac(request: Request) -> JSONResponse:
 @app.post("/api/leads")
 async def save_lead(request: Request) -> JSONResponse:
     payload = _normalize_lead_payload(await _read_request_payload(request))
+    missing = _validate_required_prospect_payload(payload)
+    if missing:
+        return JSONResponse({"ok": False, "erreurs": missing}, status_code=400)
     lead, created = _upsert_lead(payload)
     return JSONResponse(
         {
@@ -1078,6 +1133,11 @@ def get_lead(numero: str) -> JSONResponse:
 @app.post("/api/leads/{numero}")
 async def update_lead(numero: str, request: Request) -> JSONResponse:
     payload = _normalize_lead_payload(await _read_request_payload(request))
+    merged_preview = dict(_find_lead(numero) or {})
+    merged_preview.update(payload)
+    missing = _validate_required_prospect_payload(merged_preview)
+    if missing:
+        return JSONResponse({"ok": False, "erreurs": missing}, status_code=400)
     lead, _ = _upsert_lead(payload, forced_numero=numero)
     return JSONResponse({"ok": True, "numero": lead.get("numero"), "lead": _lead_for_response(lead)})
 
@@ -1120,6 +1180,9 @@ def purge_lead(numero: str) -> JSONResponse:
 @app.post("/prospect/ajax")
 async def save_prospect_ajax(request: Request) -> JSONResponse:
     payload = _normalize_lead_payload(await _read_request_payload(request))
+    missing = _validate_required_prospect_payload(payload)
+    if missing:
+        return JSONResponse({"ok": False, "status": "error", "erreurs": missing}, status_code=400)
     lead, created = _upsert_lead(payload)
     return JSONResponse(
         {
@@ -1135,6 +1198,11 @@ async def save_prospect_ajax(request: Request) -> JSONResponse:
 @app.post("/prospect/{numero}/ajax")
 async def update_prospect_ajax(numero: str, request: Request) -> JSONResponse:
     payload = _normalize_lead_payload(await _read_request_payload(request))
+    merged_preview = dict(_find_lead(numero) or {})
+    merged_preview.update(payload)
+    missing = _validate_required_prospect_payload(merged_preview)
+    if missing:
+        return JSONResponse({"ok": False, "status": "error", "erreurs": missing}, status_code=400)
     lead, _ = _upsert_lead(payload, forced_numero=numero)
     return JSONResponse(
         {"ok": True, "status": "ok", "numero": lead.get("numero"), "lead": _lead_for_response(lead)}
@@ -1218,6 +1286,14 @@ def commentaires_json(numero: str) -> JSONResponse:
     return JSONResponse(
         {"numero": numero, "commentaires": [_note_for_front(e, idx) for idx, e in enumerate(entries)]}
     )
+
+
+@app.get("/api/notes/{numero}")
+def api_notes_for_prospect(numero: str) -> JSONResponse:
+    """Retourne uniquement les notes du prospect spécifié."""
+    notes = _read_notes()
+    entries = notes.get(numero, [])
+    return JSONResponse([_note_for_front(e, idx) for idx, e in enumerate(entries)])
 
 
 # ---------------------------------------------------------------------------
@@ -1393,17 +1469,34 @@ def get_modeles_email() -> JSONResponse:
     return JSONResponse(_read_modeles_email())
 
 
+@app.get("/api/simulateur/{numero}/state")
+async def get_state_simulateur(numero: str) -> JSONResponse:
+    """Récupère le state du simulateur pour un prospect."""
+    return JSONResponse(load_state_simulateur(numero))
+
+
+@app.post("/api/simulateur/{numero}/state")
+async def save_state_simulateur(numero: str, request: Request) -> JSONResponse:
+    """Sauvegarde le state du simulateur pour un prospect."""
+    payload = await _read_request_payload(request)
+    return JSONResponse({"success": True, "state": save_state_simulateur_atomic(numero, payload)})
+
+
 def _load_state_simulateur(numero: str, prospect: dict, catalogue: list[dict]) -> dict:
+    saved = load_state_simulateur(numero)
     state = {
         "numero": numero,
         "modele_pac_id": devis_value(prospect, "modele_pac_id", default=""),
         "modele_pac": devis_value(prospect, "modele_pac", default=""),
+        "prix_pac": "",
         "surface_chauffee": devis_value(prospect, "surface_chauffee", default=""),
         "iso_toit": devis_value(prospect, "iso_toit", default="isole"),
         "iso_mur": devis_value(prospect, "iso_mur", default="isole"),
         "iso_menuiserie": devis_value(prospect, "iso_menuiserie", default="double"),
         "service": devis_value(prospect, "service", default="chauffage_ecs"),
+        "alimentation_electrique": devis_value(prospect, "alimentation_electrique", "phase_electrique", default=""),
     }
+    state.update({k: v for k, v in saved.items() if v not in (None, "")})
     if not state["modele_pac_id"] and not state["modele_pac"]:
         modele = select_default_modele(prospect, catalogue)
         state["modele_pac_id"] = modele.get("ref") or modele.get("id") or ""

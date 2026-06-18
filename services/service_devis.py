@@ -85,9 +85,9 @@ def calculer_zone_climatique(cp, zone=""):
 
 
 def get_prix_pac_for_devis(prospect, state_simulateur, catalogue):
-    forced = value(prospect, "prix_pac_force", default=None)
-    if forced not in (None, ""):
-        return float_value(forced)
+    state_price = value(state_simulateur, "prix_pac", default=None)
+    if state_price not in (None, ""):
+        return float_value(state_price)
 
     modele_ref = value(state_simulateur, "modele_pac_id", "modele_pac", default="")
     modele = find_modele(catalogue, modele_ref)
@@ -113,7 +113,7 @@ def find_modele(catalogue, modele_ref):
 
 
 def select_default_modele(prospect, catalogue):
-    phase = str(value(prospect, "phase_electrique", default="")).lower()
+    phase = str(value(prospect, "alimentation_electrique", "phase_electrique", default="")).lower()
     wants_tri = "tri" in phase
     service_ecs = True
     compatibles = []
@@ -199,8 +199,6 @@ def calculer_devis(prospect, state_simulateur, admin_params, catalogue_pac):
         "prix_pose_ttc": prix_pose_ttc,
         "prix_travaux_induits_ht": prix_travaux_induits_ht,
         "prix_travaux_induits_ttc": prix_travaux_induits_ttc,
-        "description_pose": pv.get("description_pose_defaut", ""),
-        "description_travaux_induits": pv.get("description_travaux_induits_defaut", ""),
         "tva_taux": f"{tva_rate * 100:.1f} %".replace(".", ","),
         "total_ht": total_ht,
         "total_tva": total_tva,
@@ -312,6 +310,8 @@ def validate_prospect_for_devis(prospect, state_simulateur):
         missing.append("Chauffage actuel")
     if not value(prospect, "type_emetteurs"):
         missing.append("Type d'émetteurs")
+    if not value(prospect, "alimentation_electrique", "phase_electrique"):
+        missing.append("Type d'alimentation électrique")
     if not value(prospect, "categorie_revenu", "categorie"):
         missing.append("Catégorie de revenu")
     if not value(state_simulateur, "modele_pac_id", "modele_pac"):
