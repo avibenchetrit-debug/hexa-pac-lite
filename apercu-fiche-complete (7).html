@@ -12321,6 +12321,16 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
   const AUTEUR_DEFAUT = 'Avi B.';
   let currentProspect = null;
 
+  window.resetNotesPanelState = function () {
+    currentProspect = null;
+    const sub = document.getElementById('notes-panel-prospect');
+    if (sub) sub.textContent = '—';
+    const list = document.getElementById('notes-panel-list');
+    if (list) list.innerHTML = '<div class="comments-empty">Aucune note pour ce prospect.</div>';
+    const editable = document.getElementById('notes-panel-editable');
+    if (editable) editable.innerHTML = '';
+  };
+
   function hexaAuteurCourant() {
     try { return localStorage.getItem('hexa_user') || ''; } catch (_) { return ''; }
   }
@@ -12527,8 +12537,11 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     }
   }
   window.ouvrirNotesInternes = async function (numero) {
-    if (!numero) return;
     injectNotesPanel();
+    if (!numero) {
+      window.resetNotesPanelState();
+      return;
+    }
     currentProspect = numero;
     (function(){
       var cp = window.HexaCurrentProspect;
@@ -17437,6 +17450,7 @@ L'équipe Hexa Rénov'</textarea></label>
     window._lastDpeSearch = '';
     if (typeof window.resetDpeDynamicState === 'function') window.resetDpeDynamicState();
     if (typeof window.resetAdresseDynamicState === 'function') window.resetAdresseDynamicState();
+    if (typeof window.resetNotesPanelState === 'function') window.resetNotesPanelState();
     if (typeof window.resetEchangesPanelState === 'function') window.resetEchangesPanelState();
     if (typeof window.resetDocumentsPanelState === 'function') window.resetDocumentsPanelState();
     if (!options?.skipSimulateur && typeof window.resetSimulateur === 'function') {
