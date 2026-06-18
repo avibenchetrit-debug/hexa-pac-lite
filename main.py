@@ -345,7 +345,7 @@ def save_state_simulateur_atomic(numero: str, payload: dict) -> dict:
     state = payload if isinstance(payload, dict) else {}
     state = dict(state)
     state["numero_prospect"] = numero
-    state["updated_at"] = _now_iso()
+    state["updated_at"] = _now_paris_iso()
     _atomic_write_json(_state_simulateur_path(numero), state)
     return state
 
@@ -489,6 +489,8 @@ _FIELD_ALIASES = {
 
 STATUT_ALIASES = {
     "nouveau": "nouveau",
+    "contacte": "contacte",
+    "contacté": "contacte",
     "a rappeler": "rappeler",
     "à rappeler": "rappeler",
     "a recontacter": "rappeler",
@@ -613,11 +615,14 @@ PROSPECT_FIELDS = [
     "code_postal_personne",
 
     # Logs
+    "nrp_count",
     "nrp_log",
 ]
 
 DEFAULT_PROSPECT_VALUES = {
     "date_visite_technique": "À déterminer",
+    "statut": "nouveau",
+    "nrp_count": 0,
     "nrp_log": [],
 }
 
@@ -671,6 +676,10 @@ def _lead_for_response(lead: dict) -> dict:
     _apply_field_aliases(normalized)
     for field in PROSPECT_FIELDS:
         normalized.setdefault(field, DEFAULT_PROSPECT_VALUES.get(field, ""))
+    if not isinstance(normalized.get("nrp_log"), list):
+        normalized["nrp_log"] = []
+    if not isinstance(normalized.get("nrp_count"), int):
+        normalized["nrp_count"] = len(normalized["nrp_log"])
     return normalized
 
 
@@ -738,6 +747,12 @@ def _migrate_leads_schema():
             if field not in item:
                 item[field] = DEFAULT_PROSPECT_VALUES.get(field, "")
                 changed = True
+        if not isinstance(item.get("nrp_log"), list):
+            item["nrp_log"] = []
+            changed = True
+        if not isinstance(item.get("nrp_count"), int):
+            item["nrp_count"] = len(item["nrp_log"])
+            changed = True
         if item != before:
             normalized_count += 1
         migrated.append(item)
@@ -1160,6 +1175,52 @@ async def update_lead(numero: str, request: Request) -> JSONResponse:
         return JSONResponse({"ok": False, "erreurs": missing}, status_code=400)
     lead, _ = _upsert_lead(payload, forced_numero=numero)
     return JSONResponse({"ok": True, "numero": lead.get("numero"), "lead": _lead_for_response(lead)})
+
+
+@app.post("/api/leads/{numero}/status")
+async def update_lead_status(numero: str, request: Request) -> JSONResponse:
+    """Met à jour le statut d'un prospect depuis l'Accueil."""
+    payload = await _read_request_payload(request)
+    new_status = _normalize_statut(str(payload.get("statut") or "").strip())
+    allowed = {"nouveau", "contacte", "rappeler", "rdv", "devis", "devis_envoye", "signe", "perdu"}
+    if new_status not in allowed:
+        raise HTTPException(status_code=400, detail=f"Statut invalide : {new_status}")
+    leads = _read_leads()
+    index = _find_lead_index(leads, numero)
+    if index is None:
+        raise HTTPException(status_code=404, detail="Prospect non trouvé")
+    leads[index]["statut"] = new_status
+    leads[index]["statut_updated_at"] = _now_paris_iso()
+    leads[index]["updated_at"] = _now_iso()
+    _atomic_write_json(LEADS_PATH, leads)
+    return JSONResponse({"success": True, "statut": new_status})
+
+
+@app.post("/api/leads/{numero}/nrp")
+async def update_lead_nrp(numero: str, request: Request) -> JSONResponse:
+    """Met à jour le compteur NRP (Ne Répond Pas) depuis l'Accueil."""
+    payload = await _read_request_payload(request)
+    raw_count = payload.get("nrp_count")
+    if isinstance(raw_count, str) and raw_count.isdigit():
+        raw_count = int(raw_count)
+    if not isinstance(raw_count, int) or raw_count < 0:
+        raise HTTPException(status_code=400, detail=f"Compteur NRP invalide : {raw_count}")
+    leads = _read_leads()
+    index = _find_lead_index(leads, numero)
+    if index is None:
+        raise HTTPException(status_code=404, detail="Prospect non trouvé")
+    nrp_log = payload.get("nrp_log")
+    if not isinstance(nrp_log, list):
+        nrp_log = list(leads[index].get("nrp_log") or [])
+        while len(nrp_log) < raw_count:
+            nrp_log.append(_now_paris_iso())
+        nrp_log = nrp_log[:raw_count]
+    leads[index]["nrp_log"] = nrp_log
+    leads[index]["nrp_count"] = raw_count
+    leads[index]["nrp_updated_at"] = _now_paris_iso()
+    leads[index]["updated_at"] = _now_iso()
+    _atomic_write_json(LEADS_PATH, leads)
+    return JSONResponse({"success": True, "nrp_count": raw_count})
 
 
 @app.delete("/api/leads/{numero}")

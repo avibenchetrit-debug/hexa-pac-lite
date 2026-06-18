@@ -7090,6 +7090,126 @@ input:focus{ outline:none; border-color: var(--c-navy,#002E5A); box-shadow:0 0 0
 .adm-net2{ background: var(--c-danger-bg,#FDE8EC); color: var(--c-rouge,#E2214B); }
 .adm-net1 small{ color:#5b7da3; } .adm-net2 small{ color:#c0708a; }
 
+/* === TABLEAU MODÈLES & MARGES NETTES === */
+.adm-models-table-wrapper {
+  overflow-x: auto;
+  margin: 16px -8px 0;
+  padding: 0 8px;
+  border-radius: 8px;
+}
+.adm-models-table {
+  width: 100%;
+  min-width: 1180px;
+  border-collapse: collapse;
+  font-size: 12px;
+  table-layout: fixed;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  overflow: hidden;
+  margin-top: 0;
+}
+.adm-models-table thead th {
+  background: #f3f4f6;
+  padding: 10px 8px;
+  text-align: center;
+  font-weight: 600;
+  color: #1f2937;
+  font-size: 11px;
+  border-bottom: 2px solid #d1d5db;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+.adm-models-table thead th.header-option1 { background: #dbeafe; color: #1e40af; }
+.adm-models-table thead th.header-option2 { background: #fce7f3; color: #be185d; }
+.adm-models-table thead th.sub-header-option2 { background: #fbcfe8; color: #831843; font-size: 10px; padding: 6px 4px; }
+.adm-models-table tbody td {
+  padding: 8px;
+  text-align: center;
+  border-bottom: 1px solid #f3f4f6;
+  vertical-align: middle;
+  word-wrap: break-word;
+}
+.adm-models-table tbody tr:hover { background: #fafafa; }
+.adm-models-table td.col-modele {
+  text-align: left;
+  padding-left: 12px;
+  font-weight: 600;
+  font-size: 12px;
+}
+.adm-models-table .tag-alim,
+.adm-models-table .adm-phase {
+  display: inline-block;
+  padding: 2px 6px;
+  background: #f3f4f6;
+  border-radius: 4px;
+  font-size: 10px;
+  margin-left: 4px;
+  font-weight: 400;
+  color: #6b7280;
+}
+.adm-models-table .adm-phase-tri { background:#EDE9FE; color:#6D28D9; }
+.adm-models-table .adm-phase-mono { background:#F3F4F6; color:#6B7280; }
+.adm-models-table .adm-phase-ecs { background:#FEF3C7; color:#92400E; }
+.adm-models-table input[type="text"],
+.adm-models-table input[type="number"] {
+  width: 100%;
+  height: 30px;
+  padding: 4px 6px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  text-align: right;
+  font-size: 12px;
+  background: white;
+  box-sizing: border-box;
+}
+.adm-models-table input[type="text"]:focus,
+.adm-models-table input[type="number"]:focus { border-color: #002E5A; outline: none; }
+.adm-models-table .col-calc { background: #fafafa; color: #4b5563; }
+.adm-models-table .col-marge-brute { background: #fef3c7; font-weight: 600; }
+.adm-models-table .col-marge-net1 { background: #dbeafe; font-weight: 600; color: #1e40af; }
+.adm-models-table .col-cession { background: #fce7f3; }
+.adm-models-table .col-marge-net2 { background: #fce7f3; font-weight: 600; color: #be185d; }
+.adm-models-table .col-commission { background: #f3e8ff; color: #6b21a8; font-size: 11px; }
+.adm-models-table .col-actions,
+.adm-models-table td.col-modele { position: relative; }
+.adm-models-table .adm-pac-desc-btn,
+.adm-models-table .adm-del {
+  background: transparent;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  padding: 4px 8px;
+  margin: 0 1px;
+  font-size: 12px;
+  cursor: pointer;
+  color: #4b5563;
+  height: 28px;
+}
+.adm-models-table .adm-pac-desc-btn { color: #002E5A; border-color: #93c5fd; background: #dbeafe; }
+.adm-models-table .adm-del { color: #ef4444; border-color: #fca5a5; position: static; opacity: 1; width:auto; height:28px; border-radius:4px; }
+.adm-models-table .adm-pac-desc-btn:hover,
+.adm-models-table .adm-del:hover { background: #f3f4f6; }
+.adm-models-table .adm-grp td,
+.adm-models-table .adm-models-puissance-header {
+  background: #f9fafb;
+  font-weight: 700;
+  color: #374151;
+  padding: 8px 12px;
+  font-size: 13px;
+  border-top: 2px solid #d1d5db;
+}
+.adm-models-table .adm-num em,
+.adm-marge-pct { display:inline-block; font-size:10px; color:inherit; opacity:.8; margin-left:4px; }
+.adm-models-table .adm-sim-btn,
+.adm-models-table .adm-eq-btn {
+  padding: 4px 8px;
+  font-size: 11px;
+  background: #f3f4f6;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
 .adm-legend{ font-size:11px; color: var(--c-muted,#4A5568); margin-top:12px; display:flex; flex-direction:column; gap:6px; }
 .adm-legend-row{ display:flex; align-items:flex-start; gap:8px; line-height:1.5; }
 .adm-legend-row .adm-dot{ margin-top:4px; flex:none; }
@@ -15178,19 +15298,19 @@ L'équipe Hexa Rénov'</textarea></label>
     'surface-input', 'cout-annuel-input', 'cat-anah-badge',
     'zone-climatique-chantier', 'hsp', 'hsp-input', 'phase-input',
     'input-adresse', 'cp-chantier', 'ville-chantier-select', 'altitude-input',
-    'cout-energie-input', 'cout_chauffage'
+    'cout-energie-input', 'cout_chauffage', 'fp-alimentation-electrique'
   ];
   const SELECTEURS_FICHE = [
-    '#surface-input', '[name="surface_logement_m2"]',
+    '#surface-input', '[name="surface_logement_m2"]', '[name="surface_habitable"]',
     '#cout-annuel-input', '[name="cout_energetique_annuel_eur"]',
     '#cout-energie-input', '#cout_chauffage', '[name="cout_energetique_mensuel_eur"]', '[name="cout_chauffage"]',
-    'select[name="mode_chauffage"]', '#zone-climatique-chantier',
+    'select[name="mode_chauffage"]', '[name="chauffage_actuel"]', '#zone-climatique-chantier',
     '[name="zone_climatique_chantier"]', '#hsp', '#hsp-input', '[name="hsp"]',
-    '#phase-input', '[name="phase_electrique"]',
+    '#phase-input', '[name="phase_electrique"]', '[name="alimentation_electrique"]',
     '#input-adresse', '[name="adresse_chantier"]',
-    '#cp-chantier', '[name="code_postal_chantier"]',
+    '#cp-chantier', '[name="code_postal_chantier"]', '[name="cp_chantier"]',
     '#ville-chantier-select', '[name="ville_chantier"]',
-    '#altitude-input', '[name="altitude"]'
+    '#altitude-input', '[name="altitude"]', '[name="type_emetteurs"]', '[name="categorie"]', '[name="categorie_revenu"]'
   ].join(',');
 
   function syncDepuisFiche(force = false){
@@ -15198,7 +15318,10 @@ L'équipe Hexa Rénov'</textarea></label>
     // Relecture complète depuis le DOM actif de la fiche.
     lireContexteFiche();
     state.modele_force = false;
-    if (estOuvert()) refresh();
+    if (estOuvert()) {
+      scheduleSaveSimulatorState();
+      refresh();
+    }
   }
   window.syncSimulateurDepuisFiche = syncDepuisFiche;
 
@@ -15768,21 +15891,21 @@ L'équipe Hexa Rénov'</textarea></label>
         const tip2 = `Prix de cession ${eurTip(r.cession)} = Coût ${eurTip(r.cout)} + Visite ${eurTip(p.vt2)} + COFRAC ${eurTip(p.cofrac2)} + Urbanisme ${eurTip(p.urba2)} + Marge cession ${eurTip(r.margeCession)}. Ma marge nette garantie = ${eurTip(r.net2)}.`;
         const cessTip = r.cessionForced ? 'Prix de cession forcé pour ce produit. Cliquez sur ↺ pour revenir à la marge globale.' : `Calculé : base ${eurTip(r.baseCession)} + marge globale ${eurTip(r.margeCessionDefaut)}. Vous pouvez forcer une autre valeur.`;
         rowsHTML += `<tr data-i="${i}">
-          <td class="adm-ref">${m.ref} ${phase}${ecs}<small>${m.nom||''}</small><button type="button" class="adm-pac-desc-btn" data-i="${i}" title="Description technique pour le devis">📝</button><button type="button" class="adm-del" data-i="${i}" title="Supprimer">×</button></td>
+          <td class="adm-ref col-modele">${m.ref} ${phase}${ecs}<small>${m.nom||''}</small><button type="button" class="adm-pac-desc-btn" data-i="${i}" title="Description technique pour le devis">📝</button><button type="button" class="adm-del" data-i="${i}" title="Supprimer">×</button></td>
           <td><span class="adm-euro"><input type="text" inputmode="numeric" class="adm-in" data-f="ttc" value="${ferow(m.ttc)}"><i>€</i></span></td>
-          <td class="adm-num">${eur(r.ht)}</td>
+          <td class="adm-num col-calc">${eur(r.ht)}</td>
           <td><span class="adm-euro"><input type="text" inputmode="numeric" class="adm-in" data-f="achat" value="${ferow(m.achat)}"><i>€</i></span></td>
-          <td class="adm-num">${eur(r.pose)}</td>
-          <td class="adm-num">${eur(r.cout)}</td>
-          <td class="adm-num adm-strong">${eur(r.brute)}<em>${pct(r.txBrut)}</em></td>
-          <td class="adm-num adm-net1"><b>${eur(r.net1)}</b><em>${pct(r.txNet1)}</em><span class="adm-net1-tools"><span class="adm-tip" data-tip="${tip1.replace(/"/g,'&quot;')}">i</span><button type="button" class="adm-eq-btn" data-eq="${i}" title="Point d'équilibre Option 1 vs Option 2">⚖</button></span></td>
-          <td class="adm-cess adm-rg ${r.cessionForced?'is-forced':''} ${r.cessionTropHaute?'is-toohigh':''}">
+          <td class="adm-num col-calc">${eur(r.pose)}</td>
+          <td class="adm-num col-calc">${eur(r.cout)}</td>
+          <td class="adm-num adm-strong col-marge-brute">${eur(r.brute)}<em>${pct(r.txBrut)}</em></td>
+          <td class="adm-num adm-net1 col-marge-net1"><b>${eur(r.net1)}</b><em>${pct(r.txNet1)}</em><span class="adm-net1-tools"><span class="adm-tip" data-tip="${tip1.replace(/"/g,'&quot;')}">i</span><button type="button" class="adm-eq-btn" data-eq="${i}" title="Point d'équilibre Option 1 vs Option 2">⚖</button></span></td>
+          <td class="adm-cess adm-rg col-cession ${r.cessionForced?'is-forced':''} ${r.cessionTropHaute?'is-toohigh':''}">
             <span class="adm-euro"><input type="text" inputmode="numeric" class="adm-in adm-cess-in" data-f="cession_forcee" data-i="${i}" value="${ferow(r.cession)}"><i>€</i></span>
             <button type="button" class="adm-cess-reset" data-i="${i}" title="Revenir à la marge globale" ${r.cessionForced?'':'hidden'}>↺</button>
             <span class="adm-tip" data-tip="${(r.cessionTropHaute?'⚠ Prix de cession ≥ prix catalogue HT : la régie ne gagne rien au catalogue. ':'')+cessTip.replace(/"/g,'&quot;')}">i</span>
           </td>
-          <td class="adm-num adm-net2 adm-rg"><b>${eur(r.net2)}</b><em>${pct(r.txNet2)}</em><span class="adm-tip" data-tip="${tip2.replace(/"/g,'&quot;')}">i</span></td>
-          <td class="adm-num adm-net2b adm-rg"><b>${eur(r.commissionRegie)}</b><em>au catalogue</em><button type="button" class="adm-sim-btn" data-sim="${i}" title="Simuler si la régie vend plus cher">Simuler ▾</button></td>
+          <td class="adm-num adm-net2 adm-rg col-marge-net2"><b>${eur(r.net2)}</b><em>${pct(r.txNet2)}</em><span class="adm-tip" data-tip="${tip2.replace(/"/g,'&quot;')}">i</span></td>
+          <td class="adm-num adm-net2b adm-rg col-commission"><b>${eur(r.commissionRegie)}</b><em>au catalogue</em><button type="button" class="adm-sim-btn" data-sim="${i}" title="Simuler si la régie vend plus cher">Simuler ▾</button></td>
         </tr>
         <tr class="adm-simrow" id="adm-simrow-${i}" hidden><td colspan="11"></td></tr>`;
       });
@@ -15883,8 +16006,8 @@ L'équipe Hexa Rénov'</textarea></label>
             </div>
 
             <div class="adm-section">Modèles & marges nettes</div>
-            <div class="adm-table-wrap">
-              <table class="adm-table">
+            <div class="adm-table-wrap adm-models-table-wrapper">
+              <table class="adm-table adm-models-table">
                 <thead>
                   <tr class="adm-head-group">
                     <th rowspan="2">Modèle</th>
@@ -15893,14 +16016,14 @@ L'équipe Hexa Rénov'</textarea></label>
                     <th rowspan="2">Achat HT</th>
                     <th rowspan="2">Pose + access.</th>
                     <th rowspan="2">Coût de revient</th>
-                    <th rowspan="2">Marge brute</th>
-                    <th rowspan="2" class="adm-th1">Marge nette Hexa<br>Option 1</th>
-                    <th colspan="3" class="adm-grp-regie">RÉGIE — Option 2</th>
+                    <th rowspan="2" class="header-option1">Marge brute</th>
+                    <th rowspan="2" class="adm-th1 header-option1">Marge nette Hexa<br>Option 1</th>
+                    <th colspan="3" class="adm-grp-regie header-option2">RÉGIE — Option 2</th>
                   </tr>
                   <tr>
-                    <th class="adm-th2">Prix de cession</th>
-                    <th class="adm-th2">Marge nette Hexa</th>
-                    <th class="adm-th2b">Commission régie</th>
+                    <th class="adm-th2 sub-header-option2">Prix de cession</th>
+                    <th class="adm-th2 sub-header-option2">Marge nette Hexa</th>
+                    <th class="adm-th2b sub-header-option2">Commission régie</th>
                   </tr>
                 </thead>
                 <tbody id="adm-tbody">${rowsHTML}</tbody>
@@ -16755,7 +16878,7 @@ L'équipe Hexa Rénov'</textarea></label>
     const mo=Math.floor(j/30); if(mo<12) return 'il y a '+mo+' mois';
     return 'il y a '+Math.floor(j/365)+' an(s)';
   }
-  const nrpCount = p => (p.nrp_log||[]).length;
+  const nrpCount = p => Number.isInteger(p.nrp_count) ? p.nrp_count : (p.nrp_log||[]).length;
   const nrpLast  = p => { const l=p.nrp_log||[]; return l.length?l[l.length-1]:null; };
 
   let data = [];
@@ -16836,6 +16959,29 @@ L'équipe Hexa Rénov'</textarea></label>
   async function softDeleteLead(numero) {
     const resp = await fetch('/api/leads/' + encodeURIComponent(numero), { method:'DELETE' });
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
+  }
+  async function saveLeadStatus(numero, newStatus) {
+    const res = await fetch('/api/leads/' + encodeURIComponent(numero) + '/status', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ statut: newStatus })
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(()=>({}));
+      throw new Error(body.detail || 'Erreur serveur');
+    }
+    toastMsg('✓ Statut mis à jour', '#0D6B3B');
+  }
+  async function saveLeadNRP(numero, newCount, nrpLog) {
+    const res = await fetch('/api/leads/' + encodeURIComponent(numero) + '/nrp', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ nrp_count: newCount, nrp_log: nrpLog || [] })
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(()=>({}));
+      throw new Error(body.detail || 'Erreur serveur');
+    }
   }
   const HEXA_USERS = {
     avi: 'Avi',
@@ -17227,23 +17373,46 @@ L'équipe Hexa Rénov'</textarea></label>
           if(!open){ menu.classList.add('open'); positionMenu(btn,menu); }
         });
         menu.querySelectorAll('.pv-statut-opt').forEach(opt=>{
-          opt.addEventListener('click', e=>{
+          opt.addEventListener('click', async e=>{
             e.stopPropagation();
             const k=opt.dataset.k; const prev=rec.statut;
             rec.statut=k; menu.classList.remove('open');
             renderRows();
             refreshMasterStats(true);
-            if(k!==prev) celebrateStatut(k);
+            if(k!==prev) {
+              try {
+                await saveLeadStatus(num, k);
+                celebrateStatut(k);
+              } catch(err) {
+                rec.statut = prev;
+                renderRows();
+                refreshMasterStats(true);
+                toastMsg('❌ Erreur de sauvegarde', '#B91C1C');
+                console.error(err);
+              }
+            }
           });
         });
       }
       tr.querySelectorAll('.pv-nrp-btn').forEach(btn=>{
-        btn.addEventListener('click', e=>{
+        btn.addEventListener('click', async e=>{
           e.stopPropagation();
+          const prevLog = Array.isArray(rec.nrp_log) ? rec.nrp_log.slice() : [];
+          const prevCount = rec.nrp_count;
           if(!Array.isArray(rec.nrp_log)) rec.nrp_log=[];
           if(btn.dataset.act==='inc') rec.nrp_log.push(new Date().toISOString());
           else rec.nrp_log.pop();           // annule le dernier NRP (clic par erreur)
+          rec.nrp_count = rec.nrp_log.length;
           renderRows();
+          try {
+            await saveLeadNRP(num, rec.nrp_count, rec.nrp_log);
+          } catch(err) {
+            rec.nrp_log = prevLog;
+            rec.nrp_count = prevCount;
+            renderRows();
+            toastMsg('❌ Erreur sauvegarde NRP', '#B91C1C');
+            console.error(err);
+          }
         });
       });
     });
