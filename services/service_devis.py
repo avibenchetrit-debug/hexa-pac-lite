@@ -112,6 +112,23 @@ def find_modele(catalogue, modele_ref):
     return None
 
 
+def parse_legacy_description(text):
+    """Parse l'ancien format texte libre en liste de specs structurées."""
+    specs = []
+    for raw_line in str(text or "").splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        for sep in (":", "="):
+            if sep in line:
+                champ, valeur = line.split(sep, 1)
+                specs.append({"champ": champ.strip(), "valeur": valeur.strip()})
+                break
+        else:
+            specs.append({"champ": "", "valeur": line})
+    return specs
+
+
 def select_default_modele(prospect, catalogue):
     phase = str(value(prospect, "alimentation_electrique", "phase_electrique", default="")).lower()
     wants_tri = "tri" in phase

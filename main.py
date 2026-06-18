@@ -32,6 +32,7 @@ from services.service_devis import (
     generer_numero_dossier,
     generer_numero_notedim,
     money,
+    parse_legacy_description,
     select_default_modele,
     validate_prospect_for_devis,
     value as devis_value,
@@ -237,6 +238,10 @@ def _read_catalogue_pac():
         next_item = dict(item)
         if "description_technique" not in next_item:
             next_item["description_technique"] = ""
+            changed = True
+        specs = next_item.get("description_specs")
+        if not isinstance(specs, list):
+            next_item["description_specs"] = parse_legacy_description(next_item.get("description_technique", ""))
             changed = True
         migrated.append(next_item)
     if changed:
@@ -1091,6 +1096,15 @@ async def post_catalogue_pac(request: Request) -> JSONResponse:
             item["nom"] = nom
         item["ttc"] = round(ttc, 2)
         item.setdefault("description_technique", "")
+        specs = item.get("description_specs")
+        if isinstance(specs, list):
+            item["description_specs"] = [
+                {"champ": str(spec.get("champ", "")).strip(), "valeur": str(spec.get("valeur", "")).strip()}
+                for spec in specs
+                if isinstance(spec, dict) and (str(spec.get("champ", "")).strip() or str(spec.get("valeur", "")).strip())
+            ]
+        else:
+            item["description_specs"] = parse_legacy_description(item.get("description_technique", ""))
         validated.append(item)
 
     _atomic_write_json(CATALOGUE_PAC_PATH, validated)
@@ -1556,6 +1570,9 @@ def _build_devis_context(request: Request, numero: str) -> dict:
         ).strip()
     formatted_calculs = format_devis_amounts(calculs)
     formatted_calculs["lot_titre"] = generer_lot_titre(modele_obj)
+    description_specs = modele_obj.get("description_specs", []) if modele_obj else []
+    if not description_specs and modele_obj and modele_obj.get("description_technique"):
+        description_specs = parse_legacy_description(modele_obj["description_technique"])
     context = {
         "request": request,
         "civilite": prospect.get("civilite", ""),
@@ -1582,7 +1599,7 @@ def _build_devis_context(request: Request, numero: str) -> dict:
         "parcelle_cadastrale": prospect.get("parcelle_cadastrale", ""),
         "zone_climatique": calculer_zone_climatique(cp_chantier, prospect.get("zone_climatique") or prospect.get("zone_climatique_chantier")),
         "modele_pac": modele_obj.get("nom") or modele_obj.get("ref") or "",
-        "description_pac": modele_obj.get("description_technique", "") if modele_obj else "",
+        "description_specs": description_specs,
         "sous_traitant": sous_traitant_context,
         "sous_traitant_texte": format_sous_traitant(sous_traitant),
         **formatted_calculs,

@@ -6972,6 +6972,83 @@ input:focus{ outline:none; border-color: var(--c-navy,#002E5A); box-shadow:0 0 0
 .adm-tab.active { color:#002E5A; border-bottom-color:#E2214B; }
 .adm-tab-content { display:block; }
 .adm-tab-content[hidden] { display:none; }
+.modal-large {
+  width: 90%;
+  max-width: 800px;
+  max-height: 85vh;
+  overflow-y: auto;
+}
+.specs-editor {
+  margin: 20px 0;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  overflow: hidden;
+}
+.specs-editor-header {
+  display: grid;
+  grid-template-columns: 1fr 1.5fr 40px;
+  gap: 8px;
+  padding: 10px 12px;
+  background: #f3f4f6;
+  font-weight: 600;
+  font-size: 12px;
+  color: #4b5563;
+  border-bottom: 1px solid #e5e7eb;
+}
+#specs-rows-container {
+  max-height: 400px;
+  overflow-y: auto;
+}
+.specs-editor .specs-row {
+  display: grid;
+  grid-template-columns: 1fr 1.5fr 40px;
+  gap: 8px;
+  padding: 6px 12px;
+  border-bottom: 1px solid #f3f4f6;
+  align-items: center;
+}
+.specs-editor .specs-row:hover { background: #fafafa; }
+.specs-editor .specs-row input[type="text"] {
+  height: 32px;
+  padding: 4px 8px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  font-size: 13px;
+  width: 100%;
+  box-sizing: border-box;
+}
+.specs-editor .specs-row input.specs-input-champ {
+  font-weight: normal;
+  color: #4b5563;
+}
+.specs-editor .specs-row input.specs-input-valeur {
+  font-weight: 600;
+  color: #1f2937;
+}
+.specs-row-delete {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+  color: #ef4444;
+  padding: 4px;
+}
+.specs-row-delete:hover {
+  background: #fef2f2;
+  border-radius: 4px;
+}
+.specs-add-row {
+  display: block;
+  width: 100%;
+  padding: 10px;
+  background: #f9fafb;
+  border: none;
+  border-top: 1px solid #e5e7eb;
+  cursor: pointer;
+  font-weight: 600;
+  color: #002E5A;
+}
+.specs-add-row:hover { background: #f3f4f6; }
 .adm-card{ background:#fff; border:1px solid var(--c-line,#E2E8F0); border-radius:12px; padding:14px 16px; }
 .adm-card-h{ font-size:13px; font-weight:700; color: var(--c-navy,#002E5A); margin-bottom:10px; padding-bottom:8px; border-bottom:2px solid; }
 .adm-opt1 .adm-card-h{ border-color: var(--c-navy,#002E5A); }
@@ -15917,35 +15994,98 @@ L'équipe Hexa Rénov'</textarea></label>
     rerenderBody();
   }
 
+  let currentEditedPacIndex = null;
+  let currentEditedSpecs = [];
+  function specsFromLegacyText(text){
+    return String(text || '').split(/\r?\n/).map(line => line.trim()).filter(Boolean).map(line => {
+      const colon = line.indexOf(':');
+      const equal = line.indexOf('=');
+      const indexes = [colon, equal].filter(i => i >= 0);
+      const sepIndex = indexes.length ? Math.min(...indexes) : -1;
+      if (sepIndex >= 0) return { champ: line.slice(0, sepIndex).trim(), valeur: line.slice(sepIndex + 1).trim() };
+      return { champ: '', valeur: line };
+    });
+  }
+  function renderSpecsRows(){
+    const container = document.getElementById('specs-rows-container');
+    if (!container) return;
+    container.innerHTML = '';
+    currentEditedSpecs.forEach((spec, idx) => {
+      const row = document.createElement('div');
+      row.className = 'specs-row';
+      row.innerHTML = `
+        <input type="text" class="specs-input-champ" data-idx="${idx}" data-field="champ" value="${adminEscape(spec.champ || '')}" placeholder="Ex: Marque">
+        <input type="text" class="specs-input-valeur" data-idx="${idx}" data-field="valeur" value="${adminEscape(spec.valeur || '')}" placeholder="Ex: ATLANTIC">
+        <button type="button" class="specs-row-delete" data-idx="${idx}" title="Supprimer cette ligne">🗑</button>
+      `;
+      container.appendChild(row);
+    });
+    container.querySelectorAll('input[type="text"]').forEach(input => {
+      input.addEventListener('input', function() {
+        const idx = parseInt(this.dataset.idx, 10);
+        const field = this.dataset.field;
+        if (currentEditedSpecs[idx]) currentEditedSpecs[idx][field] = this.value;
+      });
+    });
+    container.querySelectorAll('.specs-row-delete').forEach(btn => {
+      btn.addEventListener('click', function() {
+        const idx = parseInt(this.dataset.idx, 10);
+        currentEditedSpecs.splice(idx, 1);
+        renderSpecsRows();
+      });
+    });
+  }
+  function addSpecsRow(){
+    currentEditedSpecs.push({ champ:'', valeur:'' });
+    renderSpecsRows();
+    document.querySelector('#specs-rows-container .specs-row:last-child .specs-input-champ')?.focus();
+  }
   function openDescriptionPacModal(i){
     const cfg = window.HexaConfig || loadConfig();
     const m = cfg.models[i];
     if (!m) return;
+    currentEditedPacIndex = i;
+    currentEditedSpecs = Array.isArray(m.description_specs)
+      ? m.description_specs.map(s => ({ champ:String(s.champ || ''), valeur:String(s.valeur || '') }))
+      : specsFromLegacyText(m.description_technique || '');
     document.getElementById('modal-description-pac')?.remove();
     const wrap = document.createElement('div');
     wrap.id = 'modal-description-pac';
     wrap.className = 'adm-delmodal';
     wrap.innerHTML = `
-      <div class="adm-delbox" style="max-width:720px">
+      <div class="adm-delbox modal-large">
         <div class="adm-del-h">Description technique — <span id="modal-pac-nom">${adminEscape(m.nom || m.ref || '')}</span></div>
-        <p class="adm-opt2-note">Cette description apparaîtra sur le devis envoyé au client, dans la ligne "Fourniture" du tableau des lots.</p>
-        <textarea id="modal-pac-description" rows="10" style="width:100%" placeholder="Ex: Pompe à chaleur Air-Eau Atlantic ALFÉA EXCELLIA S DUO 16, monobloc, COP 4.5, SCOP 4.0, triphasée, avec ECS intégrée 190L, fluide R32...">${adminEscape(m.description_technique || '')}</textarea>
+        <p class="adm-opt2-note">Saisissez les caractéristiques techniques sous forme de tableau (champ + valeur). Chaque ligne apparaîtra sur le devis sous la ligne "Fourniture".</p>
+        <div class="specs-editor">
+          <div class="specs-editor-header">
+            <span class="specs-col-champ">Champ</span>
+            <span class="specs-col-valeur">Valeur</span>
+            <span class="specs-col-actions"></span>
+          </div>
+          <div id="specs-rows-container"></div>
+          <button type="button" class="specs-add-row" id="btn-specs-add-row">+ Ajouter une ligne</button>
+        </div>
         <div class="adm-del-actions">
-          <button type="button" class="adm-btn adm-btn-cancel" id="btn-cancel-description-pac">Annuler</button>
-          <button type="button" class="adm-btn adm-btn-primary" id="btn-save-description-pac">Sauvegarder</button>
+          <button type="button" class="adm-btn adm-btn-cancel" id="btn-cancel-specs">Annuler</button>
+          <button type="button" class="adm-btn adm-btn-primary" id="btn-save-specs">Sauvegarder</button>
         </div>
       </div>`;
     document.body.appendChild(wrap);
+    renderSpecsRows();
     const close = () => wrap.remove();
-    document.getElementById('btn-cancel-description-pac')?.addEventListener('click', close);
+    document.getElementById('btn-cancel-specs')?.addEventListener('click', close);
+    document.getElementById('btn-specs-add-row')?.addEventListener('click', addSpecsRow);
     wrap.addEventListener('click', e=>{ if(e.target === wrap) close(); });
-    document.getElementById('btn-save-description-pac')?.addEventListener('click', async ()=>{
-      m.description_technique = document.getElementById('modal-pac-description')?.value || '';
+    document.getElementById('btn-save-specs')?.addEventListener('click', async ()=>{
+      const filtered = currentEditedSpecs
+        .map(s => ({ champ:String(s.champ || '').trim(), valeur:String(s.valeur || '').trim() }))
+        .filter(s => s.champ || s.valeur);
+      m.description_specs = filtered;
       const server = await saveCatalogueToServer((cfg.models || []).map(x=>Object.assign({}, x)));
       if (server.ok) {
         persistCatalogueLocal(cfg.models);
         saveConfig(false);
-        adminToast('Description PAC sauvegardée ✓', '#0D6B3B');
+        adminToast('Specs PAC sauvegardées ✓', '#0D6B3B');
         close();
       } else {
         adminToast(`Erreur sauvegarde: ${server.error}`, '#B91C1C');

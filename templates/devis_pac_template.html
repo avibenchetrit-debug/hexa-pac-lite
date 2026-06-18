@@ -1787,8 +1787,41 @@
   }
   .specs-row .key { color: var(--gris-mute); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .specs-row .val { color: var(--noir); font-weight: 600; }
-  .pac-desc-block { padding: 8px 14px; }
-  .pac-desc-text { font-size: 10.5px; line-height: 1.55; color: var(--gris-texte); white-space: pre-line; }
+  .pac-desc-block { padding: 8px 14px; background: transparent; }
+  .pac-desc-title {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--bleu, #002E5A);
+    margin-bottom: 6px;
+    letter-spacing: 0.2px;
+  }
+  .pac-specs-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 10px;
+    line-height: 1.35;
+    table-layout: fixed;
+  }
+  .pac-specs-table tr { border-bottom: 1px solid rgba(0, 0, 0, 0.04); }
+  .pac-specs-table tr:last-child { border-bottom: none; }
+  .pac-specs-table td {
+    padding: 3px 0;
+    vertical-align: top;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .pac-specs-table td.pac-specs-champ {
+    color: var(--gris-mute, #6b7280);
+    font-weight: 400;
+    width: 38%;
+    padding-right: 12px;
+  }
+  .pac-specs-table td.pac-specs-valeur {
+    color: var(--noir, #1f2937);
+    font-weight: 600;
+    width: 62%;
+  }
   .lot-description { font-size: 10.5px; line-height: 1.55; color: var(--gris-texte); white-space: pre-wrap; }
   .lot-description { margin-top: 6px; }
   .specs-block { padding: 4px 0; }
@@ -3338,7 +3371,20 @@
 <div class="lot-header"><div class="lot-title">{{ lot_titre }}</div></div>
 <div class="sub-line">
 <div class="sub-line-header"><span class="sub-line-name">Fourniture</span><span class="sub-line-qt">{{ qt_fourniture }}</span><span class="sub-line-pu">{{ prix_fourniture_ht }}</span><span class="sub-line-tva">{{ tva_taux }}</span><span class="sub-line-total">{{ prix_fourniture_ttc }}</span></div>
-<div class="specs pac-desc-block"><div class="pac-desc-text">{{ description_pac }}</div></div>
+<div class="pac-desc-block">
+{% if modele_pac %}
+<div class="pac-desc-title">{{ modele_pac }}</div>
+{% endif %}
+{% if description_specs and description_specs|length > 0 %}
+<table class="pac-specs-table">
+<tbody>
+{% for spec in description_specs %}
+<tr><td class="pac-specs-champ">{{ spec.champ }}</td><td class="pac-specs-valeur">{{ spec.valeur }}</td></tr>
+{% endfor %}
+</tbody>
+</table>
+{% endif %}
+</div>
 </div>
 <div class="sub-line">
 <div class="sub-line-header"><span class="sub-line-name">Pose</span><span class="sub-line-qt">{{ qt_pose }}</span><span class="sub-line-pu">{{ prix_pose_ht }}</span><span class="sub-line-tva">{{ tva_taux }}</span><span class="sub-line-total">{{ prix_pose_ttc }}</span></div>
