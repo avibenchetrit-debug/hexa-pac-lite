@@ -7431,6 +7431,69 @@ input:focus{ outline:none; border-color: var(--c-navy,#002E5A); box-shadow:0 0 0
 .adm-table-regie tbody tr[data-i] td{ height:62px; }
 .adm-table-regie .adm-sim-btn{ margin:4px auto 0; }
 
+/* Fix ciblé tableau modèles : neutralise les anciennes règles flex dans les cellules marge. */
+.adm-models-table tbody td {
+  height: 50px;
+  vertical-align: middle !important;
+  padding: 8px;
+  position: relative;
+}
+.adm-models-table .col-marge-net1,
+.adm-models-table .col-marge-net2 {
+  height: 50px;
+  display: table-cell !important;
+  vertical-align: middle !important;
+  text-align: center;
+  position: relative;
+}
+.adm-models-table .col-marge-net1 > *,
+.adm-models-table .col-marge-net2 > * {
+  display: inline-block;
+  vertical-align: middle;
+}
+.adm-models-table .adm-net1-tools {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  margin-top: 0;
+}
+.adm-models-table .adm-tip,
+.adm-models-table .adm-eq-btn,
+.adm-models-table .adm-sim-btn {
+  position: relative;
+  z-index: 1;
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+.adm-models-table .adm-tip {
+  margin: 0 3px !important;
+}
+.adm-models-table .adm-eq-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+}
+.adm-models-table .adm-sim-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin: 4px auto 0;
+  white-space: nowrap;
+}
+.adm-models-table .adm-simrow td {
+  height: auto !important;
+  padding: 12px 16px !important;
+  text-align: left;
+}
+.adm-models-table th,
+.adm-models-table td {
+  overflow: visible;
+}
+
 </style>
   <style>
 /* Vue Prospects : overlay plein écran, affichée quand body.hexa-view-prospects */
@@ -14105,6 +14168,9 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
   }
 
   function isModeleTri(modele){
+    const alim = String(modele?.alim || modele?.raw?.alim || '').toLowerCase();
+    if (alim.includes('tri')) return true;
+    if (alim.includes('mono')) return false;
     const nomRef = `${modele?.nom || modele?.label || ''} ${modele?.ref || ''}`.toUpperCase();
     return nomRef.includes('TRI');
   }
@@ -14200,6 +14266,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     modele_pac: '',
     modele_pac_id: '',
     modele_force: false,
+    user_modified_price: false,
     sous_dimensionnement: false,
     selection_alerte: null
   };
@@ -14406,7 +14473,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     }
     state.modele_pac = modele.label || modele.nom || modele.ref;
     state.modele_pac_id = modele.id;
-    state.prix_pac = Math.round(modele.prix_ttc || 0);
+    if (!state.user_modified_price) state.prix_pac = Math.round(modele.prix_ttc || 0);
     state.sous_dimensionnement = !!selection.sous_dimensionnement;
   }
 
@@ -14432,6 +14499,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       modele_pac_id: state.modele_pac_id || '',
       modele_pac_nom: state.modele_pac || '',
       prix_pac: Number(state.prix_pac || 0),
+      user_modified_price: !!state.user_modified_price,
       service: state.service || '',
       iso_toit: state.iso_toit || '',
       iso_mur: state.iso_mur || '',
@@ -14470,6 +14538,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       if (saved.modele_pac_id) state.modele_pac_id = saved.modele_pac_id;
       if (saved.modele_pac_nom) state.modele_pac = saved.modele_pac_nom;
       if (saved.prix_pac) state.prix_pac = Math.round(Number(saved.prix_pac) || 0);
+      state.user_modified_price = !!saved.user_modified_price;
       if (saved.service) state.service = saved.service;
       if (saved.iso_toit) state.iso_toit = saved.iso_toit;
       if (saved.iso_mur) state.iso_mur = saved.iso_mur;
@@ -14496,7 +14565,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     if (forcedModele) {
       state.modele_pac = forcedModele.label || forcedModele.nom || forcedModele.ref;
       state.modele_pac_id = forcedModele.id;
-      state.prix_pac = Math.round(forcedModele.prix_ttc || 0);
+      if (!state.user_modified_price) state.prix_pac = Math.round(forcedModele.prix_ttc || 0);
       state.sous_dimensionnement = false;
       selection = { modele: forcedModele, sous_dimensionnement: false, forced: true };
     } else {
@@ -14523,6 +14592,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     Object.assign(state, { ...DEFAULT_SIM_STATE });
     state.numero = null;
     state.modele_force = false;
+    state.user_modified_price = false;
     state.selection_alerte = null;
     const titleSub = document.getElementById('sim-drawer-prospect');
     if (titleSub) titleSub.textContent = '—';
@@ -14571,8 +14641,8 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     // Énergie avant (bloc 7)
     const mc = document.querySelector('select[name="mode_chauffage"]')?.value;
     if (mc) state.energie_avant = mc;
-    const phase = document.getElementById('phase-input')?.value
-      || document.querySelector('[name="alimentation_electrique"]')?.value
+    const phase = document.querySelector('[name="alimentation_electrique"]')?.value
+      || document.getElementById('phase-input')?.value
       || document.querySelector('[name="phase_electrique"]')?.value;
     if (phase) state.phase_electrique = String(phase);
     const altitudeVal = num(document.getElementById('altitude-input')?.value || document.querySelector('[name="altitude"]')?.value);
@@ -14725,7 +14795,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
               <button type="button" class="sim-info-btn" id="sim-surf-info" aria-label="Info surface">i</button>
             </span>
           </div>
-          <div class="sim-ctx-sub" id="sim-surf-sub">90% de ${state.surface_habitable ?? '—'} m² habitables${state.surface_forcee?' · <b>forcé</b>':''} → tranche ${labelTranche(c.sKey)}</div>
+          <div class="sim-ctx-sub" id="sim-surf-sub">90% de ${state.surface_habitable ?? '—'} m² habitables${state.surface_forcee?' · <b>forcé</b>':''} → tranche ${labelTranche(c.sKey)} · Puissance reco <b id="sim-puissance-reco">${Number(c.dim?.puissance_kw || 0).toFixed(1)} kW</b></div>
           <div class="sim-info-pop" id="sim-info-pop" hidden>
             Surface <b>habitable</b> ≠ surface <b>chauffée</b>. On retire les pièces non chauffées (WC, salle de bain si sèche-serviette <b>électrique</b>). Défaut = 90% de l'habitable, ajustable.
           </div>
@@ -14877,7 +14947,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     const phraseRoi = phraseCommerciale(c, r, energieLbl, totalApres, delta);
     // sous-ligne surface
     const sub = document.getElementById('sim-surf-sub');
-    if (sub) sub.innerHTML = `90% de ${state.surface_habitable ?? '—'} m² habitables${state.surface_forcee?' · <b>forcé</b>':''} → tranche ${labelTranche(c.sKey)}`;
+    if (sub) sub.innerHTML = `90% de ${state.surface_habitable ?? '—'} m² habitables${state.surface_forcee?' · <b>forcé</b>':''} → tranche ${labelTranche(c.sKey)} · Puissance reco <b id="sim-puissance-reco">${Number(c.dim?.puissance_kw || 0).toFixed(1)} kW</b>`;
     // cellules compte de résultat
     const set=(id,val)=>{ const el=document.getElementById(id); if(el) el.textContent=val; };
     set('sim-mpr', eurDash(c.mprDevis, c.contextePret));
@@ -14917,6 +14987,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       prix.addEventListener('input',e=>{
         const clean=String(e.target.value).replace(/[^\d]/g,'');
         state.prix_pac=parseInt(clean,10)||0;
+        state.user_modified_price = true;
         patch();
         scheduleSaveSimulatorState();
       });
@@ -14932,7 +15003,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
         if (!selected) return;
         state.modele_pac_id = selected.id;
         state.modele_pac = selected.label;
-        state.prix_pac = Math.round(selected.prix_ttc || 0);
+        if (!state.user_modified_price) state.prix_pac = Math.round(selected.prix_ttc || 0);
         state.modele_force = true;
         state.sous_dimensionnement = false;
         scheduleSaveSimulatorState();
@@ -14941,14 +15012,14 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     }
     // Surface chauffée forçable : PATCH seulement (curseur intact)
     const sc=document.getElementById('sim-surf-chauffee');
-    if (sc) sc.addEventListener('input',e=>{
+    if (sc) ['input','change'].forEach(evt => sc.addEventListener(evt,e=>{
       const raw=e.target.value;
       if (raw==='') { state.surface_forcee=false; state.surface_chauffee = state.surface_habitable!=null?state.surface_habitable*0.9:null; }
       else { const v=parseFloat(raw); if(!isNaN(v)){ state.surface_chauffee=v; state.surface_forcee=true; } }
       state.modele_force = false;
       scheduleSaveSimulatorState();
       patch();
-    });
+    }));
     // options de financement : refresh complet (pas d'input -> ok), scroll préservé
     document.querySelectorAll('.sim-opt').forEach(btn=>{
       btn.addEventListener('click',()=>{ state.option=btn.dataset.opt; scheduleSaveSimulatorState(); refresh(); });
