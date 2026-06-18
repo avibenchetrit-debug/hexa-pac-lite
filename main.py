@@ -7,17 +7,33 @@ import json
 import os
 import re
 import shutil
-import smtplib
+# import smtplib  # legacy SMTP disabled: devis are sent with Resend.
 import time
 import urllib.parse
 import urllib.request
 import unicodedata
-from email.message import EmailMessage
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from fastapi import FastAPI, File, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+
+from services.service_devis import (
+    calculer_devis,
+    calculer_notedim,
+    calculer_zone_climatique,
+    find_modele,
+    format_devis_amounts,
+    format_sous_traitant,
+    generer_numero_devis,
+    generer_numero_dossier,
+    generer_numero_notedim,
+    money,
+    select_default_modele,
+    validate_prospect_for_devis,
+    value as devis_value,
+)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 TEMPLATES_DIR = os.path.join(BASE_DIR, "templates")
@@ -32,6 +48,9 @@ BAREMES_PATH = os.path.join(DATA_DIR, "baremes.json")
 ECHANGES_PATH = os.path.join(DATA_DIR, "echanges.json")
 DELEGATAIRES_PATH = os.path.join(DATA_DIR, "delegataires.json")
 MODELES_EMAIL_PATH = os.path.join(DATA_DIR, "modeles_email.json")
+PARAMETRES_ADMIN_PATH = os.path.join(DATA_DIR, "parametres_admin.json")
+COUNTERS_PATH = os.path.join(DATA_DIR, "counters.json")
+DEVIS_ENVOYES_PATH = os.path.join(DATA_DIR, "devis_envoyes.json")
 DEVIS_DIR = os.path.join(DATA_DIR, "devis")
 DEVIS_META_PATH = os.path.join(DEVIS_DIR, "devis_meta.json")
 REPO_CATALOGUE_PATH = os.path.join(REPO_DATA_DIR, "catalogue_pac.json")
@@ -64,6 +83,46 @@ DEFAULT_MODELES_EMAIL = [
     },
 ]
 
+DEFAULT_SOUS_TRAITANTS = [
+    {
+        "id": "italisol",
+        "entreprise": "ITAL-ISOL",
+        "siret": "907 952 048 00037",
+        "adresse": "32 Rue Clément Ader, 91280 Saint-Pierre-du-Perray",
+        "rge": "QPAC / 75024",
+        "rge_validite_du": "2025-08-08",
+        "rge_validite_au": "2026-08-08",
+        "assurance": "QBE 037.0012525-S178593",
+        "actif": True,
+    }
+]
+
+DEFAULT_PARAMETRES_ADMIN = {
+    "params": {
+        "pose": 3500,
+        "acc": 550,
+        "tva": 0.055,
+        "lead": 30,
+        "conv": 0.05,
+        "vt1": 200,
+        "cofrac1": 226,
+        "urba1": 100,
+        "vt2": 200,
+        "cofrac2": 226,
+        "urba2": 100,
+        "cession_mode": "eur",
+        "cession_eur": 2500,
+        "cession_pct": 0.20,
+        "plafond_pct": 0.60,
+    },
+    "prix_vente_devis": {
+        "prix_pose_ht": 3500,
+        "prix_travaux_induits_ht": 1200,
+        "description_pose_defaut": "Pose et mise en service de la pompe à chaleur, raccordements hydrauliques et électriques, dépose et évacuation de l'ancien système, contrôle d'étanchéité, paramétrage de la régulation.",
+    },
+    "sous_traitants": DEFAULT_SOUS_TRAITANTS,
+}
+
 
 def _load_default_catalogue():
     """Load the committed PAC catalogue as the initialization fallback."""
@@ -78,6 +137,7 @@ def _load_default_catalogue():
 DEFAULT_CATALOGUE_PAC = _load_default_catalogue()
 
 app = FastAPI(title="hexa-pac-lite")
+templates = Jinja2Templates(directory=TEMPLATES_DIR)
 
 # Serve static assets (CSS/JS/images) under /static.
 os.makedirs(STATIC_DIR, exist_ok=True)
@@ -122,6 +182,82 @@ def _atomic_write_json(path, obj):
     os.replace(tmp, path)
 
 
+def _deep_merge_defaults(data, defaults):
+    if isinstance(defaults, dict):
+        base = dict(defaults)
+        if isinstance(data, dict):
+            for key, value in data.items():
+                if isinstance(value, dict) and isinstance(base.get(key), dict):
+                    base[key] = _deep_merge_defaults(value, base[key])
+                else:
+                    base[key] = value
+        return base
+    if data is None:
+        return defaults
+    return data
+
+
+def load_parametres_admin():
+    data = _read_json(PARAMETRES_ADMIN_PATH, DEFAULT_PARAMETRES_ADMIN)
+    if not isinstance(data, dict):
+        data = {}
+    merged = _deep_merge_defaults(data, DEFAULT_PARAMETRES_ADMIN)
+    sous_traitants = merged.get("sous_traitants")
+    if not isinstance(sous_traitants, list) or not sous_traitants:
+        merged["sous_traitants"] = [dict(DEFAULT_SOUS_TRAITANTS[0])]
+    if not any(st.get("actif") for st in merged["sous_traitants"]):
+        merged["sous_traitants"][0]["actif"] = True
+    return merged
+
+
+def save_parametres_admin_atomic(payload):
+    data = _deep_merge_defaults(payload if isinstance(payload, dict) else {}, DEFAULT_PARAMETRES_ADMIN)
+    sous_traitants = data.get("sous_traitants")
+    if not isinstance(sous_traitants, list) or not sous_traitants:
+        data["sous_traitants"] = [dict(DEFAULT_SOUS_TRAITANTS[0])]
+    if not any(st.get("actif") for st in data["sous_traitants"]):
+        data["sous_traitants"][0]["actif"] = True
+    _atomic_write_json(PARAMETRES_ADMIN_PATH, data)
+
+
+def _read_catalogue_pac():
+    catalogue = _read_json(CATALOGUE_PAC_PATH, DEFAULT_CATALOGUE_PAC)
+    if not isinstance(catalogue, list):
+        catalogue = DEFAULT_CATALOGUE_PAC
+    changed = False
+    migrated = []
+    for item in catalogue:
+        if not isinstance(item, dict):
+            migrated.append(item)
+            continue
+        next_item = dict(item)
+        if "description_technique" not in next_item:
+            next_item["description_technique"] = ""
+            changed = True
+        migrated.append(next_item)
+    if changed:
+        _atomic_write_json(CATALOGUE_PAC_PATH, migrated)
+    return migrated
+
+
+def _migrate_catalogue_pac_schema():
+    _read_catalogue_pac()
+
+
+def _admin_payload_with_m3():
+    admin = load_parametres_admin()
+    baremes = _read_json(BAREMES_PATH, {})
+    if not isinstance(baremes, dict):
+        baremes = {}
+    admin["forfaits_mpr"] = baremes.get(
+        "forfaits_mpr",
+        {"tres_modeste": 5000, "modeste": 4000, "intermediaire": 3000, "superieur": 0},
+    )
+    admin["bonification_cee"] = baremes.get("bonification_cee", {"actif": True, "multiplicateur": 5})
+    admin["delegataires"] = _read_delegataires()
+    return admin
+
+
 def _seed_json_file(path, default, repo_source=None):
     if os.path.exists(path):
         return
@@ -139,10 +275,15 @@ def _init_storage():
     _seed_json_file(ECHANGES_PATH, {})
     _seed_json_file(DELEGATAIRES_PATH, DEFAULT_DELEGATAIRES)
     _seed_json_file(MODELES_EMAIL_PATH, DEFAULT_MODELES_EMAIL)
+    _seed_json_file(PARAMETRES_ADMIN_PATH, DEFAULT_PARAMETRES_ADMIN)
+    _seed_json_file(COUNTERS_PATH, {"dossier": 0})
+    _seed_json_file(DEVIS_ENVOYES_PATH, [])
     _seed_json_file(CATALOGUE_PATH, DEFAULT_CATALOGUE_PAC, REPO_CATALOGUE_PATH)
     _seed_json_file(BAREMES_PATH, {}, REPO_BAREMES_PATH)
     os.makedirs(DEVIS_DIR, exist_ok=True)
     _seed_json_file(DEVIS_META_PATH, {})
+    save_parametres_admin_atomic(load_parametres_admin())
+    _migrate_catalogue_pac_schema()
 
 
 def _read_leads():
@@ -173,6 +314,11 @@ def _read_modeles_email():
 def _read_devis_meta():
     meta = _read_json(DEVIS_META_PATH, {})
     return meta if isinstance(meta, dict) else {}
+
+
+def _read_devis_envoyes():
+    sent = _read_json(DEVIS_ENVOYES_PATH, [])
+    return sent if isinstance(sent, list) else []
 
 
 async def _read_request_payload(request: Request) -> dict:
@@ -213,6 +359,10 @@ def _normalize_lead_payload(payload: dict) -> dict:
     for key in ("zone_climatique", "zone_climatique_chantier"):
         if key in normalized:
             normalized[key] = _normalize_zone_climatique(normalized.get(key))
+    if "transfert_charge" in normalized:
+        normalized["transfert_charge"] = str(normalized.get("transfert_charge", "")).strip().lower() in {"1", "true", "on", "oui", "yes"}
+    if normalized.get("date_visite_technique_date") and not normalized.get("date_visite_technique"):
+        normalized["date_visite_technique"] = normalized["date_visite_technique_date"]
     _apply_field_aliases(normalized)
     return normalized
 
@@ -315,8 +465,9 @@ STATUT_ALIASES = {
     "rdv": "rdv",
     "rdv pris": "rdv",
     "devis": "devis",
-    "devis envoye": "devis",
-    "devis envoyé": "devis",
+    "devis envoye": "devis_envoye",
+    "devis envoyé": "devis_envoye",
+    "devis_envoye": "devis_envoye",
     "signe": "signe",
     "signé": "signe",
     "perdu": "perdu",
@@ -347,8 +498,11 @@ ZONE_CLIMATIQUE_ALIASES = {
 }
 
 FIELD_ALIASES = {
+    "adresse": "adresse_chantier",
+    "cp_chantier": "code_postal_chantier",
+    "ville": "ville_chantier",
     "code_postal_chantier": "cp",
-    "ville_chantier": "ville",
+    "cp_personne": "code_postal_personne",
 }
 
 PROSPECT_FIELDS = [
@@ -375,6 +529,7 @@ PROSPECT_FIELDS = [
     # Bloc 1 (Origine & Statut)
     "usage_bien",
     "situation_actuelle",
+    "situation_propriete",
     "date_acquisition",
 
     # Bloc 2 (Informations personnelles)
@@ -384,6 +539,9 @@ PROSPECT_FIELDS = [
     "adresse_chantier",
     "code_postal_chantier",
     "ville_chantier",
+    "adresse_personne",
+    "cp_personne",
+    "ville_personne",
     "zone_climatique",
     "parcelle_cadastrale",
     "registre_copro",
@@ -405,6 +563,18 @@ PROSPECT_FIELDS = [
     "puissance_compteur",
     "altitude",
     "panneaux_solaires",
+    "date_visite_technique",
+    "date_visite_technique_date",
+    "type_emetteurs",
+    "transfert_charge",
+    "prix_pac_force",
+    "modele_pac_id",
+    "modele_pac",
+    "surface_chauffee",
+    "iso_toit",
+    "iso_mur",
+    "iso_menuiserie",
+    "service",
 
     # Bloc 5 (Informations fiscales)
     "rfr",
@@ -414,6 +584,13 @@ PROSPECT_FIELDS = [
     # Logs
     "nrp_log",
 ]
+
+DEFAULT_PROSPECT_VALUES = {
+    "date_visite_technique": "À déterminer",
+    "transfert_charge": False,
+    "prix_pac_force": None,
+    "nrp_log": [],
+}
 
 IMPORT_PROSPECT_FIELDS = [
     "nom", "prenom", "telephone", "email", "cp",
@@ -464,7 +641,7 @@ def _lead_for_response(lead: dict) -> dict:
         normalized["zone_climatique_chantier"] = _normalize_zone_climatique(normalized.get("zone_climatique_chantier", ""))
     _apply_field_aliases(normalized)
     for field in PROSPECT_FIELDS:
-        normalized.setdefault(field, "" if field != "nrp_log" else [])
+        normalized.setdefault(field, DEFAULT_PROSPECT_VALUES.get(field, ""))
     return normalized
 
 
@@ -497,7 +674,7 @@ def _migrate_leads_schema():
             changed = True
         for field in PROSPECT_FIELDS:
             if field not in item:
-                item[field] = [] if field == "nrp_log" else ""
+                item[field] = DEFAULT_PROSPECT_VALUES.get(field, "")
                 changed = True
         if item != before:
             normalized_count += 1
@@ -775,10 +952,7 @@ async def get_baremes():
 
 @app.get("/api/catalogue-pac")
 def get_catalogue_pac() -> JSONResponse:
-    catalogue = _read_json(CATALOGUE_PAC_PATH, DEFAULT_CATALOGUE_PAC)
-    if not isinstance(catalogue, list):
-        catalogue = DEFAULT_CATALOGUE_PAC
-    return JSONResponse(catalogue)
+    return JSONResponse(_read_catalogue_pac())
 
 
 @app.get("/api/gmaps-key")
@@ -859,6 +1033,7 @@ async def post_catalogue_pac(request: Request) -> JSONResponse:
         if nom:
             item["nom"] = nom
         item["ttc"] = round(ttc, 2)
+        item.setdefault("description_technique", "")
         validated.append(item)
 
     _atomic_write_json(CATALOGUE_PAC_PATH, validated)
@@ -1148,6 +1323,20 @@ def get_admin_m3() -> JSONResponse:
     )
 
 
+@app.get("/api/admin/params")
+async def get_admin_params():
+    """Charge les paramètres Admin depuis le serveur."""
+    return load_parametres_admin()
+
+
+@app.post("/api/admin/params")
+async def save_admin_params(request: Request):
+    """Sauvegarde les paramètres Admin (écriture atomique)."""
+    payload = await _read_request_payload(request)
+    save_parametres_admin_atomic(payload)
+    return {"success": True}
+
+
 @app.post("/api/admin/auth")
 async def admin_auth(request: Request) -> JSONResponse:
     payload = await _read_request_payload(request)
@@ -1205,73 +1394,308 @@ def get_modeles_email() -> JSONResponse:
     return JSONResponse(_read_modeles_email())
 
 
-@app.get("/api/devis/{numero}/preview")
-async def preview_devis(numero: str) -> Response:
-    return Response(content=_generate_devis_pdf(numero), media_type="application/pdf")
+def _load_state_simulateur(numero: str, prospect: dict, catalogue: list[dict]) -> dict:
+    state = {
+        "numero": numero,
+        "modele_pac_id": devis_value(prospect, "modele_pac_id", default=""),
+        "modele_pac": devis_value(prospect, "modele_pac", default=""),
+        "surface_chauffee": devis_value(prospect, "surface_chauffee", default=""),
+        "iso_toit": devis_value(prospect, "iso_toit", default="isole"),
+        "iso_mur": devis_value(prospect, "iso_mur", default="isole"),
+        "iso_menuiserie": devis_value(prospect, "iso_menuiserie", default="double"),
+        "service": devis_value(prospect, "service", default="chauffage_ecs"),
+    }
+    if not state["modele_pac_id"] and not state["modele_pac"]:
+        modele = select_default_modele(prospect, catalogue)
+        state["modele_pac_id"] = modele.get("ref") or modele.get("id") or ""
+        state["modele_pac"] = modele.get("nom") or modele.get("ref") or ""
+    return state
 
 
-@app.post("/api/devis/{numero}/envoyer")
-async def envoyer_devis(numero: str, request: Request) -> JSONResponse:
-    payload = await _read_request_payload(request)
-    ctx = _devis_context(numero)
-    lead = ctx["lead"]
-    email_to = str(lead.get("email") or "").strip()
+def _next_numero_dossier() -> str:
+    counters = _read_json(COUNTERS_PATH, {"dossier": 0})
+    if not isinstance(counters, dict):
+        counters = {"dossier": 0}
+    numero_dossier, counters = generer_numero_dossier(counters)
+    _atomic_write_json(COUNTERS_PATH, counters)
+    return numero_dossier
+
+
+def _notedim_path(numero: str, version: int) -> str:
+    return os.path.join(DEVIS_DIR, f"{numero}_notedim_v{version}.pdf")
+
+
+def _build_devis_context(request: Request, numero: str) -> dict:
+    prospect = _find_lead(numero)
+    if not prospect:
+        raise HTTPException(status_code=404, detail="Prospect introuvable")
+    prospect = _lead_for_response(prospect)
+    catalogue = _read_catalogue_pac()
+    state = _load_state_simulateur(numero, prospect, catalogue)
+    admin = _admin_payload_with_m3()
+
+    missing = validate_prospect_for_devis(prospect, state)
+    if missing:
+        return {"request": request, "missing": missing, "numero": numero, "_error_template": "erreur_champs_manquants.html"}
+
+    modele_ref = state.get("modele_pac_id") or state.get("modele_pac")
+    modele_obj = find_modele(catalogue, modele_ref) or select_default_modele(prospect, catalogue)
+    today = datetime.now()
+    calculs = calculer_devis(prospect, state, admin, catalogue)
+    sous_traitant = next((st for st in admin.get("sous_traitants", []) if st.get("actif")), {})
+    cp_chantier = devis_value(prospect, "cp_chantier", "code_postal_chantier", "cp", default="")
+    ville_chantier = devis_value(prospect, "ville", "ville_chantier", default="")
+    date_visite = devis_value(prospect, "date_visite_technique", default="À déterminer")
+    if date_visite != "À déterminer" and re.fullmatch(r"\d{4}-\d{2}-\d{2}", str(date_visite)):
+        try:
+            date_visite = datetime.strptime(str(date_visite), "%Y-%m-%d").strftime("%d/%m/%Y")
+        except ValueError:
+            pass
+    context = {
+        "request": request,
+        "civilite": prospect.get("civilite", ""),
+        "nom": str(prospect.get("nom", "")).upper(),
+        "prenom": prospect.get("prenom", ""),
+        "telephone": prospect.get("telephone", ""),
+        "email": str(prospect.get("email", "")).lower(),
+        "adresse_personne": devis_value(prospect, "adresse_personne", "adresse_chantier", default=""),
+        "cp_personne": devis_value(prospect, "cp_personne", "code_postal_personne", "code_postal_chantier", "cp", default=""),
+        "ville_personne": devis_value(prospect, "ville_personne", "ville_chantier", "ville", default=""),
+        "adresse_chantier": devis_value(prospect, "adresse", "adresse_chantier", default=""),
+        "cp_chantier": cp_chantier,
+        "ville_chantier": ville_chantier,
+        "usage_bien": prospect.get("usage_bien", "proprietaire_occupant"),
+        "numero_devis": generer_numero_devis(prospect),
+        "numero_dossier": _next_numero_dossier(),
+        "date_emission": today.strftime("%d/%m/%Y"),
+        "date_validite": (today + timedelta(days=60)).strftime("%d/%m/%Y"),
+        "date_visite_technique": date_visite,
+        "date_debut_travaux": "À déterminer",
+        "type_logement": prospect.get("type_logement", ""),
+        "surface_habitable": str(devis_value(prospect, "surface_habitable", "surface_logement_m2", default="")),
+        "chauffage_actuel": devis_value(prospect, "chauffage_actuel", "mode_chauffage", default=""),
+        "parcelle_cadastrale": prospect.get("parcelle_cadastrale", ""),
+        "zone_climatique": calculer_zone_climatique(cp_chantier, prospect.get("zone_climatique") or prospect.get("zone_climatique_chantier")),
+        "modele_pac": modele_obj.get("nom") or modele_obj.get("ref") or "",
+        "description_pac": modele_obj.get("description_technique", "") if modele_obj else "",
+        "sous_traitant": format_sous_traitant(sous_traitant),
+        **format_devis_amounts(calculs),
+    }
+    return context
+
+
+def _build_notedim_context(request: Request, numero: str) -> dict:
+    prospect = _find_lead(numero)
+    if not prospect:
+        raise HTTPException(status_code=404, detail="Prospect introuvable")
+    prospect = _lead_for_response(prospect)
+    catalogue = _read_catalogue_pac()
+    state = _load_state_simulateur(numero, prospect, catalogue)
+    missing = validate_prospect_for_devis(prospect, state)
+    if missing:
+        return {"request": request, "missing": missing, "numero": numero, "_error_template": "erreur_champs_manquants.html"}
+    now = datetime.now()
+    cp_chantier = devis_value(prospect, "cp_chantier", "code_postal_chantier", "cp", default="")
+    context = {
+        "request": request,
+        "numero_notedim": generer_numero_notedim(prospect),
+        "date_emission": now.strftime("%d/%m/%Y"),
+        "heure_emission": now.strftime("%H:%M"),
+        "nom": str(prospect.get("nom", "")).upper(),
+        "prenom": prospect.get("prenom", ""),
+        "numero_prospect": numero,
+        "telephone": prospect.get("telephone", ""),
+        "email": str(prospect.get("email", "")).lower(),
+        "adresse_chantier": devis_value(prospect, "adresse", "adresse_chantier", default=""),
+        "cp_chantier": cp_chantier,
+        "ville_chantier": devis_value(prospect, "ville", "ville_chantier", default=""),
+        "type_logement": prospect.get("type_logement", ""),
+        "chauffage_actuel": devis_value(prospect, "chauffage_actuel", "mode_chauffage", default=""),
+        **calculer_notedim(prospect, state, catalogue),
+    }
+    return context
+
+
+def _render_template_response(request: Request, template_name: str, context: dict) -> HTMLResponse:
+    name = context.pop("_error_template", template_name)
+    context.setdefault("request", request)
+    html_content = templates.env.get_template(name).render(context)
+    return HTMLResponse(content=html_content)
+
+
+def _render_devis_html(request: Request, numero: str) -> str:
+    ctx = _build_devis_context(request, numero)
+    name = ctx.pop("_error_template", "devis_pac.html")
+    ctx.setdefault("request", request)
+    return templates.env.get_template(name).render(ctx)
+
+
+def _render_notedim_html(request: Request, numero: str) -> str:
+    ctx = _build_notedim_context(request, numero)
+    name = ctx.pop("_error_template", "notedim_pac.html")
+    ctx.setdefault("request", request)
+    return templates.env.get_template(name).render(ctx)
+
+
+def _html_to_pdf(html_content: str, request: Request) -> bytes:
+    try:
+        from weasyprint import HTML
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=500, detail=f"WeasyPrint indisponible: {exc}") from exc
+    return HTML(string=html_content, base_url=str(request.base_url)).write_pdf()
+
+
+def _write_pdf(path: str, pdf_bytes: bytes) -> str:
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "wb") as f:
+        f.write(pdf_bytes)
+    return path
+
+
+def _ensure_devis_pdf(numero: str, request: Request, version: int | None = None) -> tuple[str, int]:
+    version = version or _next_devis_version(numero)
+    path = _devis_path(numero, version)
+    if not os.path.exists(path):
+        _write_pdf(path, _html_to_pdf(_render_devis_html(request, numero), request))
+    return path, version
+
+
+def _ensure_notedim_pdf(numero: str, request: Request, version: int) -> str:
+    path = _notedim_path(numero, version)
+    if not os.path.exists(path):
+        _write_pdf(path, _html_to_pdf(_render_notedim_html(request, numero), request))
+    return path
+
+
+@app.get("/api/devis/{numero}/validate")
+async def validate_devis(numero: str) -> JSONResponse:
+    prospect = _find_lead(numero)
+    if not prospect:
+        raise HTTPException(status_code=404, detail="Prospect introuvable")
+    catalogue = _read_catalogue_pac()
+    state = _load_state_simulateur(numero, _lead_for_response(prospect), catalogue)
+    missing = validate_prospect_for_devis(_lead_for_response(prospect), state)
+    return JSONResponse({"ok": not missing, "missing": missing})
+
+
+@app.get("/api/devis/{numero}/preview", response_class=HTMLResponse)
+async def devis_preview(numero: str, request: Request) -> HTMLResponse:
+    return _render_template_response(request, "devis_pac.html", _build_devis_context(request, numero))
+
+
+@app.get("/api/notedim/{numero}/preview", response_class=HTMLResponse)
+async def notedim_preview(numero: str, request: Request) -> HTMLResponse:
+    return _render_template_response(request, "notedim_pac.html", _build_notedim_context(request, numero))
+
+
+@app.get("/api/devis/{numero}/pdf")
+async def devis_pdf(numero: str, request: Request):
+    pdf_bytes = _html_to_pdf(_render_devis_html(request, numero), request)
+    version = _next_devis_version(numero)
+    _write_pdf(_devis_path(numero, version), pdf_bytes)
+    return StreamingResponse(
+        io.BytesIO(pdf_bytes),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="Devis_{numero}.pdf"'},
+    )
+
+
+@app.get("/api/notedim/{numero}/pdf")
+async def notedim_pdf(numero: str, request: Request):
+    version = _next_devis_version(numero)
+    pdf_bytes = _html_to_pdf(_render_notedim_html(request, numero), request)
+    _write_pdf(_notedim_path(numero, version), pdf_bytes)
+    return StreamingResponse(
+        io.BytesIO(pdf_bytes),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="NoteDim_{numero}.pdf"'},
+    )
+
+
+async def _send_devis(numero: str, payload: dict, request: Request) -> dict:
+    prospect = _find_lead(numero)
+    if not prospect:
+        raise HTTPException(status_code=404, detail="Prospect introuvable")
+    email_to = str(payload.get("destinataire") or prospect.get("email") or "").strip()
     if not email_to:
         raise HTTPException(status_code=400, detail="Email prospect manquant")
-    version = _next_devis_version(numero)
-    pdf = _generate_devis_pdf(numero)
-    path = _devis_path(numero, version)
-    with open(path, "wb") as f:
-        f.write(pdf)
+    api_key = os.environ.get("RESEND_API_KEY", "")
+    if not api_key:
+        raise HTTPException(status_code=400, detail="RESEND_API_KEY non configurée")
 
-    smtp_user = os.environ.get("SMTP_USER", "")
-    smtp_pass = os.environ.get("SMTP_PASS", "")
-    if smtp_user and smtp_pass:
-        msg = EmailMessage()
-        msg["From"] = smtp_user
-        msg["To"] = email_to
-        msg["Subject"] = "Votre devis Hexa Rénov' - Installation Pompe à Chaleur"
-        prenom = lead.get("prenom") or ""
-        body = f"""Bonjour {prenom},
+    devis_path, version = _ensure_devis_pdf(numero, request)
+    notedim_path = _ensure_notedim_pdf(numero, request, version)
+    with open(devis_path, "rb") as f:
+        pdf_devis_b64 = base64.b64encode(f.read()).decode()
+    with open(notedim_path, "rb") as f:
+        pdf_notedim_b64 = base64.b64encode(f.read()).decode()
 
-Suite à notre échange, vous trouverez ci-joint votre devis pour l'installation d'une pompe à chaleur air/eau Atlantic ALFÉA EXCELLIA.
+    import resend
 
-Récapitulatif :
-- Modèle proposé : {ctx['modele']}
-- Reste à charge après aides : {round(ctx['reste'])} € TTC
-- Mensualité indicative : à partir de {ctx['mensualite_10']:.2f} €/mois sur 10 ans
+    resend.api_key = api_key
+    subject = payload.get("objet") or f"Votre devis Hexa Rénov' - {numero}"
+    message_html = payload.get("message_html") or payload.get("message") or (
+        f"Bonjour {html.escape(str(prospect.get('prenom') or ''))},<br><br>"
+        "Veuillez trouver ci-joint votre devis et la note de dimensionnement.<br><br>"
+        "Cordialement,<br>L'équipe Hexa Rénov'"
+    )
+    result = resend.Emails.send(
+        {
+            "from": "Hexa Rénov' <a.parisot@hexa-renov.fr>",
+            "to": [email_to],
+            "subject": subject,
+            "html": message_html,
+            "attachments": [
+                {"filename": f"Devis_{numero}.pdf", "content": pdf_devis_b64},
+                {"filename": f"NoteDim_{numero}.pdf", "content": pdf_notedim_b64},
+            ],
+        }
+    )
 
-Ce devis est valable 30 jours.
-
-Pour toute question ou pour planifier la visite technique, vous pouvez nous joindre au [téléphone Hexa-Rénov'] ou par retour de mail.
-
-À très bientôt,
-L'équipe Hexa-Rénov'
-"""
-        msg.set_content(body)
-        msg.add_attachment(pdf, maintype="application", subtype="pdf", filename=f"devis_{numero}_v{version}.pdf")
-        with smtplib.SMTP("smtp.gmail.com", 587, timeout=20) as smtp:
-            smtp.starttls()
-            smtp.login(smtp_user, smtp_pass)
-            smtp.send_message(msg)
-
+    now = _now_iso()
     leads = _read_leads()
     idx = _find_lead_index(leads, numero)
     if idx is not None:
-        leads[idx]["statut"] = "devis"
-        leads[idx]["date_envoi_devis"] = _now_iso()
+        leads[idx]["statut"] = "devis_envoye"
+        leads[idx]["date_envoi_devis"] = now
         _atomic_write_json(LEADS_PATH, leads)
 
     auteur = str(payload.get("auteur") or "Anonyme")
     notes = _read_notes()
     notes.setdefault(numero, []).append(
-        {"texte": f"📩 Devis v{version} envoyé le {_now_iso()} à {email_to} par {auteur}", "date": _now_iso(), "auteur": auteur}
+        {"texte": f"Devis v{version} envoyé le {now} à {email_to} par {auteur}", "date": now, "auteur": auteur}
     )
     _atomic_write_json(NOTES_PATH, notes)
+
     meta = _read_devis_meta()
-    meta.setdefault(numero, []).append({"version": version, "sent_at": _now_iso(), "email": email_to, "file": path})
+    item = {
+        "version": version,
+        "numero_devis": generer_numero_devis(prospect, version),
+        "sent_at": now,
+        "email": email_to,
+        "file": devis_path,
+        "notedim_file": notedim_path,
+        "resend_id": result.get("id") if isinstance(result, dict) else "",
+        "statut": "envoye",
+    }
+    meta.setdefault(numero, []).append(item)
     _atomic_write_json(DEVIS_META_PATH, meta)
-    return JSONResponse({"ok": True, "version": version, "stored_at": path})
+    sent = _read_devis_envoyes()
+    sent.append({"numero_prospect": numero, **item})
+    _atomic_write_json(DEVIS_ENVOYES_PATH, sent)
+    return {"success": True, "ok": True, "version": version, "resend_id": item["resend_id"]}
+
+
+@app.post("/api/devis/{numero}/send")
+async def send_devis_email(numero: str, request: Request) -> JSONResponse:
+    payload = await _read_request_payload(request)
+    return JSONResponse(await _send_devis(numero, payload, request))
+
+
+@app.post("/api/devis/{numero}/envoyer")
+async def envoyer_devis(numero: str, request: Request) -> JSONResponse:
+    payload = await _read_request_payload(request)
+    return JSONResponse(await _send_devis(numero, payload, request))
 
 
 @app.get("/api/devis/{numero}/list")
@@ -1280,9 +1704,15 @@ async def list_devis(numero: str) -> JSONResponse:
     items = []
     for item in meta:
         version = int(item.get("version") or 0)
-        path = _devis_path(numero, version)
+        path = item.get("file") or _devis_path(numero, version)
         if version and os.path.exists(path):
-            items.append({"version": version, "sent_at": item.get("sent_at", ""), "email": item.get("email", ""), "file": path})
+            items.append({
+                "version": version,
+                "numero_devis": item.get("numero_devis") or f"v{version}",
+                "sent_at": item.get("sent_at", ""),
+                "email": item.get("email", ""),
+                "file": path,
+            })
     return JSONResponse(items)
 
 
@@ -1305,18 +1735,8 @@ async def envoyer_modele_email(numero: str, request: Request) -> JSONResponse:
         raise HTTPException(status_code=400, detail="Email prospect manquant")
     sujet = str(payload.get("sujet") or "")
     contenu = str(payload.get("contenu") or "")
-    smtp_user = os.environ.get("SMTP_USER", "")
-    smtp_pass = os.environ.get("SMTP_PASS", "")
-    if smtp_user and smtp_pass:
-        msg = EmailMessage()
-        msg["From"] = smtp_user
-        msg["To"] = email_to
-        msg["Subject"] = sujet
-        msg.set_content(contenu)
-        with smtplib.SMTP("smtp.gmail.com", 587, timeout=20) as smtp:
-            smtp.starttls()
-            smtp.login(smtp_user, smtp_pass)
-            smtp.send_message(msg)
+    # Legacy SMTP block intentionally disabled. Devis delivery now uses Resend;
+    # email-template history is still recorded for traceability.
     auteur = str(payload.get("auteur") or "Anonyme")
     notes = _read_notes()
     notes.setdefault(numero, []).append({"texte": f"📧 Email envoyé à {email_to} : {sujet}", "date": _now_iso(), "auteur": auteur})

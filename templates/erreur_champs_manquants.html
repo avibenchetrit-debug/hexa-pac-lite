@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Champs manquants — {{ numero }}</title>
+  <style>
+    body { margin:0; font-family: Inter, Arial, sans-serif; background:#f8fafc; color:#0f172a; }
+    .box { max-width:760px; margin:48px auto; background:white; border:1px solid #e2e8f0; border-radius:16px; padding:28px; box-shadow:0 16px 40px rgba(15,23,42,.08); }
+    h1 { margin:0 0 8px; color:#b91c1c; font-size:24px; }
+    p { color:#475569; line-height:1.5; }
+    ul { margin:18px 0 0; padding-left:22px; }
+    li { margin:8px 0; font-weight:600; }
+  </style>
+</head>
+<body>
+  <main class="box">
+    <h1>Champs obligatoires manquants</h1>
+    <p>Complétez la fiche prospect {{ numero }} avant de générer le devis ou la note de dimensionnement.</p>
+    <ul>
+      {% for item in missing %}
+      <li>{{ item }}</li>
+      {% endfor %}
+    </ul>
+  </main>
+</body>
+</html>

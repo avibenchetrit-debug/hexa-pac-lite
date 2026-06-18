@@ -1,0 +1,37 @@
+{
+  "params": {
+    "pose": 3500,
+    "acc": 550,
+    "tva": 0.055,
+    "lead": 30,
+    "conv": 0.05,
+    "vt1": 200,
+    "cofrac1": 226,
+    "urba1": 100,
+    "vt2": 200,
+    "cofrac2": 226,
+    "urba2": 100,
+    "cession_mode": "eur",
+    "cession_eur": 2500,
+    "cession_pct": 0.2,
+    "plafond_pct": 0.6
+  },
+  "prix_vente_devis": {
+    "prix_pose_ht": 3500,
+    "prix_travaux_induits_ht": 1200,
+    "description_pose_defaut": "Pose et mise en service de la pompe à chaleur, raccordements hydrauliques et électriques, dépose et évacuation de l'ancien système, contrôle d'étanchéité, paramétrage de la régulation."
+  },
+  "sous_traitants": [
+    {
+      "id": "italisol",
+      "entreprise": "ITAL-ISOL",
+      "siret": "907 952 048 00037",
+      "adresse": "32 Rue Clément Ader, 91280 Saint-Pierre-du-Perray",
+      "rge": "QPAC / 75024",
+      "rge_validite_du": "2025-08-08",
+      "rge_validite_au": "2026-08-08",
+      "assurance": "QBE 037.0012525-S178593",
+      "actif": true
+    }
+  ]
+}

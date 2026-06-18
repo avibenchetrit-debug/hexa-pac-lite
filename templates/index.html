@@ -8066,6 +8066,23 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       });
       q('#batiment-classe-select')?.closest('.field')?.remove();
       q('#zone-protegee-select')?.closest('.field')?.remove();
+      if (!q('#bloc-adresse-personne', blockAdresse)) {
+        const owner = document.createElement('div');
+        owner.className = 'fp-bloc-adresse';
+        owner.id = 'bloc-adresse-personne';
+        owner.hidden = true;
+        owner.innerHTML = `
+          <div class="sub-bloc-title">Adresse du propriétaire (différente du chantier)</div>
+          <div class="row row-1">
+            <div class="field" data-label="Adresse du propriétaire"><label>Adresse propriétaire</label><input type="text" name="adresse_personne" oninput="this.value=this.value.toUpperCase()" style="text-transform:uppercase;"></div>
+          </div>
+          <div class="row row-2">
+            <div class="field" data-label="CP du propriétaire"><label>Code postal propriétaire</label><input type="text" name="cp_personne" id="fp-cp-personne" maxlength="5" inputmode="numeric"></div>
+            <div class="field" data-label="Ville du propriétaire"><label>Ville propriétaire</label><input type="text" name="ville_personne" oninput="this.value=this.value.toUpperCase()" style="text-transform:uppercase;"></div>
+          </div>`;
+        const regTitle = qa('.sub-bloc-title', blockAdresse).find(x => /Données réglementaires/i.test(x.textContent));
+        blockAdresse.insertBefore(owner, regTitle || null);
+      }
     }
 
     // BLOC 4: Caractéristiques du bien (2 sous-blocs)
@@ -8127,6 +8144,43 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
         + '<option value="chaudiere">Chaudière</option>'
         + '<option value="independant">Indépendant</option>'
         + '</select>';
+      const dateVisiteField = document.createElement('div');
+      dateVisiteField.className = 'field';
+      dateVisiteField.innerHTML = `
+        <label>Date visite technique</label>
+        <input type="hidden" name="date_visite_technique" id="fp-date-visite-tech-hidden" value="À déterminer">
+        <div class="fp-date-with-checkbox" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <input type="date" id="fp-date-visite-tech" name="date_visite_technique_date" disabled>
+          <label class="checkbox-inline" style="display:inline-flex;align-items:center;gap:6px;font-size:12px">
+            <input type="checkbox" id="fp-visite-tech-undefined" checked> À déterminer
+          </label>
+        </div>`;
+      const typeEmetteursField = document.createElement('div');
+      typeEmetteursField.className = 'field';
+      typeEmetteursField.dataset.required = 'type_emetteurs';
+      typeEmetteursField.dataset.label = "Type d'émetteurs";
+      typeEmetteursField.innerHTML = `
+        <label>Type d'émetteurs existants <span class="req">*</span></label>
+        <select name="type_emetteurs" required>
+          <option value="">— Sélectionner —</option>
+          <option value="plancher_chauffant">Plancher chauffant</option>
+          <option value="radiateurs_basse_temp">Radiateurs basse température</option>
+          <option value="radiateurs_classiques">Radiateurs classiques (acier récent)</option>
+          <option value="radiateurs_fonte">Radiateurs fonte (anciens)</option>
+        </select>`;
+      const prixForceField = document.createElement('div');
+      prixForceField.className = 'field';
+      prixForceField.innerHTML = `
+        <label>Prix négocié pour ce client</label>
+        <input type="number" name="prix_pac_force" placeholder="Laisser vide pour utiliser le prix catalogue" step="100">
+        <p class="fp-field-help" style="font-size:11px;color:var(--gris-mute);margin-top:4px">Si vous négociez un prix différent du catalogue avec ce client, saisissez-le ici. Sinon laissez vide : le devis utilisera le prix catalogue du modèle PAC sélectionné. € TTC</p>`;
+      const transfertField = document.createElement('div');
+      transfertField.className = 'field';
+      transfertField.innerHTML = `
+        <label class="checkbox-label" style="display:flex;gap:8px;align-items:center;margin-top:24px">
+          <input type="checkbox" name="transfert_charge" value="true">
+          Transfert de charge des aides (Hexa Rénov' avance MPR + CEE)
+        </label>`;
 
       if (coutField) {
         const coutInput = q('[name="cout_energetique_mensuel_eur"]', coutField);
@@ -8178,16 +8232,19 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       [typeField, surfaceField, hspField].forEach(f => { if (f) rowA.appendChild(f); });
       const rowB = document.createElement('div');
       rowB.className = 'row row-2';
-      [anneeField, altitudeField].forEach(f => { if (f) rowB.appendChild(f); });
+      [anneeField, dateVisiteField].forEach(f => { if (f) rowB.appendChild(f); });
       const rowC = document.createElement('div');
       rowC.className = 'row row-3';
-      [modeField, ecsField, coutField].forEach(f => { if (f) rowC.appendChild(f); });
+      [modeField, typeEmetteursField, ecsField].forEach(f => { if (f) rowC.appendChild(f); });
       const rowD = document.createElement('div');
       rowD.className = 'row row-2';
       [phaseField, puissanceField].forEach(f => { if (f) rowD.appendChild(f); });
       const rowE = document.createElement('div');
-      rowE.className = 'row row-1';
-      [panneauField].forEach(f => { if (f) rowE.appendChild(f); });
+      rowE.className = 'row row-3';
+      [altitudeField, coutField, panneauField].forEach(f => { if (f) rowE.appendChild(f); });
+      const rowDevis = document.createElement('div');
+      rowDevis.className = 'row row-2';
+      [prixForceField, transfertField].forEach(f => { if (f) rowDevis.appendChild(f); });
 
       blockCarac.appendChild(sb1);
       blockCarac.appendChild(rowS);
@@ -8199,6 +8256,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       blockCarac.appendChild(rowC);
       blockCarac.appendChild(rowD);
       blockCarac.appendChild(rowE);
+      blockCarac.appendChild(rowDevis);
       if (typeof window.syncDpeMetaDisplay === 'function') window.syncDpeMetaDisplay();
     }
 
@@ -8215,6 +8273,14 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
         hiddenStore.style.display = 'none';
         form.appendChild(hiddenStore);
       }
+      ['modele_pac_id','modele_pac','surface_chauffee','iso_toit','iso_mur','iso_menuiserie','service'].forEach(name=>{
+        if (!q(`[name="${name}"]`, form)) {
+          const input = document.createElement('input');
+          input.type = 'hidden';
+          input.name = name;
+          hiddenStore.appendChild(input);
+        }
+      });
       qa('input[type="hidden"]', blockChauffage).forEach(inp => hiddenStore.appendChild(inp));
       blockChauffage.remove();
     }
@@ -8223,6 +8289,52 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     [blockOrigine, blockPerso, blockAdresse, blockCarac, blockFiscal].forEach(card => {
       if (card) fieldset.appendChild(card);
     });
+    bindDevisProspectFields(form);
+  }
+
+  function bindDevisProspectFields(form) {
+    if (!form || form.dataset.devisFieldsBound === '1') return;
+    form.dataset.devisFieldsBound = '1';
+    const usage = q('[name="usage_bien"]', form);
+    function syncBailleurAdresse(){
+      const isBailleur = usage?.value === 'bailleur';
+      const bloc = q('#bloc-adresse-personne', form);
+      if (bloc) bloc.hidden = !isBailleur;
+      if (!isBailleur) {
+        const srcAdresse = q('[name="adresse_chantier"]', form)?.value || '';
+        const srcCp = q('[name="code_postal_chantier"]', form)?.value || '';
+        const srcVille = q('[name="ville_chantier"]', form)?.value || '';
+        const adr = q('[name="adresse_personne"]', form);
+        const cp = q('[name="cp_personne"]', form);
+        const ville = q('[name="ville_personne"]', form);
+        if (adr) adr.value = srcAdresse;
+        if (cp) cp.value = srcCp;
+        if (ville) ville.value = srcVille;
+      }
+    }
+    usage?.addEventListener('change', syncBailleurAdresse);
+    ['adresse_chantier','code_postal_chantier','ville_chantier'].forEach(name=>{
+      q(`[name="${name}"]`, form)?.addEventListener('change', syncBailleurAdresse);
+    });
+
+    const dateInput = q('#fp-date-visite-tech', form);
+    const dateHidden = q('#fp-date-visite-tech-hidden', form);
+    const undefinedInput = q('#fp-visite-tech-undefined', form);
+    function syncDateVisite(fromHidden=false){
+      if (fromHidden && dateHidden && dateHidden.value && dateHidden.value !== 'À déterminer') {
+        if (undefinedInput) undefinedInput.checked = false;
+        if (dateInput) dateInput.value = dateHidden.value;
+      }
+      const undef = !!undefinedInput?.checked;
+      if (dateInput) dateInput.disabled = undef;
+      if (dateHidden) dateHidden.value = undef ? 'À déterminer' : (dateInput?.value || 'À déterminer');
+    }
+    undefinedInput?.addEventListener('change', syncDateVisite);
+    dateInput?.addEventListener('change', syncDateVisite);
+    syncBailleurAdresse();
+    syncDateVisite();
+    window.syncBailleurAdresseProspect = syncBailleurAdresse;
+    window.syncDateVisiteProspect = () => syncDateVisite(true);
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initMiniPrompt53);
@@ -11205,6 +11317,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     if (rcSync && rcSel) rcSync.value = rcSel.value || rcSync.value;
     form.querySelectorAll('fieldset').forEach(fs => { fs.disabled = false; });
     const fd = new FormData(form);
+    if (!form.querySelector('[name="transfert_charge"]')?.checked) fd.set('transfert_charge', 'false');
     const saveLabel = btn.dataset.label || (btn.textContent || '').replace(/\s+/g, ' ').trim();
     btn.dataset.label = saveLabel;
     btn.disabled = true;
@@ -12739,7 +12852,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       </div>
       <div class="comments-panel-list documents-panel-body">
         <div class="docs-devis-block" id="docs-devis-block">
-          <div class="docs-devis-title">Devis envoyés</div>
+          <div class="docs-devis-title" id="docs-devis-title">📋 Devis envoyés</div>
           <div id="docs-devis-list">Chargement…</div>
         </div>
         <button type="button" class="docs-nav-back" id="docs-nav-back" style="display:none;">‹ Retour</button>
@@ -13216,15 +13329,20 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       const r = await fetch(`/api/devis/${encodeURIComponent(currentProspect)}/list`, { cache:'no-store' });
       const items = r.ok ? await r.json() : [];
       if (!items.length) {
+        const title = document.getElementById('docs-devis-title');
+        if (title) title.textContent = '📋 Devis envoyés (0)';
         root.innerHTML = '<div class="pv-muted">Aucun devis envoyé pour ce prospect</div>';
         return;
       }
+      const title = document.getElementById('docs-devis-title');
+      if (title) title.textContent = `📋 Devis envoyés (${items.length})`;
       root.innerHTML = items.map(item => `
         <div class="docs-devis-row">
-          <div><b>v${item.version}</b> · ${formatParis(item.sent_at)}<br><span class="pv-muted">${escapeHtml(item.email || '')}</span></div>
+          <div><b>${escapeHtml(item.numero_devis || ('v' + item.version))}</b> — Envoyé le ${formatParis(item.sent_at)} à ${escapeHtml(item.email || '')}</div>
           <div class="docs-devis-actions">
             <button type="button" class="hexa-meta-card-action" data-devis-preview="${item.version}">👁 Aperçu</button>
-            <button type="button" class="hexa-meta-card-action" data-devis-download="${item.version}">⬇ Télécharger</button>
+            <button type="button" class="hexa-meta-card-action" data-devis-download="${item.version}">📥 Télécharger</button>
+            <button type="button" class="hexa-meta-card-action" data-devis-resend="${item.version}">📧 Renvoyer</button>
           </div>
         </div>`).join('');
       root.querySelectorAll('[data-devis-preview]').forEach(btn => {
@@ -13232,6 +13350,9 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       });
       root.querySelectorAll('[data-devis-download]').forEach(btn => {
         btn.addEventListener('click', () => window.open(`/api/devis/${encodeURIComponent(currentProspect)}/download?version=${encodeURIComponent(btn.dataset.devisDownload)}`, '_blank'));
+      });
+      root.querySelectorAll('[data-devis-resend]').forEach(btn => {
+        btn.addEventListener('click', () => window.ouvrirSimulationsDrawer?.(currentProspect));
       });
     } catch (_) {
       root.innerHTML = '<div class="pv-muted">Aucun devis envoyé pour ce prospect</div>';
@@ -13890,6 +14011,22 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     state.sous_dimensionnement = !!selection.sous_dimensionnement;
   }
 
+  function syncSimStateToForm(){
+    const form = document.getElementById('form-prospect');
+    if (!form) return;
+    const set = (name, val) => {
+      const el = form.querySelector(`[name="${name}"]`);
+      if (el) el.value = val == null ? '' : String(val);
+    };
+    set('modele_pac_id', state.modele_pac_id || '');
+    set('modele_pac', state.modele_pac || '');
+    set('surface_chauffee', state.surface_chauffee || '');
+    set('iso_toit', state.iso_toit || 'isole');
+    set('iso_mur', state.iso_mur || 'isole');
+    set('iso_menuiserie', state.iso_menuiserie || 'double');
+    set('service', state.service || 'chauffage_ecs');
+  }
+
   function syncDimensionnement(){
     const dim = calculerPuissancePAC(state);
     state.iso_toit = dim.iso_toit;
@@ -13911,6 +14048,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     }
 
     state.selection_alerte = selection?.alerte || null;
+    syncSimStateToForm();
 
     return { ...dim, selection };
   }
@@ -14562,45 +14700,122 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     wrap.addEventListener('click', (e)=>{ if (e.target === wrap) close(); });
   }
 
-  function ouvrirModalDevis(){
+  async function ouvrirModalDevis(){
     const numero = state.numero || document.body.dataset.prospectNumero;
     if(!numero) return;
+    const validation = await fetch(`/api/devis/${encodeURIComponent(numero)}/validate`, { cache:'no-store' }).then(r=>r.json()).catch(()=>({ok:false, missing:['Validation indisponible']}));
+    if (!validation.ok) {
+      const oldErr = document.getElementById('devis-missing-modal');
+      if (oldErr) oldErr.remove();
+      const err = document.createElement('div');
+      err.id = 'devis-missing-modal';
+      err.className = 'devis-modal-overlay';
+      err.innerHTML = `
+        <div class="devis-modal-box" style="max-width:640px;height:auto">
+          <div class="devis-modal-head"><div class="devis-modal-title">Champs à compléter</div><button type="button" class="devis-close-btn" aria-label="Fermer">×</button></div>
+          <div class="devis-modal-body" style="padding:22px;overflow:auto"><ul>${(validation.missing||[]).map(x=>`<li>${x}</li>`).join('')}</ul></div>
+          <div class="devis-modal-foot"><button type="button" class="adm-btn adm-btn-primary" id="btn-completer-devis">Compléter</button></div>
+        </div>`;
+      document.body.appendChild(err);
+      const closeErr = () => err.remove();
+      err.querySelector('.devis-close-btn')?.addEventListener('click', closeErr);
+      err.querySelector('#btn-completer-devis')?.addEventListener('click', ()=>{ closeErr(); document.getElementById('form-prospect')?.scrollIntoView({behavior:'smooth'}); });
+      err.addEventListener('click', e=>{ if(e.target===err) closeErr(); });
+      return;
+    }
     document.getElementById('devis-modal-overlay')?.remove();
     const wrap = document.createElement('div');
     wrap.id = 'devis-modal-overlay';
     wrap.className = 'devis-modal-overlay';
-    const pdfUrl = `/api/devis/${encodeURIComponent(numero)}/preview`;
+    const devisUrl = `/api/devis/${encodeURIComponent(numero)}/preview`;
+    const notedimUrl = `/api/notedim/${encodeURIComponent(numero)}/preview`;
     wrap.innerHTML = `
       <div class="devis-modal-box" role="dialog" aria-modal="true">
         <div class="devis-modal-head">
-          <div class="devis-modal-title">Devis ${numero} (aperçu)</div>
-          <button type="button" class="devis-send-btn" id="devis-send-btn">📩 Envoyer au client</button>
+          <div class="devis-modal-title">Devis ${numero}</div>
+          <button type="button" class="adm-btn adm-btn-ghost devis-tab active" data-url="${devisUrl}" data-kind="devis">📄 Devis</button>
+          <button type="button" class="adm-btn adm-btn-ghost devis-tab" data-url="${notedimUrl}" data-kind="notedim">📐 Note de dim</button>
+          <button type="button" class="adm-btn adm-btn-primary" id="devis-pdf-btn">📥 Télécharger PDF</button>
+          <button type="button" class="devis-send-btn" id="devis-send-btn">📧 Envoyer</button>
           <button type="button" class="devis-close-btn" id="devis-close-btn" aria-label="Fermer">×</button>
         </div>
-        <div class="devis-modal-body"><iframe title="Aperçu devis" src="${pdfUrl}"></iframe></div>
+        <div class="devis-modal-body"><iframe id="devis-preview-frame" title="Aperçu devis" src="${devisUrl}"></iframe></div>
         <div class="devis-modal-foot"><button type="button" class="adm-btn adm-btn-cancel" id="devis-close-bottom">Fermer</button></div>
       </div>`;
     document.body.appendChild(wrap);
+    let currentKind = 'devis';
     const close = () => wrap.remove();
     document.getElementById('devis-close-btn')?.addEventListener('click', close);
     document.getElementById('devis-close-bottom')?.addEventListener('click', close);
     wrap.addEventListener('click', (e)=>{ if(e.target === wrap) close(); });
-    document.getElementById('devis-send-btn')?.addEventListener('click', async ()=>{
-      const btn = document.getElementById('devis-send-btn');
+    wrap.querySelectorAll('.devis-tab').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        wrap.querySelectorAll('.devis-tab').forEach(b=>b.classList.toggle('active', b===btn));
+        currentKind = btn.dataset.kind;
+        document.getElementById('devis-preview-frame').src = btn.dataset.url;
+      });
+    });
+    document.getElementById('devis-pdf-btn')?.addEventListener('click', ()=>{
+      const url = currentKind === 'notedim' ? `/api/notedim/${encodeURIComponent(numero)}/pdf` : `/api/devis/${encodeURIComponent(numero)}/pdf`;
+      window.open(url, '_blank');
+    });
+    document.getElementById('devis-send-btn')?.addEventListener('click', ()=>openSendDevisMailModal(numero));
+  }
+
+  function openSendDevisMailModal(numero){
+    document.getElementById('modal-envoi-mail')?.remove();
+    const email = document.querySelector('[name="email"]')?.value || '';
+    const prenom = document.querySelector('[name="prenom"]')?.value || '';
+    const modal = document.createElement('div');
+    modal.id = 'modal-envoi-mail';
+    modal.className = 'devis-modal-overlay';
+    modal.innerHTML = `
+      <div class="devis-modal-box" style="max-width:680px;height:auto">
+        <div class="devis-modal-head"><div class="devis-modal-title">📧 Envoyer le devis par mail</div><button type="button" class="devis-close-btn" aria-label="Fermer">×</button></div>
+        <div class="devis-modal-body" style="padding:22px;display:block;overflow:auto">
+          <label>Destinataire<input type="email" id="mail-destinataire" value="${email}" style="width:100%"></label>
+          <label>Objet<input type="text" id="mail-objet" value="Votre devis Hexa Rénov' - ${numero}" style="width:100%"></label>
+          <label>Message<textarea id="mail-message" rows="6" style="width:100%">Bonjour ${prenom},
+
+Veuillez trouver ci-joint votre devis ainsi que la note de dimensionnement.
+
+Cordialement,
+L'équipe Hexa Rénov'</textarea></label>
+          <div class="mail-pj-list"><h4>Pièces jointes</h4><div>✓ Devis_${numero}.pdf</div><div>✓ NoteDim_${numero}.pdf</div></div>
+        </div>
+        <div class="devis-modal-foot">
+          <button type="button" class="adm-btn adm-btn-cancel" id="btn-cancel-mail">Annuler</button>
+          <button type="button" class="adm-btn adm-btn-primary" id="btn-send-mail">📧 Envoyer maintenant</button>
+        </div>
+      </div>`;
+    document.body.appendChild(modal);
+    const close = () => modal.remove();
+    modal.querySelector('.devis-close-btn')?.addEventListener('click', close);
+    modal.querySelector('#btn-cancel-mail')?.addEventListener('click', close);
+    modal.addEventListener('click', e=>{ if(e.target===modal) close(); });
+    modal.querySelector('#btn-send-mail')?.addEventListener('click', async ()=>{
+      const btn = modal.querySelector('#btn-send-mail');
       const prev = btn.textContent;
       btn.disabled = true;
       btn.textContent = 'Envoi...';
       try{
         const auteur = (localStorage.getItem('hexa_user') || 'Anonyme');
-        const r = await fetch(`/api/devis/${encodeURIComponent(numero)}/envoyer`, {
+        const message = document.getElementById('mail-message')?.value || '';
+        const r = await fetch(`/api/devis/${encodeURIComponent(numero)}/send`, {
           method:'POST',
           headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({ auteur })
+          body: JSON.stringify({
+            auteur,
+            destinataire: document.getElementById('mail-destinataire')?.value || '',
+            objet: document.getElementById('mail-objet')?.value || '',
+            message_html: message.replace(/\n/g, '<br>')
+          })
         });
         const data = await r.json().catch(()=>({}));
-        if(!r.ok || !data.ok) throw new Error(data.detail || data.msg || 'Envoi impossible');
+        if(!r.ok || !(data.ok || data.success)) throw new Error(data.detail || data.msg || 'Envoi impossible');
         alert('Devis envoyé au client.');
         if(typeof window.hexaRefreshProspectsTable === 'function') window.hexaRefreshProspectsTable();
+        close();
       }catch(err){
         alert('Erreur : ' + err.message);
       }finally{
@@ -14946,6 +15161,39 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       <div class="adm-add-row"><button type="button" class="adm-btn adm-btn-primary" id="adm-save-m3">Enregistrer MPR/CEE/Emails</button></div>`;
   }
 
+  function renderSousTraitantsSection(){
+    const list = Array.isArray(window.HexaConfig?.sous_traitants) && window.HexaConfig.sous_traitants.length
+      ? window.HexaConfig.sous_traitants
+      : DEFAULT.sous_traitants;
+    return `
+      <div class="adm-section">Sous-traitants</div>
+      <p class="adm-opt2-note adm-section-help">
+        Liste des entreprises sous-traitantes utilisées sur les chantiers. Le sous-traitant marqué "Actif" apparaîtra sur les devis générés.
+      </p>
+      <div id="sous-traitants-list">
+        ${list.map((st,i)=>`
+          <div class="adm-card sous-traitant-card" data-id="${i}">
+            <div class="adm-cols">
+              <label>Entreprise<input type="text" data-st-field="entreprise" value="${adminEscape(st.entreprise || '')}"></label>
+              <label>SIRET<input type="text" data-st-field="siret" value="${adminEscape(st.siret || '')}"></label>
+            </div>
+            <label style="display:block;margin-top:10px">Adresse complète<input type="text" data-st-field="adresse" value="${adminEscape(st.adresse || '')}" style="width:100%"></label>
+            <label style="display:block;margin-top:10px">Certificat RGE<input type="text" data-st-field="rge" value="${adminEscape(st.rge || '')}" style="width:100%"></label>
+            <div class="adm-cols">
+              <label>Validité RGE — Du<input type="date" data-st-field="rge_validite_du" value="${adminEscape(st.rge_validite_du || '')}"></label>
+              <label>Validité RGE — Au<input type="date" data-st-field="rge_validite_au" value="${adminEscape(st.rge_validite_au || '')}"></label>
+            </div>
+            <label style="display:block;margin-top:10px">Assurance<input type="text" data-st-field="assurance" value="${adminEscape(st.assurance || '')}" style="width:100%"></label>
+            <label class="adm-check"><input type="radio" name="sous-traitant-actif" data-st-field="actif" ${st.actif?'checked':''}> Actif (utilisé pour les devis)</label>
+            <button type="button" class="adm-btn adm-btn-danger btn-delete-sous-traitant">🗑 Supprimer</button>
+          </div>`).join('')}
+      </div>
+      <div class="adm-add-row">
+        <button type="button" class="adm-btn adm-btn-add" id="btn-add-sous-traitant">+ Ajouter un sous-traitant</button>
+        <button type="button" class="adm-btn adm-btn-primary" id="btn-save-sous-traitants">Sauvegarder les sous-traitants</button>
+      </div>`;
+  }
+
   async function hydrateCatalogueDefaults(){
     if (Array.isArray(window.__hexaCataloguePacCache) && window.__hexaCataloguePacCache.length) {
       return { source:'cache', models:window.__hexaCataloguePacCache.map(normalizeAdminModel) };
@@ -14964,6 +15212,45 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
   }
   hydrateCatalogueDefaults();
 
+  let ADMIN_PARAMS_CACHE = null;
+  async function fetchAdminParams(){
+    try {
+      const res = await fetch('/api/admin/params', { cache:'no-store' });
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.params) {
+          ADMIN_PARAMS_CACHE = data;
+          return data;
+        }
+      }
+    } catch(e) {
+      console.warn('Fallback localStorage:', e);
+    }
+    const ls = localStorage.getItem(LS_KEY);
+    return ls ? JSON.parse(ls) : DEFAULT;
+  }
+
+  function adminParamsPayload(){
+    const cfg = window.HexaConfig || {};
+    return {
+      params: cfg.params || {},
+      prix_vente_devis: cfg.prix_vente_devis || DEFAULT.prix_vente_devis,
+      sous_traitants: cfg.sous_traitants || DEFAULT.sous_traitants
+    };
+  }
+
+  async function saveAdminParamsServer(){
+    try {
+      await fetch('/api/admin/params', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify(adminParamsPayload())
+      });
+    } catch(e) {
+      console.warn('Sauvegarde serveur échouée, données en localStorage', e);
+    }
+  }
+
   // ---- Config par défaut (issue du catalogue rempli) ----
   const DEFAULT = {
     params: {
@@ -14980,17 +15267,36 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       cession_pct: 0.20,       // marge de cession par défaut (% du catalogue HT)
       plafond_pct: 0.60        // plafond prix de vente régie = catalogue TTC + 60%
     },
+    prix_vente_devis: {
+      prix_pose_ht: 3500,
+      prix_travaux_induits_ht: 1200,
+      description_pose_defaut: "Pose et mise en service de la pompe à chaleur, raccordements hydrauliques et électriques, dépose et évacuation de l'ancien système, contrôle d'étanchéité, paramétrage de la régulation."
+    },
+    sous_traitants: [{
+      id:'italisol',
+      entreprise:'ITAL-ISOL',
+      siret:'907 952 048 00037',
+      adresse:'32 Rue Clément Ader, 91280 Saint-Pierre-du-Perray',
+      rge:'QPAC / 75024',
+      rge_validite_du:'2025-08-08',
+      rge_validite_au:'2026-08-08',
+      assurance:'QBE 037.0012525-S178593',
+      actif:true
+    }],
     models: []
   };
 
   // ---- Chargement / sauvegarde ----
   function loadConfig(){
-    // priorité : config déjà en mémoire > localStorage > défaut
+    // priorité : config déjà en mémoire > serveur > localStorage > défaut
     let cfg;
     if (window.HexaConfig) cfg = window.HexaConfig;
     else {
       try { const raw = localStorage.getItem(LS_KEY); if (raw) cfg = JSON.parse(raw); } catch(_){}
       if (!cfg) cfg = JSON.parse(JSON.stringify(DEFAULT));
+      if (ADMIN_PARAMS_CACHE?.params) cfg.params = Object.assign({}, DEFAULT.params, ADMIN_PARAMS_CACHE.params || {});
+      cfg.prix_vente_devis = Object.assign({}, DEFAULT.prix_vente_devis, cfg.prix_vente_devis || {}, ADMIN_PARAMS_CACHE?.prix_vente_devis || {});
+      cfg.sous_traitants = Array.isArray(ADMIN_PARAMS_CACHE?.sous_traitants) ? ADMIN_PARAMS_CACHE.sous_traitants : (Array.isArray(cfg.sous_traitants) ? cfg.sous_traitants : DEFAULT.sous_traitants);
       if (!Array.isArray(cfg.models) || !cfg.models.length) {
         cfg.models = getCatalogueDefaults();
       }
@@ -15002,6 +15308,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
   }
   function saveConfig(notify=true){
     try { localStorage.setItem(LS_KEY, JSON.stringify(window.HexaConfig)); } catch(_){}
+    saveAdminParamsServer();
     if (notify) window.dispatchEvent(new CustomEvent('hexa-config-changed'));
   }
 
@@ -15111,7 +15418,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
         const tip2 = `Prix de cession ${eurTip(r.cession)} = Coût ${eurTip(r.cout)} + Visite ${eurTip(p.vt2)} + COFRAC ${eurTip(p.cofrac2)} + Urbanisme ${eurTip(p.urba2)} + Marge cession ${eurTip(r.margeCession)}. Ma marge nette garantie = ${eurTip(r.net2)}.`;
         const cessTip = r.cessionForced ? 'Prix de cession forcé pour ce produit. Cliquez sur ↺ pour revenir à la marge globale.' : `Calculé : base ${eurTip(r.baseCession)} + marge globale ${eurTip(r.margeCessionDefaut)}. Vous pouvez forcer une autre valeur.`;
         rowsHTML += `<tr data-i="${i}">
-          <td class="adm-ref">${m.ref} ${phase}${ecs}<small>${m.nom||''}</small><button type="button" class="adm-del" data-i="${i}" title="Supprimer">×</button></td>
+          <td class="adm-ref">${m.ref} ${phase}${ecs}<small>${m.nom||''}</small><button type="button" class="adm-pac-desc-btn" data-i="${i}" title="Description technique pour le devis">📝</button><button type="button" class="adm-del" data-i="${i}" title="Supprimer">×</button></td>
           <td><span class="adm-euro"><input type="text" inputmode="numeric" class="adm-in" data-f="ttc" value="${ferow(m.ttc)}"><i>€</i></span></td>
           <td class="adm-num">${eur(r.ht)}</td>
           <td><span class="adm-euro"><input type="text" inputmode="numeric" class="adm-in" data-f="achat" value="${ferow(m.achat)}"><i>€</i></span></td>
@@ -15153,10 +15460,36 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
             </div>
 
             <div class="adm-section">Réglages généraux</div>
+            <p class="adm-opt2-note adm-section-help">
+              Ces valeurs sont vos COÛTS INTERNES (ce que vous payez aux sous-traitants).
+              Elles servent uniquement au calcul de votre marge dans le tableau ci-dessous.
+              Elles ne sont jamais affichées au client.
+            </p>
             <div class="adm-params">
-              <div class="adm-field"><span class="adm-lab">Pose HT</span><span class="adm-euro"><input type="text" inputmode="numeric" class="adm-p adm-money" data-p="pose" value="${fmtE(p.pose)}"><i>€</i></span></div>
-              <div class="adm-field"><span class="adm-lab">Accessoires HT</span><span class="adm-euro"><input type="text" inputmode="numeric" class="adm-p adm-money" data-p="acc" value="${fmtE(p.acc)}"><i>€</i></span></div>
-              <div class="adm-field"><span class="adm-lab">TVA</span><span class="adm-euro"><input type="text" inputmode="decimal" class="adm-p" data-p="tva" value="${(p.tva*100).toFixed(1)}"><i>%</i></span></div>
+              <div class="adm-field"><span class="adm-lab">Coût pose HT (calcul marge)</span><span class="adm-euro"><input type="text" inputmode="numeric" class="adm-p adm-money" data-p="pose" value="${fmtE(p.pose)}"><i>€</i></span></div>
+              <div class="adm-field"><span class="adm-lab">Coût accessoires HT (calcul marge)</span><span class="adm-euro"><input type="text" inputmode="numeric" class="adm-p adm-money" data-p="acc" value="${fmtE(p.acc)}"><i>€</i></span></div>
+              <div class="adm-field"><span class="adm-lab">TVA (5,5% par défaut)</span><span class="adm-euro"><input type="text" inputmode="decimal" class="adm-p" data-p="tva" value="${(p.tva*100).toFixed(1)}"><i>%</i></span></div>
+            </div>
+
+            <div class="adm-section">Prix de vente (devis client)</div>
+            <p class="adm-opt2-note adm-section-help">
+              Ces prix apparaissent sur le devis envoyé au client (lignes "Pose" et "Travaux induits").
+              Ils sont indépendants des coûts internes (section Réglages généraux). Le prix de la pompe à chaleur
+              est défini par modèle dans le tableau ci-dessous (colonne Prix vente TTC).
+            </p>
+            <div class="adm-card">
+              <div class="adm-cols">
+                <label>Prix vente Pose HT (devis)
+                  <span class="adm-euro"><input type="number" id="adm-prix-vente-pose-ht" value="${adminEscape(c.prix_vente_devis?.prix_pose_ht ?? 3500)}" step="50"><i>€ HT</i></span>
+                </label>
+                <label>Prix vente Travaux induits HT (devis)
+                  <span class="adm-euro"><input type="number" id="adm-prix-vente-travaux-ht" value="${adminEscape(c.prix_vente_devis?.prix_travaux_induits_ht ?? 1200)}" step="50"><i>€ HT</i></span>
+                </label>
+              </div>
+              <label style="display:block;margin-top:12px">Description par défaut "Pose" (devis)
+                <textarea id="adm-description-pose-defaut" rows="3" style="width:100%">${adminEscape(c.prix_vente_devis?.description_pose_defaut || '')}</textarea>
+              </label>
+              <button type="button" class="adm-btn adm-btn-primary" id="btn-save-prix-vente-devis">Sauvegarder les prix de vente</button>
             </div>
 
             <div class="adm-cols">
@@ -15222,6 +15555,8 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
 
             ${renderAdminM3Section()}
 
+            ${renderSousTraitantsSection()}
+
             <div class="adm-section">Corbeille</div>
             <div id="adm-trash" class="adm-trash-empty">Chargement...</div>
             </div>
@@ -15262,6 +15597,77 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     document.querySelectorAll('.adm-cess-reset').forEach(btn=>{ btn.onclick = ()=>{ const i=+btn.dataset.i; delete window.HexaConfig.models[i].cession_forcee; recalc(); }; });
   }
 
+  async function savePrixVenteDevis(){
+    const cfg = window.HexaConfig || loadConfig();
+    cfg.prix_vente_devis = {
+      prix_pose_ht: parseFloat(document.getElementById('adm-prix-vente-pose-ht')?.value || '3500') || 3500,
+      prix_travaux_induits_ht: parseFloat(document.getElementById('adm-prix-vente-travaux-ht')?.value || '1200') || 1200,
+      description_pose_defaut: document.getElementById('adm-description-pose-defaut')?.value || ''
+    };
+    window.HexaConfig = cfg;
+    try { localStorage.setItem(LS_KEY, JSON.stringify(cfg)); } catch(_){}
+    await saveAdminParamsServer();
+    adminToast('✓ Prix de vente sauvegardés', '#0D6B3B');
+  }
+
+  function collectSousTraitants(){
+    const cards = Array.from(document.querySelectorAll('.sous-traitant-card'));
+    const list = cards.map((card,i)=>{
+      const obj = { id: card.dataset.persistId || ('st_' + (i+1)) };
+      card.querySelectorAll('[data-st-field]').forEach(input=>{
+        const f = input.dataset.stField;
+        obj[f] = input.type === 'radio' ? !!input.checked : input.value;
+      });
+      return obj;
+    }).filter(st => Object.values(st).some(v => String(v || '').trim() && v !== st.id));
+    if (list.length && !list.some(st=>st.actif)) list[0].actif = true;
+    return list.length ? list : DEFAULT.sous_traitants.map(st=>Object.assign({}, st));
+  }
+
+  async function saveSousTraitants(){
+    window.HexaConfig.sous_traitants = collectSousTraitants();
+    try { localStorage.setItem(LS_KEY, JSON.stringify(window.HexaConfig)); } catch(_){}
+    await saveAdminParamsServer();
+    adminToast('Sous-traitants sauvegardés ✓', '#0D6B3B');
+    rerenderBody();
+  }
+
+  function openDescriptionPacModal(i){
+    const cfg = window.HexaConfig || loadConfig();
+    const m = cfg.models[i];
+    if (!m) return;
+    document.getElementById('modal-description-pac')?.remove();
+    const wrap = document.createElement('div');
+    wrap.id = 'modal-description-pac';
+    wrap.className = 'adm-delmodal';
+    wrap.innerHTML = `
+      <div class="adm-delbox" style="max-width:720px">
+        <div class="adm-del-h">Description technique — <span id="modal-pac-nom">${adminEscape(m.nom || m.ref || '')}</span></div>
+        <p class="adm-opt2-note">Cette description apparaîtra sur le devis envoyé au client, dans la ligne "Fourniture" du tableau des lots.</p>
+        <textarea id="modal-pac-description" rows="10" style="width:100%" placeholder="Ex: Pompe à chaleur Air-Eau Atlantic ALFÉA EXCELLIA S DUO 16, monobloc, COP 4.5, SCOP 4.0, triphasée, avec ECS intégrée 190L, fluide R32...">${adminEscape(m.description_technique || '')}</textarea>
+        <div class="adm-del-actions">
+          <button type="button" class="adm-btn adm-btn-cancel" id="btn-cancel-description-pac">Annuler</button>
+          <button type="button" class="adm-btn adm-btn-primary" id="btn-save-description-pac">Sauvegarder</button>
+        </div>
+      </div>`;
+    document.body.appendChild(wrap);
+    const close = () => wrap.remove();
+    document.getElementById('btn-cancel-description-pac')?.addEventListener('click', close);
+    wrap.addEventListener('click', e=>{ if(e.target === wrap) close(); });
+    document.getElementById('btn-save-description-pac')?.addEventListener('click', async ()=>{
+      m.description_technique = document.getElementById('modal-pac-description')?.value || '';
+      const server = await saveCatalogueToServer((cfg.models || []).map(x=>Object.assign({}, x)));
+      if (server.ok) {
+        persistCatalogueLocal(cfg.models);
+        saveConfig(false);
+        adminToast('Description PAC sauvegardée ✓', '#0D6B3B');
+        close();
+      } else {
+        adminToast(`Erreur sauvegarde: ${server.error}`, '#B91C1C');
+      }
+    });
+  }
+
   function bind(){
     const num = v => parseFloat(String(v).replace(/\s/g,'').replace(',','.'))||0;
     // Filtre : les champs numériques n'acceptent que chiffres, espace, virgule, point
@@ -15290,6 +15696,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
         else if (f==='tva'||f==='conv'||f==='cession_pct'||f==='plafond_pct') window.HexaConfig.params[f] = num(el.value)/100;
         else window.HexaConfig.params[f] = num(el.value);
         recalc();
+        saveConfig(false);
       });
       if (el.classList.contains('adm-money')){
         el.addEventListener('focus', ()=>{ const v=num(el.value); el.value=v?String(v):''; });
@@ -15324,6 +15731,24 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
         adminToast('Erreur sauvegarde URL', '#B91C1C');
       }
     });
+    document.getElementById('btn-save-prix-vente-devis')?.addEventListener('click', savePrixVenteDevis);
+    document.getElementById('btn-add-sous-traitant')?.addEventListener('click', ()=>{
+      window.HexaConfig.sous_traitants = collectSousTraitants();
+      window.HexaConfig.sous_traitants.push({ id:'st_' + Date.now(), entreprise:'', siret:'', adresse:'', rge:'', rge_validite_du:'', rge_validite_au:'', assurance:'', actif:false });
+      rerenderBody();
+    });
+    document.querySelectorAll('.btn-delete-sous-traitant').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const card = btn.closest('.sous-traitant-card');
+        const idx = Number(card?.dataset.id || 0);
+        window.HexaConfig.sous_traitants = collectSousTraitants();
+        window.HexaConfig.sous_traitants.splice(idx, 1);
+        if (!window.HexaConfig.sous_traitants.length) window.HexaConfig.sous_traitants = DEFAULT.sous_traitants.map(st=>Object.assign({}, st));
+        if (!window.HexaConfig.sous_traitants.some(st=>st.actif)) window.HexaConfig.sous_traitants[0].actif = true;
+        rerenderBody();
+      });
+    });
+    document.getElementById('btn-save-sous-traitants')?.addEventListener('click', saveSousTraitants);
     document.getElementById('adm-overlay').addEventListener('click', e=>{ if(e.target.id==='adm-overlay') close(); });
     document.getElementById('adm-save').addEventListener('click', async ()=>{
       const b=document.getElementById('adm-save');
@@ -15365,6 +15790,9 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     // boutons supprimer -> modale de confirmation stricte
     document.querySelectorAll('.adm-del').forEach(btn=>{
       btn.addEventListener('click', ()=>{ openDeleteModal(+btn.dataset.i); });
+    });
+    document.querySelectorAll('.adm-pac-desc-btn').forEach(btn=>{
+      btn.addEventListener('click', ()=>{ openDescriptionPacModal(+btn.dataset.i); });
     });
     // bouton "Simuler" -> déplie le curseur de surplus pour la ligne
     document.querySelectorAll('.adm-sim-btn').forEach(btn=>{
@@ -15662,7 +16090,10 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
 
   function open(){
     close();
-    hydrateCatalogueDefaults().then((hydrated)=>{
+    fetchAdminParams().then((adminParams)=>{
+      ADMIN_PARAMS_CACHE = adminParams;
+      return hydrateCatalogueDefaults();
+    }).then((hydrated)=>{
       return fetchAdminM3().then(()=>hydrated);
     }).then((hydrated)=>{
       let cfg = loadConfig();
@@ -15854,7 +16285,8 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     { k:"nouveau",  label:"Nouveau",      bg:"#E0ECFB", fg:"#1D4ED8" },
     { k:"rappeler", label:"À rappeler",   bg:"#FEF3C7", fg:"#B45309" },
     { k:"rdv",      label:"RDV pris",     bg:"#EDE9FE", fg:"#6D28D9" },
-    { k:"devis",    label:"Devis envoyé", bg:"#E0F2FE", fg:"#0369A1" },
+    { k:"devis",    label:"Devis",        bg:"#E0F2FE", fg:"#0369A1" },
+    { k:"devis_envoye", label:"Devis envoyé", bg:"#DCFCE7", fg:"#15803D" },
     { k:"signe",    label:"Signé",        bg:"#DCFCE7", fg:"#15803D" },
     { k:"perdu",    label:"Perdu",        bg:"#FEE2E2", fg:"#B91C1C" },
   ];
@@ -15907,7 +16339,8 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     rdv:'rdv',
     'rdv pris':'rdv',
     devis:'devis',
-    'devis envoye':'devis',
+    'devis envoye':'devis_envoye',
+    'devis envoyé':'devis_envoye',
     signe:'signe',
     perdu:'perdu',
   };
@@ -16749,6 +17182,8 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     setFieldValue('cout_energetique_mensuel_eur', readLeadValue(lead, 'cout_energetique_mensuel_eur'), { notify:false });
     setCategorieFromLead(readLeadValue(lead, 'categorie'));
     syncChoiceWidgets();
+    window.syncBailleurAdresseProspect?.();
+    window.syncDateVisiteProspect?.();
     const numero = String(lead.numero || '').trim();
     document.body.dataset.prospectNumero = numero;
     window.HexaCurrentProspect = { numero, nom_complet:((lead.nom||'')+' '+(lead.prenom||'')).trim() };

@@ -14,7 +14,8 @@
     "ballon": null,
     "db_ext": 56,
     "achat": 4261.45,
-    "ttc": 12990
+    "ttc": 12990,
+    "description_technique": ""
   },
   {
     "ref": "ATL-EXCELLIA-S-12",
@@ -31,7 +32,8 @@
     "ballon": null,
     "db_ext": 56,
     "achat": 4602.11,
-    "ttc": 13990
+    "ttc": 13990,
+    "description_technique": ""
   },
   {
     "ref": "ATL-EXCELLIA-S-14",
@@ -48,7 +50,8 @@
     "ballon": null,
     "db_ext": 58,
     "achat": 4847.66,
-    "ttc": 14490
+    "ttc": 14490,
+    "description_technique": ""
   },
   {
     "ref": "ATL-EXCELLIA-S-12 TRI",
@@ -65,7 +68,8 @@
     "ballon": null,
     "db_ext": 56,
     "achat": 4602.11,
-    "ttc": 13990
+    "ttc": 13990,
+    "description_technique": ""
   },
   {
     "ref": "ATL-EXCELLIA-S-14 TRI",
@@ -82,7 +86,8 @@
     "ballon": null,
     "db_ext": 58,
     "achat": 4847.66,
-    "ttc": 14490
+    "ttc": 14490,
+    "description_technique": ""
   },
   {
     "ref": "ATL-EXCELLIA-S-DUO-9",
@@ -99,7 +104,8 @@
     "ballon": 190,
     "db_ext": 56,
     "achat": 5367.95,
-    "ttc": 14990
+    "ttc": 14990,
+    "description_technique": ""
   },
   {
     "ref": "ATL-EXCELLIA-S-DUO-12",
@@ -116,7 +122,8 @@
     "ballon": 190,
     "db_ext": 56,
     "achat": 5681.93,
-    "ttc": 15490
+    "ttc": 15490,
+    "description_technique": ""
   },
   {
     "ref": "ATL-EXCELLIA-S-DUO-14",
@@ -133,7 +140,8 @@
     "ballon": 190,
     "db_ext": 58,
     "achat": 5908.87,
-    "ttc": 15990
+    "ttc": 15990,
+    "description_technique": ""
   },
   {
     "ref": "ATL-EXCELLIA-S-DUO-12 TRI",
@@ -150,7 +158,8 @@
     "ballon": 190,
     "db_ext": 56,
     "achat": 5681.93,
-    "ttc": 15490
+    "ttc": 15490,
+    "description_technique": ""
   },
   {
     "ref": "ATL-EXCELLIA-S-DUO-14 TRI",
@@ -167,6 +176,7 @@
     "ballon": 190,
     "db_ext": 58,
     "achat": 5908.87,
-    "ttc": 15990
+    "ttc": 15990,
+    "description_technique": ""
   }
 ]
