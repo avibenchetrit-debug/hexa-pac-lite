@@ -1788,7 +1788,8 @@
   .specs-row .key { color: var(--gris-mute); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .specs-row .val { color: var(--noir); font-weight: 600; }
   .pac-desc-block { padding: 8px 14px; }
-  .pac-desc-text, .lot-description { font-size: 10.5px; line-height: 1.55; color: var(--gris-texte); white-space: pre-wrap; }
+  .pac-desc-text { font-size: 10.5px; line-height: 1.55; color: var(--gris-texte); white-space: pre-line; }
+  .lot-description { font-size: 10.5px; line-height: 1.55; color: var(--gris-texte); white-space: pre-wrap; }
   .lot-description { margin-top: 6px; }
   .specs-block { padding: 4px 0; }
   .specs-block + .specs-block { margin-top: 6px; }
@@ -3337,7 +3338,7 @@
 <div class="lot-header"><div class="lot-title">{{ lot_titre }}</div></div>
 <div class="sub-line">
 <div class="sub-line-header"><span class="sub-line-name">Fourniture</span><span class="sub-line-qt">{{ qt_fourniture }}</span><span class="sub-line-pu">{{ prix_fourniture_ht }}</span><span class="sub-line-tva">{{ tva_taux }}</span><span class="sub-line-total">{{ prix_fourniture_ttc }}</span></div>
-<div class="specs pac-desc-block"><div class="pac-desc-text lot-description">{{ description_pac | replace('\n', '<br>') | safe }}</div></div>
+<div class="specs pac-desc-block"><div class="pac-desc-text">{{ description_pac }}</div></div>
 </div>
 <div class="sub-line">
 <div class="sub-line-header"><span class="sub-line-name">Pose</span><span class="sub-line-qt">{{ qt_pose }}</span><span class="sub-line-pu">{{ prix_pose_ht }}</span><span class="sub-line-tva">{{ tva_taux }}</span><span class="sub-line-total">{{ prix_pose_ttc }}</span></div>

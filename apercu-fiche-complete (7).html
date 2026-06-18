@@ -7329,6 +7329,8 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
 .pv-nrp-count{ min-width:30px; text-align:center; font-weight:700; font-size:14px; padding:3px 8px; border-radius:6px; }
 .pv-nrp-0{ color:#0D6B3B; background:#E6F4ED; }
 .pv-nrp-n{ color:#E2214B; background:#FDE8EC; }
+.badge-counter:empty,
+.fiche-action-count:empty { display: none !important; }
 
 /* Badge catégorie ANAH - CEE (couleurs reprises de la fiche) */
 .pv-cat{ display:inline-block; font-size:11px; font-weight:700; padding:4px 9px; border-radius:9999px; white-space:nowrap; }
@@ -7382,8 +7384,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
   function setCount(id, n) {
     const el = document.getElementById(id);
     if (!el) return;
-    const v = n > 999 ? '999+' : String(n);
-    el.textContent = v;
+    el.textContent = n > 0 ? (n > 999 ? '999+' : String(n)) : '';
     el.style.display = n > 0 ? 'flex' : 'none';
   }
 
@@ -7400,7 +7401,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       setCount('count-echanges', echanges.length);
       const legacy = document.getElementById('notes-count-badge');
       if (legacy) {
-        legacy.textContent = notes.length;
+        legacy.textContent = notes.length ? String(notes.length) : '';
         legacy.style.display = notes.length ? 'inline-block' : 'none';
       }
     } catch {
@@ -12341,7 +12342,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       const d = new Date(iso);
       const date = d.toLocaleDateString('fr-FR', { timeZone: 'Europe/Paris', day: '2-digit', month: '2-digit', year: 'numeric' });
       const heure = d.toLocaleTimeString('fr-FR', { timeZone: 'Europe/Paris', hour: '2-digit', minute: '2-digit', hour12: false });
-      return `${date} ${heure}`;
+      return `${date} à ${heure}`;
     } catch {
       return '—';
     }

@@ -13,6 +13,7 @@ import urllib.parse
 import urllib.request
 import unicodedata
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response, StreamingResponse
@@ -140,6 +141,7 @@ DEFAULT_CATALOGUE_PAC = _load_default_catalogue()
 
 app = FastAPI(title="hexa-pac-lite")
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
+PARIS_TZ = ZoneInfo("Europe/Paris")
 
 # Serve static assets (CSS/JS/images) under /static.
 os.makedirs(STATIC_DIR, exist_ok=True)
@@ -425,6 +427,10 @@ def _upsert_lead(payload: dict, forced_numero: str | None = None) -> tuple[dict,
 
 def _now_iso():
     return datetime.now().isoformat(timespec="seconds")
+
+
+def _now_paris_iso():
+    return datetime.now(PARIS_TZ).isoformat(timespec="seconds")
 
 
 def _next_numero(leads):
@@ -1267,7 +1273,7 @@ async def import_leads(file: UploadFile = File(...)) -> JSONResponse:
 
         if note_text:
             notes.setdefault(numero, []).append(
-                {"texte": note_text, "date": _now_iso(), "auteur": "Import Excel"}
+                {"texte": note_text, "date": _now_paris_iso(), "auteur": "Import Excel"}
             )
 
     _atomic_write_json(LEADS_PATH, leads)
@@ -1322,7 +1328,7 @@ async def commentaire_ajax(numero: str, request: Request) -> JSONResponse:
 
     notes = _read_notes()
     notes.setdefault(numero, []).append(
-        {"texte": texte, "date": _now_iso(), "auteur": auteur}
+        {"texte": texte, "date": _now_paris_iso(), "auteur": auteur}
     )
     _atomic_write_json(NOTES_PATH, notes)
 
@@ -1763,7 +1769,7 @@ async def _send_devis(numero: str, payload: dict, request: Request) -> dict:
     auteur = str(payload.get("auteur") or "Anonyme")
     notes = _read_notes()
     notes.setdefault(numero, []).append(
-        {"texte": f"Devis v{version} envoyé le {now} à {email_to} par {auteur}", "date": now, "auteur": auteur}
+        {"texte": f"Devis v{version} envoyé le {now} à {email_to} par {auteur}", "date": _now_paris_iso(), "auteur": auteur}
     )
     _atomic_write_json(NOTES_PATH, notes)
 
@@ -1839,6 +1845,6 @@ async def envoyer_modele_email(numero: str, request: Request) -> JSONResponse:
     # email-template history is still recorded for traceability.
     auteur = str(payload.get("auteur") or "Anonyme")
     notes = _read_notes()
-    notes.setdefault(numero, []).append({"texte": f"📧 Email envoyé à {email_to} : {sujet}", "date": _now_iso(), "auteur": auteur})
+    notes.setdefault(numero, []).append({"texte": f"📧 Email envoyé à {email_to} : {sujet}", "date": _now_paris_iso(), "auteur": auteur})
     _atomic_write_json(NOTES_PATH, notes)
     return JSONResponse({"ok": True})
