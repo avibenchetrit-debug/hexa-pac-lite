@@ -134,6 +134,16 @@ def select_default_modele(prospect, catalogue):
     return (catalogue or [{}])[0] if catalogue else {}
 
 
+def generer_lot_titre(modele_pac):
+    """Génère le titre du lot selon l'usage de la PAC."""
+    if not modele_pac:
+        return "Pompe à chaleur Air-Eau"
+    usage = str(modele_pac.get("usage", "Chauffage"))
+    if "ecs" in usage.lower():
+        return "Pompe à chaleur Air-Eau — chauffage + ECS intégrée"
+    return "Pompe à chaleur Air-Eau — chauffage"
+
+
 def calculer_mpr(prospect, state_simulateur, admin_params):
     categorie = value(prospect, "categorie_revenu", "categorie", default="modeste")
     forfaits = (admin_params or {}).get("forfaits_mpr") or {}
@@ -190,6 +200,7 @@ def calculer_devis(prospect, state_simulateur, admin_params, catalogue_pac):
         "prix_travaux_induits_ht": prix_travaux_induits_ht,
         "prix_travaux_induits_ttc": prix_travaux_induits_ttc,
         "description_pose": pv.get("description_pose_defaut", ""),
+        "description_travaux_induits": pv.get("description_travaux_induits_defaut", ""),
         "tva_taux": f"{tva_rate * 100:.1f} %".replace(".", ","),
         "total_ht": total_ht,
         "total_tva": total_tva,
@@ -203,7 +214,7 @@ def calculer_devis(prospect, state_simulateur, admin_params, catalogue_pac):
         "qt_fourniture": "1 u.",
         "qt_pose": "1 u.",
         "qt_travaux_induits": "1 forfait",
-        "lot_titre": "Pompe à chaleur Air-Eau — chauffage + ECS intégrée",
+        "lot_titre": generer_lot_titre(find_modele(catalogue_pac, value(state_simulateur, "modele_pac_id", "modele_pac"))),
     }
 
 

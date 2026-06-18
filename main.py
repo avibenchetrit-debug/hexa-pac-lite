@@ -26,6 +26,7 @@ from services.service_devis import (
     find_modele,
     format_devis_amounts,
     format_sous_traitant,
+    generer_lot_titre,
     generer_numero_devis,
     generer_numero_dossier,
     generer_numero_notedim,
@@ -118,7 +119,9 @@ DEFAULT_PARAMETRES_ADMIN = {
     "prix_vente_devis": {
         "prix_pose_ht": 3500,
         "prix_travaux_induits_ht": 1200,
+        "frais_ecair_pct": 12,
         "description_pose_defaut": "Pose et mise en service de la pompe à chaleur, raccordements hydrauliques et électriques, dépose et évacuation de l'ancien système, contrôle d'étanchéité, paramétrage de la régulation.",
+        "description_travaux_induits_defaut": "Adaptation du circuit chauffage existant, modification de la ligne électrique dédiée, mise en place des éléments de sécurité, protections et reprises nécessaires à la bonne intégration de la pompe à chaleur.",
     },
     "sous_traitants": DEFAULT_SOUS_TRAITANTS,
 }
@@ -359,8 +362,6 @@ def _normalize_lead_payload(payload: dict) -> dict:
     for key in ("zone_climatique", "zone_climatique_chantier"):
         if key in normalized:
             normalized[key] = _normalize_zone_climatique(normalized.get(key))
-    if "transfert_charge" in normalized:
-        normalized["transfert_charge"] = str(normalized.get("transfert_charge", "")).strip().lower() in {"1", "true", "on", "oui", "yes"}
     if normalized.get("date_visite_technique_date") and not normalized.get("date_visite_technique"):
         normalized["date_visite_technique"] = normalized["date_visite_technique_date"]
     _apply_field_aliases(normalized)
@@ -566,7 +567,6 @@ PROSPECT_FIELDS = [
     "date_visite_technique",
     "date_visite_technique_date",
     "type_emetteurs",
-    "transfert_charge",
     "prix_pac_force",
     "modele_pac_id",
     "modele_pac",
@@ -587,7 +587,6 @@ PROSPECT_FIELDS = [
 
 DEFAULT_PROSPECT_VALUES = {
     "date_visite_technique": "À déterminer",
-    "transfert_charge": False,
     "prix_pac_force": None,
     "nrp_log": [],
 }
@@ -1451,6 +1450,13 @@ def _build_devis_context(request: Request, numero: str) -> dict:
             date_visite = datetime.strptime(str(date_visite), "%Y-%m-%d").strftime("%d/%m/%Y")
         except ValueError:
             pass
+    sous_traitant_context = dict(sous_traitant or {})
+    if sous_traitant_context:
+        sous_traitant_context["rge_validite"] = (
+            f"{sous_traitant_context.get('rge_validite_du', '')} au {sous_traitant_context.get('rge_validite_au', '')}"
+        ).strip()
+    formatted_calculs = format_devis_amounts(calculs)
+    formatted_calculs["lot_titre"] = generer_lot_titre(modele_obj)
     context = {
         "request": request,
         "civilite": prospect.get("civilite", ""),
@@ -1478,8 +1484,9 @@ def _build_devis_context(request: Request, numero: str) -> dict:
         "zone_climatique": calculer_zone_climatique(cp_chantier, prospect.get("zone_climatique") or prospect.get("zone_climatique_chantier")),
         "modele_pac": modele_obj.get("nom") or modele_obj.get("ref") or "",
         "description_pac": modele_obj.get("description_technique", "") if modele_obj else "",
-        "sous_traitant": format_sous_traitant(sous_traitant),
-        **format_devis_amounts(calculs),
+        "sous_traitant": sous_traitant_context,
+        "sous_traitant_texte": format_sous_traitant(sous_traitant),
+        **formatted_calculs,
     }
     return context
 

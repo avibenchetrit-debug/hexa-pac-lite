@@ -2956,6 +2956,69 @@ body.panel-is-open {
       background: #E2E8F0; color: var(--gris-texte); cursor: not-allowed;
       border-style: dashed;
     }
+    .readonly-auto {
+      background: #F3F4F6 !important;
+      color: #6B7280 !important;
+      cursor: not-allowed !important;
+    }
+    .auto-owner-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      margin-left: 8px;
+      padding: 2px 7px;
+      border-radius: 999px;
+      background: #E5E7EB;
+      color: #374151;
+      font-size: 10px;
+      font-weight: 700;
+    }
+    .fp-field-adresse { grid-column: 1 / -1; }
+    .fp-field-adresse input[name="adresse_chantier"],
+    .fp-field-adresse input[name="adresse"] {
+      width: 100%;
+      grid-column: span 3;
+    }
+    .fp-date-row {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .fp-date-row input[type="date"] {
+      flex: 1;
+      height: 38px;
+      padding: 8px 12px;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+    }
+    .fp-checkbox-inline {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      white-space: nowrap;
+      font-size: 14px;
+      color: #374151;
+    }
+    .fp-date-row input[type="date"]:disabled {
+      background: #f3f4f6;
+      color: #9ca3af;
+      cursor: not-allowed;
+    }
+    .locked-by-fiche {
+      background: #F3F4F6 !important;
+      color: #6B7280 !important;
+      cursor: not-allowed !important;
+    }
+    .lock-badge {
+      margin-top: 6px;
+      font-size: 11px;
+      font-weight: 700;
+      color: #92400E;
+      background: #FEF3C7;
+      border: 1px solid #F59E0B;
+      border-radius: 999px;
+      padding: 4px 8px;
+    }
     .field select {
       background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23002E5A'%3e%3cpath d='M7 10l5 5 5-5'/%3e%3c/svg%3e");
       background-repeat: no-repeat; background-position: right 8px center;
@@ -6850,6 +6913,17 @@ input:focus{ outline:none; border-color: var(--c-navy,#002E5A); box-shadow:0 0 0
 
 /* Cartes options */
 .adm-cols{ display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+.adm-prix-vente-grid{ display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:14px; margin-top:0; }
+.adm-prix-vente-grid label{
+  display:flex !important; flex-direction:column !important; align-items:stretch !important;
+  justify-content:center !important; text-align:left !important; padding:8px !important;
+}
+.adm-prix-vente-grid input[type="number"]{
+  width:100% !important; text-align:left !important; box-sizing:border-box !important;
+}
+.adm-prix-vente-grid .adm-euro{ width:100%; display:flex; align-items:center; gap:6px; }
+.adm-prix-vente-grid .adm-euro input{ flex:1; }
+.adm-prix-vente-grid .adm-euro i{ position:static !important; }
 .adm-card{ background:#fff; border:1px solid var(--c-line,#E2E8F0); border-radius:12px; padding:14px 16px; }
 .adm-card-h{ font-size:13px; font-weight:700; color: var(--c-navy,#002E5A); margin-bottom:10px; padding-bottom:8px; border-bottom:2px solid; }
 .adm-opt1 .adm-card-h{ border-color: var(--c-navy,#002E5A); }
@@ -6898,7 +6972,7 @@ input:focus{ outline:none; border-color: var(--c-navy,#002E5A); box-shadow:0 0 0
 .adm-dot1{ background:#EEF4FA; border:1px solid var(--c-navy,#002E5A); }
 .adm-dot2{ background: var(--c-danger-bg,#FDE8EC); border:1px solid var(--c-rouge,#E2214B); }
 
-@media (max-width:720px){ .adm-cols{ grid-template-columns:1fr; } }
+@media (max-width:720px){ .adm-cols, .adm-prix-vente-grid{ grid-template-columns:1fr; } }
 
 /* Lignes de groupe par puissance */
 .adm-table tr.adm-grp td{
@@ -7532,7 +7606,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
         <div class="card-title"><span class="num-card">4</span> Adresse &amp; données réglementaires</div>
         <div class="card-subtitle">Localisation</div>
         <div class="row">
-          <div class="field ban-field-wrap" data-required="adresse_chantier" data-label="Adresse du chantier">
+          <div class="field ban-field-wrap fp-field-adresse" data-required="adresse_chantier" data-label="Adresse du chantier">
             <label>Adresse <span class="req">*</span> <span class="hint">(autocomplétion BAN)</span></label>
             <input type="text" id="input-adresse" name="adresse_chantier" required value="" placeholder="12 RUE DE L'ÉGLISE"
                    oninput="this.value=this.value.toUpperCase()" style="text-transform:uppercase;" autocomplete="off">
@@ -8066,23 +8140,6 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       });
       q('#batiment-classe-select')?.closest('.field')?.remove();
       q('#zone-protegee-select')?.closest('.field')?.remove();
-      if (!q('#bloc-adresse-personne', blockAdresse)) {
-        const owner = document.createElement('div');
-        owner.className = 'fp-bloc-adresse';
-        owner.id = 'bloc-adresse-personne';
-        owner.hidden = true;
-        owner.innerHTML = `
-          <div class="sub-bloc-title">Adresse du propriétaire (différente du chantier)</div>
-          <div class="row row-1">
-            <div class="field" data-label="Adresse du propriétaire"><label>Adresse propriétaire</label><input type="text" name="adresse_personne" oninput="this.value=this.value.toUpperCase()" style="text-transform:uppercase;"></div>
-          </div>
-          <div class="row row-2">
-            <div class="field" data-label="CP du propriétaire"><label>Code postal propriétaire</label><input type="text" name="cp_personne" id="fp-cp-personne" maxlength="5" inputmode="numeric"></div>
-            <div class="field" data-label="Ville du propriétaire"><label>Ville propriétaire</label><input type="text" name="ville_personne" oninput="this.value=this.value.toUpperCase()" style="text-transform:uppercase;"></div>
-          </div>`;
-        const regTitle = qa('.sub-bloc-title', blockAdresse).find(x => /Données réglementaires/i.test(x.textContent));
-        blockAdresse.insertBefore(owner, regTitle || null);
-      }
     }
 
     // BLOC 4: Caractéristiques du bien (2 sous-blocs)
@@ -8104,6 +8161,18 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       const dpeNumero = q('#dpe-numero', form);
       const dpeDate = q('#dpe-date', form);
       const dpeSource = q('#dpe-source', form);
+      function ensureRequiredMark(field, labelText){
+        if (!field) return;
+        field.dataset.label = labelText || field.dataset.label || '';
+        const label = q('label', field);
+        if (label && !q('.req', label)) {
+          label.insertAdjacentHTML('beforeend', ' <span class="req">*</span>');
+        }
+      }
+      ensureRequiredMark(typeField, 'Type de logement');
+      ensureRequiredMark(surfaceField, 'Surface habitable');
+      ensureRequiredMark(hspField, 'HSP');
+      ensureRequiredMark(modeField, 'Chauffage actuel');
 
       function buildDpeDisplayField(hiddenInput, labelText, displayId){
         if (!hiddenInput) return null;
@@ -8136,6 +8205,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
         hspField.className = 'field';
         hspField.innerHTML = '<label for="hsp">HSP (m)</label><input type="text" id="hsp" name="hsp" placeholder="2.5" inputmode="decimal" pattern="[0-9],?[0-9]*">';
       }
+      ensureRequiredMark(hspField, 'HSP');
       const ecsField = document.createElement('div');
       ecsField.className = 'field';
       ecsField.innerHTML = '<label for="ecs">ECS</label>'
@@ -8149,10 +8219,11 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       dateVisiteField.innerHTML = `
         <label>Date visite technique</label>
         <input type="hidden" name="date_visite_technique" id="fp-date-visite-tech-hidden" value="À déterminer">
-        <div class="fp-date-with-checkbox" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-          <input type="date" id="fp-date-visite-tech" name="date_visite_technique_date" disabled>
-          <label class="checkbox-inline" style="display:inline-flex;align-items:center;gap:6px;font-size:12px">
-            <input type="checkbox" id="fp-visite-tech-undefined" checked> À déterminer
+        <div class="fp-date-row">
+          <input type="date" id="fp-date-visite-tech" name="date_visite_technique_date" class="fp-input" disabled>
+          <label class="fp-checkbox-inline">
+            <input type="checkbox" id="fp-visite-tech-undefined" checked>
+            <span>À déterminer</span>
           </label>
         </div>`;
       const typeEmetteursField = document.createElement('div');
@@ -8174,14 +8245,6 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
         <label>Prix négocié pour ce client</label>
         <input type="number" name="prix_pac_force" placeholder="Laisser vide pour utiliser le prix catalogue" step="100">
         <p class="fp-field-help" style="font-size:11px;color:var(--gris-mute);margin-top:4px">Si vous négociez un prix différent du catalogue avec ce client, saisissez-le ici. Sinon laissez vide : le devis utilisera le prix catalogue du modèle PAC sélectionné. € TTC</p>`;
-      const transfertField = document.createElement('div');
-      transfertField.className = 'field';
-      transfertField.innerHTML = `
-        <label class="checkbox-label" style="display:flex;gap:8px;align-items:center;margin-top:24px">
-          <input type="checkbox" name="transfert_charge" value="true">
-          Transfert de charge des aides (Hexa Rénov' avance MPR + CEE)
-        </label>`;
-
       if (coutField) {
         const coutInput = q('[name="cout_energetique_mensuel_eur"]', coutField);
         if (coutInput) coutInput.required = true;
@@ -8243,8 +8306,8 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       rowE.className = 'row row-3';
       [altitudeField, coutField, panneauField].forEach(f => { if (f) rowE.appendChild(f); });
       const rowDevis = document.createElement('div');
-      rowDevis.className = 'row row-2';
-      [prixForceField, transfertField].forEach(f => { if (f) rowDevis.appendChild(f); });
+      rowDevis.className = 'row row-1';
+      [prixForceField].forEach(f => { if (f) rowDevis.appendChild(f); });
 
       blockCarac.appendChild(sb1);
       blockCarac.appendChild(rowS);
@@ -8263,6 +8326,33 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     // BLOC 5: Informations fiscales
     const blockFiscal = findCard(/Informations fiscales/i, form);
     setCardTitle(blockFiscal, 5, 'Informations fiscales (propriétaire)');
+    if (blockFiscal && !q('#bloc-adresse-personne-fiscal', blockFiscal)) {
+      const cpPersonneField = fieldByName('code_postal_personne', form) || fieldByName('cp_personne', form);
+      const ownerBlock = document.createElement('div');
+      ownerBlock.id = 'bloc-adresse-personne-fiscal';
+      ownerBlock.className = 'fp-bloc-adresse';
+      const ownerTitle = document.createElement('div');
+      ownerTitle.className = 'sub-bloc-title';
+      ownerTitle.innerHTML = 'Adresse du propriétaire <span class="auto-owner-badge" id="owner-auto-badge">🔒 Auto (occupant)</span>';
+      const ownerAddressRow = document.createElement('div');
+      ownerAddressRow.className = 'row row-1';
+      ownerAddressRow.innerHTML = '<div class="field fp-field-adresse" data-label="Adresse du propriétaire"><label>Adresse propriétaire</label><input type="text" name="adresse_personne" oninput="this.value=this.value.toUpperCase()" style="text-transform:uppercase;"></div>';
+      const ownerCityRow = document.createElement('div');
+      ownerCityRow.className = 'row row-2';
+      if (cpPersonneField) {
+        const cpLabel = q('label', cpPersonneField);
+        if (cpLabel) cpLabel.innerHTML = 'Code postal propriétaire <span class="req">*</span>';
+        ownerCityRow.appendChild(cpPersonneField);
+      } else {
+        ownerCityRow.insertAdjacentHTML('beforeend', '<div class="field" data-label="CP du propriétaire"><label>Code postal propriétaire <span class="req">*</span></label><input type="text" name="code_postal_personne" maxlength="5" inputmode="numeric"></div>');
+      }
+      ownerCityRow.insertAdjacentHTML('beforeend', '<div class="field" data-label="Ville du propriétaire"><label>Ville propriétaire</label><input type="text" name="ville_personne" oninput="this.value=this.value.toUpperCase()" style="text-transform:uppercase;"></div>');
+      ownerBlock.appendChild(ownerTitle);
+      ownerBlock.appendChild(ownerAddressRow);
+      ownerBlock.appendChild(ownerCityRow);
+      const firstRow = q('.row', blockFiscal);
+      blockFiscal.insertBefore(ownerBlock, firstRow || null);
+    }
 
     // Retire la carte chauffage/ECS (bloc 7) après extraction
     if (blockChauffage) {
@@ -8298,14 +8388,23 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     const usage = q('[name="usage_bien"]', form);
     function syncBailleurAdresse(){
       const isBailleur = usage?.value === 'bailleur';
-      const bloc = q('#bloc-adresse-personne', form);
-      if (bloc) bloc.hidden = !isBailleur;
+      const fields = ['adresse_personne', 'code_postal_personne', 'cp_personne', 'ville_personne'];
+      fields.forEach(name => {
+        const input = q(`[name="${name}"]`, form);
+        if (input) {
+          input.readOnly = !isBailleur;
+          input.classList.toggle('readonly-auto', !isBailleur);
+        }
+      });
+      const badge = q('#owner-auto-badge', form);
+      if (badge) badge.style.display = isBailleur ? 'none' : 'inline-flex';
       if (!isBailleur) {
         const srcAdresse = q('[name="adresse_chantier"]', form)?.value || '';
         const srcCp = q('[name="code_postal_chantier"]', form)?.value || '';
-        const srcVille = q('[name="ville_chantier"]', form)?.value || '';
+        const villeField = q('[name="ville_chantier"]', form);
+        const srcVille = villeField?.options ? (villeField.options[villeField.selectedIndex]?.text || villeField.value || '') : (villeField?.value || '');
         const adr = q('[name="adresse_personne"]', form);
-        const cp = q('[name="cp_personne"]', form);
+        const cp = q('[name="code_postal_personne"]', form) || q('[name="cp_personne"]', form);
         const ville = q('[name="ville_personne"]', form);
         if (adr) adr.value = srcAdresse;
         if (cp) cp.value = srcCp;
@@ -8315,6 +8414,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     usage?.addEventListener('change', syncBailleurAdresse);
     ['adresse_chantier','code_postal_chantier','ville_chantier'].forEach(name=>{
       q(`[name="${name}"]`, form)?.addEventListener('change', syncBailleurAdresse);
+      q(`[name="${name}"]`, form)?.addEventListener('input', syncBailleurAdresse);
     });
 
     const dateInput = q('#fp-date-visite-tech', form);
@@ -11317,7 +11417,6 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     if (rcSync && rcSel) rcSync.value = rcSel.value || rcSync.value;
     form.querySelectorAll('fieldset').forEach(fs => { fs.disabled = false; });
     const fd = new FormData(form);
-    if (!form.querySelector('[name="transfert_charge"]')?.checked) fd.set('transfert_charge', 'false');
     const saveLabel = btn.dataset.label || (btn.textContent || '').replace(/\s+/g, ' ').trim();
     btn.dataset.label = saveLabel;
     btn.disabled = true;
@@ -13801,6 +13900,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     modele_pac: '',
     modele_pac_id: '',
     modele_force: false,
+    prix_pac_force: null,
     sous_dimensionnement: false,
     selection_alerte: null
   };
@@ -14048,6 +14148,9 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     }
 
     state.selection_alerte = selection?.alerte || null;
+    if (state.prix_pac_force && state.prix_pac_force > 0) {
+      state.prix_pac = state.prix_pac_force;
+    }
     syncSimStateToForm();
 
     return { ...dim, selection };
@@ -14066,6 +14169,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     Object.assign(state, { ...DEFAULT_SIM_STATE });
     state.numero = null;
     state.modele_force = false;
+    state.prix_pac_force = null;
     state.selection_alerte = null;
     const titleSub = document.getElementById('sim-drawer-prospect');
     if (titleSub) titleSub.textContent = '—';
@@ -14084,6 +14188,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     state.phase_electrique = '';
     state.altitude = null;
     state.surface_habitable = null;
+    state.prix_pac_force = null;
     if (!state.surface_forcee) state.surface_chauffee = null;
     state.facture_avant = 200;
     const categorieInput = document.getElementById('categorie-input')?.value || '';
@@ -14139,6 +14244,8 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       const coutAnnuel = num(document.getElementById('cout-annuel-input')?.value || document.querySelector('[name="cout_energetique_annuel_eur"]')?.value);
       if (coutAnnuel!=null && coutAnnuel>0) state.facture_avant=Math.round(coutAnnuel/12);
     }
+    const forcedPrix = num(document.querySelector('[name="prix_pac_force"]')?.value);
+    state.prix_pac_force = forcedPrix != null && forcedPrix > 0 ? Math.round(forcedPrix) : null;
   }
 
   function pmt(tauxAnnuel, nMois, capital){
@@ -14326,11 +14433,12 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
           <div class="sim-pnl-line sim-pnl-prix">
             <span>Prix PAC fourni posé <i>· note de dimensionnement</i></span>
             <span class="sim-pnl-edit-wrap">
-              <span class="sim-pnl-edit"><input type="text" inputmode="numeric" id="sim-prix" value="${new Intl.NumberFormat('fr-FR').format(state.prix_pac||0)}"><em>€</em></span>
+              <span class="sim-pnl-edit"><input type="text" inputmode="numeric" id="sim-prix" value="${new Intl.NumberFormat('fr-FR').format(state.prix_pac||0)}" ${state.prix_pac_force ? 'disabled class="locked-by-fiche"' : ''}><em>€</em></span>
               <select id="sim-modele-select" class="sim-model-select">
                 ${catalogueOptionsOrdonnees(state).map(m => `<option value="${m.id}" ${m.id===state.modele_pac_id?'selected':''}>${m.label} · ${puissanceModele(m)} kW · ${eur(m.prix_ttc)}</option>`).join('')}
               </select>
               ${state.sous_dimensionnement ? '<span class="sim-warn-badge">⚠ Vérifier</span>' : ''}
+              ${state.prix_pac_force ? '<span id="prix-pac-lock-badge" class="lock-badge">🔒 Verrouillé par Prix négocié sur fiche prospect</span>' : ''}
             </span>
           </div>
           ${state.selection_alerte ? `<div class="sim-note sim-note--warn" id="sim-selection-alerte">${state.selection_alerte}</div>` : ''}
@@ -14430,6 +14538,8 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     const prixInput = document.getElementById('sim-prix');
     if (prixInput && document.activeElement !== prixInput) {
       prixInput.value = new Intl.NumberFormat('fr-FR').format(state.prix_pac||0);
+      prixInput.disabled = !!state.prix_pac_force;
+      prixInput.classList.toggle('locked-by-fiche', !!state.prix_pac_force);
     }
     const modelSelect = document.getElementById('sim-modele-select');
     if (modelSelect) {
@@ -14456,15 +14566,20 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     // résultats (l'input n'est pas recréé -> curseur intact). Au blur on reformate.
     const prix=document.getElementById('sim-prix');
     if (prix){
-      prix.addEventListener('input',e=>{
-        const clean=String(e.target.value).replace(/[^\d]/g,'');
-        state.prix_pac=parseInt(clean,10)||0;
-        patch();
-      });
-      prix.addEventListener('blur',()=>{ refresh(); }); // reformate avec séparateurs
-      prix.addEventListener('focus',()=>{ // passer en valeur brute (sans espaces) à l'entrée
-        prix.value = String(state.prix_pac || 0);
-      });
+      if (state.prix_pac_force) {
+        prix.disabled = true;
+        prix.classList.add('locked-by-fiche');
+      } else {
+        prix.addEventListener('input',e=>{
+          const clean=String(e.target.value).replace(/[^\d]/g,'');
+          state.prix_pac=parseInt(clean,10)||0;
+          patch();
+        });
+        prix.addEventListener('blur',()=>{ refresh(); }); // reformate avec séparateurs
+        prix.addEventListener('focus',()=>{ // passer en valeur brute (sans espaces) à l'entrée
+          prix.value = String(state.prix_pac || 0);
+        });
+      }
     }
     const modelSelect = document.getElementById('sim-modele-select');
     if (modelSelect){
@@ -14473,7 +14588,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
         if (!selected) return;
         state.modele_pac_id = selected.id;
         state.modele_pac = selected.label;
-        state.prix_pac = Math.round(selected.prix_ttc || 0);
+        state.prix_pac = state.prix_pac_force || Math.round(selected.prix_ttc || 0);
         state.modele_force = true;
         state.sous_dimensionnement = false;
         refresh();
@@ -15265,12 +15380,15 @@ L'équipe Hexa Rénov'</textarea></label>
       cession_mode: 'eur',     // 'eur' = marge fixe en €, 'pct' = % du prix catalogue HT
       cession_eur: 2500,       // marge de cession par défaut (€)
       cession_pct: 0.20,       // marge de cession par défaut (% du catalogue HT)
-      plafond_pct: 0.60        // plafond prix de vente régie = catalogue TTC + 60%
+      plafond_pct: 0.60,       // plafond prix de vente régie = catalogue TTC + 60%
+      frais_ecair_pct: 12      // miroir interne pour le calcul de marge Admin
     },
     prix_vente_devis: {
       prix_pose_ht: 3500,
       prix_travaux_induits_ht: 1200,
-      description_pose_defaut: "Pose et mise en service de la pompe à chaleur, raccordements hydrauliques et électriques, dépose et évacuation de l'ancien système, contrôle d'étanchéité, paramétrage de la régulation."
+      frais_ecair_pct: 12,
+      description_pose_defaut: "Pose et mise en service de la pompe à chaleur, raccordements hydrauliques et électriques, dépose et évacuation de l'ancien système, contrôle d'étanchéité, paramétrage de la régulation.",
+      description_travaux_induits_defaut: "Adaptation du circuit chauffage existant, modification de la ligne électrique dédiée, mise en place des éléments de sécurité, protections et reprises nécessaires à la bonne intégration de la pompe à chaleur."
     },
     sous_traitants: [{
       id:'italisol',
@@ -15296,6 +15414,7 @@ L'équipe Hexa Rénov'</textarea></label>
       if (!cfg) cfg = JSON.parse(JSON.stringify(DEFAULT));
       if (ADMIN_PARAMS_CACHE?.params) cfg.params = Object.assign({}, DEFAULT.params, ADMIN_PARAMS_CACHE.params || {});
       cfg.prix_vente_devis = Object.assign({}, DEFAULT.prix_vente_devis, cfg.prix_vente_devis || {}, ADMIN_PARAMS_CACHE?.prix_vente_devis || {});
+      cfg.params.frais_ecair_pct = Number(cfg.prix_vente_devis.frais_ecair_pct ?? cfg.params.frais_ecair_pct ?? 12);
       cfg.sous_traitants = Array.isArray(ADMIN_PARAMS_CACHE?.sous_traitants) ? ADMIN_PARAMS_CACHE.sous_traitants : (Array.isArray(cfg.sous_traitants) ? cfg.sous_traitants : DEFAULT.sous_traitants);
       if (!Array.isArray(cfg.models) || !cfg.models.length) {
         cfg.models = getCatalogueDefaults();
@@ -15304,6 +15423,8 @@ L'équipe Hexa Rénov'</textarea></label>
     }
     // prix d'achat toujours en entier
     if (cfg.models) cfg.models.forEach(m=>{ if(m.achat!=null) m.achat=Math.round(m.achat); if(m.ttc!=null) m.ttc=Math.round(m.ttc); });
+    cfg.prix_vente_devis = Object.assign({}, DEFAULT.prix_vente_devis, cfg.prix_vente_devis || {});
+    cfg.params.frais_ecair_pct = Number(cfg.prix_vente_devis.frais_ecair_pct ?? cfg.params.frais_ecair_pct ?? 12);
     return cfg;
   }
   function saveConfig(notify=true){
@@ -15322,7 +15443,11 @@ L'équipe Hexa Rénov'</textarea></label>
     const ttc = +m.ttc||0;                       // prix catalogue TTC
     const ht = ttc/(1+p.tva);                    // prix catalogue HT
     const cout = (+m.achat||0) + (+p.pose||0) + (+p.acc||0);   // coût de revient (produit + pose + acc)
-    const brute = ht - cout;                     // marge brute (vente directe)
+    const fraisEcairPct = ((p.frais_ecair_pct !== undefined ? +p.frais_ecair_pct : 12) || 0) / 100;
+    const montantMpr = 5000;                     // estimation TMO conservatrice pour le coût interne ECAIR
+    const fraisEcair = montantMpr * fraisEcairPct;
+    const coutAvecEcair = cout + fraisEcair;
+    const brute = ht - coutAvecEcair;            // marge brute (vente directe)
 
     // --- Option 1 : vente directe ---
     const frais1 = cac(p) + (+p.vt1||0) + (+p.cofrac1||0) + (+p.urba1||0);
@@ -15330,7 +15455,7 @@ L'équipe Hexa Rénov'</textarea></label>
 
     // --- Option 2 : prix de cession ---
     const frais2directs = (+p.vt2||0) + (+p.cofrac2||0) + (+p.urba2||0);
-    const baseCession = cout + frais2directs;
+    const baseCession = coutAvecEcair + frais2directs;
     // marge de cession globale (défaut) : en € OU en % du prix catalogue HT
     let margeCessionDefaut;
     if (p.cession_mode === 'pct') margeCessionDefaut = ht * (+p.cession_pct||0);
@@ -15371,7 +15496,7 @@ L'équipe Hexa Rénov'</textarea></label>
       return { venteHT, surplus, hexa, regie };
     }
 
-    return { ttc, ht, cout, pose:(+p.pose||0)+(+p.acc||0), brute,
+    return { ttc, ht, cout:coutAvecEcair, coutHorsEcair:cout, fraisEcair, pose:(+p.pose||0)+(+p.acc||0), brute,
              frais1, net1,
              frais2directs, baseCession, margeCession, margeCessionDefaut, cession, cessionForced:forced, cessionTropHaute, net2, commissionRegie,
              plafondTTC, plafondHT, surplusMode, surplusPct, repartir,
@@ -15478,16 +15603,26 @@ L'équipe Hexa Rénov'</textarea></label>
               est défini par modèle dans le tableau ci-dessous (colonne Prix vente TTC).
             </p>
             <div class="adm-card">
-              <div class="adm-cols">
+              <div class="adm-prix-vente-grid">
                 <label>Prix vente Pose HT (devis)
                   <span class="adm-euro"><input type="number" id="adm-prix-vente-pose-ht" value="${adminEscape(c.prix_vente_devis?.prix_pose_ht ?? 3500)}" step="50"><i>€ HT</i></span>
                 </label>
                 <label>Prix vente Travaux induits HT (devis)
                   <span class="adm-euro"><input type="number" id="adm-prix-vente-travaux-ht" value="${adminEscape(c.prix_vente_devis?.prix_travaux_induits_ht ?? 1200)}" step="50"><i>€ HT</i></span>
                 </label>
+                <label>Frais ECAIR (% sur MPR)
+                  <span class="adm-euro"><input type="number" id="adm-frais-ecair-pct" value="${adminEscape(c.prix_vente_devis?.frais_ecair_pct ?? 12)}" step="0.1" min="0" max="100"><i>%</i></span>
+                </label>
               </div>
+              <p class="adm-opt2-note adm-section-help">
+                ECAIR avance MaPrimeRénov' à Hexa Rénov' et prélève ce pourcentage sur le montant MPR.
+                Ce frais est un coût interne qui affecte la marge. Il n'apparaît JAMAIS sur le devis client.
+              </p>
               <label style="display:block;margin-top:12px">Description par défaut "Pose" (devis)
                 <textarea id="adm-description-pose-defaut" rows="3" style="width:100%">${adminEscape(c.prix_vente_devis?.description_pose_defaut || '')}</textarea>
+              </label>
+              <label style="display:block;margin-top:12px">Description par défaut "Travaux induits" (devis)
+                <textarea id="adm-description-travaux-induits-defaut" rows="3" placeholder="Ex: Adaptation du circuit chauffage existant, modification de la ligne électrique dédiée, mise en place des éléments de sécurité..." style="width:100%">${adminEscape(c.prix_vente_devis?.description_travaux_induits_defaut || '')}</textarea>
               </label>
               <button type="button" class="adm-btn adm-btn-primary" id="btn-save-prix-vente-devis">Sauvegarder les prix de vente</button>
             </div>
@@ -15602,8 +15737,11 @@ L'équipe Hexa Rénov'</textarea></label>
     cfg.prix_vente_devis = {
       prix_pose_ht: parseFloat(document.getElementById('adm-prix-vente-pose-ht')?.value || '3500') || 3500,
       prix_travaux_induits_ht: parseFloat(document.getElementById('adm-prix-vente-travaux-ht')?.value || '1200') || 1200,
-      description_pose_defaut: document.getElementById('adm-description-pose-defaut')?.value || ''
+      frais_ecair_pct: parseFloat(document.getElementById('adm-frais-ecair-pct')?.value || '12') || 0,
+      description_pose_defaut: document.getElementById('adm-description-pose-defaut')?.value || '',
+      description_travaux_induits_defaut: document.getElementById('adm-description-travaux-induits-defaut')?.value || ''
     };
+    cfg.params.frais_ecair_pct = cfg.prix_vente_devis.frais_ecair_pct;
     window.HexaConfig = cfg;
     try { localStorage.setItem(LS_KEY, JSON.stringify(cfg)); } catch(_){}
     await saveAdminParamsServer();

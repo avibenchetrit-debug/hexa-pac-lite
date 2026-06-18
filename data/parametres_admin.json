@@ -19,7 +19,9 @@
   "prix_vente_devis": {
     "prix_pose_ht": 3500,
     "prix_travaux_induits_ht": 1200,
-    "description_pose_defaut": "Pose et mise en service de la pompe à chaleur, raccordements hydrauliques et électriques, dépose et évacuation de l'ancien système, contrôle d'étanchéité, paramétrage de la régulation."
+    "frais_ecair_pct": 12,
+    "description_pose_defaut": "Pose et mise en service de la pompe à chaleur, raccordements hydrauliques et électriques, dépose et évacuation de l'ancien système, contrôle d'étanchéité, paramétrage de la régulation.",
+    "description_travaux_induits_defaut": "Adaptation du circuit chauffage existant, modification de la ligne électrique dédiée, mise en place des éléments de sécurité, protections et reprises nécessaires à la bonne intégration de la pompe à chaleur."
   },
   "sous_traitants": [
     {

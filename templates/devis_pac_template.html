@@ -13,7 +13,10 @@
      L'horizontal reste géré par le padding 56px des sections. */
   @page {
     size: A4;
-    margin: 14mm 0 16mm 0;
+    margin: 1.5cm 1.5cm 2cm 1.5cm;
+  }
+  @page:first {
+    margin-top: 2cm;
   }
 
   :root {
@@ -37,13 +40,51 @@
 
   html, body {
     background: #E8EBF0;
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-family: 'Inter', Helvetica, Arial, sans-serif;
     color: var(--noir);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     font-feature-settings: 'tnum' 1;
     max-width: 100%;
     overflow-x: clip;
+  }
+  @media print {
+    body {
+      font-family: Helvetica, Arial, sans-serif;
+      font-size: 10pt;
+      line-height: 1.4;
+      color: #1f2937;
+      padding: 0;
+    }
+    .document { box-shadow: none; max-width: none; width: 100%; }
+    .cover-header, .header, .infos, .lots-detail, .recap, .signature, .payment-terms {
+      padding-left: 0 !important;
+      padding-right: 0 !important;
+    }
+    .lots-detail, .family, .lot, .recap, .recap-grid, .recap-rac, .payment-card, .subcontractor {
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+    .sub-line-header { page-break-after: avoid; break-after: avoid; }
+    .lot-description {
+      font-size: 9pt;
+      color: #4b5563;
+      white-space: pre-wrap;
+      margin-top: 4px;
+    }
+    .mentions-legales, .anah-mention-block {
+      font-size: 8pt;
+      color: #6b7280;
+      page-break-before: auto;
+    }
+    .sous-traitant-block, .subcontractor {
+      margin-top: 20px;
+      padding: 10px;
+      background: #f9fafb;
+      border-left: 3px solid #002E5A;
+      page-break-inside: avoid;
+    }
+    .no-break { page-break-inside: avoid; break-inside: avoid; }
   }
 
   body {
@@ -1747,7 +1788,8 @@
   .specs-row .key { color: var(--gris-mute); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .specs-row .val { color: var(--noir); font-weight: 600; }
   .pac-desc-block { padding: 8px 14px; }
-  .pac-desc-text { font-size: 10.5px; line-height: 1.55; color: var(--gris-texte); white-space: pre-line; }
+  .pac-desc-text, .lot-description { font-size: 10.5px; line-height: 1.55; color: var(--gris-texte); white-space: pre-wrap; }
+  .lot-description { margin-top: 6px; }
   .specs-block { padding: 4px 0; }
   .specs-block + .specs-block { margin-top: 6px; }
   .specs-block-title {
@@ -3295,15 +3337,17 @@
 <div class="lot-header"><div class="lot-title">{{ lot_titre }}</div></div>
 <div class="sub-line">
 <div class="sub-line-header"><span class="sub-line-name">Fourniture</span><span class="sub-line-qt">{{ qt_fourniture }}</span><span class="sub-line-pu">{{ prix_fourniture_ht }}</span><span class="sub-line-tva">{{ tva_taux }}</span><span class="sub-line-total">{{ prix_fourniture_ttc }}</span></div>
-<div class="specs pac-desc-block"><div class="pac-desc-text">{{ description_pac }}</div></div>
+<div class="specs pac-desc-block"><div class="pac-desc-text lot-description">{{ description_pac | replace('\n', '<br>') | safe }}</div></div>
 </div>
 <div class="sub-line">
 <div class="sub-line-header"><span class="sub-line-name">Pose</span><span class="sub-line-qt">{{ qt_pose }}</span><span class="sub-line-pu">{{ prix_pose_ht }}</span><span class="sub-line-tva">{{ tva_taux }}</span><span class="sub-line-total">{{ prix_pose_ttc }}</span></div>
+<div class="lot-description">{{ description_pose | replace('\n', '<br>') | safe }}</div>
 <div class="specs"><div class="specs-block"><div class="specs-block-title">Système mis en œuvre</div><ul class="specs-list"><li>Installation et mise en service d'une pompe à chaleur air - eau</li></ul></div><div class="specs-block"><div class="specs-block-title">Aménagements et sujétions</div><ul class="specs-list"><li>Fourniture et pose des unités intérieure et extérieure</li><li>Liaison hydraulique et liaison frigorifique</li><li>Raccordement aux réseaux existants</li><li>Câblage d'alimentation et connexions électriques</li><li>Protection électrique par dispositif adapté</li><li>Mise sous pression d'azote</li><li>Contrôle de l'étanchéité du circuit frigorifique</li><li>Contrôle du circuit hydraulique et de son étanchéité</li><li>Mise en service et programmation</li><li>Évacuation des déchets en filière agréée</li></ul></div><div class="specs-block"><div class="specs-block-title">Système de finition</div><ul class="specs-list"><li>Vannes d'arrêt et organes d'isolement</li><li>Calorifugeage des réseaux hydrauliques accessibles</li><li>Disconnecteur</li><li>Ballon tampon adapté à l'installation</li><li>Circulateur</li><li>Pot à boue</li><li>Interrupteur de proximité</li><li>Supports antivibratiles type Rubberfoot</li><li>Réglage et optimisation des paramètres de fonctionnement</li></ul></div></div>
 <div class="subcontractor"><div class="subcontractor-title">Travaux sous-traités</div><div class="subcontractor-grid"><div class="sc-row"><span class="key">Entreprise</span><span class="val">{{ sous_traitant.entreprise }}</span></div><div class="sc-row"><span class="key">SIRET</span><span class="val">{{ sous_traitant.siret }}</span></div><div class="sc-row"><span class="key">Adresse</span><span class="val">{{ sous_traitant.adresse }}</span></div><div class="sc-row"><span class="key">Certificat RGE</span><span class="val">{{ sous_traitant.rge }}</span></div><div class="sc-row"><span class="key">Validité RGE</span><span class="val">{{ sous_traitant.rge_validite }}</span></div><div class="sc-row"><span class="key">Assurance</span><span class="val">{{ sous_traitant.assurance }}</span></div></div></div>
 </div>
 <div class="sub-line">
 <div class="sub-line-header"><span class="sub-line-name">Travaux induits</span><span class="sub-line-qt">{{ qt_travaux_induits }}</span><span class="sub-line-pu">{{ prix_travaux_induits_ht }}</span><span class="sub-line-tva">{{ tva_taux }}</span><span class="sub-line-total">{{ prix_travaux_induits_ttc }}</span></div>
+<div class="lot-description">{{ description_travaux_induits | replace('\n', '<br>') | safe }}</div>
 <div class="specs"><div class="specs-block"><div class="specs-block-title">Travaux induits</div><ul class="specs-list"><li>Protection et sécurisation des zones d'intervention</li><li>Création ou adaptation des passages techniques</li><li>Reprises localisées d'étanchéité et de calfeutrement</li><li>Adaptation ponctuelle des réseaux et équipements existants</li><li>Dépose et évacuation des équipements remplacés</li></ul></div><div class="specs-block"><div class="specs-block-title">Non inclus</div><ul class="specs-list"><li>Renforcement ou mise en conformité complète de l'installation électrique</li><li>Modification des émetteurs ou réseaux hors descriptif</li><li>Travaux de maçonnerie ou de couverture lourde</li><li>Prestations de décoration et reprises complètes de finition</li></ul></div></div>
 </div>
 <div class="lot-subtotal"><span class="lot-subtotal-label">Sous-total lot</span><div class="lot-subtotal-amounts"><span class="ht"><span class="label">HT</span>{{ total_ht }}</span><span class="ttc"><span class="label">TTC</span>{{ total_ttc }}</span></div></div>
