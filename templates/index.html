@@ -11769,6 +11769,9 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       return null;
     }
   }
+  function escapeDuplicateHtml(v) {
+    return String(v ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+  }
   function showDuplicateModal(duplicates, onContinue) {
     document.getElementById('modal-duplicate-alert')?.remove();
     const wrap = document.createElement('div');
@@ -11789,24 +11792,45 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     list.innerHTML = duplicates.map(d => {
       const reasonText = (d.match_reason || []).map(r => r === 'telephone' ? '📞 même téléphone' : '📧 même email').join(' + ');
       return `<div class="duplicate-card">
-        <div class="duplicate-header"><strong>${escapeHtml(d.numero || '')}</strong> — ${escapeHtml(d.prenom || '')} ${escapeHtml(d.nom || '')}<span class="duplicate-reason">${reasonText}</span></div>
+        <div class="duplicate-header"><strong>${escapeDuplicateHtml(d.numero || '')}</strong> — ${escapeDuplicateHtml(d.prenom || '')} ${escapeDuplicateHtml(d.nom || '')}<span class="duplicate-reason">${reasonText}</span></div>
         <div class="duplicate-details">
-          <div>📞 ${escapeHtml(d.telephone || '—')}</div>
-          <div>📧 ${escapeHtml(d.email || '—')}</div>
-          <div>📍 ${escapeHtml(d.adresse || '')}, ${escapeHtml(d.cp_chantier || '')} ${escapeHtml(d.ville || '')}</div>
-          <div>🟢 Statut : ${escapeHtml(d.statut || 'nouveau')}</div>
+          <div>📞 ${escapeDuplicateHtml(d.telephone || '—')}</div>
+          <div>📧 ${escapeDuplicateHtml(d.email || '—')}</div>
+          <div>📍 ${escapeDuplicateHtml(d.adresse || '')}, ${escapeDuplicateHtml(d.cp_chantier || '')} ${escapeDuplicateHtml(d.ville || '')}</div>
+          <div>🟢 Statut : ${escapeDuplicateHtml(d.statut || 'nouveau')}</div>
         </div>
-        <button type="button" class="duplicate-open-btn" data-numero="${escapeHtml(d.numero || '')}">Ouvrir cette fiche</button>
+        <button type="button" class="duplicate-open-btn" data-numero="${escapeDuplicateHtml(d.numero || '')}">Ouvrir cette fiche</button>
       </div>`;
     }).join('');
-    document.getElementById('btn-duplicate-continue').onclick = () => { wrap.remove(); onContinue(); };
-    document.getElementById('btn-duplicate-cancel').onclick = () => wrap.remove();
+    const btnContinue = document.getElementById('btn-duplicate-continue');
+    const btnCancel = document.getElementById('btn-duplicate-cancel');
+    if (!btnContinue || !btnCancel) {
+      console.error('[Doublons] Boutons introuvables', { btnContinue, btnCancel });
+      return;
+    }
+    const newBtnContinue = btnContinue.cloneNode(true);
+    btnContinue.parentNode.replaceChild(newBtnContinue, btnContinue);
+    const newBtnCancel = btnCancel.cloneNode(true);
+    btnCancel.parentNode.replaceChild(newBtnCancel, btnCancel);
+    newBtnContinue.addEventListener('click', e => {
+      e.preventDefault();
+      e.stopPropagation();
+      wrap.remove();
+      onContinue();
+    });
+    newBtnCancel.addEventListener('click', e => {
+      e.preventDefault();
+      e.stopPropagation();
+      wrap.remove();
+    });
     list.querySelectorAll('.duplicate-open-btn').forEach(btn => {
-      btn.onclick = () => {
+      btn.addEventListener('click', e => {
+        e.preventDefault();
+        e.stopPropagation();
         const numero = btn.dataset.numero;
         wrap.remove();
         if (numero) window.openFicheByNumero?.(numero);
-      };
+      });
     });
   }
 
