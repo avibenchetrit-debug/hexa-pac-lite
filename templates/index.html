@@ -17296,7 +17296,8 @@ L'équipe Hexa Rénov'</textarea></label>
         <button type="button" class="adm-btn adm-btn-cancel" id="af-cancel">Annuler</button>
         <button type="button" class="adm-btn adm-btn-primary" id="af-add">Ajouter au catalogue</button>
       </div>`;
-    document.querySelector('.adm-add-row').appendChild(form);
+    const addRow = document.getElementById('adm-add')?.closest('.adm-add-row') || document.querySelector('.adm-add-row');
+    addRow.appendChild(form);
     document.getElementById('af-cancel').addEventListener('click', ()=>form.remove());
     document.getElementById('af-add').addEventListener('click', ()=>{
       const num = v => parseFloat(String(v).replace(/\s/g,'').replace(',','.'))||0;
