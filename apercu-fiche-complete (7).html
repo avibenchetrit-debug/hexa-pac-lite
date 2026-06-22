@@ -11920,6 +11920,9 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
         setSaveCtaLabel(savedNumero ? 'MODIFIER' : 'ENREGISTRER');
         saveToast('Prospect enregistré ✓', '#0D6B3B');
         majBadgesReglementairesBandeau();
+        if (typeof window.syncCurrentProspectToSimulatorState === 'function') {
+          window.syncCurrentProspectToSimulatorState();
+        }
         if (typeof window.hexaRefreshProspectsTable === 'function') {
           window.hexaRefreshProspectsTable();
         }
@@ -14595,6 +14598,13 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     set('iso_menuiserie', state.iso_menuiserie || 'double');
     set('service', state.service || 'chauffage_ecs');
   }
+  function syncCurrentProspectToSimulatorState(){
+    lireContexteFiche();
+    state.modele_force = false;
+    syncSimStateToForm();
+    scheduleSaveSimulatorState();
+    if (estOuvert()) refresh();
+  }
 
   let simSaveTimeout = null;
   function simulatorPayload(){
@@ -14835,20 +14845,8 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     if (M3_CONFIG?.forfaits_mpr && state.categorie in M3_CONFIG.forfaits_mpr) {
       mprDevis = Number(M3_CONFIG.forfaits_mpr[state.categorie]) || 0;
     }
-    const formuleBar = M3_CONFIG?.formule_bar_th_171;
-    if (formuleBar?.actif) {
-      const resultCee = calculerCeeBarTh171(state, formuleBar, M3_CONFIG || {});
-      ceeBrut = resultCee.montant || 0;
-    } else {
-      ceeBrut = contextePret ? (node?.cee_devis?.[state.zone]?.[state.categorie] ?? 0) : 0;
-      const actif = (M3_CONFIG?.delegataires || []).find(d => d.actif);
-      if (actif && Number.isFinite(Number(state.surface_chauffee))) {
-        const mwh = Math.max(Number(state.surface_chauffee || 0) / 10, 1);
-        const unit = state.categorie === 'tres_modeste' ? Number(actif.mwh_precaire || 0) : Number(actif.mwh_classique || 0);
-        ceeBrut = Math.round(mwh * unit * 10);
-        if (M3_CONFIG?.bonification_cee?.actif) ceeBrut *= Number(M3_CONFIG.bonification_cee.multiplicateur || 5);
-      }
-    }
+    const resultCee = calculerCeeBarTh171(state, M3_CONFIG?.formule_bar_th_171 || defaultFormuleBarTh171(), M3_CONFIG || {});
+    ceeBrut = resultCee.montant || 0;
     const plafonds = M3_CONFIG?.plafonds_reglementaires || {};
     const plafondEligible = Number(plafonds.plafond_eligible_ttc) || 12000;
     const plafondsPct = plafonds.plafonds_aides_pct || {};
@@ -14856,14 +14854,15 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     let mprFinal = mprDevis;
     let ceeDevis = ceeBrut;
     let ceeConserveCalcule = 0;
-    if (state.categorie === 'superieur') {
+    const categoriePlafond = state.categorie || 'modeste';
+    if (categoriePlafond === 'superieur') {
       mprFinal = 0;
       ceeDevis = ceeBrut;
     } else {
-      const plafondPct = Number(plafondsPct[state.categorie] || 0) / 100;
+      const plafondPct = Number(plafondsPct[categoriePlafond] ?? 0) / 100;
       const plafondAides = baseEligible * plafondPct;
       const totalBrut = mprDevis + ceeBrut;
-      if (totalBrut > plafondAides) {
+      if (plafondPct > 0 && totalBrut > plafondAides) {
         mprFinal = mprDevis;
         ceeDevis = Math.max(plafondAides - mprFinal, 0);
         ceeConserveCalcule = Math.round((ceeBrut - ceeDevis) * 100) / 100;
@@ -15571,6 +15570,7 @@ L'équipe Hexa Rénov'</textarea></label>
     }
   }
   window.syncSimulateurDepuisFiche = syncDepuisFiche;
+  window.syncCurrentProspectToSimulatorState = syncCurrentProspectToSimulatorState;
 
   // input + change couvrent saisie clavier et sélection
   ['input','change'].forEach(evt=>{
@@ -15825,7 +15825,6 @@ L'équipe Hexa Rénov'</textarea></label>
   }
   function defaultFormuleBarTh171(){
     return {
-      actif:false,
       tableau_montant_base:[
         {logement:'Appartement', etas_min:111, etas_max:139.99, montant_kwhc:48700, actif:true},
         {logement:'Appartement', etas_min:140, etas_max:999, montant_kwhc:58900, actif:true},
@@ -15882,10 +15881,7 @@ L'équipe Hexa Rénov'</textarea></label>
       <div class="adm-section-block" data-section="formule-bar-th-171">
         <div class="adm-section-header">
           <div class="adm-section">Formule BAR-TH-171 (PAC Air-Eau)</div>
-          <div class="adm-toggle">
-            <label class="adm-toggle-label"><input type="checkbox" id="adm-formule-bar-th-171-actif" ${formule.actif?'checked':''}> <span>Activer la nouvelle formule officielle</span></label>
-            <p class="adm-hint">Quand activée : utilise la formule BAR-TH-171 ci-dessous.<br>Quand désactivée : utilise la formule simplifiée actuelle (fallback).</p>
-          </div>
+          <p class="adm-hint">Formule officielle de calcul du CEE pour PAC air-eau. Modifiez les bornes et facteurs ci-dessous si la réglementation évolue.</p>
         </div>
         <div class="adm-subsection"><h3>Tableau 1 — Montant de base (kWhc)</h3>
           <table class="adm-bareme-table" id="bareme-montant-base"><thead><tr><th>Type logement</th><th>ETAS min (%)</th><th>ETAS max (%)</th><th>Montant kWhc</th><th>Actif</th><th></th></tr></thead><tbody>${renderBarRows('base', formule.tableau_montant_base)}</tbody></table>
@@ -16741,7 +16737,6 @@ L'équipe Hexa Rénov'</textarea></label>
     function collectFormuleBar(){
       const readNum = (row, cls) => Number(String(row.querySelector(cls)?.value || '').replace(',','.')) || 0;
       return {
-        actif: !!document.getElementById('adm-formule-bar-th-171-actif')?.checked,
         tableau_montant_base: Array.from(document.querySelectorAll('#bareme-montant-base tbody tr')).map(row=>({
           logement: row.querySelector('.adm-bar-logement')?.value || '',
           etas_min: readNum(row, '.adm-bar-etas-min'),

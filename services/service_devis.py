@@ -263,32 +263,13 @@ def calculer_cee_bar_th_171(prospect, state_simulateur, admin_params):
     }
 
 
-def _calculer_cee_legacy(prospect, state_simulateur, admin_params, with_bonification=True):
-    categorie = value(prospect, "categorie_revenu", "categorie", default="modeste")
-    surface = float_value(value(state_simulateur, "surface_chauffee", default=0))
-    if surface <= 0:
-        surface = float_value(value(prospect, "surface_habitable", "surface_logement_m2", default=90)) * 0.9
-    delegataires = (admin_params or {}).get("delegataires") or []
-    delegataire = next((d for d in delegataires if d.get("actif")), delegataires[0] if delegataires else {})
-    unit_key = "mwh_precaire" if categorie == "tres_modeste" else "mwh_classique"
-    unit = float_value(delegataire.get(unit_key), 7.2)
-    cee = round(max(surface / 10, 1) * unit * 10, 2)
-    bonif = (admin_params or {}).get("bonification_cee") or {}
-    if with_bonification and bonif.get("actif", True):
-        cee *= float_value(bonif.get("multiplicateur"), 5)
-    return round(cee, 2)
-
-
 def calculer_cee(prospect, state_simulateur, admin_params, with_bonification=True):
-    """Calcule le montant CEE (BAR-TH-171 si activée, legacy sinon)."""
-    formule = (admin_params or {}).get("formule_bar_th_171", {})
-    if formule.get("actif"):
-        result = calculer_cee_bar_th_171(prospect, state_simulateur, admin_params)
-        if result.get("erreur"):
-            print(f"[CEE] Nouvelle formule erreur : {result['erreur']}, fallback ancienne")
-            return _calculer_cee_legacy(prospect, state_simulateur, admin_params, with_bonification)
-        return result["montant"]
-    return _calculer_cee_legacy(prospect, state_simulateur, admin_params, with_bonification)
+    """Calcule le montant CEE avec la formule BAR-TH-171."""
+    result = calculer_cee_bar_th_171(prospect, state_simulateur, admin_params)
+    if result.get("erreur"):
+        print(f"[CEE] Erreur calcul : {result['erreur']}")
+        return 0
+    return result["montant"]
 
 
 def appliquer_plafonds_reglementaires(prix_pac_ttc, montant_mpr_brut, montant_cee_brut, prospect, admin_params):

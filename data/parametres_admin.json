@@ -35,7 +35,6 @@
     }
   ],
   "formule_bar_th_171": {
-    "actif": false,
     "tableau_montant_base": [
       {"logement": "Appartement", "etas_min": 111, "etas_max": 139.99, "montant_kwhc": 48700, "actif": true},
       {"logement": "Appartement", "etas_min": 140, "etas_max": 999, "montant_kwhc": 58900, "actif": true},

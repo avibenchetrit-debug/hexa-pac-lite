@@ -103,7 +103,6 @@ DEFAULT_SOUS_TRAITANTS = [
 ]
 
 DEFAULT_FORMULE_BAR_TH_171 = {
-    "actif": False,
     "tableau_montant_base": [
         {"logement": "Appartement", "etas_min": 111, "etas_max": 139.99, "montant_kwhc": 48700, "actif": True},
         {"logement": "Appartement", "etas_min": 140, "etas_max": 999, "montant_kwhc": 58900, "actif": True},
