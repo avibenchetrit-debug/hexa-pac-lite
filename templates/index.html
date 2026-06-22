@@ -7146,6 +7146,42 @@ input:focus{ outline:none; border-color: var(--c-navy,#002E5A); box-shadow:0 0 0
   color: #002E5A;
 }
 .specs-add-row:hover { background: #f3f4f6; }
+.pac-performance-box {
+  margin: 14px 0 18px;
+  padding: 12px;
+  border: 1px solid #dbeafe;
+  border-radius: 8px;
+  background: #f8fbff;
+}
+.pac-performance-title {
+  font-size: 12px;
+  font-weight: 800;
+  color: #002E5A;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  margin-bottom: 10px;
+}
+.pac-performance-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.pac-performance-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #1f2937;
+}
+.pac-performance-grid input {
+  height: 34px;
+  border: 1px solid #d1d5db;
+  border-radius: 5px;
+  padding: 6px 8px;
+  font-size: 13px;
+  box-sizing: border-box;
+}
 .adm-card{ background:#fff; border:1px solid var(--c-line,#E2E8F0); border-radius:12px; padding:14px 16px; }
 .adm-card-h{ font-size:13px; font-weight:700; color: var(--c-navy,#002E5A); margin-bottom:10px; padding-bottom:8px; border-bottom:2px solid; }
 .adm-opt1 .adm-card-h{ border-color: var(--c-navy,#002E5A); }
@@ -16617,6 +16653,12 @@ L'équipe Hexa Rénov'</textarea></label>
     renderSpecsRows();
     document.querySelector('#specs-rows-container .specs-row:last-child .specs-input-champ')?.focus();
   }
+  function adminNumberOrEmpty(v){
+    const raw = String(v == null ? '' : v).trim();
+    if (!raw) return '';
+    const n = parseFloat(raw.replace(/\s/g, '').replace(',', '.'));
+    return Number.isFinite(n) ? n : '';
+  }
   function openDescriptionPacModal(i){
     const cfg = window.HexaConfig || loadConfig();
     const m = cfg.models[i];
@@ -16633,6 +16675,17 @@ L'équipe Hexa Rénov'</textarea></label>
       <div class="adm-delbox modal-large">
         <div class="adm-del-h">Description technique — <span id="modal-pac-nom">${adminEscape(m.nom || m.ref || '')}</span></div>
         <p class="adm-opt2-note">Saisissez les caractéristiques techniques sous forme de tableau (champ + valeur). Chaque ligne apparaîtra sur le devis sous la ligne "Fourniture".</p>
+        <div class="pac-performance-box">
+          <div class="pac-performance-title">Performances (ETAS)</div>
+          <div class="pac-performance-grid">
+            <label>ETAS 35°C (%)
+              <input type="number" inputmode="decimal" id="modal-pac-etas35" value="${adminEscape(m.etas35 ?? '')}" placeholder="183" step="0.01">
+            </label>
+            <label>ETAS 55°C (%)
+              <input type="number" inputmode="decimal" id="modal-pac-etas55" value="${adminEscape(m.etas55 ?? '')}" placeholder="131" step="0.01">
+            </label>
+          </div>
+        </div>
         <div class="specs-editor">
           <div class="specs-editor-header">
             <span class="specs-col-champ">Champ</span>
@@ -16658,6 +16711,8 @@ L'équipe Hexa Rénov'</textarea></label>
         .map(s => ({ champ:String(s.champ || '').trim(), valeur:String(s.valeur || '').trim() }))
         .filter(s => s.champ || s.valeur);
       m.description_specs = filtered;
+      m.etas35 = adminNumberOrEmpty(document.getElementById('modal-pac-etas35')?.value);
+      m.etas55 = adminNumberOrEmpty(document.getElementById('modal-pac-etas55')?.value);
       const server = await saveCatalogueToServer((cfg.models || []).map(x=>Object.assign({}, x)));
       if (server.ok) {
         persistCatalogueLocal(cfg.models);
@@ -17226,6 +17281,8 @@ L'équipe Hexa Rénov'</textarea></label>
         <label>Référence interne<input type="text" id="af-ref" placeholder="ATL-EXCELLIA-S-DUO-16"></label>
         <label>Nom commercial<input type="text" id="af-nom" placeholder="ALFÉA EXCELLIA S DUO 16"></label>
         <label>Puissance kW (35°C)<input type="text" inputmode="decimal" id="af-puiss" placeholder="16"></label>
+        <label>ETAS 35°C (%)<input type="text" inputmode="numeric" id="af-etas35" placeholder="183"></label>
+        <label>ETAS 55°C (%)<input type="text" inputmode="numeric" id="af-etas55" placeholder="131"></label>
         <label>Alimentation
           <select id="af-alim"><option value="mono">Monophasé</option><option value="tri">Triphasé</option></select>
         </label>
@@ -17253,6 +17310,8 @@ L'équipe Hexa Rénov'</textarea></label>
         usage: usage==='ecs' ? 'Chauffage + ECS' : 'Chauffage',
         alim: alim==='tri' ? 'Triphasé' : 'Monophasé',
         puiss35: num(document.getElementById('af-puiss').value),
+        etas35: num(document.getElementById('af-etas35').value),
+        etas55: num(document.getElementById('af-etas55').value),
         achat: Math.round(num(document.getElementById('af-achat').value)),
         ttc: Math.round(num(document.getElementById('af-ttc').value))
       };
