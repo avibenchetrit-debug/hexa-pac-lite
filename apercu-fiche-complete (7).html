@@ -6990,6 +6990,69 @@ input:focus{ outline:none; border-color: var(--c-navy,#002E5A); box-shadow:0 0 0
 .adm-tab.active { color:#002E5A; border-bottom-color:#E2214B; }
 .adm-tab-content { display:block; }
 .adm-tab-content[hidden] { display:none; }
+.adm-bloc {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  margin-bottom: 12px;
+  overflow: hidden;
+}
+.adm-bloc-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  cursor: pointer;
+  background: #f9fafb;
+  user-select: none;
+  transition: background 0.15s;
+}
+.adm-bloc-header:hover { background: #f3f4f6; }
+.adm-bloc-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #002E5A;
+}
+.adm-bloc-chevron,
+.adm-sous-bloc-chevron {
+  font-size: 12px;
+  color: #6b7280;
+  transition: transform 0.2s;
+}
+.adm-bloc[data-open="true"] > .adm-bloc-header .adm-bloc-chevron,
+.adm-sous-bloc[data-open="true"] > .adm-sous-bloc-header .adm-sous-bloc-chevron {
+  transform: rotate(90deg);
+}
+.adm-bloc-content { padding: 16px 20px 20px; }
+.adm-sous-bloc {
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  margin-bottom: 8px;
+  overflow: hidden;
+}
+.adm-sous-bloc-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  cursor: pointer;
+  background: white;
+  user-select: none;
+}
+.adm-sous-bloc-header:hover { background: #f9fafb; }
+.adm-sous-bloc-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #1f2937;
+}
+.adm-sous-bloc-content {
+  padding: 16px;
+  border-top: 1px solid #e5e7eb;
+}
+.adm-bloc-content[hidden],
+.adm-sous-bloc-content[hidden] { display: none; }
 .adm-section-block { margin-top: 18px; }
 .adm-section-header { display:flex; justify-content:space-between; align-items:flex-start; gap:16px; }
 .adm-subsection { background:#fff; border:1px solid #e5e7eb; border-radius:10px; padding:14px 16px; margin:12px 0; }
@@ -15946,6 +16009,79 @@ L'équipe Hexa Rénov'</textarea></label>
         <div class="adm-actions"><button type="button" class="adm-btn-save" id="btn-save-plafonds">Sauvegarder</button></div>
       </div>`;
   }
+  function admBloc(id, title, content){
+    return `<div class="adm-bloc" data-bloc-id="${id}" data-open="false">
+      <div class="adm-bloc-header" data-toggle-bloc="${id}">
+        <h2 class="adm-bloc-title">${title}</h2>
+        <span class="adm-bloc-chevron">▶</span>
+      </div>
+      <div class="adm-bloc-content" id="adm-bloc-content-${id}" hidden>${content}</div>
+    </div>`;
+  }
+  function admSousBloc(id, title, content){
+    return `<div class="adm-sous-bloc" data-sous-bloc-id="${id}" data-open="false">
+      <div class="adm-sous-bloc-header" data-toggle-sous-bloc="${id}">
+        <h3 class="adm-sous-bloc-title">${title}</h3>
+        <span class="adm-sous-bloc-chevron">▶</span>
+      </div>
+      <div class="adm-sous-bloc-content" id="adm-sous-bloc-content-${id}" hidden>${content}</div>
+    </div>`;
+  }
+  function renderMprFields(){
+    const cfg = M3_ADMIN || {};
+    const forfaits = cfg.forfaits_mpr || { tres_modeste:5000, modeste:4000, intermediaire:3000, superieur:0 };
+    return `<div class="adm-card">
+      ${[
+        ['tres_modeste','TMO (Très modeste)'],
+        ['modeste','MO (Modeste)'],
+        ['intermediaire','INT (Intermédiaire)'],
+        ['superieur','SUP (Supérieur)']
+      ].map(([k,l])=>`<div class="adm-field adm-field-row"><span class="adm-lab">${l}</span><span class="adm-euro"><input type="text" inputmode="numeric" class="adm-m3-mpr adm-money" data-cat="${k}" value="${adminEscape(forfaits[k] ?? 0)}"><i>€</i></span></div>`).join('')}
+      <div class="adm-actions"><button type="button" class="adm-btn-save" id="adm-save-mpr">Enregistrer</button></div>
+    </div>`;
+  }
+  function renderBonificationFields(){
+    const cfg = M3_ADMIN || {};
+    const bonif = cfg.bonification_cee || { actif:true, multiplicateur:5 };
+    return `<div class="adm-card">
+      <label class="adm-check"><input type="checkbox" id="adm-bonif-actif" ${bonif.actif ? 'checked' : ''}> Coup de pouce actif</label>
+      <div class="adm-field adm-field-row"><span class="adm-lab">Multiplicateur</span><input type="number" min="1" max="10" id="adm-bonif-mult" value="${adminEscape(bonif.multiplicateur || 5)}"></div>
+      <p class="adm-opt2-note">La bonification multiplie le montant CEE classique. Par défaut x5 (Coup de pouce Chauffage).</p>
+      <div class="adm-actions"><button type="button" class="adm-btn-save" id="adm-save-bonif">Enregistrer</button></div>
+    </div>`;
+  }
+  function renderDelegatairesFields(){
+    const cfg = M3_ADMIN || {};
+    const delegataires = cfg.delegataires || [{nom:'PICOTY', mwh_precaire:12.5, mwh_classique:7.2, actif:true}];
+    return `<div class="adm-card">
+      <div id="adm-delegataires-list">
+        ${delegataires.map((d,i)=>`<div class="adm-field adm-field-row adm-delegataire-row" data-i="${i}">
+          <input type="radio" name="adm-del-actif" class="adm-del-actif" ${d.actif?'checked':''}>
+          <input type="text" class="adm-del-nom" value="${adminEscape(d.nom || '')}" placeholder="Nom">
+          <input type="text" inputmode="decimal" class="adm-del-precaire" value="${adminEscape(d.mwh_precaire ?? '')}" placeholder="MWh précaire">
+          <input type="text" inputmode="decimal" class="adm-del-classique" value="${adminEscape(d.mwh_classique ?? '')}" placeholder="MWh classique">
+          <button type="button" class="adm-btn adm-btn-danger adm-del-remove">Supprimer</button>
+        </div>`).join('')}
+      </div>
+      <button type="button" class="adm-btn adm-btn-add" id="adm-add-delegataire">+ Ajouter délégataire</button>
+      <div class="adm-actions"><button type="button" class="adm-btn-save" id="adm-save-delegataires">Enregistrer</button></div>
+    </div>`;
+  }
+  function renderEmailsFields(){
+    const cfg = M3_ADMIN || {};
+    const emails = cfg.modeles_email || [];
+    const emailRows = [0,1,2].map(i => {
+      const m = emails[i] || { titre:['Premier contact','Relance après pré-visite','Relance après devis'][i], sujet:'', contenu:'' };
+      return `<div class="adm-card" data-email-i="${i}">
+        <div class="adm-card-h">Modèle ${i+1} : ${m.titre || ''}</div>
+        <div class="adm-field"><span class="adm-lab">Titre court</span><input type="text" class="adm-email-titre" value="${adminEscape(m.titre || '')}"></div>
+        <div class="adm-field"><span class="adm-lab">Sujet</span><input type="text" class="adm-email-sujet" value="${adminEscape(m.sujet || '')}"></div>
+        <div class="adm-field"><span class="adm-lab">Contenu</span><textarea class="adm-email-contenu" rows="5">${adminEscape(m.contenu || '')}</textarea></div>
+        <p class="adm-opt2-note">Variables : {prenom}, {nom}, {numero}, {modele_pac}, {reste_a_charge}</p>
+      </div>`;
+    }).join('');
+    return `<div class="adm-cols">${emailRows}</div><div class="adm-actions"><button type="button" class="adm-btn-save" id="adm-save-emails">Enregistrer</button></div>`;
+  }
   function renderAdminM3Section(){
     const cfg = M3_ADMIN || {};
     const forfaits = cfg.forfaits_mpr || { tres_modeste:5000, modeste:4000, intermediaire:3000, superieur:0 };
@@ -16283,6 +16419,75 @@ L'équipe Hexa Rénov'</textarea></label>
       });
     });
 
+    const coutHexa = `
+      <div class="adm-card">
+        <label>URL du script d'appel (Notion)
+          <input type="text" id="adm-script-url" placeholder="https://www.notion.so/..." value="${adminEscape(M3_ADMIN?.script_notion_url || '')}" style="width:100%">
+        </label>
+      </div>
+      <p class="adm-opt2-note adm-section-help">
+        Ces valeurs sont vos COÛTS INTERNES (ce que vous payez aux sous-traitants).
+        Elles servent uniquement au calcul de votre marge dans le tableau ci-dessous.
+        Elles ne sont jamais affichées au client.
+      </p>
+      <div class="adm-params">
+        <div class="adm-field"><span class="adm-lab">Coût pose HT (calcul marge)</span><span class="adm-euro"><input type="text" inputmode="numeric" class="adm-p adm-money" data-p="pose" value="${fmtE(p.pose)}"><i>€</i></span></div>
+        <div class="adm-field"><span class="adm-lab">Coût accessoires HT (calcul marge)</span><span class="adm-euro"><input type="text" inputmode="numeric" class="adm-p adm-money" data-p="acc" value="${fmtE(p.acc)}"><i>€</i></span></div>
+        <div class="adm-field"><span class="adm-lab">Frais ECAIR (% sur MPR)</span><span class="adm-euro"><input type="number" id="adm-frais-ecair-pct" value="${adminEscape(c.prix_vente_devis?.frais_ecair_pct ?? 12)}" step="0.1" min="0" max="100"><i>%</i></span></div>
+        <div class="adm-field"><span class="adm-lab">TVA (5,5% par défaut)</span><span class="adm-euro"><input type="text" inputmode="decimal" class="adm-p" data-p="tva" value="${(p.tva*100).toFixed(1)}"><i>%</i></span></div>
+      </div>
+      <div class="adm-actions"><button type="button" class="adm-btn-save" data-save-sous-bloc="1-1">Enregistrer</button></div>`;
+    const venteHexa = `
+      <div class="adm-card">
+        <div class="adm-fields-row">
+          <label>Prix vente Pose HT (devis)
+            <input type="number" id="adm-prix-vente-pose-ht" value="${adminEscape(c.prix_vente_devis?.prix_pose_ht ?? 3500)}" step="50">
+            <span class="adm-unit">€ HT</span>
+          </label>
+          <label>Prix vente Travaux induits HT (devis)
+            <input type="number" id="adm-prix-vente-travaux-ht" value="${adminEscape(c.prix_vente_devis?.prix_travaux_induits_ht ?? 1200)}" step="50">
+            <span class="adm-unit">€ HT</span>
+          </label>
+        </div>
+        <p class="adm-section-help">Ces 2 prix apparaissent sur le devis envoyé au client.</p>
+        <div class="adm-actions"><button type="button" class="adm-btn-save" id="btn-save-prix-vente-devis">Enregistrer</button></div>
+      </div>`;
+    const optionsCommerciales = `
+      <div class="adm-tabs">
+        <button type="button" class="adm-tab active" data-tab="option1">Option 1 — Vente directe</button>
+        <button type="button" class="adm-tab" data-tab="option2">Option 2 — Régie</button>
+      </div>
+      <div class="adm-tab-content active" data-content="option1">
+        <div class="adm-card adm-opt1">
+          <div class="adm-card-h">Option 1 — j'achète mes leads</div>
+          <div class="adm-field adm-field-row"><span class="adm-lab">Prix lead HT</span><span class="adm-euro"><input type="text" inputmode="numeric" class="adm-p adm-money" data-p="lead" value="${fmtE(p.lead)}"><i>€</i></span></div>
+          <div class="adm-field adm-field-row"><span class="adm-lab">Taux conversion</span><span class="adm-euro"><input type="text" inputmode="decimal" class="adm-p" data-p="conv" value="${(p.conv*100).toFixed(1)}"><i>%</i></span></div>
+          <div class="adm-cac">CAC <span class="adm-tip adm-tip-dark" data-tip="CAC = Coût d'Acquisition Client. Combien me coûte un client signé. Calcul : prix d'un lead ÷ taux de conversion. Ex : 30 € ÷ 5 % = 600 € pour obtenir une signature.">i</span> : <b id="adm-cac">${eur(cac(p))}</b></div>
+          <div class="adm-field adm-field-row"><span class="adm-lab">Visite technique</span><span class="adm-euro"><input type="text" inputmode="numeric" class="adm-p adm-money" data-p="vt1" value="${fmtE(p.vt1)}"><i>€</i></span></div>
+          <div class="adm-field adm-field-row"><span class="adm-lab">COFRAC</span><span class="adm-euro"><input type="text" inputmode="numeric" class="adm-p adm-money" data-p="cofrac1" value="${fmtE(p.cofrac1)}"><i>€</i></span></div>
+          <div class="adm-field adm-field-row"><span class="adm-lab">Urbanisme</span><span class="adm-euro"><input type="text" inputmode="numeric" class="adm-p adm-money" data-p="urba1" value="${fmtE(p.urba1)}"><i>€</i></span></div>
+        </div>
+      </div>
+      <div class="adm-tab-content" data-content="option2" hidden>
+        <div class="adm-card adm-opt2">
+          <div class="adm-card-h">Option 2 — régie (prix de cession)</div>
+          <p class="adm-opt2-note">Je cède la PAC à la régie à un prix plancher qui garantit ma marge. La régie revend au prix qu'elle veut et garde le surplus.</p>
+          <div class="adm-field adm-field-row"><span class="adm-lab">Visite technique</span><span class="adm-euro"><input type="text" inputmode="numeric" class="adm-p adm-money" data-p="vt2" value="${fmtE(p.vt2)}"><i>€</i></span></div>
+          <div class="adm-field adm-field-row"><span class="adm-lab">COFRAC</span><span class="adm-euro"><input type="text" inputmode="numeric" class="adm-p adm-money" data-p="cofrac2" value="${fmtE(p.cofrac2)}"><i>€</i></span></div>
+          <div class="adm-field adm-field-row"><span class="adm-lab">Urbanisme</span><span class="adm-euro"><input type="text" inputmode="numeric" class="adm-p adm-money" data-p="urba2" value="${fmtE(p.urba2)}"><i>€</i></span></div>
+          <div class="adm-cession-mode"><span class="adm-lab">Marge de cession à ajouter</span><div class="adm-seg"><button type="button" class="adm-seg-btn ${p.cession_mode==='eur'?'active':''}" data-cession="eur">en €</button><button type="button" class="adm-seg-btn ${p.cession_mode==='pct'?'active':''}" data-cession="pct">en %</button></div></div>
+          <div class="adm-field adm-field-row" id="adm-cession-eur" ${p.cession_mode==='pct'?'style="display:none"':''}><span class="adm-lab">Marge cession (€)</span><span class="adm-euro"><input type="text" inputmode="numeric" class="adm-p adm-money" data-p="cession_eur" value="${fmtE(p.cession_eur)}"><i>€</i></span></div>
+          <div class="adm-field adm-field-row" id="adm-cession-pct" ${p.cession_mode!=='pct'?'style="display:none"':''}><span class="adm-lab">Marge cession <span class="adm-tip adm-tip-dark" data-tip="% du prix catalogue HT, pour rester comparable avec l'Option 1.">i</span></span><span class="adm-euro"><input type="text" inputmode="decimal" class="adm-p" data-p="cession_pct" value="${(p.cession_pct*100).toFixed(1)}"><i>%</i></span></div>
+          <div class="adm-field adm-field-row"><span class="adm-lab">Plafond de vente régie <span class="adm-tip adm-tip-dark" data-tip="La régie ne peut pas vendre au client au-delà du prix catalogue TTC majoré de ce pourcentage. Protège ton image prix.">i</span></span><span class="adm-euro"><span class="adm-euro-pre">catalogue +</span><input type="text" inputmode="decimal" class="adm-p" data-p="plafond_pct" value="${(p.plafond_pct*100).toFixed(0)}"><i>%</i></span></div>
+        </div>
+      </div>
+      <div class="adm-actions"><button type="button" class="adm-btn-save" data-save-sous-bloc="5-1">Enregistrer</button></div>`;
+    const modelesMarges = `
+      <div class="adm-table-wrap adm-models-table-wrapper"><table class="adm-table adm-models-table"><thead><tr class="adm-head-group"><th rowspan="2">Modèle</th><th rowspan="2">Prix vente TTC</th><th rowspan="2">Prix vente HT</th><th rowspan="2">Achat HT</th><th rowspan="2">Pose + access.</th><th rowspan="2">Coût de revient</th><th rowspan="2" class="header-option1">Marge brute</th><th rowspan="2" class="adm-th1 header-option1">Marge nette Hexa<br>Option 1</th><th colspan="3" class="adm-grp-regie header-option2">RÉGIE — Option 2</th></tr><tr><th class="adm-th2 sub-header-option2">Prix de cession</th><th class="adm-th2 sub-header-option2">Marge nette Hexa</th><th class="adm-th2b sub-header-option2">Commission régie</th></tr></thead><tbody id="adm-tbody">${rowsHTML}</tbody></table></div>
+      <div class="adm-add-row"><button type="button" class="adm-btn adm-btn-add" id="adm-add">+ Ajouter une pompe à chaleur</button></div>
+      <div class="adm-legend"><div class="adm-legend-row"><span class="adm-dot adm-dot1"></span><span>Option 1 — vente directe : marge brute − CAC − visite − COFRAC − urbanisme.</span></div><div class="adm-legend-row"><span class="adm-dot adm-dot2"></span><span>Option 2 — prix de cession : marge garantie au-dessus de (coût + visite + COFRAC + urbanisme). La régie revend au-dessus et garde le surplus ; la colonne « Commission régie » montre ce qu'elle gagne si elle revend à ton prix catalogue.</span></div></div>
+      <div class="adm-actions"><button type="button" class="adm-btn-save" id="adm-save-catalogue">Enregistrer</button></div>`;
+    const adminBody = `${admBloc('1','1. Réglages généraux',admSousBloc('1-1','1.1 Coût Hexa',coutHexa)+admSousBloc('1-2','1.2 Vente Hexa',venteHexa))}${admBloc('2','2. MPR',admSousBloc('2-1','2.1 Forfait MPR',renderMprFields())+admSousBloc('2-2','2.2 Plafonds réglementaires',renderPlafondsSection()))}${admBloc('3','3. CEE',admSousBloc('3-1','3.1 Formule BAR-TH-171 (PAC Air-Eau)',renderFormuleBarSection())+admSousBloc('3-2','3.2 Bonification CEE',renderBonificationFields())+admSousBloc('3-3','3.3 Délégataires CEE',renderDelegatairesFields()))}${admBloc('4','4. Sous-traitants',renderSousTraitantsSection())}${admBloc('5','5. Commercial',admSousBloc('5-1','5.1 Options commerciales',optionsCommerciales)+admSousBloc('5-2','5.2 Modèles et marges nettes',modelesMarges))}${admBloc('6','6. Modèles email',renderEmailsFields())}${admBloc('7','7. Corbeille des leads','<div id="adm-trash" class="adm-trash-empty">Chargement...</div>')}`;
     return `
       <div class="adm-overlay" id="adm-overlay">
         <div class="adm-modal">
@@ -16290,133 +16495,10 @@ L'équipe Hexa Rénov'</textarea></label>
             <div class="adm-title">⚙ Administration — pilotage tarifaire</div>
             <div class="adm-head-actions">
               <button type="button" class="adm-btn adm-btn-ghost" id="adm-lock">🔒 Verrouiller Admin</button>
-              <button type="button" class="adm-btn adm-btn-primary" id="adm-save">Enregistrer</button>
               <button type="button" class="adm-close" id="adm-close" aria-label="Fermer">&times;</button>
             </div>
           </div>
-          <div class="adm-body">
-
-            <div class="adm-section">Configuration générale</div>
-            <div class="adm-card">
-              <label>URL du script d'appel (Notion)
-                <input type="text" id="adm-script-url" placeholder="https://www.notion.so/..." value="${adminEscape(M3_ADMIN?.script_notion_url || '')}" style="width:100%">
-              </label>
-              <button type="button" class="adm-btn adm-btn-primary" id="adm-save-script-url">Sauvegarder l'URL</button>
-            </div>
-
-            <div class="adm-section">Réglages généraux</div>
-            <p class="adm-opt2-note adm-section-help">
-              Ces valeurs sont vos COÛTS INTERNES (ce que vous payez aux sous-traitants).
-              Elles servent uniquement au calcul de votre marge dans le tableau ci-dessous.
-              Elles ne sont jamais affichées au client.
-            </p>
-            <div class="adm-params">
-              <div class="adm-field"><span class="adm-lab">Coût pose HT (calcul marge)</span><span class="adm-euro"><input type="text" inputmode="numeric" class="adm-p adm-money" data-p="pose" value="${fmtE(p.pose)}"><i>€</i></span></div>
-              <div class="adm-field"><span class="adm-lab">Coût accessoires HT (calcul marge)</span><span class="adm-euro"><input type="text" inputmode="numeric" class="adm-p adm-money" data-p="acc" value="${fmtE(p.acc)}"><i>€</i></span></div>
-              <div class="adm-field"><span class="adm-lab">TVA (5,5% par défaut)</span><span class="adm-euro"><input type="text" inputmode="decimal" class="adm-p" data-p="tva" value="${(p.tva*100).toFixed(1)}"><i>%</i></span></div>
-            </div>
-
-            <div class="adm-section-block" data-section="prix-vente-devis">
-              <div class="adm-section">Prix de vente (devis client)</div>
-              <div class="adm-card">
-                <div class="adm-fields-row">
-                <label>Prix vente Pose HT (devis)
-                  <input type="number" id="adm-prix-vente-pose-ht" value="${adminEscape(c.prix_vente_devis?.prix_pose_ht ?? 3500)}" step="50">
-                  <span class="adm-unit">€ HT</span>
-                </label>
-                <label>Prix vente Travaux induits HT (devis)
-                  <input type="number" id="adm-prix-vente-travaux-ht" value="${adminEscape(c.prix_vente_devis?.prix_travaux_induits_ht ?? 1200)}" step="50">
-                  <span class="adm-unit">€ HT</span>
-                </label>
-                <label>Frais ECAIR (% sur MPR)
-                  <input type="number" id="adm-frais-ecair-pct" value="${adminEscape(c.prix_vente_devis?.frais_ecair_pct ?? 12)}" step="0.1" min="0" max="100">
-                  <span class="adm-unit">%</span>
-                </label>
-                </div>
-                <p class="adm-section-help">
-                  Ces 2 prix apparaissent sur le devis envoyé au client. Les frais ECAIR sont
-                  un coût interne (jamais visible client) qui affecte la marge.
-                </p>
-                <button type="button" class="adm-btn-save" id="btn-save-prix-vente-devis">Sauvegarder</button>
-              </div>
-            </div>
-
-            <div class="adm-section">Options commerciales</div>
-            <div class="adm-tabs">
-              <button type="button" class="adm-tab active" data-tab="option1">Option 1 — Vente directe</button>
-              <button type="button" class="adm-tab" data-tab="option2">Option 2 — Régie</button>
-            </div>
-            <div class="adm-tab-content active" data-content="option1">
-              <div class="adm-card adm-opt1">
-                <div class="adm-card-h">Option 1 — j'achète mes leads</div>
-                <div class="adm-field adm-field-row"><span class="adm-lab">Prix lead HT</span><span class="adm-euro"><input type="text" inputmode="numeric" class="adm-p adm-money" data-p="lead" value="${fmtE(p.lead)}"><i>€</i></span></div>
-                <div class="adm-field adm-field-row"><span class="adm-lab">Taux conversion</span><span class="adm-euro"><input type="text" inputmode="decimal" class="adm-p" data-p="conv" value="${(p.conv*100).toFixed(1)}"><i>%</i></span></div>
-                <div class="adm-cac">CAC <span class="adm-tip adm-tip-dark" data-tip="CAC = Coût d'Acquisition Client. Combien me coûte un client signé. Calcul : prix d'un lead ÷ taux de conversion. Ex : 30 € ÷ 5 % = 600 € pour obtenir une signature.">i</span> : <b id="adm-cac">${eur(cac(p))}</b></div>
-                <div class="adm-field adm-field-row"><span class="adm-lab">Visite technique</span><span class="adm-euro"><input type="text" inputmode="numeric" class="adm-p adm-money" data-p="vt1" value="${fmtE(p.vt1)}"><i>€</i></span></div>
-                <div class="adm-field adm-field-row"><span class="adm-lab">COFRAC</span><span class="adm-euro"><input type="text" inputmode="numeric" class="adm-p adm-money" data-p="cofrac1" value="${fmtE(p.cofrac1)}"><i>€</i></span></div>
-                <div class="adm-field adm-field-row"><span class="adm-lab">Urbanisme</span><span class="adm-euro"><input type="text" inputmode="numeric" class="adm-p adm-money" data-p="urba1" value="${fmtE(p.urba1)}"><i>€</i></span></div>
-              </div>
-            </div>
-            <div class="adm-tab-content" data-content="option2" hidden>
-              <div class="adm-card adm-opt2">
-                <div class="adm-card-h">Option 2 — régie (prix de cession)</div>
-                <p class="adm-opt2-note">Je cède la PAC à la régie à un prix plancher qui garantit ma marge. La régie revend au prix qu'elle veut et garde le surplus.</p>
-                <div class="adm-field adm-field-row"><span class="adm-lab">Visite technique</span><span class="adm-euro"><input type="text" inputmode="numeric" class="adm-p adm-money" data-p="vt2" value="${fmtE(p.vt2)}"><i>€</i></span></div>
-                <div class="adm-field adm-field-row"><span class="adm-lab">COFRAC</span><span class="adm-euro"><input type="text" inputmode="numeric" class="adm-p adm-money" data-p="cofrac2" value="${fmtE(p.cofrac2)}"><i>€</i></span></div>
-                <div class="adm-field adm-field-row"><span class="adm-lab">Urbanisme</span><span class="adm-euro"><input type="text" inputmode="numeric" class="adm-p adm-money" data-p="urba2" value="${fmtE(p.urba2)}"><i>€</i></span></div>
-                <div class="adm-cession-mode">
-                  <span class="adm-lab">Marge de cession à ajouter</span>
-                  <div class="adm-seg">
-                    <button type="button" class="adm-seg-btn ${p.cession_mode==='eur'?'active':''}" data-cession="eur">en €</button>
-                    <button type="button" class="adm-seg-btn ${p.cession_mode==='pct'?'active':''}" data-cession="pct">en %</button>
-                  </div>
-                </div>
-                <div class="adm-field adm-field-row" id="adm-cession-eur" ${p.cession_mode==='pct'?'style="display:none"':''}><span class="adm-lab">Marge cession (€)</span><span class="adm-euro"><input type="text" inputmode="numeric" class="adm-p adm-money" data-p="cession_eur" value="${fmtE(p.cession_eur)}"><i>€</i></span></div>
-                <div class="adm-field adm-field-row" id="adm-cession-pct" ${p.cession_mode!=='pct'?'style="display:none"':''}><span class="adm-lab">Marge cession <span class="adm-tip adm-tip-dark" data-tip="% du prix catalogue HT, pour rester comparable avec l'Option 1.">i</span></span><span class="adm-euro"><input type="text" inputmode="decimal" class="adm-p" data-p="cession_pct" value="${(p.cession_pct*100).toFixed(1)}"><i>%</i></span></div>
-                <div class="adm-field adm-field-row"><span class="adm-lab">Plafond de vente régie <span class="adm-tip adm-tip-dark" data-tip="La régie ne peut pas vendre au client au-delà du prix catalogue TTC majoré de ce pourcentage. Protège ton image prix.">i</span></span><span class="adm-euro"><span class="adm-euro-pre">catalogue +</span><input type="text" inputmode="decimal" class="adm-p" data-p="plafond_pct" value="${(p.plafond_pct*100).toFixed(0)}"><i>%</i></span></div>
-              </div>
-            </div>
-
-            <div class="adm-section">Modèles & marges nettes</div>
-            <div class="adm-table-wrap adm-models-table-wrapper">
-              <table class="adm-table adm-models-table">
-                <thead>
-                  <tr class="adm-head-group">
-                    <th rowspan="2">Modèle</th>
-                    <th rowspan="2">Prix vente TTC</th>
-                    <th rowspan="2">Prix vente HT</th>
-                    <th rowspan="2">Achat HT</th>
-                    <th rowspan="2">Pose + access.</th>
-                    <th rowspan="2">Coût de revient</th>
-                    <th rowspan="2" class="header-option1">Marge brute</th>
-                    <th rowspan="2" class="adm-th1 header-option1">Marge nette Hexa<br>Option 1</th>
-                    <th colspan="3" class="adm-grp-regie header-option2">RÉGIE — Option 2</th>
-                  </tr>
-                  <tr>
-                    <th class="adm-th2 sub-header-option2">Prix de cession</th>
-                    <th class="adm-th2 sub-header-option2">Marge nette Hexa</th>
-                    <th class="adm-th2b sub-header-option2">Commission régie</th>
-                  </tr>
-                </thead>
-                <tbody id="adm-tbody">${rowsHTML}</tbody>
-              </table>
-            </div>
-            <div class="adm-add-row">
-              <button type="button" class="adm-btn adm-btn-add" id="adm-add">+ Ajouter une pompe à chaleur</button>
-            </div>
-            <div class="adm-legend">
-              <div class="adm-legend-row"><span class="adm-dot adm-dot1"></span><span>Option 1 — vente directe : marge brute − CAC − visite − COFRAC − urbanisme.</span></div>
-              <div class="adm-legend-row"><span class="adm-dot adm-dot2"></span><span>Option 2 — prix de cession : marge garantie au-dessus de (coût + visite + COFRAC + urbanisme). La régie revend au-dessus et garde le surplus ; la colonne « Commission régie » montre ce qu'elle gagne si elle revend à ton prix catalogue.</span></div>
-            </div>
-
-            ${renderAdminM3Section()}
-
-            ${renderSousTraitantsSection()}
-
-            <div class="adm-section">Corbeille</div>
-            <div id="adm-trash" class="adm-trash-empty">Chargement...</div>
-            </div>
-          </div>
+          <div class="adm-body">${adminBody}</div>
         </div>
       </div>`;
   }
@@ -16588,6 +16670,77 @@ L'équipe Hexa Rénov'</textarea></label>
     });
   }
 
+  function saveAccordionState(){
+    const state = {};
+    document.querySelectorAll('.adm-bloc').forEach(bloc => {
+      state[`bloc_${bloc.dataset.blocId}`] = bloc.dataset.open === 'true';
+    });
+    document.querySelectorAll('.adm-sous-bloc').forEach(sb => {
+      state[`sous_bloc_${sb.dataset.sousBlocId}`] = sb.dataset.open === 'true';
+    });
+    try { localStorage.setItem('admAccordionState', JSON.stringify(state)); } catch(_) {}
+  }
+  function restoreAccordionState(){
+    let state = {};
+    try { state = JSON.parse(localStorage.getItem('admAccordionState') || '{}'); } catch(_) { state = {}; }
+    Object.entries(state).forEach(([key, isOpen]) => {
+      if (!isOpen) return;
+      if (key.startsWith('bloc_')) {
+        const id = key.replace('bloc_', '');
+        const content = document.getElementById(`adm-bloc-content-${id}`);
+        const bloc = document.querySelector(`.adm-bloc[data-bloc-id="${id}"]`);
+        if (content && bloc) { content.hidden = false; bloc.dataset.open = 'true'; }
+      }
+      if (key.startsWith('sous_bloc_')) {
+        const id = key.replace('sous_bloc_', '');
+        const content = document.getElementById(`adm-sous-bloc-content-${id}`);
+        const sb = document.querySelector(`.adm-sous-bloc[data-sous-bloc-id="${id}"]`);
+        if (content && sb) { content.hidden = false; sb.dataset.open = 'true'; }
+      }
+    });
+  }
+  function bindAccordions(){
+    document.querySelectorAll('[data-toggle-bloc]').forEach(header => {
+      header.addEventListener('click', () => {
+        const id = header.dataset.toggleBloc;
+        const content = document.getElementById(`adm-bloc-content-${id}`);
+        const bloc = header.closest('.adm-bloc');
+        if (!content || !bloc) return;
+        const isOpen = !content.hidden;
+        content.hidden = isOpen;
+        bloc.dataset.open = String(!isOpen);
+        saveAccordionState();
+      });
+    });
+    document.querySelectorAll('[data-toggle-sous-bloc]').forEach(header => {
+      header.addEventListener('click', () => {
+        const id = header.dataset.toggleSousBloc;
+        const content = document.getElementById(`adm-sous-bloc-content-${id}`);
+        const sb = header.closest('.adm-sous-bloc');
+        if (!content || !sb) return;
+        const isOpen = !content.hidden;
+        content.hidden = isOpen;
+        sb.dataset.open = String(!isOpen);
+        saveAccordionState();
+      });
+    });
+    restoreAccordionState();
+  }
+  async function saveCatalogueAdmin(){
+    const payload = (window.HexaConfig?.models || []).map((m)=>Object.assign({}, m));
+    const server = await saveCatalogueToServer(payload);
+    if (server.ok) {
+      persistCatalogueLocal(payload);
+      saveConfig(false);
+      window.dispatchEvent(new CustomEvent('hexa-config-changed'));
+      adminToast('✓ Paramètres enregistrés', '#0D6B3B');
+    } else {
+      saveConfig(false);
+      window.dispatchEvent(new CustomEvent('hexa-config-changed'));
+      adminToast("❌ Erreur lors de l'enregistrement", '#B91C1C');
+    }
+  }
+
   function bind(){
     const num = v => parseFloat(String(v).replace(/\s/g,'').replace(',','.'))||0;
     // Filtre : les champs numériques n'acceptent que chiffres, espace, virgule, point
@@ -16616,7 +16769,6 @@ L'équipe Hexa Rénov'</textarea></label>
         else if (f==='tva'||f==='conv'||f==='cession_pct'||f==='plafond_pct') window.HexaConfig.params[f] = num(el.value)/100;
         else window.HexaConfig.params[f] = num(el.value);
         recalc();
-        saveConfig(false);
       });
       if (el.classList.contains('adm-money')){
         el.addEventListener('focus', ()=>{ const v=num(el.value); el.value=v?String(v):''; });
@@ -16669,6 +16821,21 @@ L'équipe Hexa Rénov'</textarea></label>
       });
     });
     document.getElementById('btn-save-sous-traitants')?.addEventListener('click', saveSousTraitants);
+    document.querySelector('[data-save-sous-bloc="1-1"]')?.addEventListener('click', async ()=>{
+      const cfg = window.HexaConfig || loadConfig();
+      cfg.prix_vente_devis = Object.assign({}, cfg.prix_vente_devis || {}, { frais_ecair_pct: Number(document.getElementById('adm-frais-ecair-pct')?.value || 0) });
+      cfg.params.frais_ecair_pct = cfg.prix_vente_devis.frais_ecair_pct;
+      const url = document.getElementById('adm-script-url')?.value || '';
+      const r = await fetch('/api/admin/config', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ script_notion_url:url }) });
+      await saveAdminParamsServer();
+      if (r.ok) { M3_ADMIN = M3_ADMIN || {}; M3_ADMIN.script_notion_url = url; window.updateScriptAppelButton?.(url); adminToast('✓ Paramètres enregistrés', '#0D6B3B'); }
+      else adminToast("❌ Erreur lors de l'enregistrement", '#B91C1C');
+    });
+    document.querySelector('[data-save-sous-bloc="5-1"]')?.addEventListener('click', ()=>{
+      saveConfig(false);
+      adminToast('✓ Paramètres enregistrés', '#0D6B3B');
+    });
+    document.getElementById('adm-save-catalogue')?.addEventListener('click', saveCatalogueAdmin);
     document.querySelectorAll('.adm-tab').forEach(tab => {
       tab.addEventListener('click', function() {
         const target = this.dataset.tab;
@@ -16680,29 +16847,7 @@ L'équipe Hexa Rénov'</textarea></label>
       });
     });
     document.getElementById('adm-overlay').addEventListener('click', e=>{ if(e.target.id==='adm-overlay') close(); });
-    document.getElementById('adm-save').addEventListener('click', async ()=>{
-      const b=document.getElementById('adm-save');
-      const t=b.textContent;
-      b.disabled = true;
-      b.textContent='Sauvegarde...';
-
-      const payload = (window.HexaConfig?.models || []).map((m)=>Object.assign({}, m));
-      const server = await saveCatalogueToServer(payload);
-      if (server.ok) {
-        persistCatalogueLocal(payload);
-        saveConfig(false);
-        window.dispatchEvent(new CustomEvent('hexa-config-changed'));
-        adminToast('Catalogue sauvegardé sur le serveur ✓', '#0D6B3B');
-        b.textContent='✓ Enregistré';
-      } else {
-        // filet local même en cas d'échec serveur
-        saveConfig(false);
-        window.dispatchEvent(new CustomEvent('hexa-config-changed'));
-        adminToast(`Erreur sauvegarde serveur: ${server.error}`, '#B91C1C');
-        b.textContent='⚠ Enregistré localement';
-      }
-      setTimeout(()=>{ b.textContent=t; b.disabled=false; }, 1800);
-    });
+    bindAccordions();
     const addBtn=document.getElementById('adm-add');
     if(addBtn) addBtn.addEventListener('click', openAddForm);
     // segmented control marge de cession € / %
@@ -16824,6 +16969,42 @@ L'équipe Hexa Rénov'</textarea></label>
         if (!M3_ADMIN.delegataires.some(d=>d.actif) && M3_ADMIN.delegataires[0]) M3_ADMIN.delegataires[0].actif = true;
         rerenderBody();
       });
+    });
+    document.getElementById('adm-save-mpr')?.addEventListener('click', async ()=>{
+      const forfaits_mpr = {};
+      document.querySelectorAll('.adm-m3-mpr').forEach(input=>{ forfaits_mpr[input.dataset.cat] = Number(String(input.value).replace(/\s/g,'').replace(',','.')) || 0; });
+      const r = await fetch('/api/admin/m3', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ forfaits_mpr }) });
+      if (r.ok) { M3_ADMIN.forfaits_mpr = forfaits_mpr; adminToast('✓ Paramètres enregistrés', '#0D6B3B'); window.dispatchEvent(new CustomEvent('hexa-config-changed')); }
+      else adminToast("❌ Erreur lors de l'enregistrement", '#B91C1C');
+    });
+    document.getElementById('adm-save-bonif')?.addEventListener('click', async ()=>{
+      const bonification_cee = { actif: !!document.getElementById('adm-bonif-actif')?.checked, multiplicateur: Number(document.getElementById('adm-bonif-mult')?.value || 5) };
+      const r = await fetch('/api/admin/m3', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ bonification_cee }) });
+      if (r.ok) { M3_ADMIN.bonification_cee = bonification_cee; adminToast('✓ Paramètres enregistrés', '#0D6B3B'); window.dispatchEvent(new CustomEvent('hexa-config-changed')); }
+      else adminToast("❌ Erreur lors de l'enregistrement", '#B91C1C');
+    });
+    document.getElementById('adm-save-delegataires')?.addEventListener('click', async ()=>{
+      const delegataires = Array.from(document.querySelectorAll('.adm-delegataire-row')).map((row)=>({
+        nom: row.querySelector('.adm-del-nom')?.value || '',
+        mwh_precaire: Number(String(row.querySelector('.adm-del-precaire')?.value || '').replace(',','.')) || 0,
+        mwh_classique: Number(String(row.querySelector('.adm-del-classique')?.value || '').replace(',','.')) || 0,
+        actif: !!row.querySelector('.adm-del-actif')?.checked
+      }));
+      const r = await fetch('/api/admin/m3', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ delegataires }) });
+      if (r.ok) { M3_ADMIN.delegataires = delegataires; adminToast('✓ Paramètres enregistrés', '#0D6B3B'); window.dispatchEvent(new CustomEvent('hexa-config-changed')); }
+      else adminToast("❌ Erreur lors de l'enregistrement", '#B91C1C');
+    });
+    document.getElementById('adm-save-emails')?.addEventListener('click', async ()=>{
+      const modeles_email = Array.from(document.querySelectorAll('[data-email-i]')).map((card,i)=>({
+        id: 'modele_' + (i+1),
+        label: card.querySelector('.adm-email-titre')?.value || ('Modèle ' + (i+1)),
+        titre: card.querySelector('.adm-email-titre')?.value || '',
+        sujet: card.querySelector('.adm-email-sujet')?.value || '',
+        contenu: card.querySelector('.adm-email-contenu')?.value || ''
+      }));
+      const r = await fetch('/api/admin/m3', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ modeles_email }) });
+      if (r.ok) { M3_ADMIN.modeles_email = modeles_email; adminToast('✓ Paramètres enregistrés', '#0D6B3B'); }
+      else adminToast("❌ Erreur lors de l'enregistrement", '#B91C1C');
     });
     document.getElementById('adm-save-m3')?.addEventListener('click', async ()=>{
       const forfaits_mpr = {};
