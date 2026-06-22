@@ -3017,6 +3017,24 @@ body.panel-is-open {
     .field-error:focus {
       outline-color: #dc2626;
     }
+    .hint-required {
+      display: block;
+      font-size: 10px;
+      color: #6b7280;
+      font-style: italic;
+      margin-top: -2px;
+      margin-bottom: 2px;
+    }
+    .duplicate-modal-overlay{position:fixed;inset:0;z-index:5600;background:rgba(8,20,40,.55);display:flex;align-items:center;justify-content:center;padding:20px}
+    .duplicate-modal{max-width:600px;width:100%;background:#fff;border-radius:12px;padding:20px;box-shadow:0 20px 60px rgba(0,46,90,.25)}
+    .duplicate-intro{color:#ef4444;font-weight:600;margin-bottom:16px}
+    .duplicate-list{max-height:400px;overflow-y:auto;margin:12px 0}
+    .duplicate-card{border:1px solid #fca5a5;border-radius:8px;padding:12px;margin-bottom:8px;background:#fef2f2}
+    .duplicate-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;font-size:14px;gap:8px}
+    .duplicate-reason{font-size:11px;color:#dc2626;font-weight:600;background:#fee2e2;padding:2px 6px;border-radius:4px}
+    .duplicate-details{font-size:12px;color:#4b5563;line-height:1.6}
+    .duplicate-open-btn{margin-top:8px;padding:6px 12px;background:#002E5A;color:white;border:none;border-radius:4px;cursor:pointer;font-size:12px}
+    .duplicate-open-btn:hover{background:#001f3f}
 
     /* Champs calculés (zone, réseau hydraulique) */
     .field-auto {
@@ -6972,6 +6990,22 @@ input:focus{ outline:none; border-color: var(--c-navy,#002E5A); box-shadow:0 0 0
 .adm-tab.active { color:#002E5A; border-bottom-color:#E2214B; }
 .adm-tab-content { display:block; }
 .adm-tab-content[hidden] { display:none; }
+.adm-section-block { margin-top: 18px; }
+.adm-section-header { display:flex; justify-content:space-between; align-items:flex-start; gap:16px; }
+.adm-subsection { background:#fff; border:1px solid #e5e7eb; border-radius:10px; padding:14px 16px; margin:12px 0; }
+.adm-subsection h3 { margin:0 0 10px; font-size:13px; color:#002E5A; }
+.adm-toggle-label { display:flex; align-items:center; gap:8px; font-size:13px; font-weight:700; color:#002E5A; }
+.adm-hint, .adm-hint-inline { font-size:11.5px; color:#6b7280; line-height:1.45; margin:6px 0 0; }
+.adm-hint-inline { margin:4px 0 0; }
+.adm-bareme-table { width:100%; border-collapse:collapse; font-size:12px; background:#fff; }
+.adm-bareme-table th { background:#f3f4f6; color:#374151; font-weight:700; padding:8px; border-bottom:1px solid #d1d5db; text-align:left; }
+.adm-bareme-table td { padding:6px 8px; border-bottom:1px solid #f3f4f6; vertical-align:middle; }
+.adm-bareme-table input, .adm-bareme-table select { width:100%; box-sizing:border-box; border:1px solid #d1d5db; border-radius:5px; padding:6px 8px; font-size:12px; }
+.adm-bareme-table input[type="checkbox"] { width:auto; }
+.adm-row-delete { border:none; background:#fee2e2; color:#b91c1c; border-radius:5px; padding:5px 8px; cursor:pointer; }
+.adm-input-with-unit { display:flex; align-items:center; gap:8px; }
+.adm-input-with-unit input { max-width:180px; }
+.adm-actions { margin-top:10px; display:flex; justify-content:flex-start; }
 .modal-large {
   width: 90%;
   max-width: 800px;
@@ -8355,6 +8389,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
 
   function q(sel, root) { return (root || document).querySelector(sel); }
   function qa(sel, root) { return Array.from((root || document).querySelectorAll(sel)); }
+  function escapeHtml(v) { return String(v ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c])); }
   function cardTitleText(card) { return (q('.card-title', card)?.textContent || '').trim(); }
   function findCard(re, root) { return qa('.card', root).find(c => re.test(cardTitleText(c))); }
   function fieldByName(name, root) {
@@ -8694,6 +8729,27 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       if (card) fieldset.appendChild(card);
     });
     bindDevisProspectFields(form);
+    reduceRequiredFieldsForSave(form);
+  }
+
+  function reduceRequiredFieldsForSave(form) {
+    const requiredForSave = new Set(['nom', 'prenom', 'telephone', 'email']);
+    form.querySelectorAll('[name]').forEach(el => {
+      const name = el.getAttribute('name');
+      if (!requiredForSave.has(name)) el.removeAttribute('required');
+      const field = el.closest('.field');
+      const label = field?.querySelector('label');
+      if (!label) return;
+      label.querySelectorAll('.req').forEach(req => req.remove());
+      if (requiredForSave.has(name)) {
+        label.insertAdjacentHTML('beforeend', ' <span class="req">*</span>');
+      } else if ([
+        'adresse_chantier','code_postal_chantier','ville_chantier','type_logement','surface_logement_m2',
+        'hsp','mode_chauffage','type_emetteurs','alimentation_electrique','categorie'
+      ].includes(name) && !field.querySelector('.hint-required')) {
+        label.insertAdjacentHTML('afterend', '<span class="hint-required">Requis pour le devis</span>');
+      }
+    });
   }
 
   function bindDevisProspectFields(form) {
@@ -11640,16 +11696,15 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
 
   function validerFormulaire() {
     const champsManquants = [];
-    form.querySelectorAll('input[required], select[required], textarea[required]').forEach(input => {
+    ['nom', 'prenom', 'telephone', 'email'].forEach(name => {
+      const input = form.querySelector(`[name="${name}"]`);
       const field = input.closest('.field');
       const labelEl = field?.querySelector('label');
       const label = (field?.dataset.label || labelEl?.innerText || input.name || 'Champ obligatoire')
         .replace(/\*/g, '')
         .replace(/\s+/g, ' ')
         .trim();
-      const missing = input.tagName === 'SELECT'
-        ? (!input.value || input.selectedIndex === 0)
-        : !(input.value || '').trim();
+      const missing = !(input.value || '').trim();
       if (missing) {
         champsManquants.push(label);
         field?.classList.add('error');
@@ -11680,29 +11735,6 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       }
     });
 
-    const categorie = form.querySelector('[name="categorie"]');
-    if (categorie && !String(categorie.value || '').trim()) {
-      champsManquants.push('Catégorie de revenu');
-      categorie.closest('.field')?.classList.add('error');
-    }
-
-    if (form.querySelector('[name="usage_bien"]')?.value === 'bailleur') {
-      [
-        ['adresse_personne', 'Adresse du propriétaire'],
-        ['code_postal_personne', 'CP du propriétaire'],
-        ['ville_personne', 'Ville du propriétaire']
-      ].forEach(([name, label]) => {
-        const input = form.querySelector(`[name="${name}"]`);
-        if (!String(input?.value || '').trim()) {
-          champsManquants.push(label);
-          input?.closest('.field')?.classList.add('error');
-          input?.classList.add('field-error');
-        } else {
-          input?.classList.remove('field-error');
-        }
-      });
-    }
-
     return [...new Set(champsManquants)];
   }
 
@@ -11719,7 +11751,66 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     }, 2600);
   }
 
-  function onSaveClick(e) {
+  async function checkDuplicatesBeforeSave() {
+    const telephone = document.querySelector('[name="telephone"]')?.value?.trim();
+    const email = document.querySelector('[name="email"]')?.value?.trim();
+    const currentNumero = (document.body.dataset.prospectNumero || '').trim();
+    if (!telephone && !email) return null;
+    const params = new URLSearchParams();
+    if (telephone) params.set('telephone', telephone);
+    if (email) params.set('email', email);
+    if (currentNumero) params.set('exclude_numero', currentNumero);
+    try {
+      const res = await fetch(`/api/leads/check-duplicate?${params}`);
+      const data = await res.json();
+      return data.duplicates && data.duplicates.length > 0 ? data.duplicates : null;
+    } catch(e) {
+      console.warn('Vérification doublon échouée', e);
+      return null;
+    }
+  }
+  function showDuplicateModal(duplicates, onContinue) {
+    document.getElementById('modal-duplicate-alert')?.remove();
+    const wrap = document.createElement('div');
+    wrap.id = 'modal-duplicate-alert';
+    wrap.className = 'duplicate-modal-overlay';
+    wrap.innerHTML = `
+      <div class="duplicate-modal">
+        <h3>⚠ Prospect existant détecté</h3>
+        <p class="duplicate-intro">Un ou plusieurs prospects existent déjà avec les mêmes coordonnées :</p>
+        <div id="duplicate-list" class="duplicate-list"></div>
+        <div class="modal-actions">
+          <button type="button" class="adm-btn adm-btn-cancel" id="btn-duplicate-continue">Continuer (créer un doublon)</button>
+          <button type="button" class="adm-btn adm-btn-primary" id="btn-duplicate-cancel">Annuler</button>
+        </div>
+      </div>`;
+    document.body.appendChild(wrap);
+    const list = document.getElementById('duplicate-list');
+    list.innerHTML = duplicates.map(d => {
+      const reasonText = (d.match_reason || []).map(r => r === 'telephone' ? '📞 même téléphone' : '📧 même email').join(' + ');
+      return `<div class="duplicate-card">
+        <div class="duplicate-header"><strong>${escapeHtml(d.numero || '')}</strong> — ${escapeHtml(d.prenom || '')} ${escapeHtml(d.nom || '')}<span class="duplicate-reason">${reasonText}</span></div>
+        <div class="duplicate-details">
+          <div>📞 ${escapeHtml(d.telephone || '—')}</div>
+          <div>📧 ${escapeHtml(d.email || '—')}</div>
+          <div>📍 ${escapeHtml(d.adresse || '')}, ${escapeHtml(d.cp_chantier || '')} ${escapeHtml(d.ville || '')}</div>
+          <div>🟢 Statut : ${escapeHtml(d.statut || 'nouveau')}</div>
+        </div>
+        <button type="button" class="duplicate-open-btn" data-numero="${escapeHtml(d.numero || '')}">Ouvrir cette fiche</button>
+      </div>`;
+    }).join('');
+    document.getElementById('btn-duplicate-continue').onclick = () => { wrap.remove(); onContinue(); };
+    document.getElementById('btn-duplicate-cancel').onclick = () => wrap.remove();
+    list.querySelectorAll('.duplicate-open-btn').forEach(btn => {
+      btn.onclick = () => {
+        const numero = btn.dataset.numero;
+        wrap.remove();
+        if (numero) window.openFicheByNumero?.(numero);
+      };
+    });
+  }
+
+  async function onSaveClick(e) {
     // Toujours re-cibler les noeuds actifs (PJAX / toggle édition)
     btnSave = document.getElementById('btn-save');
     form = document.getElementById('form-prospect');
@@ -11759,6 +11850,17 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     const url = prospectNumero
       ? `/api/leads/${encodeURIComponent(prospectNumero)}`
       : '/api/leads';
+    if (!window.__skipDuplicateCheck) {
+      const duplicates = await checkDuplicatesBeforeSave();
+      if (duplicates && duplicates.length) {
+        showDuplicateModal(duplicates, () => {
+          window.__skipDuplicateCheck = true;
+          onSaveClick({ preventDefault(){} });
+        });
+        return;
+      }
+    }
+    window.__skipDuplicateCheck = false;
     const rcSync = document.getElementById('registre-copro-hidden-sync');
     const rcSel = document.getElementById('registre-copro-select');
     if (rcSync && rcSel) rcSync.value = rcSel.value || rcSync.value;
@@ -14246,6 +14348,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     zone_detail: '',
     cp_chantier: '',
     energie_avant: '',             // fioul | gaz | bois | electricite (lu fiche)
+    type_logement: '',
     surface_habitable: null,
     surface_chauffee: null,
     surface_forcee: false,
@@ -14507,6 +14610,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       alimentation: state.phase_electrique || '',
       alimentation_electrique: state.phase_electrique || '',
       categorie_revenu: state.categorie || '',
+      type_logement: state.type_logement || '',
       surface_chauffee: state.surface_chauffee || '',
       option: state.option || ''
     };
@@ -14545,6 +14649,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       if (saved.iso_menuiserie) state.iso_menuiserie = saved.iso_menuiserie;
       if (saved.alimentation_electrique || saved.alimentation) state.phase_electrique = saved.alimentation_electrique || saved.alimentation;
       if (saved.categorie_revenu) state.categorie = saved.categorie_revenu;
+      if (saved.type_logement) state.type_logement = saved.type_logement;
       if (saved.surface_chauffee) { state.surface_chauffee = Number(saved.surface_chauffee); state.surface_forcee = true; }
       if (saved.option) state.option = saved.option;
       state.modele_force = !!saved.modele_pac_id;
@@ -14608,6 +14713,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     state.zone_detail = '';
     state.cp_chantier = '';
     state.energie_avant = '';
+    state.type_logement = '';
     state.phase_electrique = '';
     state.altitude = null;
     state.surface_habitable = null;
@@ -14641,6 +14747,8 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     // Énergie avant (bloc 7)
     const mc = document.querySelector('select[name="mode_chauffage"]')?.value;
     if (mc) state.energie_avant = mc;
+    const typeLogement = document.querySelector('[name="type_logement"]')?.value;
+    if (typeLogement) state.type_logement = typeLogement;
     const phase = document.querySelector('[name="alimentation_electrique"]')?.value
       || document.getElementById('phase-input')?.value
       || document.querySelector('[name="phase_electrique"]')?.value;
@@ -14676,25 +14784,93 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     return capital*i/(1-Math.pow(1+i,-nMois));
   }
 
+  function calculerCeeBarTh171(state, formule, m3Config) {
+    let typeLogement = state.type_logement || '';
+    if (typeLogement.toLowerCase().includes('maison')) typeLogement = 'Maison';
+    else if (typeLogement.toLowerCase().includes('appart')) typeLogement = 'Appartement';
+    else return { montant: 0, erreur: 'Type logement inconnu' };
+
+    const etas = Number(state.etas) || 140;
+    const surface = Number(state.surface_chauffee) || 0;
+    const zone = state.zone || 'H2';
+    const categorie = state.categorie || 'modeste';
+    if (etas < 111) return { montant: 0, erreur: 'ETAS insuffisant' };
+
+    const ligneBase = (formule.tableau_montant_base || []).find(l =>
+      l.actif && l.logement === typeLogement && Number(l.etas_min) <= etas && etas <= Number(l.etas_max)
+    );
+    if (!ligneBase) return { montant: 0, erreur: 'Montant base non trouvé' };
+
+    const ligneSurface = (formule.tableau_facteur_surface || []).find(l =>
+      l.actif && l.logement === typeLogement && Number(l.surface_min) <= surface && surface <= Number(l.surface_max)
+    );
+    if (!ligneSurface) return { montant: 0, erreur: 'Facteur surface non trouvé' };
+
+    const ligneZone = (formule.tableau_facteur_zone || []).find(l =>
+      l.actif && l.zone === zone
+    );
+    if (!ligneZone) return { montant: 0, erreur: 'Facteur zone non trouvé' };
+
+    const kwhc = Number(ligneBase.montant_kwhc || 0) * Number(ligneSurface.facteur || 0) * Number(ligneZone.facteur || 0);
+    const mwhc = kwhc / 1000;
+    const delegataire = (m3Config.delegataires || []).find(d => d.actif);
+    if (!delegataire) return { montant: 0, erreur: 'Aucun délégataire actif' };
+    const prixUnitaire = categorie === 'tres_modeste'
+      ? Number(delegataire.mwh_precaire || 0)
+      : Number(delegataire.mwh_classique || 0);
+    const bonif = m3Config.bonification_cee || {};
+    const mult = bonif.actif ? Number(bonif.multiplicateur || 1) : 1;
+    const montant = Math.round(mwhc * prixUnitaire * mult * 100) / 100;
+    return { montant, erreur: null, details: { typeLogement, etas, surface, zone, categorie, kwhc, mwhc, prixUnitaire, mult } };
+  }
+
   async function calcul(){
     if (Object.keys(GRILLE).length === 0 || !CATALOGUE_PAC.length) { await chargerBaremes(); }
     const dim = syncDimensionnement();
     const contextePret = !!state.categorie && !!state.zone && Number.isFinite(dim.surface_chauffee) && dim.surface_chauffee > 0;
     const sKey = trancheSurface(state.surface_chauffee);
     const node = GRILLE[state.etas]?.[sKey];
-    let ceeDevis    = contextePret ? (node?.cee_devis?.[state.zone]?.[state.categorie] ?? 0) : 0;
-    const ceeConserve = contextePret ? (node?.cee_conserve?.[state.zone]?.[state.categorie] ?? 0) : 0;
+    let ceeBrut = 0;
     let mprDevis    = contextePret ? (node?.mpr_devis?.[state.zone]?.[state.categorie] ?? 0) : 0;
     if (M3_CONFIG?.forfaits_mpr && state.categorie in M3_CONFIG.forfaits_mpr) {
       mprDevis = Number(M3_CONFIG.forfaits_mpr[state.categorie]) || 0;
     }
-    const actif = (M3_CONFIG?.delegataires || []).find(d => d.actif);
-    if (actif && Number.isFinite(Number(state.surface_chauffee))) {
-      const mwh = Math.max(Number(state.surface_chauffee || 0) / 10, 1);
-      const unit = state.categorie === 'tres_modeste' ? Number(actif.mwh_precaire || 0) : Number(actif.mwh_classique || 0);
-      ceeDevis = Math.round(mwh * unit * 10);
-      if (M3_CONFIG?.bonification_cee?.actif) ceeDevis *= Number(M3_CONFIG.bonification_cee.multiplicateur || 5);
+    const formuleBar = M3_CONFIG?.formule_bar_th_171;
+    if (formuleBar?.actif) {
+      const resultCee = calculerCeeBarTh171(state, formuleBar, M3_CONFIG || {});
+      ceeBrut = resultCee.montant || 0;
+    } else {
+      ceeBrut = contextePret ? (node?.cee_devis?.[state.zone]?.[state.categorie] ?? 0) : 0;
+      const actif = (M3_CONFIG?.delegataires || []).find(d => d.actif);
+      if (actif && Number.isFinite(Number(state.surface_chauffee))) {
+        const mwh = Math.max(Number(state.surface_chauffee || 0) / 10, 1);
+        const unit = state.categorie === 'tres_modeste' ? Number(actif.mwh_precaire || 0) : Number(actif.mwh_classique || 0);
+        ceeBrut = Math.round(mwh * unit * 10);
+        if (M3_CONFIG?.bonification_cee?.actif) ceeBrut *= Number(M3_CONFIG.bonification_cee.multiplicateur || 5);
+      }
     }
+    const plafonds = M3_CONFIG?.plafonds_reglementaires || {};
+    const plafondEligible = Number(plafonds.plafond_eligible_ttc) || 12000;
+    const plafondsPct = plafonds.plafonds_aides_pct || {};
+    const baseEligible = Math.min(state.prix_pac || 0, plafondEligible);
+    let mprFinal = mprDevis;
+    let ceeDevis = ceeBrut;
+    let ceeConserveCalcule = 0;
+    if (state.categorie === 'superieur') {
+      mprFinal = 0;
+      ceeDevis = ceeBrut;
+    } else {
+      const plafondPct = Number(plafondsPct[state.categorie] || 0) / 100;
+      const plafondAides = baseEligible * plafondPct;
+      const totalBrut = mprDevis + ceeBrut;
+      if (totalBrut > plafondAides) {
+        mprFinal = mprDevis;
+        ceeDevis = Math.max(plafondAides - mprFinal, 0);
+        ceeConserveCalcule = Math.round((ceeBrut - ceeDevis) * 100) / 100;
+      }
+    }
+    mprDevis = mprFinal;
+    const ceeConserve = ceeConserveCalcule;
     const aidesDevis  = ceeDevis + mprDevis;
     const g29 = Math.max(0, (state.prix_pac || 0) - aidesDevis);
 
@@ -15647,6 +15823,109 @@ L'équipe Hexa Rénov'</textarea></label>
     M3_ADMIN.script_notion_url = cfg.script_notion_url || '';
     return M3_ADMIN;
   }
+  function defaultFormuleBarTh171(){
+    return {
+      actif:false,
+      tableau_montant_base:[
+        {logement:'Appartement', etas_min:111, etas_max:139.99, montant_kwhc:48700, actif:true},
+        {logement:'Appartement', etas_min:140, etas_max:999, montant_kwhc:58900, actif:true},
+        {logement:'Maison', etas_min:111, etas_max:139.99, montant_kwhc:90900, actif:true},
+        {logement:'Maison', etas_min:140, etas_max:999, montant_kwhc:109200, actif:true}
+      ],
+      tableau_facteur_surface:[
+        {logement:'Appartement', surface_min:0, surface_max:34.99, facteur:0.5, actif:true},
+        {logement:'Appartement', surface_min:35, surface_max:59.99, facteur:0.7, actif:true},
+        {logement:'Appartement', surface_min:60, surface_max:9999, facteur:1.0, actif:true},
+        {logement:'Maison', surface_min:0, surface_max:69.99, facteur:0.5, actif:true},
+        {logement:'Maison', surface_min:70, surface_max:89.99, facteur:0.7, actif:true},
+        {logement:'Maison', surface_min:90, surface_max:9999, facteur:1.0, actif:true}
+      ],
+      tableau_facteur_zone:[
+        {zone:'H1', facteur:1.2, actif:true},
+        {zone:'H2', facteur:1.0, actif:true},
+        {zone:'H3', facteur:0.7, actif:true}
+      ]
+    };
+  }
+  function defaultPlafondsReglementaires(){
+    return { plafond_eligible_ttc:12000, plafonds_aides_pct:{ tres_modeste:90, modeste:75, intermediaire:60, superieur:0 } };
+  }
+  function renderBarRows(type, rows){
+    return (rows || []).map((r,i)=>{
+      if(type==='base') return `<tr data-i="${i}">
+        <td><select class="adm-bar-logement"><option ${r.logement==='Appartement'?'selected':''}>Appartement</option><option ${r.logement==='Maison'?'selected':''}>Maison</option></select></td>
+        <td><input type="number" class="adm-bar-etas-min" value="${adminEscape(r.etas_min ?? '')}" step="0.01"></td>
+        <td><input type="number" class="adm-bar-etas-max" value="${adminEscape(r.etas_max ?? '')}" step="0.01"></td>
+        <td><input type="number" class="adm-bar-montant" value="${adminEscape(r.montant_kwhc ?? '')}" step="1"></td>
+        <td><input type="checkbox" class="adm-bar-actif" ${r.actif?'checked':''}></td>
+        <td><button type="button" class="adm-row-delete">🗑</button></td>
+      </tr>`;
+      if(type==='surface') return `<tr data-i="${i}">
+        <td><select class="adm-bar-logement"><option ${r.logement==='Appartement'?'selected':''}>Appartement</option><option ${r.logement==='Maison'?'selected':''}>Maison</option></select></td>
+        <td><input type="number" class="adm-bar-surface-min" value="${adminEscape(r.surface_min ?? '')}" step="0.01"></td>
+        <td><input type="number" class="adm-bar-surface-max" value="${adminEscape(r.surface_max ?? '')}" step="0.01"></td>
+        <td><input type="number" class="adm-bar-facteur" value="${adminEscape(r.facteur ?? '')}" step="0.01"></td>
+        <td><input type="checkbox" class="adm-bar-actif" ${r.actif?'checked':''}></td>
+        <td><button type="button" class="adm-row-delete">🗑</button></td>
+      </tr>`;
+      return `<tr data-i="${i}">
+        <td><input type="text" class="adm-bar-zone" value="${adminEscape(r.zone || '')}"></td>
+        <td><input type="number" class="adm-bar-facteur" value="${adminEscape(r.facteur ?? '')}" step="0.01"></td>
+        <td><input type="checkbox" class="adm-bar-actif" ${r.actif?'checked':''}></td>
+        <td><button type="button" class="adm-row-delete">🗑</button></td>
+      </tr>`;
+    }).join('');
+  }
+  function renderFormuleBarSection(){
+    const formule = Object.assign(defaultFormuleBarTh171(), M3_ADMIN?.formule_bar_th_171 || {});
+    return `
+      <div class="adm-section-block" data-section="formule-bar-th-171">
+        <div class="adm-section-header">
+          <div class="adm-section">Formule BAR-TH-171 (PAC Air-Eau)</div>
+          <div class="adm-toggle">
+            <label class="adm-toggle-label"><input type="checkbox" id="adm-formule-bar-th-171-actif" ${formule.actif?'checked':''}> <span>Activer la nouvelle formule officielle</span></label>
+            <p class="adm-hint">Quand activée : utilise la formule BAR-TH-171 ci-dessous.<br>Quand désactivée : utilise la formule simplifiée actuelle (fallback).</p>
+          </div>
+        </div>
+        <div class="adm-subsection"><h3>Tableau 1 — Montant de base (kWhc)</h3>
+          <table class="adm-bareme-table" id="bareme-montant-base"><thead><tr><th>Type logement</th><th>ETAS min (%)</th><th>ETAS max (%)</th><th>Montant kWhc</th><th>Actif</th><th></th></tr></thead><tbody>${renderBarRows('base', formule.tableau_montant_base)}</tbody></table>
+          <button type="button" class="adm-btn-add" data-target="bareme-montant-base">+ Ajouter une ligne</button>
+        </div>
+        <div class="adm-subsection"><h3>Tableau 2 — Facteur surface chauffée</h3>
+          <table class="adm-bareme-table" id="bareme-facteur-surface"><thead><tr><th>Type logement</th><th>Surface min (m²)</th><th>Surface max (m²)</th><th>Facteur</th><th>Actif</th><th></th></tr></thead><tbody>${renderBarRows('surface', formule.tableau_facteur_surface)}</tbody></table>
+          <button type="button" class="adm-btn-add" data-target="bareme-facteur-surface">+ Ajouter une ligne</button>
+        </div>
+        <div class="adm-subsection"><h3>Tableau 3 — Facteur zone climatique</h3>
+          <table class="adm-bareme-table" id="bareme-facteur-zone"><thead><tr><th>Zone climatique</th><th>Facteur</th><th>Actif</th><th></th></tr></thead><tbody>${renderBarRows('zone', formule.tableau_facteur_zone)}</tbody></table>
+          <button type="button" class="adm-btn-add" data-target="bareme-facteur-zone">+ Ajouter une ligne</button>
+        </div>
+        <div class="adm-actions"><button type="button" class="adm-btn-save" id="btn-save-formule-bar-th-171">Sauvegarder</button></div>
+      </div>`;
+  }
+  function renderPlafondsSection(){
+    const plafonds = Object.assign(defaultPlafondsReglementaires(), M3_ADMIN?.plafonds_reglementaires || {});
+    const pct = Object.assign(defaultPlafondsReglementaires().plafonds_aides_pct, plafonds.plafonds_aides_pct || {});
+    return `
+      <div class="adm-section-block" data-section="plafonds-reglementaires">
+        <div class="adm-section">Plafonds réglementaires</div>
+        <div class="adm-subsection">
+          <h3>Plafond du montant éligible aux aides</h3>
+          <label class="adm-field">Plafond TTC max éligible <div class="adm-input-with-unit"><input type="number" id="adm-plafond-eligible-ttc" value="${adminEscape(plafonds.plafond_eligible_ttc ?? 12000)}" step="100" min="0"><span class="adm-unit">€ TTC</span></div></label>
+          <p class="adm-hint">Au-delà de ce montant TTC, le calcul des aides est plafonné à cette valeur.</p>
+        </div>
+        <div class="adm-subsection">
+          <h3>Plafonds du cumul des aides (MPR + CEE)</h3>
+          <p class="adm-hint">Le montant cumulé MPR + CEE ne peut pas dépasser ces pourcentages du montant TTC éligible.</p>
+          <table class="adm-bareme-table"><thead><tr><th>Catégorie revenu</th><th>Plafond max (%)</th></tr></thead><tbody>
+            <tr><td>Très Modeste (TMO)</td><td><input type="number" id="adm-plafond-tres-modeste" value="${adminEscape(pct.tres_modeste ?? 90)}" step="1" min="0" max="100"> %</td></tr>
+            <tr><td>Modeste (MO)</td><td><input type="number" id="adm-plafond-modeste" value="${adminEscape(pct.modeste ?? 75)}" step="1" min="0" max="100"> %</td></tr>
+            <tr><td>Intermédiaire (INT)</td><td><input type="number" id="adm-plafond-intermediaire" value="${adminEscape(pct.intermediaire ?? 60)}" step="1" min="0" max="100"> %</td></tr>
+            <tr><td>Supérieur (SUP)</td><td><input type="number" id="adm-plafond-superieur" value="${adminEscape(pct.superieur ?? 0)}" step="1" min="0" max="100"> %<p class="adm-hint-inline">⚠ SUP ne touche pas MPR, mais conserve son CEE complet</p></td></tr>
+          </tbody></table>
+        </div>
+        <div class="adm-actions"><button type="button" class="adm-btn-save" id="btn-save-plafonds">Sauvegarder</button></div>
+      </div>`;
+  }
   function renderAdminM3Section(){
     const cfg = M3_ADMIN || {};
     const forfaits = cfg.forfaits_mpr || { tres_modeste:5000, modeste:4000, intermediaire:3000, superieur:0 };
@@ -15692,6 +15971,8 @@ L'équipe Hexa Rénov'</textarea></label>
         <div class="adm-field adm-field-row"><span class="adm-lab">Multiplicateur</span><input type="number" min="1" max="10" id="adm-bonif-mult" value="${adminEscape(bonif.multiplicateur || 5)}"></div>
         <p class="adm-opt2-note">La bonification multiplie le montant CEE classique. Par défaut x5 (Coup de pouce Chauffage).</p>
       </div>
+      ${renderFormuleBarSection()}
+      ${renderPlafondsSection()}
       <div class="adm-section">Modèles d'emails</div>
       <div class="adm-cols">${emailRows}</div>
       <div class="adm-add-row"><button type="button" class="adm-btn adm-btn-primary" id="adm-save-m3">Enregistrer MPR/CEE/Emails</button></div>`;
@@ -16441,6 +16722,75 @@ L'équipe Hexa Rénov'</textarea></label>
   }
 
   function bindAdminM3(){
+    function addBaremeRow(target){
+      const table = document.getElementById(target);
+      const tbody = table?.querySelector('tbody');
+      if (!tbody) return;
+      if (target === 'bareme-montant-base') tbody.insertAdjacentHTML('beforeend', renderBarRows('base', [{logement:'Maison', etas_min:140, etas_max:999, montant_kwhc:0, actif:true}]));
+      if (target === 'bareme-facteur-surface') tbody.insertAdjacentHTML('beforeend', renderBarRows('surface', [{logement:'Maison', surface_min:0, surface_max:9999, facteur:1, actif:true}]));
+      if (target === 'bareme-facteur-zone') tbody.insertAdjacentHTML('beforeend', renderBarRows('zone', [{zone:'H2', facteur:1, actif:true}]));
+      bindBaremeDeleteButtons();
+    }
+    function bindBaremeDeleteButtons(){
+      document.querySelectorAll('.adm-bareme-table .adm-row-delete').forEach(btn=>{
+        if (btn.dataset.bound === '1') return;
+        btn.dataset.bound = '1';
+        btn.addEventListener('click', ()=>btn.closest('tr')?.remove());
+      });
+    }
+    function collectFormuleBar(){
+      const readNum = (row, cls) => Number(String(row.querySelector(cls)?.value || '').replace(',','.')) || 0;
+      return {
+        actif: !!document.getElementById('adm-formule-bar-th-171-actif')?.checked,
+        tableau_montant_base: Array.from(document.querySelectorAll('#bareme-montant-base tbody tr')).map(row=>({
+          logement: row.querySelector('.adm-bar-logement')?.value || '',
+          etas_min: readNum(row, '.adm-bar-etas-min'),
+          etas_max: readNum(row, '.adm-bar-etas-max'),
+          montant_kwhc: readNum(row, '.adm-bar-montant'),
+          actif: !!row.querySelector('.adm-bar-actif')?.checked
+        })),
+        tableau_facteur_surface: Array.from(document.querySelectorAll('#bareme-facteur-surface tbody tr')).map(row=>({
+          logement: row.querySelector('.adm-bar-logement')?.value || '',
+          surface_min: readNum(row, '.adm-bar-surface-min'),
+          surface_max: readNum(row, '.adm-bar-surface-max'),
+          facteur: readNum(row, '.adm-bar-facteur'),
+          actif: !!row.querySelector('.adm-bar-actif')?.checked
+        })),
+        tableau_facteur_zone: Array.from(document.querySelectorAll('#bareme-facteur-zone tbody tr')).map(row=>({
+          zone: row.querySelector('.adm-bar-zone')?.value || '',
+          facteur: readNum(row, '.adm-bar-facteur'),
+          actif: !!row.querySelector('.adm-bar-actif')?.checked
+        }))
+      };
+    }
+    function collectPlafonds(){
+      const n = id => Number(document.getElementById(id)?.value || 0) || 0;
+      return {
+        plafond_eligible_ttc: n('adm-plafond-eligible-ttc'),
+        plafonds_aides_pct: {
+          tres_modeste: n('adm-plafond-tres-modeste'),
+          modeste: n('adm-plafond-modeste'),
+          intermediaire: n('adm-plafond-intermediaire'),
+          superieur: n('adm-plafond-superieur')
+        }
+      };
+    }
+    bindBaremeDeleteButtons();
+    document.querySelectorAll('.adm-btn-add[data-target]').forEach(btn=>{
+      btn.addEventListener('click', ()=>addBaremeRow(btn.dataset.target));
+    });
+    document.getElementById('btn-save-formule-bar-th-171')?.addEventListener('click', async ()=>{
+      const payload = collectFormuleBar();
+      const r = await fetch('/api/admin/formule-bar-th-171', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+      if (r.ok) { M3_ADMIN.formule_bar_th_171 = payload; adminToast('Formule BAR-TH-171 sauvegardée ✓', '#0D6B3B'); window.dispatchEvent(new CustomEvent('hexa-config-changed')); }
+      else adminToast('Erreur sauvegarde formule BAR-TH-171', '#B91C1C');
+    });
+    document.getElementById('btn-save-plafonds')?.addEventListener('click', async ()=>{
+      const payload = collectPlafonds();
+      const r = await fetch('/api/admin/plafonds-reglementaires', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+      if (r.ok) { M3_ADMIN.plafonds_reglementaires = payload; adminToast('Plafonds sauvegardés ✓', '#0D6B3B'); window.dispatchEvent(new CustomEvent('hexa-config-changed')); }
+      else adminToast('Erreur sauvegarde plafonds', '#B91C1C');
+    });
     document.getElementById('adm-add-delegataire')?.addEventListener('click', ()=>{
       M3_ADMIN = M3_ADMIN || {};
       M3_ADMIN.delegataires = M3_ADMIN.delegataires || [];
@@ -17895,6 +18245,10 @@ L'équipe Hexa Rénov'</textarea></label>
     updateIdentityBanner();
     document.body.classList.remove('hexa-view-prospects'); window.scrollTo(0,0);
   }
+  window.openFicheByNumero = function(numero) {
+    if (!numero) return;
+    openFiche({ numero });
+  };
   function openNewProspect(){
     window.resetGlobalsFiche();
     clearProspectForm();

@@ -33,5 +33,36 @@
       "assurance": "QBE 037.0012525-S178593",
       "actif": true
     }
-  ]
+  ],
+  "formule_bar_th_171": {
+    "actif": false,
+    "tableau_montant_base": [
+      {"logement": "Appartement", "etas_min": 111, "etas_max": 139.99, "montant_kwhc": 48700, "actif": true},
+      {"logement": "Appartement", "etas_min": 140, "etas_max": 999, "montant_kwhc": 58900, "actif": true},
+      {"logement": "Maison", "etas_min": 111, "etas_max": 139.99, "montant_kwhc": 90900, "actif": true},
+      {"logement": "Maison", "etas_min": 140, "etas_max": 999, "montant_kwhc": 109200, "actif": true}
+    ],
+    "tableau_facteur_surface": [
+      {"logement": "Appartement", "surface_min": 0, "surface_max": 34.99, "facteur": 0.5, "actif": true},
+      {"logement": "Appartement", "surface_min": 35, "surface_max": 59.99, "facteur": 0.7, "actif": true},
+      {"logement": "Appartement", "surface_min": 60, "surface_max": 9999, "facteur": 1.0, "actif": true},
+      {"logement": "Maison", "surface_min": 0, "surface_max": 69.99, "facteur": 0.5, "actif": true},
+      {"logement": "Maison", "surface_min": 70, "surface_max": 89.99, "facteur": 0.7, "actif": true},
+      {"logement": "Maison", "surface_min": 90, "surface_max": 9999, "facteur": 1.0, "actif": true}
+    ],
+    "tableau_facteur_zone": [
+      {"zone": "H1", "facteur": 1.2, "actif": true},
+      {"zone": "H2", "facteur": 1.0, "actif": true},
+      {"zone": "H3", "facteur": 0.7, "actif": true}
+    ]
+  },
+  "plafonds_reglementaires": {
+    "plafond_eligible_ttc": 12000,
+    "plafonds_aides_pct": {
+      "tres_modeste": 90,
+      "modeste": 75,
+      "intermediaire": 60,
+      "superieur": 0
+    }
+  }
 }

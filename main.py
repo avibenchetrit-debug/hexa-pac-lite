@@ -36,6 +36,7 @@ from services.service_devis import (
     select_default_modele,
     validate_prospect_for_devis,
     value as devis_value,
+    _format_date_fr,
 )
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -101,6 +102,39 @@ DEFAULT_SOUS_TRAITANTS = [
     }
 ]
 
+DEFAULT_FORMULE_BAR_TH_171 = {
+    "actif": False,
+    "tableau_montant_base": [
+        {"logement": "Appartement", "etas_min": 111, "etas_max": 139.99, "montant_kwhc": 48700, "actif": True},
+        {"logement": "Appartement", "etas_min": 140, "etas_max": 999, "montant_kwhc": 58900, "actif": True},
+        {"logement": "Maison", "etas_min": 111, "etas_max": 139.99, "montant_kwhc": 90900, "actif": True},
+        {"logement": "Maison", "etas_min": 140, "etas_max": 999, "montant_kwhc": 109200, "actif": True},
+    ],
+    "tableau_facteur_surface": [
+        {"logement": "Appartement", "surface_min": 0, "surface_max": 34.99, "facteur": 0.5, "actif": True},
+        {"logement": "Appartement", "surface_min": 35, "surface_max": 59.99, "facteur": 0.7, "actif": True},
+        {"logement": "Appartement", "surface_min": 60, "surface_max": 9999, "facteur": 1.0, "actif": True},
+        {"logement": "Maison", "surface_min": 0, "surface_max": 69.99, "facteur": 0.5, "actif": True},
+        {"logement": "Maison", "surface_min": 70, "surface_max": 89.99, "facteur": 0.7, "actif": True},
+        {"logement": "Maison", "surface_min": 90, "surface_max": 9999, "facteur": 1.0, "actif": True},
+    ],
+    "tableau_facteur_zone": [
+        {"zone": "H1", "facteur": 1.2, "actif": True},
+        {"zone": "H2", "facteur": 1.0, "actif": True},
+        {"zone": "H3", "facteur": 0.7, "actif": True},
+    ],
+}
+
+DEFAULT_PLAFONDS_REGLEMENTAIRES = {
+    "plafond_eligible_ttc": 12000,
+    "plafonds_aides_pct": {
+        "tres_modeste": 90,
+        "modeste": 75,
+        "intermediaire": 60,
+        "superieur": 0,
+    },
+}
+
 DEFAULT_PARAMETRES_ADMIN = {
     "params": {
         "pose": 3500,
@@ -125,6 +159,8 @@ DEFAULT_PARAMETRES_ADMIN = {
         "frais_ecair_pct": 12,
     },
     "sous_traitants": DEFAULT_SOUS_TRAITANTS,
+    "formule_bar_th_171": DEFAULT_FORMULE_BAR_TH_171,
+    "plafonds_reglementaires": DEFAULT_PLAFONDS_REGLEMENTAIRES,
 }
 
 
@@ -264,6 +300,8 @@ def _admin_payload_with_m3():
     )
     admin["bonification_cee"] = baremes.get("bonification_cee", {"actif": True, "multiplicateur": 5})
     admin["delegataires"] = _read_delegataires()
+    admin["formule_bar_th_171"] = admin.get("formule_bar_th_171", DEFAULT_FORMULE_BAR_TH_171)
+    admin["plafonds_reglementaires"] = admin.get("plafonds_reglementaires", DEFAULT_PLAFONDS_REGLEMENTAIRES)
     return admin
 
 
@@ -686,33 +724,14 @@ def _lead_for_response(lead: dict) -> dict:
 def _validate_required_prospect_payload(prospect: dict) -> list[str]:
     missing = []
     required = [
-        ("civilite", "Civilité"),
         ("nom", "Nom"),
         ("prenom", "Prénom"),
         ("telephone", "Téléphone"),
         ("email", "Email"),
-        ("adresse_chantier", "Adresse chantier"),
-        ("code_postal_chantier", "Code postal chantier"),
-        ("ville_chantier", "Ville chantier"),
-        ("type_logement", "Type de logement"),
-        ("surface_logement_m2", "Surface habitable"),
-        ("hsp", "Hauteur sous plafond (HSP)"),
-        ("mode_chauffage", "Chauffage actuel"),
-        ("type_emetteurs", "Type d'émetteurs"),
-        ("alimentation_electrique", "Type d'alimentation électrique"),
-        ("categorie", "Catégorie de revenu"),
     ]
     for key, label in required:
         if not str(devis_value(prospect, key, default="")).strip():
             missing.append(label)
-    if devis_value(prospect, "usage_bien") == "bailleur":
-        for key, label in (
-            ("adresse_personne", "Adresse du propriétaire"),
-            ("code_postal_personne", "CP du propriétaire"),
-            ("ville_personne", "Ville du propriétaire"),
-        ):
-            if not str(devis_value(prospect, key, default="")).strip():
-                missing.append(label)
     return missing
 
 
@@ -1156,6 +1175,42 @@ def get_leads_trash() -> JSONResponse:
     return JSONResponse([_lead_for_response(lead) for lead in _read_leads() if _is_deleted(lead)])
 
 
+@app.get("/api/leads/check-duplicate")
+async def check_duplicate(telephone: str | None = None, email: str | None = None, exclude_numero: str | None = None) -> JSONResponse:
+    """Vérifie si un prospect existe déjà avec ce téléphone ou email."""
+    def normalize_phone(phone):
+        return "".join(c for c in str(phone or "") if c.isdigit())
+
+    def normalize_email(em):
+        return str(em or "").strip().lower()
+
+    target_phone = normalize_phone(telephone) if telephone else None
+    target_email = normalize_email(email) if email else None
+    matches = []
+    for lead in _read_leads():
+        if exclude_numero and lead.get("numero") == exclude_numero:
+            continue
+        match_reason = []
+        if target_phone and normalize_phone(lead.get("telephone", "")) == target_phone:
+            match_reason.append("telephone")
+        if target_email and normalize_email(lead.get("email", "")) == target_email:
+            match_reason.append("email")
+        if match_reason:
+            matches.append({
+                "numero": lead.get("numero"),
+                "nom": lead.get("nom"),
+                "prenom": lead.get("prenom"),
+                "telephone": lead.get("telephone"),
+                "email": lead.get("email"),
+                "adresse": lead.get("adresse") or lead.get("adresse_chantier"),
+                "cp_chantier": lead.get("cp_chantier") or lead.get("code_postal_chantier") or lead.get("cp"),
+                "ville": lead.get("ville") or lead.get("ville_chantier"),
+                "statut": lead.get("statut", "nouveau"),
+                "match_reason": match_reason,
+            })
+    return JSONResponse({"duplicates": matches})
+
+
 @app.get("/api/leads/{numero}")
 def get_lead(numero: str) -> JSONResponse:
     wanted = str(numero or "").strip()
@@ -1475,6 +1530,8 @@ def get_admin_m3() -> JSONResponse:
             "bonification_cee": baremes.get("bonification_cee", {"actif": True, "multiplicateur": 5}),
             "delegataires": _read_delegataires(),
             "modeles_email": _read_modeles_email(),
+            "formule_bar_th_171": load_parametres_admin().get("formule_bar_th_171", DEFAULT_FORMULE_BAR_TH_171),
+            "plafonds_reglementaires": load_parametres_admin().get("plafonds_reglementaires", DEFAULT_PLAFONDS_REGLEMENTAIRES),
         }
     )
 
@@ -1490,6 +1547,36 @@ async def save_admin_params(request: Request):
     """Sauvegarde les paramètres Admin (écriture atomique)."""
     payload = await _read_request_payload(request)
     save_parametres_admin_atomic(payload)
+    return {"success": True}
+
+
+@app.get("/api/admin/formule-bar-th-171")
+async def get_formule_bar_th_171():
+    params = load_parametres_admin()
+    return params.get("formule_bar_th_171", DEFAULT_FORMULE_BAR_TH_171)
+
+
+@app.post("/api/admin/formule-bar-th-171")
+async def save_formule_bar_th_171(request: Request):
+    payload = await _read_request_payload(request)
+    params = load_parametres_admin()
+    params["formule_bar_th_171"] = payload
+    save_parametres_admin_atomic(params)
+    return {"success": True}
+
+
+@app.get("/api/admin/plafonds-reglementaires")
+async def get_plafonds_reglementaires():
+    params = load_parametres_admin()
+    return params.get("plafonds_reglementaires", DEFAULT_PLAFONDS_REGLEMENTAIRES)
+
+
+@app.post("/api/admin/plafonds-reglementaires")
+async def save_plafonds_reglementaires(request: Request):
+    payload = await _read_request_payload(request)
+    params = load_parametres_admin()
+    params["plafonds_reglementaires"] = payload
+    save_parametres_admin_atomic(params)
     return {"success": True}
 
 
@@ -1627,7 +1714,7 @@ def _build_devis_context(request: Request, numero: str) -> dict:
     sous_traitant_context = dict(sous_traitant or {})
     if sous_traitant_context:
         sous_traitant_context["rge_validite"] = (
-            f"{sous_traitant_context.get('rge_validite_du', '')} au {sous_traitant_context.get('rge_validite_au', '')}"
+            f"du {_format_date_fr(sous_traitant_context.get('rge_validite_du', ''))} au {_format_date_fr(sous_traitant_context.get('rge_validite_au', ''))}"
         ).strip()
     formatted_calculs = format_devis_amounts(calculs)
     formatted_calculs["lot_titre"] = generer_lot_titre(modele_obj)

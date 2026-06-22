@@ -168,7 +168,102 @@ def calculer_mpr(prospect, state_simulateur, admin_params):
     return float_value(forfaits.get(categorie), defaults.get(categorie, 4000))
 
 
-def calculer_cee(prospect, state_simulateur, admin_params, with_bonification=True):
+def calculer_cee_bar_th_171(prospect, state_simulateur, admin_params):
+    """Calcule le montant CEE selon la formule officielle BAR-TH-171."""
+    formule = (admin_params or {}).get("formule_bar_th_171", {})
+    type_logement = value(prospect, "type_logement", "type", default="")
+    if "maison" in str(type_logement).lower():
+        type_logement = "Maison"
+    elif "appart" in str(type_logement).lower():
+        type_logement = "Appartement"
+
+    categorie = value(prospect, "categorie_revenu", "categorie", default="modeste")
+    etas = float_value(value(state_simulateur, "etas", default=140), 140)
+    if etas <= 0:
+        etas = 140
+    surface = float_value(value(state_simulateur, "surface_chauffee", default=0))
+    if surface <= 0:
+        surface = float_value(value(prospect, "surface_habitable", "surface_logement_m2", default=90))
+    zone = value(state_simulateur, "zone", default=calculer_zone_climatique(value(prospect, "cp_chantier", "code_postal_chantier", "cp")))
+
+    if etas < 111:
+        return {"montant": 0, "erreur": "Non éligible / ETAS insuffisant", "details": {"etas": etas}}
+
+    montant_base = None
+    for ligne in formule.get("tableau_montant_base", []):
+        if not ligne.get("actif"):
+            continue
+        if ligne.get("logement") != type_logement:
+            continue
+        if float_value(ligne.get("etas_min")) <= etas <= float_value(ligne.get("etas_max")):
+            montant_base = float_value(ligne.get("montant_kwhc"))
+            break
+    if montant_base is None:
+        return {"montant": 0, "erreur": f"Barème montant base non trouvé pour {type_logement} ETAS {etas}", "details": {}}
+
+    facteur_surface = None
+    for ligne in formule.get("tableau_facteur_surface", []):
+        if not ligne.get("actif"):
+            continue
+        if ligne.get("logement") != type_logement:
+            continue
+        if float_value(ligne.get("surface_min")) <= surface <= float_value(ligne.get("surface_max")):
+            facteur_surface = float_value(ligne.get("facteur"))
+            break
+    if facteur_surface is None:
+        return {"montant": 0, "erreur": f"Facteur surface non trouvé pour {type_logement} {surface}m²", "details": {}}
+
+    facteur_zone = None
+    for ligne in formule.get("tableau_facteur_zone", []):
+        if not ligne.get("actif"):
+            continue
+        if ligne.get("zone") == zone:
+            facteur_zone = float_value(ligne.get("facteur"))
+            break
+    if facteur_zone is None:
+        return {"montant": 0, "erreur": f"Facteur zone non trouvé pour {zone}", "details": {}}
+
+    kwhc = montant_base * facteur_surface * facteur_zone
+    mwhc = kwhc / 1000
+
+    delegataires = (admin_params or {}).get("delegataires") or []
+    delegataire = next((d for d in delegataires if d.get("actif")), None)
+    if not delegataire:
+        return {"montant": 0, "erreur": "Aucun délégataire CEE actif", "details": {}}
+
+    if categorie == "tres_modeste":
+        prix_unitaire = float_value(delegataire.get("mwh_precaire"), 0)
+        type_prix = "précaire"
+    else:
+        prix_unitaire = float_value(delegataire.get("mwh_classique"), 0)
+        type_prix = "classique"
+
+    bonif = (admin_params or {}).get("bonification_cee") or {}
+    multiplicateur = float_value(bonif.get("multiplicateur"), 1) if bonif.get("actif", True) else 1
+    montant = round(mwhc * prix_unitaire * multiplicateur, 2)
+
+    return {
+        "montant": montant,
+        "erreur": None,
+        "details": {
+            "type_logement": type_logement,
+            "categorie": categorie,
+            "etas": etas,
+            "surface": surface,
+            "zone": zone,
+            "montant_base_kwhc": montant_base,
+            "facteur_surface": facteur_surface,
+            "facteur_zone": facteur_zone,
+            "kwhc": kwhc,
+            "mwhc": round(mwhc, 2),
+            "prix_unitaire": prix_unitaire,
+            "type_prix": type_prix,
+            "bonification": multiplicateur,
+        },
+    }
+
+
+def _calculer_cee_legacy(prospect, state_simulateur, admin_params, with_bonification=True):
     categorie = value(prospect, "categorie_revenu", "categorie", default="modeste")
     surface = float_value(value(state_simulateur, "surface_chauffee", default=0))
     if surface <= 0:
@@ -182,6 +277,85 @@ def calculer_cee(prospect, state_simulateur, admin_params, with_bonification=Tru
     if with_bonification and bonif.get("actif", True):
         cee *= float_value(bonif.get("multiplicateur"), 5)
     return round(cee, 2)
+
+
+def calculer_cee(prospect, state_simulateur, admin_params, with_bonification=True):
+    """Calcule le montant CEE (BAR-TH-171 si activée, legacy sinon)."""
+    formule = (admin_params or {}).get("formule_bar_th_171", {})
+    if formule.get("actif"):
+        result = calculer_cee_bar_th_171(prospect, state_simulateur, admin_params)
+        if result.get("erreur"):
+            print(f"[CEE] Nouvelle formule erreur : {result['erreur']}, fallback ancienne")
+            return _calculer_cee_legacy(prospect, state_simulateur, admin_params, with_bonification)
+        return result["montant"]
+    return _calculer_cee_legacy(prospect, state_simulateur, admin_params, with_bonification)
+
+
+def appliquer_plafonds_reglementaires(prix_pac_ttc, montant_mpr_brut, montant_cee_brut, prospect, admin_params):
+    """Applique les plafonds réglementaires sur MPR + CEE."""
+    plafonds = (admin_params or {}).get("plafonds_reglementaires", {})
+    plafond_eligible = float_value(plafonds.get("plafond_eligible_ttc"), 12000)
+    plafonds_pct = plafonds.get("plafonds_aides_pct", {})
+    categorie = value(prospect, "categorie_revenu", "categorie", default="modeste")
+    base_eligible = min(float_value(prix_pac_ttc), plafond_eligible)
+
+    if categorie == "superieur":
+        return {
+            "mpr_final": 0,
+            "cee_final": montant_cee_brut,
+            "cee_conserve": 0,
+            "reste_a_charge": round(max(prix_pac_ttc - montant_cee_brut, 0), 2),
+            "details": {
+                "categorie": categorie,
+                "base_eligible": base_eligible,
+                "mpr_brut": montant_mpr_brut,
+                "cee_brut": montant_cee_brut,
+                "ecretement": False,
+                "raison_no_ecretement": "SUP : pas de plafond cumulé",
+            },
+        }
+
+    plafond_pct = float_value(plafonds_pct.get(categorie), 0) / 100
+    plafond_aides = base_eligible * plafond_pct
+    total_brut = montant_mpr_brut + montant_cee_brut
+
+    if total_brut <= plafond_aides:
+        return {
+            "mpr_final": montant_mpr_brut,
+            "cee_final": montant_cee_brut,
+            "cee_conserve": 0,
+            "reste_a_charge": round(max(prix_pac_ttc - total_brut, 0), 2),
+            "details": {
+                "categorie": categorie,
+                "base_eligible": base_eligible,
+                "plafond_pct": plafond_pct * 100,
+                "plafond_aides": plafond_aides,
+                "mpr_brut": montant_mpr_brut,
+                "cee_brut": montant_cee_brut,
+                "total_brut": total_brut,
+                "ecretement": False,
+            },
+        }
+
+    mpr_final = montant_mpr_brut
+    cee_final = max(plafond_aides - mpr_final, 0)
+    cee_conserve = montant_cee_brut - cee_final
+    return {
+        "mpr_final": round(mpr_final, 2),
+        "cee_final": round(cee_final, 2),
+        "cee_conserve": round(cee_conserve, 2),
+        "reste_a_charge": round(max(prix_pac_ttc - mpr_final - cee_final, 0), 2),
+        "details": {
+            "categorie": categorie,
+            "base_eligible": base_eligible,
+            "plafond_pct": plafond_pct * 100,
+            "plafond_aides": plafond_aides,
+            "mpr_brut": montant_mpr_brut,
+            "cee_brut": montant_cee_brut,
+            "total_brut": total_brut,
+            "ecretement": True,
+        },
+    }
 
 
 def calculer_devis(prospect, state_simulateur, admin_params, catalogue_pac):
@@ -203,9 +377,18 @@ def calculer_devis(prospect, state_simulateur, admin_params, catalogue_pac):
     prix_fourniture_ttc = round(prix_fourniture_ht * (1 + tva_rate), 2)
     total_tva = round(total_ttc - total_ht, 2)
 
-    montant_mpr = calculer_mpr(prospect, state_simulateur, admin_params)
-    montant_cee = calculer_cee(prospect, state_simulateur, admin_params, with_bonification=True)
-    reste_a_charge = round(max(total_ttc - montant_mpr - montant_cee, 0), 2)
+    montant_mpr_brut = calculer_mpr(prospect, state_simulateur, admin_params)
+    montant_cee_brut = calculer_cee(prospect, state_simulateur, admin_params, with_bonification=True)
+    result_plafonds = appliquer_plafonds_reglementaires(
+        prix_pac_ttc=total_ttc,
+        montant_mpr_brut=montant_mpr_brut,
+        montant_cee_brut=montant_cee_brut,
+        prospect=prospect,
+        admin_params=admin_params,
+    )
+    montant_mpr = result_plafonds["mpr_final"]
+    montant_cee = result_plafonds["cee_final"]
+    reste_a_charge = result_plafonds["reste_a_charge"]
 
     categorie_revenu = value(prospect, "categorie_revenu", "categorie", default="")
     return {
@@ -224,6 +407,8 @@ def calculer_devis(prospect, state_simulateur, admin_params, catalogue_pac):
         "montant_cee": montant_cee,
         "montant_cee_lettres": nombre_en_lettres_euros(montant_cee),
         "reste_a_charge": reste_a_charge,
+        "_cee_conserve": result_plafonds["cee_conserve"],
+        "_details_plafonds": result_plafonds["details"],
         "categorie_CEE_label": "Précaire" if categorie_revenu == "tres_modeste" else "Classique",
         "categorie_revenu_label": LABELS_ANAH.get(categorie_revenu, ""),
         "qt_fourniture": "1 u.",
@@ -276,14 +461,29 @@ def generer_numero_notedim(prospect):
     return f"ND{annee}-{numero}-{init}"
 
 
+def _format_date_fr(date_str):
+    """Convertit une date ISO (yyyy-mm-dd) en format FR (dd/mm/yyyy)."""
+    if not date_str:
+        return ""
+    try:
+        raw = str(date_str)
+        if len(raw) >= 10 and raw[4] == "-":
+            return datetime.fromisoformat(raw[:10]).strftime("%d/%m/%Y")
+        return raw
+    except (TypeError, ValueError):
+        return str(date_str)
+
+
 def format_sous_traitant(sous_traitant):
     if not sous_traitant:
         return ""
+    rge_du_fr = _format_date_fr(sous_traitant.get("rge_validite_du", ""))
+    rge_au_fr = _format_date_fr(sous_traitant.get("rge_validite_au", ""))
     lines = [
         sous_traitant.get("entreprise", ""),
         f"SIRET : {sous_traitant.get('siret', '')}" if sous_traitant.get("siret") else "",
         sous_traitant.get("adresse", ""),
-        f"RGE : {sous_traitant.get('rge', '')} (du {sous_traitant.get('rge_validite_du', '')} au {sous_traitant.get('rge_validite_au', '')})",
+        f"RGE : {sous_traitant.get('rge', '')} (du {rge_du_fr} au {rge_au_fr})",
         f"Assurance : {sous_traitant.get('assurance', '')}" if sous_traitant.get("assurance") else "",
     ]
     return "\n".join(line for line in lines if line)
