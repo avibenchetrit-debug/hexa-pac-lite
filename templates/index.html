@@ -16014,6 +16014,18 @@ L'équipe Hexa Rénov'</textarea></label>
       duree_vie_pac_ans:20
     };
   }
+  function defaultParamsFinancement(){
+    return {
+      seuil_rac_eur:6000,
+      credit_travaux:{
+        sous_seuil:{ taux_pct:5.90, duree_mois:156 },
+        sur_seuil:{ taux_pct:4.90, duree_mois:180 }
+      },
+      mention_premiere_echeance:"Première échéance 180 jours après travaux",
+      eco_ptz:{ taux_pct:0, duree_mois:180 },
+      libelles:{ option1:"Crédit Travaux", option2:"Éco-PTZ", option3:"Fonds propres" }
+    };
+  }
   function renderBarRows(type, rows){
     return (rows || []).map((r,i)=>{
       if(type==='base') return `<tr data-i="${i}">
@@ -16124,6 +16136,46 @@ L'équipe Hexa Rénov'</textarea></label>
           <label class="adm-field">Durée de vie <div class="adm-input-with-unit"><input type="number" id="adm-eco-duree-vie" value="${adminEscape(eco.duree_vie_pac_ans ?? 20)}" step="1" min="0"><span class="adm-unit">ans</span></div></label>
         </div>
         <div class="adm-actions"><button type="button" class="adm-btn-save" id="btn-save-params-eco-energie">Enregistrer</button></div>
+      </div>`;
+  }
+  function renderParamsFinancement(){
+    const d = defaultParamsFinancement();
+    const fin = Object.assign(defaultParamsFinancement(), M3_ADMIN?.params_financement || {});
+    const credit = Object.assign(d.credit_travaux, fin.credit_travaux || {});
+    const sous = Object.assign(d.credit_travaux.sous_seuil, credit.sous_seuil || {});
+    const sur = Object.assign(d.credit_travaux.sur_seuil, credit.sur_seuil || {});
+    const ptz = Object.assign(d.eco_ptz, fin.eco_ptz || {});
+    const lib = Object.assign(d.libelles, fin.libelles || {});
+    return `
+      <div class="adm-section-block" data-section="params-financement">
+        <div class="adm-section-header">
+          <div class="adm-section">Hypothèses financement</div>
+          <p class="adm-hint">Hypothèses de financement. Saisie uniquement — aucun calcul branché pour l'instant.</p>
+        </div>
+        <div class="adm-subsection"><h3>Seuil reste à charge (€)</h3>
+          <label class="adm-field">Seuil RAC <div class="adm-input-with-unit"><input type="number" id="adm-fin-seuil-rac" value="${adminEscape(fin.seuil_rac_eur ?? 6000)}" step="100" min="0"><span class="adm-unit">€</span></div></label>
+        </div>
+        <div class="adm-subsection"><h3>Crédit Travaux — sous le seuil</h3>
+          <label class="adm-field">Taux <div class="adm-input-with-unit"><input type="number" id="adm-fin-sous-taux" value="${adminEscape(sous.taux_pct ?? 5.90)}" step="0.01" min="0"><span class="adm-unit">%</span></div></label>
+          <label class="adm-field">Durée <div class="adm-input-with-unit"><input type="number" id="adm-fin-sous-duree" value="${adminEscape(sous.duree_mois ?? 156)}" step="1" min="0"><span class="adm-unit">mois</span></div></label>
+        </div>
+        <div class="adm-subsection"><h3>Crédit Travaux — au-dessus du seuil</h3>
+          <label class="adm-field">Taux <div class="adm-input-with-unit"><input type="number" id="adm-fin-sur-taux" value="${adminEscape(sur.taux_pct ?? 4.90)}" step="0.01" min="0"><span class="adm-unit">%</span></div></label>
+          <label class="adm-field">Durée <div class="adm-input-with-unit"><input type="number" id="adm-fin-sur-duree" value="${adminEscape(sur.duree_mois ?? 180)}" step="1" min="0"><span class="adm-unit">mois</span></div></label>
+        </div>
+        <div class="adm-subsection"><h3>Mention première échéance</h3>
+          <label class="adm-field"><input type="text" id="adm-fin-mention" value="${adminEscape(fin.mention_premiere_echeance ?? '')}" placeholder="Première échéance 180 jours après travaux" style="width:100%"></label>
+        </div>
+        <div class="adm-subsection"><h3>Éco-PTZ</h3>
+          <label class="adm-field">Taux <div class="adm-input-with-unit"><input type="number" id="adm-fin-ptz-taux" value="${adminEscape(ptz.taux_pct ?? 0)}" step="0.01" min="0"><span class="adm-unit">%</span></div></label>
+          <label class="adm-field">Durée <div class="adm-input-with-unit"><input type="number" id="adm-fin-ptz-duree" value="${adminEscape(ptz.duree_mois ?? 180)}" step="1" min="0"><span class="adm-unit">mois</span></div></label>
+        </div>
+        <div class="adm-subsection"><h3>Libellés des options</h3>
+          <label class="adm-field">Option 1 <input type="text" id="adm-fin-lib-opt1" value="${adminEscape(lib.option1 ?? '')}"></label>
+          <label class="adm-field">Option 2 <input type="text" id="adm-fin-lib-opt2" value="${adminEscape(lib.option2 ?? '')}"></label>
+          <label class="adm-field">Option 3 <input type="text" id="adm-fin-lib-opt3" value="${adminEscape(lib.option3 ?? '')}"></label>
+        </div>
+        <div class="adm-actions"><button type="button" class="adm-btn-save" id="btn-save-params-financement">Enregistrer</button></div>
       </div>`;
   }
   function admBloc(id, title, content){
@@ -16604,7 +16656,7 @@ L'équipe Hexa Rénov'</textarea></label>
       <div class="adm-add-row"><button type="button" class="adm-btn adm-btn-add" id="adm-add">+ Ajouter une pompe à chaleur</button></div>
       <div class="adm-legend"><div class="adm-legend-row"><span class="adm-dot adm-dot1"></span><span>Option 1 — vente directe : marge brute − CAC − visite − COFRAC − urbanisme.</span></div><div class="adm-legend-row"><span class="adm-dot adm-dot2"></span><span>Option 2 — prix de cession : marge garantie au-dessus de (coût + visite + COFRAC + urbanisme). La régie revend au-dessus et garde le surplus ; la colonne « Commission régie » montre ce qu'elle gagne si elle revend à ton prix catalogue.</span></div></div>
       <div class="adm-actions"><button type="button" class="adm-btn-save" id="adm-save-catalogue">Enregistrer</button></div>`;
-    const adminBody = `${admBloc('1','1. Réglages généraux',admSousBloc('1-1','1.1 Coût Hexa',coutHexa)+admSousBloc('1-2','1.2 Vente Hexa',venteHexa))}${admBloc('2','2. MPR',admSousBloc('2-1','2.1 Forfait MPR',renderMprFields())+admSousBloc('2-2','2.2 Plafonds réglementaires',renderPlafondsSection()))}${admBloc('3','3. CEE',admSousBloc('3-1','3.1 Formule BAR-TH-171 (PAC Air-Eau)',renderFormuleBarSection())+admSousBloc('3-2','3.2 Bonification CEE',renderBonificationFields())+admSousBloc('3-3','3.3 Délégataires CEE',renderDelegatairesFields()))}${admBloc('4','4. Sous-traitants',renderSousTraitantsSection())}${admBloc('5','5. Commercial',admSousBloc('5-1','5.1 Options commerciales',optionsCommerciales)+admSousBloc('5-2','5.2 Modèles et marges nettes',modelesMarges))}${admBloc('6','6. Modèles email',renderEmailsFields())}${admBloc('7','7. Corbeille des leads','<div id="adm-trash" class="adm-trash-empty">Chargement...</div>')}${admBloc('8','8. Paramètres économiques',admSousBloc('8-1',"8.1 Hypothèses économie d'énergie",renderParamsEcoEnergie())+'<!-- 8.2 Financement — sous-bloc à ajouter ultérieurement -->')}`;
+    const adminBody = `${admBloc('1','1. Réglages généraux',admSousBloc('1-1','1.1 Coût Hexa',coutHexa)+admSousBloc('1-2','1.2 Vente Hexa',venteHexa))}${admBloc('2','2. MPR',admSousBloc('2-1','2.1 Forfait MPR',renderMprFields())+admSousBloc('2-2','2.2 Plafonds réglementaires',renderPlafondsSection()))}${admBloc('3','3. CEE',admSousBloc('3-1','3.1 Formule BAR-TH-171 (PAC Air-Eau)',renderFormuleBarSection())+admSousBloc('3-2','3.2 Bonification CEE',renderBonificationFields())+admSousBloc('3-3','3.3 Délégataires CEE',renderDelegatairesFields()))}${admBloc('4','4. Sous-traitants',renderSousTraitantsSection())}${admBloc('5','5. Commercial',admSousBloc('5-1','5.1 Options commerciales',optionsCommerciales)+admSousBloc('5-2','5.2 Modèles et marges nettes',modelesMarges))}${admBloc('6','6. Modèles email',renderEmailsFields())}${admBloc('7','7. Corbeille des leads','<div id="adm-trash" class="adm-trash-empty">Chargement...</div>')}${admBloc('8','8. Paramètres économiques',admSousBloc('8-1',"8.1 Hypothèses économie d'énergie",renderParamsEcoEnergie())+admSousBloc('8-2','8.2 Hypothèses financement',renderParamsFinancement()))}`;
     return `
       <div class="adm-overlay" id="adm-overlay">
         <div class="adm-modal">
@@ -17102,6 +17154,23 @@ L'équipe Hexa Rénov'</textarea></label>
       };
       const r = await fetch('/api/admin/params-eco-energie', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
       if (r.ok) { M3_ADMIN.params_eco_energie = payload; adminToast('✓ Paramètres économiques sauvegardés', '#0D6B3B'); }
+      else adminToast("❌ Erreur lors de l'enregistrement", '#B91C1C');
+    });
+    document.getElementById('btn-save-params-financement')?.addEventListener('click', async ()=>{
+      const n = id => Number(String(document.getElementById(id)?.value ?? '').replace(',','.')) || 0;
+      const t = id => String(document.getElementById(id)?.value ?? '');
+      const payload = {
+        seuil_rac_eur:n('adm-fin-seuil-rac'),
+        credit_travaux:{
+          sous_seuil:{ taux_pct:n('adm-fin-sous-taux'), duree_mois:n('adm-fin-sous-duree') },
+          sur_seuil:{ taux_pct:n('adm-fin-sur-taux'), duree_mois:n('adm-fin-sur-duree') }
+        },
+        mention_premiere_echeance:t('adm-fin-mention'),
+        eco_ptz:{ taux_pct:n('adm-fin-ptz-taux'), duree_mois:n('adm-fin-ptz-duree') },
+        libelles:{ option1:t('adm-fin-lib-opt1'), option2:t('adm-fin-lib-opt2'), option3:t('adm-fin-lib-opt3') }
+      };
+      const r = await fetch('/api/admin/params-financement', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+      if (r.ok) { M3_ADMIN.params_financement = payload; adminToast('✓ Paramètres financement sauvegardés', '#0D6B3B'); }
       else adminToast("❌ Erreur lors de l'enregistrement", '#B91C1C');
     });
     document.getElementById('adm-add-delegataire')?.addEventListener('click', ()=>{
