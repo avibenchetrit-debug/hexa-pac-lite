@@ -14957,9 +14957,42 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     return { montant, erreur: null, details: { typeLogement, etas, surface, zone, categorie, kwhc, mwhc, prixUnitaire, mult } };
   }
 
+  // Estimation réelle de la facture après PAC (€/mois). Renvoie null si données insuffisantes.
+  function calculerFactureApresPac(){
+    // 1. Surface
+    const surface = Number(state.surface_chauffee) || Number(state.surface_habitable) || 0;
+    if (!surface) return null;
+    const params = M3_CONFIG?.params_eco_energie || defaultParamsEcoEnergie();
+    // 2. Zone réduite h1/h2/h3
+    const z = String(state.zone || '').toLowerCase();
+    const zoneRed = z.startsWith('h1') ? 'h1' : z.startsWith('h3') ? 'h3' : 'h2';
+    const conso = Number(params.conso_zone_kwh_m2_an?.[zoneRed]) || 130; // fallback h2
+    // 3. ETAS retenu selon émetteur (fiche) + service
+    const modele = getModeleActuel();
+    const etas35 = Number(modele?.etas35 ?? modele?.raw?.etas35 ?? 0);
+    const etas55 = Number(modele?.etas55 ?? modele?.raw?.etas55 ?? 0);
+    const emetteur = document.querySelector('[name="type_emetteurs"]')?.value || '';
+    const etasRetenu = (emetteur === 'plancher_chauffant' && state.service === 'chauffage_seul')
+      ? etas35
+      : etas55;
+    // 4. ETAS -> SCOP (coef 2.5 = énergie primaire élec, CONSTANTE)
+    let scop = etasRetenu ? (etasRetenu / 100) * 2.5 : 0;
+    if (!(scop > 0)) scop = Number(params.scop_defaut) || 3.5;
+    // 5. Calcul
+    const prixElec = Number(params.prix_kwh?.electricite) || 0.21;
+    const besoinThermiqueAnnuel = surface * conso;     // kWh/an
+    const consoElecPac = besoinThermiqueAnnuel / scop;  // kWh/an
+    const coutAnnuel = consoElecPac * prixElec;         // €/an
+    const factureApresMensuelle = Math.round(coutAnnuel / 12);
+    // 6.
+    return factureApresMensuelle > 0 ? factureApresMensuelle : null;
+  }
+
   async function calcul(){
     if (Object.keys(GRILLE).length === 0 || !CATALOGUE_PAC.length) { await chargerBaremes(); }
     const dim = syncDimensionnement();
+    const factureApresCalc = calculerFactureApresPac();
+    if (factureApresCalc != null && factureApresCalc > 0) state.facture_apres = factureApresCalc;
     const contextePret = !!state.categorie && !!state.zone && Number.isFinite(dim.surface_chauffee) && dim.surface_chauffee > 0;
     const sKey = trancheSurface(state.surface_chauffee);
     const node = GRILLE[state.etas]?.[sKey];
