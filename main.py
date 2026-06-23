@@ -134,6 +134,14 @@ DEFAULT_PLAFONDS_REGLEMENTAIRES = {
     },
 }
 
+DEFAULT_PARAMS_ECO_ENERGIE = {
+    "conso_zone_kwh_m2_an": {"h1": 150, "h2": 130, "h3": 110},
+    "scop_defaut": 3.5,
+    "prix_kwh": {"electricite": 0.21, "gaz": 0.12, "fioul": 0.13, "bois": 0.07},
+    "inflation_annuelle_pct": {"electricite": 3, "gaz": 4, "fioul": 4, "bois": 2.5, "defaut": 4},
+    "duree_vie_pac_ans": 20,
+}
+
 DEFAULT_PARAMETRES_ADMIN = {
     "params": {
         "pose": 3500,
@@ -1531,6 +1539,7 @@ def get_admin_m3() -> JSONResponse:
             "modeles_email": _read_modeles_email(),
             "formule_bar_th_171": load_parametres_admin().get("formule_bar_th_171", DEFAULT_FORMULE_BAR_TH_171),
             "plafonds_reglementaires": load_parametres_admin().get("plafonds_reglementaires", DEFAULT_PLAFONDS_REGLEMENTAIRES),
+            "params_eco_energie": load_parametres_admin().get("params_eco_energie", DEFAULT_PARAMS_ECO_ENERGIE),
         }
     )
 
@@ -1575,6 +1584,21 @@ async def save_plafonds_reglementaires(request: Request):
     payload = await _read_request_payload(request)
     params = load_parametres_admin()
     params["plafonds_reglementaires"] = payload
+    save_parametres_admin_atomic(params)
+    return {"success": True}
+
+
+@app.get("/api/admin/params-eco-energie")
+async def get_params_eco_energie():
+    params = load_parametres_admin()
+    return params.get("params_eco_energie", DEFAULT_PARAMS_ECO_ENERGIE)
+
+
+@app.post("/api/admin/params-eco-energie")
+async def save_params_eco_energie(request: Request):
+    payload = await _read_request_payload(request)
+    params = load_parametres_admin()
+    params["params_eco_energie"] = payload
     save_parametres_admin_atomic(params)
     return {"success": True}
 

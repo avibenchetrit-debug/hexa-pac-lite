@@ -15972,6 +15972,15 @@ L'équipe Hexa Rénov'</textarea></label>
   function defaultPlafondsReglementaires(){
     return { plafond_eligible_ttc:12000, plafonds_aides_pct:{ tres_modeste:90, modeste:75, intermediaire:60, superieur:0 } };
   }
+  function defaultParamsEcoEnergie(){
+    return {
+      conso_zone_kwh_m2_an:{ h1:150, h2:130, h3:110 },
+      scop_defaut:3.5,
+      prix_kwh:{ electricite:0.21, gaz:0.12, fioul:0.13, bois:0.07 },
+      inflation_annuelle_pct:{ electricite:3, gaz:4, fioul:4, bois:2.5, defaut:4 },
+      duree_vie_pac_ans:20
+    };
+  }
   function renderBarRows(type, rows){
     return (rows || []).map((r,i)=>{
       if(type==='base') return `<tr data-i="${i}">
@@ -16043,6 +16052,45 @@ L'équipe Hexa Rénov'</textarea></label>
           </tbody></table>
         </div>
         <div class="adm-actions"><button type="button" class="adm-btn-save" id="btn-save-plafonds">Sauvegarder</button></div>
+      </div>`;
+  }
+  function renderParamsEcoEnergie(){
+    const d = defaultParamsEcoEnergie();
+    const eco = Object.assign(defaultParamsEcoEnergie(), M3_ADMIN?.params_eco_energie || {});
+    const conso = Object.assign(d.conso_zone_kwh_m2_an, eco.conso_zone_kwh_m2_an || {});
+    const prix = Object.assign(d.prix_kwh, eco.prix_kwh || {});
+    const infl = Object.assign(d.inflation_annuelle_pct, eco.inflation_annuelle_pct || {});
+    return `
+      <div class="adm-section-block" data-section="params-eco-energie">
+        <div class="adm-section-header">
+          <div class="adm-section">Hypothèses économie d'énergie</div>
+          <p class="adm-hint">Hypothèses servant à estimer l'économie d'énergie. Saisie uniquement — aucun calcul branché pour l'instant.</p>
+        </div>
+        <div class="adm-subsection"><h3>Consommation par zone climatique (kWh/m²/an)</h3>
+          <label class="adm-field">Zone H1 <div class="adm-input-with-unit"><input type="number" id="adm-eco-conso-h1" value="${adminEscape(conso.h1 ?? 150)}" step="1" min="0"><span class="adm-unit">kWh/m²/an</span></div></label>
+          <label class="adm-field">Zone H2 <div class="adm-input-with-unit"><input type="number" id="adm-eco-conso-h2" value="${adminEscape(conso.h2 ?? 130)}" step="1" min="0"><span class="adm-unit">kWh/m²/an</span></div></label>
+          <label class="adm-field">Zone H3 <div class="adm-input-with-unit"><input type="number" id="adm-eco-conso-h3" value="${adminEscape(conso.h3 ?? 110)}" step="1" min="0"><span class="adm-unit">kWh/m²/an</span></div></label>
+        </div>
+        <div class="adm-subsection"><h3>SCOP par défaut</h3>
+          <label class="adm-field">SCOP <div class="adm-input-with-unit"><input type="number" id="adm-eco-scop" value="${adminEscape(eco.scop_defaut ?? 3.5)}" step="0.1" min="0"></div></label>
+        </div>
+        <div class="adm-subsection"><h3>Prix du kWh (€)</h3>
+          <label class="adm-field">Électricité <div class="adm-input-with-unit"><input type="number" id="adm-eco-prix-elec" value="${adminEscape(prix.electricite ?? 0.21)}" step="0.01" min="0"><span class="adm-unit">€</span></div></label>
+          <label class="adm-field">Gaz <div class="adm-input-with-unit"><input type="number" id="adm-eco-prix-gaz" value="${adminEscape(prix.gaz ?? 0.12)}" step="0.01" min="0"><span class="adm-unit">€</span></div></label>
+          <label class="adm-field">Fioul <div class="adm-input-with-unit"><input type="number" id="adm-eco-prix-fioul" value="${adminEscape(prix.fioul ?? 0.13)}" step="0.01" min="0"><span class="adm-unit">€</span></div></label>
+          <label class="adm-field">Bois <div class="adm-input-with-unit"><input type="number" id="adm-eco-prix-bois" value="${adminEscape(prix.bois ?? 0.07)}" step="0.01" min="0"><span class="adm-unit">€</span></div></label>
+        </div>
+        <div class="adm-subsection"><h3>Inflation annuelle (%)</h3>
+          <label class="adm-field">Électricité <div class="adm-input-with-unit"><input type="number" id="adm-eco-infl-elec" value="${adminEscape(infl.electricite ?? 3)}" step="0.1" min="0"><span class="adm-unit">%</span></div></label>
+          <label class="adm-field">Gaz <div class="adm-input-with-unit"><input type="number" id="adm-eco-infl-gaz" value="${adminEscape(infl.gaz ?? 4)}" step="0.1" min="0"><span class="adm-unit">%</span></div></label>
+          <label class="adm-field">Fioul <div class="adm-input-with-unit"><input type="number" id="adm-eco-infl-fioul" value="${adminEscape(infl.fioul ?? 4)}" step="0.1" min="0"><span class="adm-unit">%</span></div></label>
+          <label class="adm-field">Bois <div class="adm-input-with-unit"><input type="number" id="adm-eco-infl-bois" value="${adminEscape(infl.bois ?? 2.5)}" step="0.1" min="0"><span class="adm-unit">%</span></div></label>
+          <label class="adm-field">Défaut <div class="adm-input-with-unit"><input type="number" id="adm-eco-infl-defaut" value="${adminEscape(infl.defaut ?? 4)}" step="0.1" min="0"><span class="adm-unit">%</span></div></label>
+        </div>
+        <div class="adm-subsection"><h3>Durée de vie PAC</h3>
+          <label class="adm-field">Durée de vie <div class="adm-input-with-unit"><input type="number" id="adm-eco-duree-vie" value="${adminEscape(eco.duree_vie_pac_ans ?? 20)}" step="1" min="0"><span class="adm-unit">ans</span></div></label>
+        </div>
+        <div class="adm-actions"><button type="button" class="adm-btn-save" id="btn-save-params-eco-energie">Enregistrer</button></div>
       </div>`;
   }
   function admBloc(id, title, content){
@@ -16523,7 +16571,7 @@ L'équipe Hexa Rénov'</textarea></label>
       <div class="adm-add-row"><button type="button" class="adm-btn adm-btn-add" id="adm-add">+ Ajouter une pompe à chaleur</button></div>
       <div class="adm-legend"><div class="adm-legend-row"><span class="adm-dot adm-dot1"></span><span>Option 1 — vente directe : marge brute − CAC − visite − COFRAC − urbanisme.</span></div><div class="adm-legend-row"><span class="adm-dot adm-dot2"></span><span>Option 2 — prix de cession : marge garantie au-dessus de (coût + visite + COFRAC + urbanisme). La régie revend au-dessus et garde le surplus ; la colonne « Commission régie » montre ce qu'elle gagne si elle revend à ton prix catalogue.</span></div></div>
       <div class="adm-actions"><button type="button" class="adm-btn-save" id="adm-save-catalogue">Enregistrer</button></div>`;
-    const adminBody = `${admBloc('1','1. Réglages généraux',admSousBloc('1-1','1.1 Coût Hexa',coutHexa)+admSousBloc('1-2','1.2 Vente Hexa',venteHexa))}${admBloc('2','2. MPR',admSousBloc('2-1','2.1 Forfait MPR',renderMprFields())+admSousBloc('2-2','2.2 Plafonds réglementaires',renderPlafondsSection()))}${admBloc('3','3. CEE',admSousBloc('3-1','3.1 Formule BAR-TH-171 (PAC Air-Eau)',renderFormuleBarSection())+admSousBloc('3-2','3.2 Bonification CEE',renderBonificationFields())+admSousBloc('3-3','3.3 Délégataires CEE',renderDelegatairesFields()))}${admBloc('4','4. Sous-traitants',renderSousTraitantsSection())}${admBloc('5','5. Commercial',admSousBloc('5-1','5.1 Options commerciales',optionsCommerciales)+admSousBloc('5-2','5.2 Modèles et marges nettes',modelesMarges))}${admBloc('6','6. Modèles email',renderEmailsFields())}${admBloc('7','7. Corbeille des leads','<div id="adm-trash" class="adm-trash-empty">Chargement...</div>')}`;
+    const adminBody = `${admBloc('1','1. Réglages généraux',admSousBloc('1-1','1.1 Coût Hexa',coutHexa)+admSousBloc('1-2','1.2 Vente Hexa',venteHexa))}${admBloc('2','2. MPR',admSousBloc('2-1','2.1 Forfait MPR',renderMprFields())+admSousBloc('2-2','2.2 Plafonds réglementaires',renderPlafondsSection()))}${admBloc('3','3. CEE',admSousBloc('3-1','3.1 Formule BAR-TH-171 (PAC Air-Eau)',renderFormuleBarSection())+admSousBloc('3-2','3.2 Bonification CEE',renderBonificationFields())+admSousBloc('3-3','3.3 Délégataires CEE',renderDelegatairesFields()))}${admBloc('4','4. Sous-traitants',renderSousTraitantsSection())}${admBloc('5','5. Commercial',admSousBloc('5-1','5.1 Options commerciales',optionsCommerciales)+admSousBloc('5-2','5.2 Modèles et marges nettes',modelesMarges))}${admBloc('6','6. Modèles email',renderEmailsFields())}${admBloc('7','7. Corbeille des leads','<div id="adm-trash" class="adm-trash-empty">Chargement...</div>')}${admBloc('8','8. Paramètres économiques',admSousBloc('8-1',"8.1 Hypothèses économie d'énergie",renderParamsEcoEnergie())+'<!-- 8.2 Financement — sous-bloc à ajouter ultérieurement -->')}`;
     return `
       <div class="adm-overlay" id="adm-overlay">
         <div class="adm-modal">
@@ -17009,6 +17057,19 @@ L'équipe Hexa Rénov'</textarea></label>
       const r = await fetch('/api/admin/plafonds-reglementaires', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
       if (r.ok) { M3_ADMIN.plafonds_reglementaires = payload; adminToast('Plafonds sauvegardés ✓', '#0D6B3B'); window.dispatchEvent(new CustomEvent('hexa-config-changed')); }
       else adminToast('Erreur sauvegarde plafonds', '#B91C1C');
+    });
+    document.getElementById('btn-save-params-eco-energie')?.addEventListener('click', async ()=>{
+      const n = id => Number(String(document.getElementById(id)?.value ?? '').replace(',','.')) || 0;
+      const payload = {
+        conso_zone_kwh_m2_an:{ h1:n('adm-eco-conso-h1'), h2:n('adm-eco-conso-h2'), h3:n('adm-eco-conso-h3') },
+        scop_defaut:n('adm-eco-scop'),
+        prix_kwh:{ electricite:n('adm-eco-prix-elec'), gaz:n('adm-eco-prix-gaz'), fioul:n('adm-eco-prix-fioul'), bois:n('adm-eco-prix-bois') },
+        inflation_annuelle_pct:{ electricite:n('adm-eco-infl-elec'), gaz:n('adm-eco-infl-gaz'), fioul:n('adm-eco-infl-fioul'), bois:n('adm-eco-infl-bois'), defaut:n('adm-eco-infl-defaut') },
+        duree_vie_pac_ans:n('adm-eco-duree-vie')
+      };
+      const r = await fetch('/api/admin/params-eco-energie', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+      if (r.ok) { M3_ADMIN.params_eco_energie = payload; adminToast('✓ Paramètres économiques sauvegardés', '#0D6B3B'); }
+      else adminToast("❌ Erreur lors de l'enregistrement", '#B91C1C');
     });
     document.getElementById('adm-add-delegataire')?.addEventListener('click', ()=>{
       M3_ADMIN = M3_ADMIN || {};
