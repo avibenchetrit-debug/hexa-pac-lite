@@ -15088,22 +15088,30 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
   // ROI : cumul des économies (facture avant inflatée − (facture après inflatée + crédit tant qu'il court))
   // comparé au reste à charge déboursé (g29). Renvoie l'année de rentabilité + total 20 ans.
   function roi(c){
-    const infAvant = INFLATION[state.energie_avant] ?? INFLATION.defaut;
+    const pe = M3_CONFIG?.params_eco_energie || {};
+    const inflA = pe.inflation_annuelle_pct || {};
+    // inflation de l'énergie actuelle (avant), en décimal, fallback constante en dur
+    const infAvant = (inflA[state.energie_avant] != null ? inflA[state.energie_avant]/100
+                      : (inflA.defaut != null ? inflA.defaut/100 : (INFLATION[state.energie_avant] ?? INFLATION.defaut)));
+    // inflation de l'électricité (PAC), en décimal, fallback constante
+    const inflElec = (inflA.electricite != null ? inflA.electricite/100 : INFLATION_ELEC);
+    // durée de vie PAC, fallback constante
+    const dureeVie = Number(pe.duree_vie_pac_ans) || DUREE_VIE_PAC;
     const annAvant0 = state.facture_avant*12;
     const annApres0 = state.facture_apres*12;
     const mensAnnee = c.mensOpt*12;                 // coût crédit annuel
     const dureeCreditAns = c.nMois/12;
     let cumul = 0; let anneeRentable = null;
     const invest = c.g29;
-    for (let an=1; an<=DUREE_VIE_PAC; an++){
+    for (let an=1; an<=dureeVie; an++){
       const factAvant = annAvant0*Math.pow(1+infAvant, an-1);
-      const factApres = annApres0*Math.pow(1+INFLATION_ELEC, an-1);
+      const factApres = annApres0*Math.pow(1+inflElec, an-1);
       const credit = (an <= dureeCreditAns) ? mensAnnee : 0;
       const econoAnnee = factAvant - factApres - credit;
       cumul += econoAnnee;
       if (anneeRentable===null && cumul >= invest) anneeRentable = an;
     }
-    return { anneeRentable, total20: cumul - invest >=0 ? cumul - invest : cumul, infAvant,
+    return { anneeRentable, total20: cumul - invest >=0 ? cumul - invest : cumul, infAvant, inflElec,
              dureeCreditAns, cumulNet: cumul };
   }
 
@@ -15127,7 +15135,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
   // Explication du calcul en langage très simple
   function explicationCalcul(c, r, energieLbl){
     const infA = Math.round(r.infAvant*100);
-    const infE = Math.round(INFLATION_ELEC*100);
+    const infE = Math.round((r.inflElec ?? INFLATION_ELEC)*100);
     return `<b>En clair :</b> le ${energieLbl} coûte de plus en plus cher chaque année (environ +${infA}%). L'électricité aussi, mais beaucoup moins vite (environ +${infE}%). Comme la pompe à chaleur consomme bien moins, le client paie moins qu'avant. Ce qu'il économise chaque année${state.option!=='opt3'?', une fois la mensualité du crédit payée,':''} on l'additionne d'année en année. Quand le total rattrape les ${eur(c.g29)} qu'il a déboursés, le projet est remboursé — et tout ce qui vient ensuite, c'est du gain. Calcul fait sur 20 ans, la durée de vie d'une pompe à chaleur.`;
   }
 
