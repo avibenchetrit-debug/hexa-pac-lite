@@ -7626,6 +7626,28 @@ input:focus{ outline:none; border-color: var(--c-navy,#002E5A); box-shadow:0 0 0
 .adm-models-table td {
   overflow: visible;
 }
+/* === 5.2 : cellules de marge en grille verticale + couleurs sobres === */
+.adm-models-table td .cell-stack{ display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; }
+.adm-models-table .cell-amount{ font-weight:700; font-variant-numeric:tabular-nums; color:#1f2937; font-size:13px; line-height:1.2; }
+.adm-models-table .cell-amount-net1{ color:#1e40af; }
+.adm-models-table .cell-amount-net2{ color:#be185d; }
+.adm-models-table .cell-pct{ font-size:10px; color:#94a3b8; line-height:1.1; }
+.adm-models-table .cell-tools{ display:flex; align-items:center; justify-content:center; gap:5px; min-height:18px; opacity:0; transition:opacity .15s; }
+.adm-models-table tbody tr:hover .cell-tools{ opacity:1; }
+/* alignement chiffres */
+.adm-models-table td.adm-num, .adm-models-table .col-calc, .adm-models-table .col-marge-brute,
+.adm-models-table .col-marge-net1, .adm-models-table .col-marge-net2, .adm-models-table .col-commission{ font-variant-numeric:tabular-nums; }
+/* fonds blancs (retire jaune/bleu/rose/violet des colonnes) */
+.adm-models-table tbody td.col-calc, .adm-models-table tbody td.col-marge-brute, .adm-models-table tbody td.col-marge-net1,
+.adm-models-table tbody td.col-marge-net2, .adm-models-table tbody td.col-cession, .adm-models-table tbody td.col-commission,
+.adm-models-table tbody td.adm-net1, .adm-models-table tbody td.adm-net2, .adm-models-table tbody td.adm-net2b{ background:#fff; }
+/* liseré du groupe RÉGIE — Option 2 */
+.adm-models-table thead th.adm-grp-regie{ border-left:2px solid #be185d; border-right:2px solid #be185d; }
+.adm-models-table td.col-cession{ border-left:2px solid #f1d4df; }
+.adm-models-table td.col-commission{ border-right:2px solid #f1d4df; }
+/* neutralise l'ancien layout flex/inline des cellules net1/net2 */
+.adm-models-table td.adm-num.adm-net1, .adm-models-table td.adm-num.adm-net2{ display:table-cell; }
+.adm-models-table .col-marge-net1 > *, .adm-models-table .col-marge-net2 > *{ display:block; }
 
 </style>
   <style>
@@ -16592,15 +16614,15 @@ L'équipe Hexa Rénov'</textarea></label>
           <td><span class="adm-euro"><input type="text" inputmode="numeric" class="adm-in" data-f="achat" value="${ferow(m.achat)}"><i>€</i></span></td>
           <td class="adm-num col-calc">${eur(r.pose)}</td>
           <td class="adm-num col-calc">${eur(r.cout)}</td>
-          <td class="adm-num adm-strong col-marge-brute">${eur(r.brute)}<em>${pct(r.txBrut)}</em></td>
-          <td class="adm-num adm-net1 col-marge-net1"><b>${eur(r.net1)}</b><em>${pct(r.txNet1)}</em><span class="adm-net1-tools"><span class="adm-tip" data-tip="${tip1.replace(/"/g,'&quot;')}">i</span><button type="button" class="adm-eq-btn" data-eq="${i}" title="Point d'équilibre Option 1 vs Option 2">⚖</button></span></td>
+          <td class="adm-num adm-strong col-marge-brute"><div class="cell-stack"><span class="cell-amount">${eur(r.brute)}</span><span class="cell-pct">${pct(r.txBrut)}</span><span class="cell-tools"></span></div></td>
+          <td class="adm-num adm-net1 col-marge-net1"><div class="cell-stack"><span class="cell-amount cell-amount-net1">${eur(r.net1)}</span><span class="cell-pct">${pct(r.txNet1)}</span><span class="cell-tools"><span class="adm-tip" data-tip="${tip1.replace(/"/g,'&quot;')}">i</span><button type="button" class="adm-eq-btn" data-eq="${i}" title="Point d'équilibre Option 1 vs Option 2">⚖</button></span></div></td>
           <td class="adm-cess adm-rg col-cession ${r.cessionForced?'is-forced':''} ${r.cessionTropHaute?'is-toohigh':''}">
             <span class="adm-euro"><input type="text" inputmode="numeric" class="adm-in adm-cess-in" data-f="cession_forcee" data-i="${i}" value="${ferow(r.cession)}"><i>€</i></span>
             <button type="button" class="adm-cess-reset" data-i="${i}" title="Revenir à la marge globale" ${r.cessionForced?'':'hidden'}>↺</button>
             <span class="adm-tip" data-tip="${(r.cessionTropHaute?'⚠ Prix de cession ≥ prix catalogue HT : la régie ne gagne rien au catalogue. ':'')+cessTip.replace(/"/g,'&quot;')}">i</span>
           </td>
-          <td class="adm-num adm-net2 adm-rg col-marge-net2"><b>${eur(r.net2)}</b><em>${pct(r.txNet2)}</em><span class="adm-tip" data-tip="${tip2.replace(/"/g,'&quot;')}">i</span></td>
-          <td class="adm-num adm-net2b adm-rg col-commission"><b>${eur(r.commissionRegie)}</b><em>au catalogue</em><button type="button" class="adm-sim-btn" data-sim="${i}" title="Simuler si la régie vend plus cher">Simuler ▾</button></td>
+          <td class="adm-num adm-net2 adm-rg col-marge-net2"><div class="cell-stack"><span class="cell-amount cell-amount-net2">${eur(r.net2)}</span><span class="cell-pct">${pct(r.txNet2)}</span><span class="cell-tools"><span class="adm-tip" data-tip="${tip2.replace(/"/g,'&quot;')}">i</span></span></div></td>
+          <td class="adm-num adm-net2b adm-rg col-commission"><div class="cell-stack"><span class="cell-amount">${eur(r.commissionRegie)}</span><span class="cell-pct">au catalogue</span><span class="cell-tools"><button type="button" class="adm-sim-btn" data-sim="${i}" title="Simuler si la régie vend plus cher">Simuler ▾</button></span></div></td>
         </tr>
         <tr class="adm-simrow" id="adm-simrow-${i}" hidden><td colspan="11"></td></tr>`;
       });
@@ -16702,10 +16724,10 @@ L'équipe Hexa Rénov'</textarea></label>
       tds[2].innerHTML = eur(r.ht);
       tds[4].innerHTML = eur(r.pose);
       tds[5].innerHTML = eur(r.cout);
-      tds[6].innerHTML = `${eur(r.brute)}<em>${pct(r.txBrut)}</em>`;
+      tds[6].innerHTML = `<div class="cell-stack"><span class="cell-amount">${eur(r.brute)}</span><span class="cell-pct">${pct(r.txBrut)}</span><span class="cell-tools"></span></div>`;
       const tip1 = `Marge brute ${eurTip(r.brute)} − CAC ${eurTip(cac(p))} − Visite ${eurTip(p.vt1)} − COFRAC ${eurTip(p.cofrac1)} − Urbanisme ${eurTip(p.urba1)} = ${eurTip(r.net1)}. (Frais ECAIR 12% sur MPR déjà déduits dans la marge brute.)`;
       const tip2 = `Prix de cession ${eurTip(r.cession)} = Coût ${eurTip(r.cout)} + Visite ${eurTip(p.vt2)} + COFRAC ${eurTip(p.cofrac2)} + Urbanisme ${eurTip(p.urba2)} + Marge cession ${eurTip(r.margeCession)}. Ma marge nette garantie = ${eurTip(r.net2)}. (Frais ECAIR 12% sur MPR déjà déduits.)`;
-      tds[7].innerHTML = `<b>${eur(r.net1)}</b><em>${pct(r.txNet1)}</em><span class="adm-net1-tools"><span class="adm-tip" data-tip="${tip1.replace(/"/g,'&quot;')}">i</span><button type="button" class="adm-eq-btn" data-eq="${i}" title="Point d'équilibre Option 1 vs Option 2">⚖</button></span>`;
+      tds[7].innerHTML = `<div class="cell-stack"><span class="cell-amount cell-amount-net1">${eur(r.net1)}</span><span class="cell-pct">${pct(r.txNet1)}</span><span class="cell-tools"><span class="adm-tip" data-tip="${tip1.replace(/"/g,'&quot;')}">i</span><button type="button" class="adm-eq-btn" data-eq="${i}" title="Point d'équilibre Option 1 vs Option 2">⚖</button></span></div>`;
       // td[8] = cession (champ éditable) : on ne réécrit pas le HTML, juste la valeur si pas focus + l'état
       const cessTd = tds[8];
       const cessInput = cessTd.querySelector('.adm-cess-in');
@@ -16713,8 +16735,8 @@ L'équipe Hexa Rénov'</textarea></label>
       cessTd.classList.toggle('is-forced', r.cessionForced);
       cessTd.classList.toggle('is-toohigh', r.cessionTropHaute);
       const resetBtn = cessTd.querySelector('.adm-cess-reset'); if(resetBtn) resetBtn.hidden = !r.cessionForced;
-      tds[9].innerHTML = `<b>${eur(r.net2)}</b><em>${pct(r.txNet2)}</em><span class="adm-tip" data-tip="${tip2.replace(/"/g,'&quot;')}">i</span>`;
-      tds[10].innerHTML = `<b>${eur(r.commissionRegie)}</b><em>au catalogue</em><button type="button" class="adm-sim-btn" data-sim="${i}" title="Simuler si la régie vend plus cher">Simuler ▾</button>`;
+      tds[9].innerHTML = `<div class="cell-stack"><span class="cell-amount cell-amount-net2">${eur(r.net2)}</span><span class="cell-pct">${pct(r.txNet2)}</span><span class="cell-tools"><span class="adm-tip" data-tip="${tip2.replace(/"/g,'&quot;')}">i</span></span></div>`;
+      tds[10].innerHTML = `<div class="cell-stack"><span class="cell-amount">${eur(r.commissionRegie)}</span><span class="cell-pct">au catalogue</span><span class="cell-tools"><button type="button" class="adm-sim-btn" data-sim="${i}" title="Simuler si la régie vend plus cher">Simuler ▾</button></span></div>`;
     });
     // rebrancher les boutons recréés
     document.querySelectorAll('.adm-sim-btn').forEach(btn=>{ btn.onclick = ()=>toggleSim(+btn.dataset.sim, false); });
