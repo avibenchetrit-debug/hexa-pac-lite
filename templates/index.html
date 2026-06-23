@@ -15029,18 +15029,36 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     const aidesDevis  = ceeDevis + mprDevis;
     const g29 = Math.max(0, (state.prix_pac || 0) - aidesDevis);
 
-    const mensO1 = pmt(0.049,180,g29);
-    const mensO2 = pmt(0.0,60,g29);
-    const fraisO2 = 0.17*g29;
+    const fin = M3_CONFIG?.params_financement || defaultParamsFinancement();
+    // Option 1 — Crédit Travaux : taux/durée conditionnels au seuil de reste à charge
+    const seuil = Number(fin.seuil_rac_eur) || 0;
+    const sousLeSeuil = g29 < seuil;
+    const ct = sousLeSeuil ? (fin.credit_travaux?.sous_seuil || {}) : (fin.credit_travaux?.sur_seuil || {});
+    const tauxO1 = (Number(ct.taux_pct) || 0) / 100;
+    const dureeO1 = Number(ct.duree_mois) || 0;
+    const mensO1 = pmt(tauxO1, dureeO1, g29);
+    // Option 2 — Éco-PTZ
+    const tauxO2 = (Number(fin.eco_ptz?.taux_pct) || 0) / 100;
+    const dureeO2 = Number(fin.eco_ptz?.duree_mois) || 0;
+    const mensO2 = pmt(tauxO2, dureeO2, g29);
+    const fraisO2 = 0;
 
     // mensualité selon option choisie (opt3 = pas de crédit)
-    const dureeOpt = { opt1:180, opt2:60, opt3:0 };
+    const dureeOpt = { opt1:dureeO1, opt2:dureeO2, opt3:0 };
     const mensOpt = state.option==='opt1' ? mensO1 : state.option==='opt2' ? mensO2 : 0;
     const nMois = dureeOpt[state.option];
 
+    // données d'affichage financement (libellés/taux/durées/mention, tout depuis l'Admin)
+    const finView = {
+      libelles: fin.libelles || {},
+      mention: fin.mention_premiere_echeance || '',
+      tauxO1Pct: Number(ct.taux_pct) || 0, dureeO1,
+      tauxO2Pct: Number(fin.eco_ptz?.taux_pct) || 0, dureeO2
+    };
+
     return { sKey, ceeDevis, ceeConserve, mprDevis, aidesDevis, g29,
              contextePret,
-             mensO1, mensO2, fraisO2, mensOpt, nMois, dim };
+             mensO1, mensO2, fraisO2, mensOpt, nMois, dim, finView };
   }
 
   // ROI : cumul des économies (facture avant inflatée − (facture après inflatée + crédit tant qu'il court))
@@ -15105,7 +15123,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     // mensualité affichée dans Avant/Après selon option
     const creditLine = state.option==='opt3'
       ? ''
-      : `<div class="sa-line"><span>Crédit ${state.option==='opt1'?'Travaux':'Taux Zéro'} <i>${(c.nMois/12)}&nbsp;ans</i></span><b>${eur(c.mensOpt)}/mois</b></div>`;
+      : `<div class="sa-line"><span>${state.option==='opt1'?(c.finView.libelles.option1||'Crédit Travaux'):(c.finView.libelles.option2||'Éco-PTZ')} <i>${(c.nMois/12)}&nbsp;ans</i></span><b>${eur(c.mensOpt)}/mois</b></div>`;
     const totalApres = state.facture_apres + (state.option==='opt3'?0:c.mensOpt);
     const delta = state.facture_avant - totalApres;
     const phraseRoi = phraseCommerciale(c, r, energieLbl, totalApres, delta);
@@ -15218,24 +15236,24 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
         <div class="sim-opts">
           <button type="button" class="sim-opt ${state.option==='opt1'?'active':''}" data-opt="opt1">
             <span class="sim-opt-tag">Option 1</span>
-            <span class="sim-opt-name">Crédit Travaux</span>
-            <span class="sim-opt-sub">4,9 % · 180 mois</span>
+            <span class="sim-opt-name">${c.finView.libelles.option1 || 'Crédit Travaux'}</span>
+            <span class="sim-opt-sub">${String(c.finView.tauxO1Pct).replace('.',',')} % · ${c.finView.dureeO1} mois</span>
             <span class="sim-opt-amt">${eur(c.mensO1)}<small>/mois</small></span>
           </button>
           <button type="button" class="sim-opt ${state.option==='opt2'?'active':''}" data-opt="opt2">
             <span class="sim-opt-tag">Option 2</span>
-            <span class="sim-opt-name">Taux Zéro</span>
-            <span class="sim-opt-sub">0 % · 60 mois</span>
+            <span class="sim-opt-name">${c.finView.libelles.option2 || 'Éco-PTZ'}</span>
+            <span class="sim-opt-sub">${String(c.finView.tauxO2Pct).replace('.',',')} % · ${c.finView.dureeO2} mois</span>
             <span class="sim-opt-amt">${eur(c.mensO2)}<small>/mois</small></span>
           </button>
           <button type="button" class="sim-opt ${state.option==='opt3'?'active':''}" data-opt="opt3">
             <span class="sim-opt-tag">Option 3</span>
-            <span class="sim-opt-name">Fonds propres</span>
+            <span class="sim-opt-name">${c.finView.libelles.option3 || 'Fonds propres'}</span>
             <span class="sim-opt-sub">comptant</span>
             <span class="sim-opt-amt">${eur(c.g29)}<small> 1 fois</small></span>
           </button>
         </div>
-        ${state.option==='opt2' ? `<div class="sim-note sim-note--warn">Frais installateur à prévoir : <b>${eur(c.fraisO2)}</b> (17 % du reste à charge).</div>` : ''}
+        ${state.option==='opt1' && c.finView.mention ? `<div class="sim-note">${c.finView.mention}</div>` : ''}
 
         <!-- AVANT / APRÈS PAC (live) -->
         <div class="sim-section-label">Avant / Après PAC</div>
@@ -15272,7 +15290,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     const r = roi(c);
     const energieLbl = ENERGIE_LABEL[state.energie_avant] || '—';
     const creditLine = state.option==='opt3' ? ''
-      : `<div class="sa-line"><span>Crédit ${state.option==='opt1'?'Travaux':'Taux Zéro'} <i>${(c.nMois/12)}&nbsp;ans</i></span><b>${eur(state.option==='opt1'?c.mensO1:c.mensO2)}/mois</b></div>`;
+      : `<div class="sa-line"><span>${state.option==='opt1'?(c.finView.libelles.option1||'Crédit Travaux'):(c.finView.libelles.option2||'Éco-PTZ')} <i>${(c.nMois/12)}&nbsp;ans</i></span><b>${eur(state.option==='opt1'?c.mensO1:c.mensO2)}/mois</b></div>`;
     const totalApres = state.facture_apres + (state.option==='opt3'?0:(state.option==='opt1'?c.mensO1:c.mensO2));
     const delta = state.facture_avant - totalApres;
     const phraseRoi = phraseCommerciale(c, r, energieLbl, totalApres, delta);
