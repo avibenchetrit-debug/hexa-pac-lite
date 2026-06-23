@@ -7627,12 +7627,14 @@ input:focus{ outline:none; border-color: var(--c-navy,#002E5A); box-shadow:0 0 0
   overflow: visible;
 }
 /* === 5.2 : cellules de marge en grille verticale + couleurs sobres === */
-.adm-models-table td .cell-stack{ display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; }
+.adm-models-table td.col-marge-brute, .adm-models-table td.col-marge-net1, .adm-models-table td.col-marge-net2, .adm-models-table td.col-commission{ position:relative; }
+.adm-models-table td .cell-stack{ display:flex; flex-direction:column; align-items:center; justify-content:center; gap:0; }
 .adm-models-table .cell-amount{ font-weight:700; font-variant-numeric:tabular-nums; color:#1f2937; font-size:13px; line-height:1.2; }
 .adm-models-table .cell-amount-net1{ color:#1e40af; }
 .adm-models-table .cell-amount-net2{ color:#be185d; }
-.adm-models-table .cell-pct{ font-size:10px; color:#94a3b8; line-height:1.1; }
-.adm-models-table .cell-tools{ display:flex; align-items:center; justify-content:center; gap:5px; min-height:18px; opacity:0; transition:opacity .15s; }
+.adm-models-table .cell-pct{ position:absolute; left:0; right:0; bottom:5px; text-align:center; font-size:10px; color:#94a3b8; line-height:1; transition:opacity .15s; }
+.adm-models-table .cell-tools{ position:absolute; left:0; right:0; bottom:4px; display:flex; align-items:center; justify-content:center; gap:5px; opacity:0; transition:opacity .15s; }
+.adm-models-table tbody tr:hover .cell-pct{ opacity:0; }
 .adm-models-table tbody tr:hover .cell-tools{ opacity:1; }
 /* alignement chiffres */
 .adm-models-table td.adm-num, .adm-models-table .col-calc, .adm-models-table .col-marge-brute,
