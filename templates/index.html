@@ -16233,7 +16233,7 @@ L'équipe Hexa Rénov'</textarea></label>
     return `<div class="adm-card">
       <label class="adm-check"><input type="checkbox" id="adm-bonif-actif" ${bonif.actif ? 'checked' : ''}> Coup de pouce actif</label>
       <div class="adm-field adm-field-row"><span class="adm-lab">Multiplicateur</span><input type="number" min="1" max="10" id="adm-bonif-mult" value="${adminEscape(bonif.multiplicateur || 5)}"></div>
-      <p class="adm-opt2-note">La bonification multiplie le montant CEE classique. Par défaut x5 (Coup de pouce Chauffage).</p>
+      <p class="adm-opt2-note">La bonification multiplie le montant CEE (précaire ou classique selon le revenu). Par défaut ×5 (Coup de pouce Chauffage).</p>
       <div class="adm-actions"><button type="button" class="adm-btn-save" id="adm-save-bonif">Enregistrer</button></div>
     </div>`;
   }
@@ -16312,7 +16312,7 @@ L'équipe Hexa Rénov'</textarea></label>
       <div class="adm-card">
         <label class="adm-check"><input type="checkbox" id="adm-bonif-actif" ${bonif.actif ? 'checked' : ''}> Coup de pouce actif</label>
         <div class="adm-field adm-field-row"><span class="adm-lab">Multiplicateur</span><input type="number" min="1" max="10" id="adm-bonif-mult" value="${adminEscape(bonif.multiplicateur || 5)}"></div>
-        <p class="adm-opt2-note">La bonification multiplie le montant CEE classique. Par défaut x5 (Coup de pouce Chauffage).</p>
+        <p class="adm-opt2-note">La bonification multiplie le montant CEE (précaire ou classique selon le revenu). Par défaut ×5 (Coup de pouce Chauffage).</p>
       </div>
       ${renderFormuleBarSection()}
       ${renderPlafondsSection()}
