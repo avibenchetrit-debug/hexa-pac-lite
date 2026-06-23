@@ -1351,6 +1351,8 @@
      4. Bloc CNIL 12.4 non coupé
      ================================================================== */
   @media print {
+    /* Retrait horizontal de .legal-intro : Playwright ignore son padding horizontal en print */
+    .legal-intro { padding-left: 56px !important; padding-right: 56px !important; }
     /* (1) Hero (Votre projet en un coup d'œil) : rester sur la page des infos, aéré */
     .document .hero {
       break-before: avoid !important;
