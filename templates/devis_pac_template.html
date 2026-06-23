@@ -1395,6 +1395,17 @@
     .payment-terms { padding-top: 20px !important; padding-bottom: 20px !important; }
     .payment-card { padding: 14px 16px !important; }
 
+    /* .lots-detail : autoriser à remonter dès la page 1 (pas de saut forcé) + padding haut réduit */
+    .document .lots-detail {
+      break-before: auto !important;
+      page-break-before: auto !important;
+      padding-top: 16px !important;
+    }
+    .document .lots-detail .section-title {
+      break-before: auto !important;
+      page-break-before: auto !important;
+    }
+
     /* (4) Bloc CNIL 12.4 : titre + paragraphe + tableau DPO non coupés (wrapper dédié) */
     .cgv-section-12-4 {
       break-inside: avoid !important;
