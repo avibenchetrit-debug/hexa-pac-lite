@@ -556,6 +556,19 @@
     color: var(--gris-mute);
     font-style: italic;
   }
+
+  @media print {
+    /* fond blanc en impression pour éviter le bloc gris fantôme en bas de page */
+    html, body { background: #ffffff !important; }
+    /* badges : forcer inline-block (plus robuste que inline-flex en print) et empêcher la coupure */
+    .compliance-row { white-space: nowrap; }
+    .compliance-badge {
+      display: inline-block !important;
+      white-space: nowrap;
+    }
+    /* le ✓ doit rester collé au texte du badge */
+    .compliance-badge::before { margin-right: 4px; }
+  }
 </style>
 </head>
 <body>
