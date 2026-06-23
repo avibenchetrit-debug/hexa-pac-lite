@@ -1947,7 +1947,7 @@ async def notedim_preview(numero: str, request: Request) -> HTMLResponse:
 
 @app.get("/api/devis/{numero}/pdf")
 async def devis_pdf(numero: str, request: Request):
-    pdf_bytes = _html_to_pdf(_render_devis_html(request, numero), request)
+    pdf_bytes = _html_to_pdf_playwright(_render_devis_html(request, numero), request)
     version = _next_devis_version(numero)
     _write_pdf(_devis_path(numero, version), pdf_bytes)
     return StreamingResponse(
