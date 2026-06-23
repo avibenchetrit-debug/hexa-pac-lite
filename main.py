@@ -1797,7 +1797,7 @@ def _build_devis_context(request: Request, numero: str) -> dict:
         "date_debut_travaux": "À déterminer",
         "type_logement": prospect.get("type_logement", ""),
         "surface_habitable": str(devis_value(prospect, "surface_habitable", "surface_logement_m2", default="")),
-        "chauffage_actuel": devis_value(prospect, "chauffage_actuel", "mode_chauffage", default=""),
+        "chauffage_actuel": str(devis_value(prospect, "chauffage_actuel", "mode_chauffage", default="")).capitalize(),
         "parcelle_cadastrale": prospect.get("parcelle_cadastrale", ""),
         "zone_climatique": calculer_zone_climatique(cp_chantier, prospect.get("zone_climatique") or prospect.get("zone_climatique_chantier")),
         "modele_pac": modele_obj.get("nom") or modele_obj.get("ref") or "",
@@ -1835,7 +1835,7 @@ def _build_notedim_context(request: Request, numero: str) -> dict:
         "cp_chantier": cp_chantier,
         "ville_chantier": devis_value(prospect, "ville", "ville_chantier", default=""),
         "type_logement": prospect.get("type_logement", ""),
-        "chauffage_actuel": devis_value(prospect, "chauffage_actuel", "mode_chauffage", default=""),
+        "chauffage_actuel": str(devis_value(prospect, "chauffage_actuel", "mode_chauffage", default="")).capitalize(),
         **calculer_notedim(prospect, state, catalogue),
     }
     return context
@@ -1960,7 +1960,7 @@ async def devis_pdf(numero: str, request: Request):
 @app.get("/api/notedim/{numero}/pdf")
 async def notedim_pdf(numero: str, request: Request):
     version = _next_devis_version(numero)
-    pdf_bytes = _html_to_pdf(_render_notedim_html(request, numero), request)
+    pdf_bytes = _html_to_pdf_playwright(_render_notedim_html(request, numero), request)
     _write_pdf(_notedim_path(numero, version), pdf_bytes)
     return StreamingResponse(
         io.BytesIO(pdf_bytes),
