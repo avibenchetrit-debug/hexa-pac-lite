@@ -1870,6 +1870,38 @@ def _html_to_pdf(html_content: str, request: Request) -> bytes:
     return HTML(string=html_content, base_url=str(request.base_url)).write_pdf()
 
 
+def _html_to_pdf_playwright(html_content: str, request: Request) -> bytes:
+    """Génère un PDF fidèle au HTML via Chromium (Playwright), rendu navigateur réel."""
+    try:
+        from playwright.sync_api import sync_playwright
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=500, detail=f"Playwright indisponible: {exc}") from exc
+
+    base_url = str(request.base_url)
+
+    def _run() -> bytes:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(args=["--no-sandbox"])
+            try:
+                page = browser.new_page()
+                # base_url résout les chemins relatifs (CSS, images) comme dans le navigateur.
+                # set_content() de Playwright 1.49 n'accepte pas base_url -> on ne le passe pas ici.
+                page.set_content(html_content, wait_until="networkidle")
+                pdf_bytes = page.pdf(
+                    format="A4",
+                    print_background=True,
+                    margin={"top": "0", "bottom": "0", "left": "0", "right": "0"},
+                )
+            finally:
+                browser.close()
+            return pdf_bytes
+
+    # Playwright sync doit tourner hors de la boucle asyncio de FastAPI : on l'isole dans un thread.
+    import concurrent.futures
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as ex:
+        return ex.submit(_run).result()
+
+
 def _write_pdf(path: str, pdf_bytes: bytes) -> str:
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "wb") as f:
