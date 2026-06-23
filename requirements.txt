@@ -8,3 +8,4 @@ reportlab
 weasyprint==62.3
 pydyf==0.10.0
 resend==2.1.0
+playwright==1.49.0

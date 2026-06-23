@@ -19,6 +19,10 @@ RUN apt-get update && apt-get install -y \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Playwright : installe le navigateur Chromium + ses dépendances système Debian.
+# Placé après pip install (playwright doit être installé) et avant COPY . . (cache Docker).
+RUN playwright install --with-deps chromium
+
 COPY . .
 
 EXPOSE 8080
