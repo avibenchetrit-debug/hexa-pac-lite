@@ -9285,7 +9285,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
   }
 
   window.OPTIONAL_BACKEND_APIS_ENABLED = true;
-  async function fetchOptionalBackendApi(url) {
+  window.fetchOptionalBackendApi = async function fetchOptionalBackendApi(url) {
     console.log('[DBG] fetchOptional', url, 'flag=', window.OPTIONAL_BACKEND_APIS_ENABLED);
     if (!window.OPTIONAL_BACKEND_APIS_ENABLED) {
       console.debug('Endpoint pas encore branché:', url);
@@ -9300,7 +9300,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       console.debug('Endpoint pas encore branché:', e.message);
       return null;
     }
-  }
+  };
 
   function activerToggleAuditDpe(audit, dpe) {
     const pillAudit = document.querySelector('.dpe-source-pill[data-source="audit_officiel"]');
@@ -9329,7 +9329,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
         await window.lancerRechercheDpeSources(adresse, cp, lat, lon);
       } else {
         const q = new URLSearchParams({ adresse, cp, lat: String(lat), lon: String(lon) });
-        const data = await fetchOptionalBackendApi(`/api/dpe-lookup?${q}`);
+        const data = await window.fetchOptionalBackendApi(`/api/dpe-lookup?${q}`);
         if (!data) return;
         const src = data.source;
         const row = (data.sources && data.sources[src]) || {};
@@ -10489,7 +10489,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       const urbsUrl = banId
         ? `/api/urbs?ban_id=${encodeURIComponent(banId)}&adresse=${encodeURIComponent(adresse)}&cp=${encodeURIComponent(cp5)}`
         : `/api/urbs?adresse=${encodeURIComponent(adresse)}&cp=${encodeURIComponent(cp5)}`;
-      const urbs = await fetchOptionalBackendApi(urbsUrl);
+      const urbs = await window.fetchOptionalBackendApi(urbsUrl);
       if (urbs && !urbs.error) {
         appliquerUrbs(urbs);
         if (dpeStatus) {
@@ -10604,7 +10604,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     if (!window.OPTIONAL_BACKEND_APIS_ENABLED) return;
     if (statusEl) statusEl.textContent = '⏳ Mérimée…';
     try {
-      const data = await fetchOptionalBackendApi(`/api/batiment-classe?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}`);
+      const data = await window.fetchOptionalBackendApi(`/api/batiment-classe?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}`);
       if (!data) return;
       if (data.batiment_classe === true || data.batiment_classe === false || data.batiment_classe === 'Oui' || data.batiment_classe === 'Non') {
         const v = (data.batiment_classe === true || data.batiment_classe === 'Oui') ? 'oui' : 'non';
@@ -10631,7 +10631,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     if (!window.OPTIONAL_BACKEND_APIS_ENABLED) return;
     if (statusEl) statusEl.textContent = '⏳ Périmètre MH…';
     try {
-      const data = await fetchOptionalBackendApi(`/api/zone-protegee?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}`);
+      const data = await window.fetchOptionalBackendApi(`/api/zone-protegee?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}`);
       if (!data) return;
       if (data.zone_protegee === true || data.zone_protegee === false) {
         const v = data.zone_protegee ? 'oui' : 'non';
@@ -11329,7 +11329,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       const pNum = document.body.dataset.prospectNumero;
       if (pNum) q.set('prospect_numero', pNum);
       console.log('[DBG] FETCH', '/api/dpe-lookup?' + q.toString());
-      const data = await fetchOptionalBackendApi(`/api/dpe-lookup?${q.toString()}`);
+      const data = await window.fetchOptionalBackendApi(`/api/dpe-lookup?${q.toString()}`);
       if (!data) return;
       console.log('[DBG] data recu', data);
       majPillsDpeSources(data);
@@ -12630,7 +12630,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     statusEl.innerHTML = '⏳ Calcul DPE enrichi URBS…';
     statusEl.style.background = '#E8EFF7'; statusEl.style.color = '#1A4A7A';
     try {
-      const u = await fetchOptionalBackendApi(`/api/urbs?adresse=${encodeURIComponent(adresse)}&cp=${encodeURIComponent(cp)}`);
+      const u = await window.fetchOptionalBackendApi(`/api/urbs?adresse=${encodeURIComponent(adresse)}&cp=${encodeURIComponent(cp)}`);
       if (!u) {
         statusEl.style.display = 'none';
         return;
