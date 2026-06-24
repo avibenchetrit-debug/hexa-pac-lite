@@ -2115,7 +2115,7 @@
     font-style: italic;
     line-height: 1.5;
   }
-  .projet-apercu { margin: 18px 0 0; background: var(--gris-fond); border-left: 3px solid var(--rouge); padding: 16px 24px; }
+  .projet-apercu { margin: 22px 0 0; width: 100%; box-sizing: border-box; background: var(--gris-fond); border-left: 3px solid var(--rouge); padding: 16px 24px; }
   .projet-apercu-title { font-size: 10px; text-transform: uppercase; letter-spacing: 0.22em; color: var(--rouge); font-weight: 700; margin-bottom: 12px; }
   .projet-apercu-accroche { display: table; width: 100%; margin-bottom: 14px; }
   .projet-apercu-eclair { display: inline-block; width: 28px; height: 28px; border-radius: 50%; background: var(--rouge); text-align: center; vertical-align: middle; line-height: 32px; margin-right: 10px; }
@@ -3471,6 +3471,9 @@
 <tfoot><tr><td>Total</td><td class="right">{{ total_ht }}</td><td class="right">{{ total_tva }}</td></tr></tfoot>
 </table>
 <div class="tva-cgi">Taux de TVA applicable selon la réglementation en vigueur (articles 278 et s. du CGI).</div>
+
+</div>
+</div>
 {% if projet_apercu %}
 <div class="projet-apercu">
   <div class="projet-apercu-title">Votre projet en un coup d'œil</div>
@@ -3501,9 +3504,6 @@
   <div class="projet-apercu-legal">Estimations indicatives non contractuelles. La facture d'électricité dépend de votre consommation et de l'évolution des tarifs. Financement sous réserve d'acceptation de l'organisme prêteur ; un Éco-PTZ à 0&nbsp;% est également mobilisable auprès de votre banque.</div>
 </div>
 {% endif %}
-
-</div>
-</div>
 <div class="anah-mention-block anah-mention-block-full">
 <strong>Condition MaPrimeRénov'</strong><br>
 Dans le cas où l'aide notifiée au client est inférieure au montant de l'aide prévisionnelle, l'usager n'est pas lié par le devis et l'entreprise s'engage à proposer un devis rectificatif. Le client conserve alors un droit de rétractation d'une durée de quatorze jours à partir de la date de présentation du devis rectificatif. L'aide MaPrimeRénov' est conditionnelle et soumise à la conformité des pièces justificatives et informations déclarées par le bénéficiaire. En cas de fausse déclaration, de manoeuvre frauduleuse ou de changement du projet de travaux subventionné, le bénéficiaire s'expose au retrait et au reversement de tout ou partie de l'aide. Les services de l'ANAH pourront faire procéder à tout contrôle des engagements et sanctionner le bénéficiaire et son mandataire éventuel des manquements constatés.<br><br>
