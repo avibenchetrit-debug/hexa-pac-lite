@@ -8971,7 +8971,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     const numDisplay = document.getElementById('dpe-numero-display');
     const dateDisplay = document.getElementById('dpe-date-display');
     if (numDisplay) numDisplay.textContent = num || '—';
-    if (dateDisplay) dateDisplay.textContent = date || '—';
+    if (dateDisplay) dateDisplay.textContent = date ? _formatDate(date) : '—';
   }
   window.syncDpeMetaDisplay = syncDpeMetaDisplay;
 
