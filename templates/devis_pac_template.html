@@ -2115,6 +2115,27 @@
     font-style: italic;
     line-height: 1.5;
   }
+  .projet-apercu { margin: 18px 0 0; background: var(--gris-fond); border-left: 3px solid var(--rouge); padding: 16px 24px; }
+  .projet-apercu-title { font-size: 10px; text-transform: uppercase; letter-spacing: 0.22em; color: var(--rouge); font-weight: 700; margin-bottom: 12px; }
+  .projet-apercu-accroche { display: table; width: 100%; margin-bottom: 14px; }
+  .projet-apercu-eclair { display: inline-block; width: 28px; height: 28px; border-radius: 50%; background: var(--rouge); text-align: center; vertical-align: middle; line-height: 32px; margin-right: 10px; }
+  .projet-apercu-accroche > span:last-child { color: var(--bleu); font-weight: 600; font-size: 13px; line-height: 1.4; }
+  .projet-apercu-cols { display: table; width: 100%; table-layout: fixed; border-top: 1px solid var(--gris-ligne); }
+  .projet-apercu-col { display: table-cell; width: 50%; padding: 12px 16px 12px 0; vertical-align: top; }
+  .projet-apercu-col + .projet-apercu-col { padding-left: 20px; border-left: 1px solid var(--gris-ligne); }
+  .projet-apercu-phase { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--gris-mute); margin-bottom: 5px; }
+  .projet-apercu-ligne { font-size: 13px; color: var(--gris-texte); margin-bottom: 8px; }
+  .projet-apercu-ligne strong { color: var(--bleu); font-weight: 700; }
+  .pa-barre { text-decoration: line-through; color: var(--gris-mute); }
+  .projet-apercu-eco { display: inline-block; padding: 4px 10px; border-radius: 4px; font-size: 11px; color: var(--gris-texte); }
+  .projet-apercu-eco strong { font-size: 15px; }
+  .pa-eco-rouge { background: #FBEAEE; } .pa-eco-rouge strong { color: var(--rouge); }
+  .pa-eco-bleu { background: var(--bleu-pale); } .pa-eco-bleu strong { color: var(--bleu); }
+  .projet-apercu-note { font-size: 10px; color: var(--gris-mute); margin-top: 7px; }
+  .projet-apercu-fin { display: table; width: 100%; margin-top: 12px; padding: 10px 0 0; border-top: 1px solid var(--gris-ligne); }
+  .projet-apercu-fin-label { display: table-cell; font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--gris-mute); }
+  .projet-apercu-fin-val { display: table-cell; text-align: right; font-size: 13px; font-weight: 700; color: var(--bleu); }
+  .projet-apercu-legal { font-size: 10px; color: var(--gris-mute); line-height: 1.5; margin-top: 12px; }
 
   /* Remises récap */
   .remises-recap {
@@ -3450,6 +3471,36 @@
 <tfoot><tr><td>Total</td><td class="right">{{ total_ht }}</td><td class="right">{{ total_tva }}</td></tr></tfoot>
 </table>
 <div class="tva-cgi">Taux de TVA applicable selon la réglementation en vigueur (articles 278 et s. du CGI).</div>
+{% if projet_apercu %}
+<div class="projet-apercu">
+  <div class="projet-apercu-title">Votre projet en un coup d'œil</div>
+  <div class="projet-apercu-accroche">
+    <span class="projet-apercu-eclair">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+    </span>
+    <span>Démarrez sans attendre : avec un crédit travaux, réponse de principe sous 24&nbsp;h — et vous économisez dès le premier mois.</span>
+  </div>
+  <div class="projet-apercu-cols">
+    <div class="projet-apercu-col">
+      <div class="projet-apercu-phase">Pendant le crédit</div>
+      <div class="projet-apercu-ligne"><span class="pa-barre">{{ projet_apercu.facture_avant }} €</span> → <strong>{{ projet_apercu.total_credit }} €</strong>/mois</div>
+      <div class="projet-apercu-eco pa-eco-rouge">vous économisez <strong>{{ projet_apercu.eco_pendant }} €</strong>/mois</div>
+      <div class="projet-apercu-note">…tout en remboursant votre installation</div>
+    </div>
+    <div class="projet-apercu-col">
+      <div class="projet-apercu-phase">Après le crédit</div>
+      <div class="projet-apercu-ligne"><span class="pa-barre">{{ projet_apercu.facture_avant }} €</span> → <strong>{{ projet_apercu.facture_apres }} €</strong>/mois</div>
+      <div class="projet-apercu-eco pa-eco-bleu">vous économisez <strong>{{ projet_apercu.eco_apres }} €</strong>/mois</div>
+      <div class="projet-apercu-note">…l'installation est à vous</div>
+    </div>
+  </div>
+  <div class="projet-apercu-fin">
+    <span class="projet-apercu-fin-label">Financement</span>
+    <span class="projet-apercu-fin-val">{{ projet_apercu.taux_pct }} % · {{ projet_apercu.duree_mois }} mois · 1ʳᵉ échéance à {{ projet_apercu.premiere_echeance_jours }} j</span>
+  </div>
+  <div class="projet-apercu-legal">Estimations indicatives non contractuelles. La facture d'électricité dépend de votre consommation et de l'évolution des tarifs. Financement sous réserve d'acceptation de l'organisme prêteur ; un Éco-PTZ à 0&nbsp;% est également mobilisable auprès de votre banque.</div>
+</div>
+{% endif %}
 
 </div>
 </div>

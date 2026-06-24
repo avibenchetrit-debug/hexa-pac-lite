@@ -1832,6 +1832,29 @@ def _build_devis_context(request: Request, numero: str) -> dict:
         devis_value(state, "service", default="chauffage_ecs"),
         facture_avant, admin,
     )
+    _eco = context.get("economie_devis") or {}
+    _fin = context.get("financement_devis") or {}
+    projet_apercu = None
+    if _eco.get("facture_apres_mois") and _eco.get("facture_avant_mois"):
+        _fav = float_value(_eco.get("facture_avant_mois"))
+        _fap = float_value(_eco.get("facture_apres_mois"))
+        _mens = float_value(_fin.get("mensualite"))
+        _total_credit = round(_fap + _mens)
+        _eco_pendant = round(_fav - _total_credit)
+        _eco_apres = round(_fav - _fap)
+        if _fav > 0 and _eco_pendant > 0 and _eco_apres > 0:
+            projet_apercu = {
+                "facture_avant": round(_fav),
+                "facture_apres": round(_fap),
+                "total_credit": _total_credit,
+                "mensualite_credit": round(_mens),
+                "eco_pendant": _eco_pendant,
+                "eco_apres": _eco_apres,
+                "taux_pct": _fin.get("taux_pct"),
+                "duree_mois": _fin.get("duree_mois"),
+                "premiere_echeance_jours": _fin.get("premiere_echeance_jours"),
+            }
+    context["projet_apercu"] = projet_apercu
     return context
 
 
