@@ -15123,23 +15123,23 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     const av = eur(state.facture_avant);
     const ap = eur(totalApres);
     if (!r.anneeRentable){
-      return `Avec cette configuration, le projet se rentabilise au-delà de 20 ans. Ajustez l'option de financement ou la facture après PAC pour améliorer le retour.`;
+      return `Cette configuration se rentabilise au-delà de 20 ans. Ajustez l'option de financement ou le modèle.`;
     }
-    if (state.option==='opt3'){
-      // fonds propres : pas de mensualité
-      return `Aujourd'hui le client paie ${av} par mois pour se chauffer. Avec la pompe à chaleur, il ne paiera plus que ${ap} par mois. Il met ${eur(c.g29)} de sa poche au départ, et ses économies lui rendent cette somme en ${r.anneeRentable} ans. Tout ce qui suit, c'est de l'argent gagné.`;
+    if (r.estCredit && delta >= 0){
+      return `Aujourd'hui : ${av}/mois de ${energieLbl}, perdus. Demain : ${ap}/mois (${eur(state.facture_apres)} d'électricité + ${eur(c.mensOpt)} qui remboursent votre installation). Vous payez ${eur(delta)} de moins chaque mois, sans rien avancer. Crédit terminé, vous tombez à ${eur(state.facture_apres)}/mois.`;
     }
-    if (delta >= 0){
-      return `Aujourd'hui le client paie ${av} par mois pour se chauffer. Avec la pompe à chaleur, entre l'électricité et le crédit, il paiera ${ap} par mois : c'est déjà moins cher tout de suite. Une fois le crédit terminé, sa facture tombe à ${eur(state.facture_apres)} par mois. Au total, le projet est remboursé en ${r.anneeRentable} ans.`;
+    if (r.estCredit){
+      return `Pendant le crédit, vous payez ${ap}/mois, un peu plus qu'aujourd'hui — mais cet argent rembourse VOTRE installation, il n'est pas perdu. Crédit soldé, votre facture tombe à ${eur(state.facture_apres)}/mois. Gagnant dès la ${r.anneeRentable}ᵉ année.`;
     }
-    return `Aujourd'hui le client paie ${av} par mois. Pendant le crédit, il paiera ${ap} par mois (un peu plus), mais dès le crédit soldé sa facture tombe à ${eur(state.facture_apres)} par mois. Le projet est remboursé en ${r.anneeRentable} ans.`;
+    return `Vous avancez ${eur(c.g29)}. Vos économies de chauffage (${av} → ${eur(state.facture_apres)}/mois) vous les rendent en ${r.anneeRentable} ans. Ensuite, c'est gain pur.`;
   }
 
   // Explication du calcul en langage très simple
   function explicationCalcul(c, r, energieLbl){
-    const infA = Math.round(r.infAvant*100);
-    const infE = Math.round((r.inflElec ?? INFLATION_ELEC)*100);
-    return `<b>En clair :</b> le ${energieLbl} coûte de plus en plus cher chaque année (environ +${infA}%). L'électricité aussi, mais beaucoup moins vite (environ +${infE}%). Comme la pompe à chaleur consomme bien moins, le client paie moins qu'avant. Ce qu'il économise chaque année${state.option!=='opt3'?', une fois la mensualité du crédit payée,':''} on l'additionne d'année en année. Quand le total rattrape les ${eur(c.g29)} qu'il a déboursés, le projet est remboursé — et tout ce qui vient ensuite, c'est du gain. Calcul fait sur 20 ans, la durée de vie d'une pompe à chaleur.`;
+    if (r.estCredit){
+      return `<b>"Mais le crédit, je le paie quand même ?"</b> Oui — avec l'argent que vous donniez déjà au ${energieLbl}. Avant, ${eur(state.facture_avant)}/mois partaient en fumée chez votre fournisseur. Maintenant, ${eur(c.mensOpt)} de votre mensualité remboursent un équipement qui devient le vôtre. Vous ne payez pas la pompe à chaleur en plus de votre chauffage — vous la payez à la place, pour moins cher. Et le ${energieLbl} augmente d'environ ${Math.round(r.infAvant*100)}%/an, pas votre crédit. Crédit soldé, vous ne payez plus que ${eur(state.facture_apres)}/mois.`;
+    }
+    return `<b>En clair :</b> vous avancez ${eur(c.g29)} une fois. Vos économies de chauffage remboursent cette somme en ${r.anneeRentable} ans. Ensuite vous gardez tout : sur 20 ans, ça fait ${eur(r.total20)} dans votre poche. Le ${energieLbl} augmente d'environ ${Math.round(r.infAvant*100)}%/an, donc l'écart se creuse en votre faveur chaque année.`;
   }
 
 
@@ -15305,7 +15305,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
         <!-- ROI -->
         <div class="sim-roi">
           <div class="sim-roi-head">
-            ${r.anneeRentable?`Projet rentable dès la <b>${r.anneeRentable}ᵉ année</b>`:`Rentabilité au-delà de 20 ans`}
+            ${!r.anneeRentable ? `Rentabilité au-delà de 20 ans` : r.estCredit ? (delta>=0 ? `Moins cher dès le <b>1er mois</b>` : `Rentable dès la <b>${r.anneeRentable}ᵉ année</b>`) : `Remboursé en <b>${r.anneeRentable} ans</b>`}
             <button type="button" class="sim-info-btn" id="sim-roi-info" aria-label="Détail calcul">i</button>
           </div>
           <p class="sim-roi-phrase">${phraseRoi}</p>
