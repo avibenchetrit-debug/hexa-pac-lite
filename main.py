@@ -534,7 +534,7 @@ def _upsert_lead(payload: dict, forced_numero: str | None = None) -> tuple[dict,
 
 
 def _now_iso():
-    return datetime.now().isoformat(timespec="seconds")
+    return datetime.now(PARIS_TZ).isoformat(timespec="seconds")
 
 
 def _now_paris_iso():
@@ -1797,7 +1797,7 @@ def _build_devis_context(request: Request, numero: str) -> dict:
 
     modele_ref = state.get("modele_pac_id") or state.get("modele_pac")
     modele_obj = find_modele(catalogue, modele_ref) or select_default_modele(prospect, catalogue)
-    today = datetime.now()
+    today = datetime.now(PARIS_TZ)
     calculs = calculer_devis(prospect, state, admin, catalogue)
     sous_traitant = next((st for st in admin.get("sous_traitants", []) if st.get("actif")), {})
     cp_chantier = devis_value(prospect, "cp_chantier", "code_postal_chantier", "cp", default="")
@@ -1904,7 +1904,7 @@ def _build_notedim_context(request: Request, numero: str) -> dict:
     missing = validate_prospect_for_devis(prospect, state)
     if missing:
         return {"request": request, "missing": missing, "numero": numero, "_error_template": "erreur_champs_manquants.html"}
-    now = datetime.now()
+    now = datetime.now(PARIS_TZ)
     cp_chantier = devis_value(prospect, "cp_chantier", "code_postal_chantier", "cp", default="")
     context = {
         "request": request,
