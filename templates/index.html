@@ -9284,9 +9284,9 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     }
   }
 
-  const OPTIONAL_BACKEND_APIS_ENABLED = true;
+  window.OPTIONAL_BACKEND_APIS_ENABLED = true;
   async function fetchOptionalBackendApi(url) {
-    if (!OPTIONAL_BACKEND_APIS_ENABLED) {
+    if (!window.OPTIONAL_BACKEND_APIS_ENABLED) {
       console.debug('Endpoint pas encore branché:', url);
       return null;
     }
@@ -10584,7 +10584,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     const statusEl = document.getElementById('batiment-classe-status');
     const sel = document.getElementById('batiment-classe-select');
     const hidden = document.getElementById('batiment-classe-hidden');
-    if (!OPTIONAL_BACKEND_APIS_ENABLED) return;
+    if (!window.OPTIONAL_BACKEND_APIS_ENABLED) return;
     if (statusEl) statusEl.textContent = '⏳ Mérimée…';
     try {
       const data = await fetchOptionalBackendApi(`/api/batiment-classe?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}`);
@@ -10611,7 +10611,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     const statusEl = document.getElementById('zone-protegee-status');
     const sel = document.getElementById('zone-protegee-select');
     const hidden = document.getElementById('zone-protegee-hidden');
-    if (!OPTIONAL_BACKEND_APIS_ENABLED) return;
+    if (!window.OPTIONAL_BACKEND_APIS_ENABLED) return;
     if (statusEl) statusEl.textContent = '⏳ Périmètre MH…';
     try {
       const data = await fetchOptionalBackendApi(`/api/zone-protegee?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}`);
