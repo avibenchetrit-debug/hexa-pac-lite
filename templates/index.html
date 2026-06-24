@@ -14058,6 +14058,12 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
             <button type="button" class="hexa-meta-card-action" data-devis-download="${item.version}">📥 Télécharger</button>
             <button type="button" class="hexa-meta-card-action" data-devis-resend="${item.version}">📧 Renvoyer</button>
           </div>
+          ${item.has_notedim ? `
+          <div style="margin-top:8px;padding-top:8px;border-top:1px solid #eee;">
+            <div style="font-size:11px;color:#888;margin-bottom:4px;">Note de dimensionnement</div>
+            <button type="button" class="hexa-meta-card-action" data-notedim-preview="${item.version}">👁 Aperçu</button>
+            <button type="button" class="hexa-meta-card-action" data-notedim-download="${item.version}">📥 Télécharger</button>
+          </div>` : ''}
         </div>`).join('');
       root.querySelectorAll('[data-devis-preview]').forEach(btn => {
         btn.addEventListener('click', () => openDevisPdfViewer(btn.dataset.devisPreview));
@@ -14067,6 +14073,12 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       });
       root.querySelectorAll('[data-devis-resend]').forEach(btn => {
         btn.addEventListener('click', () => window.ouvrirSimulationsDrawer?.(currentProspect));
+      });
+      root.querySelectorAll('[data-notedim-preview]').forEach(btn => {
+        btn.addEventListener('click', () => openNotedimPdfViewer(btn.dataset.notedimPreview));
+      });
+      root.querySelectorAll('[data-notedim-download]').forEach(btn => {
+        btn.addEventListener('click', () => window.open(`/api/notedim/${encodeURIComponent(currentProspect)}/download?version=${encodeURIComponent(btn.dataset.notedimDownload)}`, '_blank'));
       });
     } catch (_) {
       root.innerHTML = '<div class="pv-muted">Aucun devis envoyé pour ce prospect</div>';
@@ -14083,6 +14095,20 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     const dlUrl = `/api/devis/${encodeURIComponent(currentProspect)}/download?version=${encodeURIComponent(version)}`;
     ttl.textContent = `Devis v${version}`;
     body.innerHTML = `<iframe title="Devis v${version}" src="${viewUrl}"></iframe>`;
+    document.getElementById('doc-viewer-dl').onclick = () => window.open(dlUrl, '_blank');
+    ov.classList.add('open');
+  }
+
+  function openNotedimPdfViewer(version) {
+    ensureViewer();
+    const ov = document.getElementById('doc-viewer-overlay');
+    const body = document.getElementById('doc-viewer-body');
+    const ttl = document.getElementById('doc-viewer-title');
+    if (!ov || !body) return;
+    const viewUrl = `/api/notedim/${encodeURIComponent(currentProspect)}/view?version=${encodeURIComponent(version)}`;
+    const dlUrl = `/api/notedim/${encodeURIComponent(currentProspect)}/download?version=${encodeURIComponent(version)}`;
+    ttl.textContent = `Note de dimensionnement v${version}`;
+    body.innerHTML = `<iframe title="Note v${version}" src="${viewUrl}"></iframe>`;
     document.getElementById('doc-viewer-dl').onclick = () => window.open(dlUrl, '_blank');
     ov.classList.add('open');
   }

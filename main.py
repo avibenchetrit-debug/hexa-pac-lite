@@ -2369,7 +2369,9 @@ async def list_devis(numero: str) -> JSONResponse:
                 "sent_at": item.get("sent_at", ""),
                 "email": item.get("email", ""),
                 "file": path,
+                "has_notedim": bool(item.get("notedim_file") and os.path.exists(item.get("notedim_file"))),
             })
+    items.sort(key=lambda x: x.get("version", 0), reverse=True)
     return JSONResponse(items)
 
 
@@ -2387,6 +2389,22 @@ async def view_devis(numero: str, version: int):
     if not os.path.exists(path):
         raise HTTPException(status_code=404, detail="Devis introuvable")
     return FileResponse(path, media_type="application/pdf", headers={"Content-Disposition": "inline"})
+
+
+@app.get("/api/notedim/{numero}/view")
+async def view_notedim(numero: str, version: int):
+    path = _notedim_path(numero, version)
+    if not os.path.exists(path):
+        raise HTTPException(status_code=404, detail="Note de dimensionnement introuvable")
+    return FileResponse(path, media_type="application/pdf", headers={"Content-Disposition": "inline"})
+
+
+@app.get("/api/notedim/{numero}/download")
+async def download_notedim(numero: str, version: int):
+    path = _notedim_path(numero, version)
+    if not os.path.exists(path):
+        raise HTTPException(status_code=404, detail="Note de dimensionnement introuvable")
+    return FileResponse(path, media_type="application/pdf", filename=os.path.basename(path))
 
 
 @app.post("/api/modeles-email/{numero}/envoyer")
