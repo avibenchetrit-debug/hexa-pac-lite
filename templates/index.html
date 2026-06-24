@@ -14079,10 +14079,11 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     const body = document.getElementById('doc-viewer-body');
     const ttl = document.getElementById('doc-viewer-title');
     if (!ov || !body) return;
-    const url = `/api/devis/${encodeURIComponent(currentProspect)}/download?version=${encodeURIComponent(version)}`;
+    const viewUrl = `/api/devis/${encodeURIComponent(currentProspect)}/view?version=${encodeURIComponent(version)}`;
+    const dlUrl = `/api/devis/${encodeURIComponent(currentProspect)}/download?version=${encodeURIComponent(version)}`;
     ttl.textContent = `Devis v${version}`;
-    body.innerHTML = `<iframe title="Devis v${version}" src="${url}"></iframe>`;
-    document.getElementById('doc-viewer-dl').onclick = () => window.open(url, '_blank');
+    body.innerHTML = `<iframe title="Devis v${version}" src="${viewUrl}"></iframe>`;
+    document.getElementById('doc-viewer-dl').onclick = () => window.open(dlUrl, '_blank');
     ov.classList.add('open');
   }
 

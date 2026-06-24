@@ -2381,6 +2381,14 @@ async def download_devis(numero: str, version: int):
     return FileResponse(path, media_type="application/pdf", filename=os.path.basename(path))
 
 
+@app.get("/api/devis/{numero}/view")
+async def view_devis(numero: str, version: int):
+    path = _devis_path(numero, version)
+    if not os.path.exists(path):
+        raise HTTPException(status_code=404, detail="Devis introuvable")
+    return FileResponse(path, media_type="application/pdf", headers={"Content-Disposition": "inline"})
+
+
 @app.post("/api/modeles-email/{numero}/envoyer")
 async def envoyer_modele_email(numero: str, request: Request) -> JSONResponse:
     payload = await _read_request_payload(request)
