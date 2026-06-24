@@ -2144,6 +2144,114 @@ async def notedim_pdf(numero: str, request: Request):
     )
 
 
+def _email_header_html():
+    return """<tr><td style="background:#ffffff;border-bottom:3px solid #002E5A;padding:24px;text-align:center;">
+<div style="display:inline-block;width:38px;height:38px;line-height:34px;border:3px solid #E2214B;border-radius:8px;color:#E2214B;font-size:20px;font-weight:bold;text-align:center;">&#11041;</div>
+<div style="color:#002E5A;font-size:24px;font-weight:bold;margin-top:10px;">Hexa Rénov'</div>
+<div style="color:#8A92A0;font-size:10px;text-transform:uppercase;letter-spacing:0.15em;margin-top:4px;">Rénovons l'avenir, économisons l'énergie</div>
+</td></tr>"""
+
+
+def _email_footer_html():
+    return """<tr><td style="background:#F8F9FB;border-top:1px solid #E1E5EB;padding:24px;text-align:center;">
+<div style="color:#4A5567;font-size:12px;font-weight:bold;">SAS HEXA RÉNOV'</div>
+<div style="color:#8A92A0;font-size:11px;margin-top:4px;">RCS Nanterre 845 229 152 · info@hexa-renov.fr · 09 70 70 25 11</div>
+</td></tr>"""
+
+
+def _email_devis_html(prenom, apercu, pct_eco, lien_devis):
+    bandeau = ""
+    if apercu:
+        bandeau = f"""<tr><td style="padding:0 32px 8px 32px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#002E5A;border-radius:8px;"><tr><td style="padding:22px 24px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+<td style="vertical-align:top;">
+<div style="color:#9fb8d4;font-size:12px;text-transform:uppercase;letter-spacing:0.06em;">Vous économisez dès maintenant</div>
+<div style="margin-top:6px;"><span style="color:#ffffff;font-size:38px;font-weight:bold;">{apercu['eco_pendant']} €</span><span style="color:#9fb8d4;font-size:16px;"> /mois</span></div>
+<div style="border-top:1px solid #1a4775;margin-top:12px;padding-top:12px;color:#c5d2e0;font-size:14px;">puis <strong style="color:#fff;">{apercu['eco_apres']} €/mois</strong> une fois l'installation remboursée</div>
+</td>
+<td style="width:70px;vertical-align:top;text-align:right;">
+<span style="display:inline-block;background:#E2214B;color:#fff;font-size:15px;font-weight:bold;padding:6px 12px;border-radius:6px;">-{pct_eco}%</span>
+</td>
+</tr></table>
+</td></tr></table>
+</td></tr>"""
+    return f"""<!DOCTYPE html><html><head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background:#eef1f5;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#eef1f5;padding:24px 0;"><tr><td align="center">
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="width:600px;max-width:600px;background:#ffffff;border-radius:12px;overflow:hidden;font-family:Arial,Helvetica,sans-serif;">
+{_email_header_html()}
+<tr><td style="padding:32px 32px 0 32px;">
+<div style="color:#E2214B;font-size:13px;font-weight:bold;text-transform:uppercase;letter-spacing:0.04em;">Votre devis personnalisé est prêt</div>
+<div style="color:#0a2540;font-size:23px;font-weight:bold;margin-top:10px;line-height:1.3;">Bonjour {prenom},<br>votre projet de pompe à chaleur prend forme.</div>
+<div style="color:#4A5567;font-size:15px;line-height:1.6;margin-top:16px;">Nous avons préparé votre devis sur mesure. Bonne nouvelle : dès le premier mois, vous payez <strong style="color:#002E5A">moins cher qu'aujourd'hui</strong> — tout en remboursant votre installation.</div>
+</td></tr>
+{bandeau}
+<tr><td style="padding:24px 32px 8px 32px;text-align:center;">
+<a href="{lien_devis}" style="display:inline-block;background:#E2214B;color:#ffffff;font-size:16px;font-weight:bold;padding:16px 44px;border-radius:8px;text-decoration:none;">Découvrir mon devis</a>
+<div style="color:#8A92A0;font-size:12px;margin-top:10px;">Consultable en ligne · Téléchargeable en PDF</div>
+</td></tr>
+<tr><td style="padding:18px 32px 8px 32px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+<td style="text-align:center;"><div style="font-size:22px;">🛡️</div><div style="color:#4A5567;font-size:11px;font-weight:bold;margin-top:4px;">Certifié RGE</div></td>
+<td style="text-align:center;"><div style="font-size:22px;">🤝</div><div style="color:#4A5567;font-size:11px;font-weight:bold;margin-top:4px;">Aides incluses</div></td>
+<td style="text-align:center;"><div style="font-size:22px;">⚡</div><div style="color:#4A5567;font-size:11px;font-weight:bold;margin-top:4px;">Réponse 24h</div></td>
+<td style="text-align:center;"><div style="font-size:22px;">📍</div><div style="color:#4A5567;font-size:11px;font-weight:bold;margin-top:4px;">France Rénov'</div></td>
+</tr></table>
+</td></tr>
+<tr><td style="padding:24px 32px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#002E5A;border-radius:10px;"><tr><td style="padding:28px 24px;text-align:center;">
+<div style="color:#ffffff;font-size:18px;font-weight:bold;">Une maison à rénover entièrement ?</div>
+<div style="color:#9fb8d4;font-size:13px;margin-top:6px;">Un seul interlocuteur. Des aides cumulées. Plus d'économies.</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:18px;"><tr>
+<td style="width:33%;padding:4px;vertical-align:top;"><div style="background:#ffffff;border-radius:10px;height:96px;text-align:center;"><div style="padding-top:18px;font-size:30px;">🧱</div><div style="color:#002E5A;font-size:13px;font-weight:bold;margin-top:6px;">Isolation</div></div></td>
+<td style="width:33%;padding:4px;vertical-align:top;"><div style="background:#ffffff;border-radius:10px;height:96px;text-align:center;"><div style="padding-top:18px;font-size:30px;">❄️</div><div style="color:#002E5A;font-size:13px;font-weight:bold;margin-top:6px;">Climatisation</div></div></td>
+<td style="width:33%;padding:4px;vertical-align:top;"><div style="background:#ffffff;border-radius:10px;height:96px;text-align:center;"><div style="padding-top:18px;font-size:30px;">🏠</div><div style="color:#002E5A;font-size:13px;font-weight:bold;margin-top:6px;">Rénovation globale</div></div></td>
+</tr></table>
+</td></tr></table>
+</td></tr>
+{_email_footer_html()}
+</table>
+</td></tr></table>
+</body></html>"""
+
+
+def _email_notedim_html(prenom, specs, lien_notedim):
+    def _v(x):
+        return x if x not in (None, "") else "—"
+    modele = _v(specs.get("modele"))
+    etas35 = _v(specs.get("etas35"))
+    etas55 = _v(specs.get("etas55"))
+    surface = _v(specs.get("surface"))
+    return f"""<!DOCTYPE html><html><head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background:#eef1f5;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#eef1f5;padding:24px 0;"><tr><td align="center">
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="width:600px;max-width:600px;background:#ffffff;border-radius:12px;overflow:hidden;font-family:Arial,Helvetica,sans-serif;">
+{_email_header_html()}
+<tr><td style="padding:32px 32px 0 32px;">
+<div style="color:#002E5A;font-size:13px;font-weight:bold;text-transform:uppercase;letter-spacing:0.04em;">Votre étude technique</div>
+<div style="color:#0a2540;font-size:22px;font-weight:bold;margin-top:10px;line-height:1.3;">Bonjour {prenom},<br>voici la note de dimensionnement de votre installation.</div>
+<div style="color:#4A5567;font-size:15px;line-height:1.6;margin-top:16px;">Nous avons étudié votre logement pour dimensionner précisément votre pompe à chaleur. Voici les caractéristiques retenues pour garantir une installation parfaitement adaptée.</div>
+</td></tr>
+<tr><td style="padding:22px 32px 8px 32px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F0F4F9;border-radius:8px;"><tr><td style="padding:6px 20px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+<tr><td style="padding:14px 0;border-bottom:1px solid #E1E5EB;color:#8A92A0;font-size:14px;">Modèle préconisé</td><td style="padding:14px 0;border-bottom:1px solid #E1E5EB;color:#002E5A;font-size:14px;font-weight:bold;text-align:right;">{modele}</td></tr>
+<tr><td style="padding:14px 0;border-bottom:1px solid #E1E5EB;color:#8A92A0;font-size:14px;">ETAS 35°C / 55°C</td><td style="padding:14px 0;border-bottom:1px solid #E1E5EB;color:#002E5A;font-size:14px;font-weight:bold;text-align:right;">{etas35} % / {etas55} %</td></tr>
+<tr><td style="padding:14px 0;color:#8A92A0;font-size:14px;">Surface chauffée</td><td style="padding:14px 0;color:#002E5A;font-size:14px;font-weight:bold;text-align:right;">{surface} m²</td></tr>
+</table>
+</td></tr></table>
+</td></tr>
+<tr><td style="padding:22px 32px 8px 32px;text-align:center;">
+<a href="{lien_notedim}" style="display:inline-block;background:#002E5A;color:#ffffff;font-size:16px;font-weight:bold;padding:16px 44px;border-radius:8px;text-decoration:none;">Consulter ma note technique</a>
+<div style="color:#8A92A0;font-size:12px;margin-top:10px;">Consultable en ligne · Téléchargeable en PDF</div>
+</td></tr>
+{_email_footer_html()}
+</table>
+</td></tr></table>
+</body></html>"""
+
+
 async def _send_devis(numero: str, payload: dict, request: Request) -> dict:
     prospect = _find_lead(numero)
     if not prospect:
@@ -2157,30 +2265,47 @@ async def _send_devis(numero: str, payload: dict, request: Request) -> dict:
 
     devis_path, version = _ensure_devis_pdf(numero, request)
     notedim_path = _ensure_notedim_pdf(numero, request, version)
-    with open(devis_path, "rb") as f:
-        pdf_devis_b64 = base64.b64encode(f.read()).decode()
-    with open(notedim_path, "rb") as f:
-        pdf_notedim_b64 = base64.b64encode(f.read()).decode()
+
+    # Aperçu éco (bandeau email devis) — peut être None
+    ctx = _build_devis_context(request, numero)
+    apercu = ctx.get("projet_apercu")
+    pct_eco = None
+    if apercu and apercu.get("facture_avant") and apercu.get("eco_pendant"):
+        pct_eco = round(apercu["eco_pendant"] / apercu["facture_avant"] * 100)
+
+    # Specs techniques note de dim (None -> "—" géré dans le template email)
+    catalogue = _read_catalogue_pac()
+    state = _load_state_simulateur(numero, prospect, catalogue)
+    modele_ref = state.get("modele_pac_id") or state.get("modele_pac")
+    modele_obj = find_modele(catalogue, modele_ref) or select_default_modele(prospect, catalogue)
+    specs = {
+        "modele": (modele_obj.get("nom") or modele_obj.get("ref")) if modele_obj else None,
+        "etas35": devis_value(modele_obj or {}, "etas35", default=None),
+        "etas55": devis_value(modele_obj or {}, "etas55", default=None),
+        "surface": devis_value(state, "surface_chauffee", default="") or devis_value(prospect, "surface_habitable", "surface_logement_m2", default="") or None,
+    }
+
+    prenom = html.escape(str(prospect.get("prenom") or ""))
+    lien_devis = _public_devis_url(request, numero)
+    lien_notedim = _public_notedim_url(request, numero)
 
     import resend
 
     resend.api_key = api_key
-    subject = payload.get("objet") or f"Votre devis Hexa Rénov' - {numero}"
-    message_html = payload.get("message_html") or payload.get("message") or (
-        f"Bonjour {html.escape(str(prospect.get('prenom') or ''))},<br><br>"
-        "Veuillez trouver ci-joint votre devis et la note de dimensionnement.<br><br>"
-        "Cordialement,<br>L'équipe Hexa Rénov'"
-    )
     result = resend.Emails.send(
         {
             "from": "Hexa Rénov' <a.parisot@hexa-renov.fr>",
             "to": [email_to],
-            "subject": subject,
-            "html": message_html,
-            "attachments": [
-                {"filename": f"Devis_{numero}.pdf", "content": pdf_devis_b64},
-                {"filename": f"NoteDim_{numero}.pdf", "content": pdf_notedim_b64},
-            ],
+            "subject": f"Votre devis Hexa Rénov' — {prenom}",
+            "html": _email_devis_html(prenom, apercu, pct_eco, lien_devis),
+        }
+    )
+    resend.Emails.send(
+        {
+            "from": "Hexa Rénov' <a.parisot@hexa-renov.fr>",
+            "to": [email_to],
+            "subject": "Votre note de dimensionnement Hexa Rénov'",
+            "html": _email_notedim_html(prenom, specs, lien_notedim),
         }
     )
 
