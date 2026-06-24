@@ -22,6 +22,8 @@ from fastapi.templating import Jinja2Templates
 
 from services.service_devis import (
     calculer_devis,
+    calculer_economie_devis,
+    calculer_financement_devis,
     calculer_notedim,
     calculer_zone_climatique,
     find_modele,
@@ -35,6 +37,7 @@ from services.service_devis import (
     parse_legacy_description,
     select_default_modele,
     validate_prospect_for_devis,
+    float_value,
     value as devis_value,
     _format_date_fr,
 )
@@ -1810,6 +1813,25 @@ def _build_devis_context(request: Request, numero: str) -> dict:
         "sous_traitant_texte": format_sous_traitant(sous_traitant),
         **formatted_calculs,
     }
+    # Phase 2A : calculs financement + économie (réplique JS) — exposés au contexte, PAS affichés (2B plus tard)
+    facture_avant = devis_value(state, "facture_avant", default=None)
+    if facture_avant in (None, ""):
+        _cout_mensuel = devis_value(prospect, "cout_energetique_mensuel_eur", "cout_chauffage", default="")
+        if str(_cout_mensuel).strip() and float_value(_cout_mensuel) > 0:
+            facture_avant = float_value(_cout_mensuel)
+        else:
+            _cout_annuel = devis_value(prospect, "cout_energetique_annuel_eur", default="")
+            facture_avant = round(float_value(_cout_annuel) / 12) if (str(_cout_annuel).strip() and float_value(_cout_annuel) > 0) else None
+    _surface_eco = devis_value(state, "surface_chauffee", default="") or devis_value(prospect, "surface_habitable", "surface_logement_m2", default="")
+    _zone_eco = devis_value(state, "zone", default=context["zone_climatique"])
+    context["financement_devis"] = calculer_financement_devis(calculs["reste_a_charge"], admin)
+    context["economie_devis"] = calculer_economie_devis(
+        _surface_eco, _zone_eco,
+        devis_value(modele_obj, "etas35", default=0), devis_value(modele_obj, "etas55", default=0),
+        devis_value(prospect, "type_emetteurs", default=""),
+        devis_value(state, "service", default="chauffage_ecs"),
+        facture_avant, admin,
+    )
     return context
 
 

@@ -399,6 +399,66 @@ def calculer_devis(prospect, state_simulateur, admin_params, catalogue_pac):
     }
 
 
+def _pmt(taux_annuel, n_mois, capital):
+    """Mensualité de crédit — réplique fidèle du pmt() JS du simulateur."""
+    capital = float_value(capital)
+    n_mois = float_value(n_mois)
+    if capital <= 0 or n_mois <= 0:
+        return 0.0
+    i = float_value(taux_annuel) / 12
+    if i == 0:
+        return capital / n_mois
+    return capital * i / (1 - (1 + i) ** (-n_mois))
+
+
+def calculer_financement_devis(reste_a_charge, admin_params):
+    """Financement Option 1 (Crédit Travaux) — réplique JS, taux/durée conditionnels au seuil."""
+    fin = (admin_params or {}).get("params_financement") or {}
+    rac = float_value(reste_a_charge)
+    seuil = float_value(fin.get("seuil_rac_eur"), 6000)
+    credit = fin.get("credit_travaux") or {}
+    sous = rac < seuil
+    bareme = (credit.get("sous_seuil") if sous else credit.get("sur_seuil")) or {}
+    taux_pct = float_value(bareme.get("taux_pct"), 5.90 if sous else 4.90)
+    duree_mois = int(float_value(bareme.get("duree_mois"), 156 if sous else 180))
+    mensualite = _pmt(taux_pct / 100, duree_mois, rac)
+    return {
+        "mensualite": round(mensualite, 2),
+        "taux_pct": taux_pct,
+        "duree_mois": duree_mois,
+        "reste_a_charge": round(rac, 2),
+        "premiere_echeance_jours": int(float_value(fin.get("premiere_echeance_jours"), 180)),
+    }
+
+
+def calculer_economie_devis(surface, zone, etas35, etas55, emetteur, service, facture_avant, admin_params):
+    """Facture après PAC (€/mois) + économie — réplique fidèle de calculerFactureApresPac() JS."""
+    params = (admin_params or {}).get("params_eco_energie") or {}
+    surface = float_value(surface)
+    if surface <= 0:
+        return {"facture_apres_mois": None, "facture_avant_mois": facture_avant, "economie_mois": None}
+    z = str(zone or "").lower()
+    zone_red = "h1" if z.startswith("h1") else ("h3" if z.startswith("h3") else "h2")
+    conso = float_value((params.get("conso_zone_kwh_m2_an") or {}).get(zone_red), 130) or 130
+    etas_retenu = float_value(etas35) if (emetteur == "plancher_chauffant" and service == "chauffage_seul") else float_value(etas55)
+    scop = (etas_retenu / 100) * 2.5 if etas_retenu > 0 else 0
+    if scop <= 0:
+        scop = float_value(params.get("scop_defaut"), 3.5) or 3.5
+    prix_elec = float_value((params.get("prix_kwh") or {}).get("electricite"), 0.21)
+    cout_annuel = (surface * conso / scop) * prix_elec
+    facture_apres = round(cout_annuel / 12)
+    if facture_apres <= 0:
+        facture_apres = None
+    economie = None
+    if facture_apres is not None and facture_avant not in (None, "") and float_value(facture_avant) > 0:
+        economie = round(float_value(facture_avant) - facture_apres)
+    return {
+        "facture_apres_mois": facture_apres,
+        "facture_avant_mois": facture_avant,
+        "economie_mois": economie,
+    }
+
+
 def format_devis_amounts(calculs):
     out = dict(calculs)
     for key in (
