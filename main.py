@@ -2162,7 +2162,7 @@ def _email_footer_html():
 def _email_devis_html(prenom, apercu, pct_eco, lien_devis):
     bandeau = ""
     if apercu:
-        bandeau = f"""<tr><td style="padding:0 32px 8px 32px;">
+        bandeau = f"""<tr><td style="padding:20px 32px 8px 32px;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#002E5A;border-radius:8px;"><tr><td style="padding:22px 24px;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
 <td style="vertical-align:top;">
