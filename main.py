@@ -1145,6 +1145,99 @@ def get_parcelle(lat: float, lon: float) -> JSONResponse:
     return JSONResponse({"parcelle": f"{code_insee}-{prefixe}-{section}-{numero}", "source": "ign"})
 
 
+DPE_DATASET = "dpe03existant"
+AUDIT_DATASET = "audit-opendata"
+_DPE_MIN_DATE = "2021-07-01"   # DPE/audit valides depuis le 1er juillet 2021
+
+
+def _ademe_lines(dataset, sort_field, lat=None, lon=None, adresse="", cp="", qs=None):
+    params = {"size": "10", "sort": "-" + sort_field}
+    if lat is not None and lon is not None:
+        params["geo_distance"] = f"{lon}:{lat}:100m"   # ATTENTION : lon puis lat
+    else:
+        q = (str(adresse or "").strip() + " " + str(cp or "").strip()).strip()
+        if not q:
+            return []
+        params["q"] = q
+    if qs:
+        params["qs"] = qs
+    url = ("https://data.ademe.fr/data-fair/api/v1/datasets/" + dataset + "/lines?"
+           + urllib.parse.urlencode(params, quote_via=urllib.parse.quote))
+    try:
+        with urllib.request.urlopen(url, timeout=10) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+        return data.get("results") or []
+    except Exception:
+        return []
+
+
+def _enrich_dpe(rec):
+    out = dict(rec)
+    out["classe_energie"] = rec.get("etiquette_dpe", "")
+    out["classe_consommation_energie"] = rec.get("etiquette_dpe", "")
+    out["conso_kwh_m2"] = rec.get("conso_5_usages_par_m2_ep", "")
+    out["cout_5_usages"] = rec.get("cout_total_5_usages", "")
+    out["emission_ges_initial"] = rec.get("emission_ges_5_usages_par_m2", "")
+    out["altitude"] = rec.get("classe_altitude", "")
+    out["nb_niveau_logement"] = rec.get("nombre_niveau_logement", "")
+    return out
+
+
+def _enrich_audit(rec):
+    out = dict(rec)
+    out["classe_energie"] = rec.get("classe_bilan_dpe", "")
+    out["classe_consommation_energie"] = rec.get("classe_bilan_dpe", "")
+    out["conso_kwh_m2"] = rec.get("ep_conso_5_usages_m2", "")
+    out["cout_5_usages"] = rec.get("cout_5_usages", "")
+    out["emission_ges_initial"] = rec.get("emission_ges_5_usages_m2", "")
+    out["altitude"] = rec.get("classe_altitude", "")
+    out["date_etablissement_dpe"] = rec.get("date_etablissement_audit", "")  # le front lit cette cle
+    return out
+
+
+@app.get("/api/dpe-lookup")
+def get_dpe_lookup(adresse: str = "", cp: str = "", lat: float | None = None,
+                   lon: float | None = None, prospect_numero: str | None = None) -> JSONResponse:
+    dpe_lines = _ademe_lines(DPE_DATASET, "date_etablissement_dpe", lat, lon, adresse, cp)
+    dpe = dpe_lines[0] if dpe_lines else None
+    if dpe and str(dpe.get("date_etablissement_dpe") or "") < _DPE_MIN_DATE:
+        dpe = None
+    audit_lines = _ademe_lines(AUDIT_DATASET, "date_etablissement_audit", lat, lon, adresse, cp,
+                               qs='categorie_scenario:"état initial"')
+    audit = audit_lines[0] if audit_lines else None
+    if audit and str(audit.get("date_etablissement_audit") or "") < _DPE_MIN_DATE:
+        audit = None
+
+    dpe_date = str((dpe or {}).get("date_etablissement_dpe") or "")
+    audit_date = str((audit or {}).get("date_etablissement_audit") or "")
+
+    if not dpe and not audit:
+        source, badge = "manuel", "SAISIE MANUELLE"
+        status_text = "Aucun DPE/Audit trouvé — saisie manuelle"
+    elif audit and not dpe:
+        source, badge = "audit_officiel", "AUDIT OFFICIEL"
+        status_text = f"Audit officiel trouvé (n°{audit.get('numero_dpe', '')} du {audit_date})"
+    elif dpe and not audit:
+        source, badge = "dpe_officiel", "DPE OFFICIEL"
+        status_text = f"DPE officiel trouvé (n°{dpe.get('numero_dpe', '')} du {dpe_date})"
+    else:
+        if audit_date > dpe_date:
+            source, badge = "audit_officiel", "AUDIT OFFICIEL"
+            status_text = f"Audit officiel trouvé (n°{audit.get('numero_dpe', '')} du {audit_date})"
+        else:
+            source, badge = "dpe_officiel", "DPE OFFICIEL"
+            status_text = f"DPE officiel trouvé (n°{dpe.get('numero_dpe', '')} du {dpe_date})"
+
+    return JSONResponse({
+        "source": source, "badge": badge, "status_text": status_text,
+        "sources": {
+            "dpe_officiel": _enrich_dpe(dpe) if dpe else {},
+            "audit_officiel": _enrich_audit(audit) if audit else {},
+            "urbs_enrichi": {},
+        },
+    })
+
+
 @app.post("/api/catalogue-pac")
 async def post_catalogue_pac(request: Request) -> JSONResponse:
     try:
