@@ -240,6 +240,8 @@ def _verify_devis_token(numero: str, token: str) -> bool:
 
 def _public_devis_url(request: Request, numero: str) -> str:
     base = str(request.base_url).rstrip("/")
+    if base.startswith("http://"):
+        base = "https://" + base[len("http://"):]
     return f"{base}/devis-public/{numero}/{_sign_devis_token(numero)}"
 
 
@@ -2033,17 +2035,24 @@ async def devis_public(numero: str, token: str, request: Request):
     if not _verify_devis_token(numero, token):
         raise HTTPException(status_code=403, detail="Lien invalide")
     html_devis = _render_devis_html(request, numero)
-    bouton = (
+    barre = (
+        '<div style="position:fixed;top:0;left:0;right:0;z-index:9999;'
+        'background:#002E5A;display:flex;align-items:center;justify-content:space-between;'
+        'padding:12px 24px;box-shadow:0 2px 8px rgba(0,0,0,0.15);'
+        'font-family:Arial,Helvetica,sans-serif;">'
+        '<span style="color:#fff;font-weight:600;font-size:15px;letter-spacing:0.02em;">'
+        'Votre devis Hexa Renov</span>'
         '<a href="/devis-public/' + numero + '/' + token + '/pdf" '
-        'style="position:fixed;bottom:24px;right:24px;z-index:9999;'
-        'background:#E2214B;color:#fff;padding:14px 22px;border-radius:8px;'
-        'font-family:sans-serif;font-weight:600;font-size:14px;text-decoration:none;'
-        'box-shadow:0 4px 16px rgba(0,0,0,0.2);">⬇ Télécharger le PDF</a>'
+        'style="background:#fff;color:#002E5A;padding:10px 20px;border-radius:6px;'
+        'font-weight:700;font-size:14px;text-decoration:none;">Telecharger le PDF</a>'
+        '</div>'
+        '<div style="height:58px;"></div>'
     )
-    if "</body>" in html_devis:
-        html_devis = html_devis.replace("</body>", bouton + "</body>")
+    import re as _re
+    if _re.search(r'<body[^>]*>', html_devis):
+        html_devis = _re.sub(r'(<body[^>]*>)', lambda m: m.group(1) + barre, html_devis, count=1)
     else:
-        html_devis = html_devis + bouton
+        html_devis = barre + html_devis
     return HTMLResponse(html_devis)
 
 
