@@ -1998,14 +1998,14 @@ def _ensure_devis_pdf(numero: str, request: Request, version: int | None = None)
     version = version or _next_devis_version(numero)
     path = _devis_path(numero, version)
     if not os.path.exists(path):
-        _write_pdf(path, _html_to_pdf(_render_devis_html(request, numero), request))
+        _write_pdf(path, _html_to_pdf_playwright(_render_devis_html(request, numero), request))
     return path, version
 
 
 def _ensure_notedim_pdf(numero: str, request: Request, version: int) -> str:
     path = _notedim_path(numero, version)
     if not os.path.exists(path):
-        _write_pdf(path, _html_to_pdf(_render_notedim_html(request, numero), request))
+        _write_pdf(path, _html_to_pdf_playwright(_render_notedim_html(request, numero), request))
     return path
 
 
