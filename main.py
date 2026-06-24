@@ -245,6 +245,24 @@ def _public_devis_url(request: Request, numero: str) -> str:
     return f"{base}/devis-public/{numero}/{_sign_devis_token(numero)}"
 
 
+def _sign_notedim_token(numero: str) -> str:
+    payload = f"notedim:{numero}"
+    sig = hmac.new(_admin_secret(), payload.encode("utf-8"), hashlib.sha256).digest()
+    return base64.urlsafe_b64encode(sig).decode("ascii").rstrip("=")
+
+
+def _verify_notedim_token(numero: str, token: str) -> bool:
+    import hmac as _hmac
+    return _hmac.compare_digest(token, _sign_notedim_token(numero))
+
+
+def _public_notedim_url(request: Request, numero: str) -> str:
+    base = str(request.base_url).rstrip("/")
+    if base.startswith("http://"):
+        base = "https://" + base[len("http://"):]
+    return f"{base}/notedim-public/{numero}/{_sign_notedim_token(numero)}"
+
+
 # ---------------------------------------------------------------------------
 # JSON storage helpers (atomic writes: tmp file + os.replace)
 # ---------------------------------------------------------------------------
@@ -2013,6 +2031,12 @@ async def devis_lien_public(numero: str, request: Request):
     return JSONResponse({"lien": _public_devis_url(request, numero)})
 
 
+@app.get("/api/notedim/{numero}/lien-public")
+async def notedim_lien_public(numero: str, request: Request):
+    # TEMPORAIRE (a retirer) : renvoie le lien public signe pour tester l'etape 2
+    return JSONResponse({"lien": _public_notedim_url(request, numero)})
+
+
 @app.get("/api/notedim/{numero}/preview", response_class=HTMLResponse)
 async def notedim_preview(numero: str, request: Request) -> HTMLResponse:
     return _render_template_response(request, "notedim_pac.html", _build_notedim_context(request, numero))
@@ -2065,6 +2089,44 @@ async def devis_public_pdf(numero: str, token: str, request: Request):
         io.BytesIO(pdf_bytes),
         media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="Devis_{numero}.pdf"'},
+    )
+
+
+@app.get("/notedim-public/{numero}/{token}", response_class=HTMLResponse)
+async def notedim_public(numero: str, token: str, request: Request):
+    if not _verify_notedim_token(numero, token):
+        raise HTTPException(status_code=403, detail="Lien invalide")
+    html_nd = _render_notedim_html(request, numero)
+    barre = (
+        '<div style="position:fixed;top:0;left:0;right:0;z-index:9999;'
+        'background:#002E5A;display:flex;align-items:center;justify-content:space-between;'
+        'padding:12px 24px;box-shadow:0 2px 8px rgba(0,0,0,0.15);'
+        'font-family:Arial,Helvetica,sans-serif;">'
+        '<span style="color:#fff;font-weight:600;font-size:15px;letter-spacing:0.02em;">'
+        'Votre note de dimensionnement Hexa Renov</span>'
+        '<a href="/notedim-public/' + numero + '/' + token + '/pdf" '
+        'style="background:#fff;color:#002E5A;padding:10px 20px;border-radius:6px;'
+        'font-weight:700;font-size:14px;text-decoration:none;">Telecharger le PDF</a>'
+        '</div>'
+        '<div style="height:58px;"></div>'
+    )
+    import re as _re
+    if _re.search(r'<body[^>]*>', html_nd):
+        html_nd = _re.sub(r'(<body[^>]*>)', lambda m: m.group(1) + barre, html_nd, count=1)
+    else:
+        html_nd = barre + html_nd
+    return HTMLResponse(html_nd)
+
+
+@app.get("/notedim-public/{numero}/{token}/pdf")
+async def notedim_public_pdf(numero: str, token: str, request: Request):
+    if not _verify_notedim_token(numero, token):
+        raise HTTPException(status_code=403, detail="Lien invalide")
+    pdf_bytes = _html_to_pdf_playwright(_render_notedim_html(request, numero), request)
+    return StreamingResponse(
+        io.BytesIO(pdf_bytes),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="NoteDim_{numero}.pdf"'},
     )
 
 
