@@ -9284,7 +9284,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     }
   }
 
-  const OPTIONAL_BACKEND_APIS_ENABLED = false;
+  const OPTIONAL_BACKEND_APIS_ENABLED = true;
   async function fetchOptionalBackendApi(url) {
     if (!OPTIONAL_BACKEND_APIS_ENABLED) {
       console.debug('Endpoint pas encore branché:', url);
