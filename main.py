@@ -227,6 +227,22 @@ def _sign_admin_token(payload: str) -> str:
     return base64.urlsafe_b64encode(sig).decode("ascii").rstrip("=")
 
 
+def _sign_devis_token(numero: str) -> str:
+    payload = f"devis:{numero}"
+    sig = hmac.new(_admin_secret(), payload.encode("utf-8"), hashlib.sha256).digest()
+    return base64.urlsafe_b64encode(sig).decode("ascii").rstrip("=")
+
+
+def _verify_devis_token(numero: str, token: str) -> bool:
+    import hmac as _hmac
+    return _hmac.compare_digest(token, _sign_devis_token(numero))
+
+
+def _public_devis_url(request: Request, numero: str) -> str:
+    base = str(request.base_url).rstrip("/")
+    return f"{base}/devis-public/{numero}/{_sign_devis_token(numero)}"
+
+
 # ---------------------------------------------------------------------------
 # JSON storage helpers (atomic writes: tmp file + os.replace)
 # ---------------------------------------------------------------------------
@@ -1999,6 +2015,37 @@ async def devis_pdf(numero: str, request: Request):
     pdf_bytes = _html_to_pdf_playwright(_render_devis_html(request, numero), request)
     version = _next_devis_version(numero)
     _write_pdf(_devis_path(numero, version), pdf_bytes)
+    return StreamingResponse(
+        io.BytesIO(pdf_bytes),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="Devis_{numero}.pdf"'},
+    )
+
+
+@app.get("/devis-public/{numero}/{token}", response_class=HTMLResponse)
+async def devis_public(numero: str, token: str, request: Request):
+    if not _verify_devis_token(numero, token):
+        raise HTTPException(status_code=403, detail="Lien invalide")
+    html_devis = _render_devis_html(request, numero)
+    bouton = (
+        '<a href="/devis-public/' + numero + '/' + token + '/pdf" '
+        'style="position:fixed;bottom:24px;right:24px;z-index:9999;'
+        'background:#E2214B;color:#fff;padding:14px 22px;border-radius:8px;'
+        'font-family:sans-serif;font-weight:600;font-size:14px;text-decoration:none;'
+        'box-shadow:0 4px 16px rgba(0,0,0,0.2);">⬇ Télécharger le PDF</a>'
+    )
+    if "</body>" in html_devis:
+        html_devis = html_devis.replace("</body>", bouton + "</body>")
+    else:
+        html_devis = html_devis + bouton
+    return HTMLResponse(html_devis)
+
+
+@app.get("/devis-public/{numero}/{token}/pdf")
+async def devis_public_pdf(numero: str, token: str, request: Request):
+    if not _verify_devis_token(numero, token):
+        raise HTTPException(status_code=403, detail="Lien invalide")
+    pdf_bytes = _html_to_pdf_playwright(_render_devis_html(request, numero), request)
     return StreamingResponse(
         io.BytesIO(pdf_bytes),
         media_type="application/pdf",
