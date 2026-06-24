@@ -2136,8 +2136,7 @@ async def notedim_pdf(numero: str, request: Request):
 
 def _email_header_html():
     return """<tr><td style="background:#ffffff;border-bottom:3px solid #002E5A;padding:24px;text-align:center;">
-<div style="display:inline-block;width:38px;height:38px;line-height:34px;border:3px solid #E2214B;border-radius:8px;color:#E2214B;font-size:20px;font-weight:bold;text-align:center;">&#11041;</div>
-<div style="color:#002E5A;font-size:24px;font-weight:bold;margin-top:10px;">Hexa Rénov'</div>
+<img src="https://hexa-pac-lite-production.up.railway.app/static/Logo.png" alt="Hexa Rénov'" width="200" style="display:block;margin:0 auto;width:200px;max-width:200px;height:auto;border:0;">
 <div style="color:#8A92A0;font-size:10px;text-transform:uppercase;letter-spacing:0.15em;margin-top:4px;">Rénovons l'avenir, économisons l'énergie</div>
 </td></tr>"""
 
