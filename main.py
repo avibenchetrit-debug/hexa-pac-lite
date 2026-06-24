@@ -2025,18 +2025,6 @@ async def devis_preview(numero: str, request: Request) -> HTMLResponse:
     return _render_template_response(request, "devis_pac.html", _build_devis_context(request, numero))
 
 
-@app.get("/api/devis/{numero}/lien-public")
-async def devis_lien_public(numero: str, request: Request):
-    # TEMPORAIRE (à retirer) : renvoie le lien public signé pour tester l'étape 1
-    return JSONResponse({"lien": _public_devis_url(request, numero)})
-
-
-@app.get("/api/notedim/{numero}/lien-public")
-async def notedim_lien_public(numero: str, request: Request):
-    # TEMPORAIRE (a retirer) : renvoie le lien public signe pour tester l'etape 2
-    return JSONResponse({"lien": _public_notedim_url(request, numero)})
-
-
 @app.get("/api/notedim/{numero}/preview", response_class=HTMLResponse)
 async def notedim_preview(numero: str, request: Request) -> HTMLResponse:
     return _render_template_response(request, "notedim_pac.html", _build_notedim_context(request, numero))
