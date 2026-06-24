@@ -18246,7 +18246,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       +'<td class="pv-nom"><span class="pv-nom-only">'+(p.nom||'')+'</span> '+(p.prenom||'')+'</td>'
       +'<td>'+(p.cp||'<span class="pv-muted">—</span>')+'</td>'
       +'<td>'+(p.tel||p.telephone||'<span class="pv-muted">—</span>')+'</td>'
-      +'<td>'+(p.email?'<a class="pv-mail" href="mailto:'+p.email+'">'+p.email+'</a>':'<span class="pv-muted">—</span>')+'</td>'
+      +'<td>'+(p.email?'<span class="pv-mail">'+p.email+'</span>':'<span class="pv-muted">—</span>')+'</td>'
       +'<td>'+catBadge(p.categorie)+'</td>'
       +'<td class="pv-muted">'+(p.date?fmtDate(p.date):'—')+'</td>'
       +'<td class="pv-nrp-cell"><span class="pv-nrp-ctl">'
