@@ -15170,7 +15170,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
         <div class="sim-context">
           <div class="sim-ctx-item"><span class="sim-ctx-k">Catégorie</span><span class="sim-ctx-v">${catLabel}</span></div>
           <div class="sim-ctx-item"><span class="sim-ctx-k">Zone clim.</span><span class="sim-ctx-v"><span class="sim-zone-badge ${zoneValue?'':'is-empty'}">${zoneValue || '—'}</span></span></div>
-          <div class="sim-ctx-item"><span class="sim-ctx-k">Énergie act.</span><span class="sim-ctx-v">${energieLbl}</span></div>
+          <div class="sim-ctx-item"><span class="sim-ctx-k">Énergie act.</span><span class="sim-ctx-v">${energieLbl && energieLbl!=='—' ? energieLbl.charAt(0).toUpperCase()+energieLbl.slice(1) : '—'}</span></div>
           <div class="sim-ctx-item">
             <span class="sim-ctx-k">Surf. chauffée</span>
             <span class="sim-ctx-v sim-surf-wrap">
