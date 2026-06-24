@@ -9866,6 +9866,11 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       try { await window.rechercheReglementaireAuto(lat, lon, state.parcelle); }
       catch (e) { console.debug('reglementaire auto KO (non bloquant):', e); }
     }
+    console.log('[DBG] confirmParcelle DPE direct', {lat, lon});
+    if (Number.isFinite(lat) && Number.isFinite(lon) && typeof window.lancerRechercheDpeAutomatique === 'function') {
+      const cpDirect = (document.querySelector('[name="code_postal_chantier"]')?.value || '').replace(/\D/g,'').slice(0,5);
+      await window.lancerRechercheDpeAutomatique(lat, lon, cpDirect);
+    }
     console.log('[DBG] avant branches', {adresse, cp5, hasCharger: typeof window.chargerDonneesAdresse, hasSources: typeof window.lancerRechercheDpeSources});
     if (typeof window.chargerDonneesAdresse === 'function' && adresse && cp5.length === 5) {
       console.log('[DBG] -> chargerDonneesAdresse');
@@ -10520,7 +10525,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       recalculerCategories();
       majBadgesReglementairesBandeau();
     } catch (e) {
-      /* APIs adresse indisponibles — saisie manuelle possible */
+      console.log('[DBG] chargerDonneesAdresse CATCH erreur:', e);
     }
   }
 
