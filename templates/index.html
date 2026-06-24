@@ -15101,18 +15101,21 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     const annApres0 = state.facture_apres*12;
     const mensAnnee = c.mensOpt*12;                 // coût crédit annuel
     const dureeCreditAns = c.nMois/12;
+    const estCredit = (mensAnnee > 0 && dureeCreditAns > 0);
+    // Au comptant, le client débourse g29 ; à crédit, rien au départ (tout financé) => seuil 0
+    const seuilRentabilite = estCredit ? 0 : c.g29;
     let cumul = 0; let anneeRentable = null;
-    const invest = c.g29;
     for (let an=1; an<=dureeVie; an++){
       const factAvant = annAvant0*Math.pow(1+infAvant, an-1);
       const factApres = annApres0*Math.pow(1+inflElec, an-1);
       const credit = (an <= dureeCreditAns) ? mensAnnee : 0;
       const econoAnnee = factAvant - factApres - credit;
       cumul += econoAnnee;
-      if (anneeRentable===null && cumul >= invest) anneeRentable = an;
+      if (anneeRentable===null && cumul >= seuilRentabilite) anneeRentable = an;
     }
-    return { anneeRentable, total20: cumul - invest >=0 ? cumul - invest : cumul, infAvant, inflElec,
-             dureeCreditAns, cumulNet: cumul };
+    // total20 = cumul des gains nets sur dureeVie, moins ce qui a été déboursé au départ (g29 au comptant, 0 à crédit)
+    const total20 = cumul - (estCredit ? 0 : c.g29);
+    return { anneeRentable, total20, infAvant, inflElec, dureeCreditAns, cumulNet: cumul, estCredit };
   }
 
   // Phrase commerciale simple, prête à dire au téléphone, chiffres ajustés à l'option
