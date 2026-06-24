@@ -7898,6 +7898,11 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
  <a href="#" aria-label="Hexa Rénov'" id="hexa-logo-home" style="text-decoration:none;display:inline-flex;align-items:center;">
     <span class="pv-brand">Hexa-Rénov'</span>
   </a>
+  <div id="hexa-paris-clock" style="display:inline-flex;align-items:center;gap:8px;background:#002E5A;border-radius:8px;padding:6px 12px;margin-left:16px;">
+    <span style="font-size:13px;line-height:1;">🕐</span>
+    <span style="color:#9Fb8d4;font-size:10px;text-transform:uppercase;letter-spacing:0.1em;">Paris</span>
+    <span class="hexa-paris-clock-time" style="color:#ffffff;font-size:14px;font-weight:bold;font-variant-numeric:tabular-nums;letter-spacing:0.04em;">--:--:--</span>
+  </div>
   <nav class="hexa-lite-nav">
     <a href="#" class="hexa-nav-link" id="hexa-nav-home">Accueil</a>
   </nav>
@@ -7906,11 +7911,6 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     <div class="hexa-user-dropdown" id="hexa-user-dropdown">
       <button type="button" id="hexa-change-user">Changer d'utilisateur</button>
     </div>
-  </div>
-  <div id="hexa-paris-clock" style="display:inline-flex;align-items:center;gap:8px;background:#002E5A;border-radius:8px;padding:8px 14px;margin-right:8px;">
-    <span style="font-size:13px;line-height:1;">🕐</span>
-    <span style="color:#9Fb8d4;font-size:10px;text-transform:uppercase;letter-spacing:0.1em;">Paris</span>
-    <span id="hexa-paris-clock-time" style="color:#ffffff;font-size:15px;font-weight:bold;font-variant-numeric:tabular-nums;letter-spacing:0.04em;">--:--:--</span>
   </div>
   <button type="button" id="btn-script-appel" class="hexa-header-btn" title="Configurer dans Admin" disabled>📞 Script d'appel</button>
   <a href="#" class="topbar-btn-primary hexa-topbar-new" id="hexa-nav-new">+ Nouveau</a>
@@ -18130,12 +18130,12 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     v.innerHTML = `
       <div class="pv-top">
         <div class="pv-brand">Hexa-Rénov'</div>
+        <div style="display:inline-flex;align-items:center;gap:8px;background:#002E5A;border-radius:8px;padding:6px 12px;margin-left:16px;">
+          <span style="font-size:13px;line-height:1;">🕐</span>
+          <span style="color:#9Fb8d4;font-size:10px;text-transform:uppercase;letter-spacing:0.1em;">Paris</span>
+          <span class="hexa-paris-clock-time" style="color:#ffffff;font-size:14px;font-weight:bold;font-variant-numeric:tabular-nums;letter-spacing:0.04em;">--:--:--</span>
+        </div>
         <div class="pv-actions">
-          <div style="display:inline-flex;align-items:center;gap:8px;background:#002E5A;border-radius:8px;padding:8px 14px;margin-right:8px;">
-            <span style="font-size:13px;line-height:1;">🕐</span>
-            <span style="color:#9Fb8d4;font-size:10px;text-transform:uppercase;letter-spacing:0.1em;">Paris</span>
-            <span class="hexa-paris-clock-time" style="color:#ffffff;font-size:15px;font-weight:bold;font-variant-numeric:tabular-nums;letter-spacing:0.04em;">--:--:--</span>
-          </div>
           <button class="pv-btn pv-btn-ghost" id="pv-regie">📊 Simulateur régie</button>
           <button class="pv-btn pv-btn-ghost" id="pv-admin">⚙ Admin</button>
           <button class="pv-btn pv-btn-primary" id="pv-new">+ Nouveau</button>
