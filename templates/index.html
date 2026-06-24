@@ -5630,8 +5630,11 @@ body.comments-panel-open {
 .docs-uploaded-ok { color: var(--vert); font-weight: 700; }
 .docs-devis-block{ margin:0 0 14px; padding:12px; border:1px solid #E2E8F0; border-radius:10px; background:#F8FAFC; }
 .docs-devis-title{ font-size:12px; font-weight:800; color:#002E5A; text-transform:uppercase; letter-spacing:.06em; margin-bottom:8px; }
-.docs-devis-row{ display:flex; align-items:center; justify-content:space-between; gap:10px; padding:8px; border-radius:8px; background:#fff; border:1px solid #E2E8F0; margin-top:6px; }
+.docs-devis-row{ display:flex; flex-direction:column; align-items:stretch; gap:10px; padding:12px; border-radius:8px; background:#fff; border:1px solid #E2E8F0; margin-top:6px; }
+.docs-devis-row > div:first-child{ font-size:13px; color:#2D3748; }
 .docs-devis-actions{ display:flex; gap:6px; flex-wrap:wrap; }
+.docs-notedim-row{ display:flex; flex-wrap:wrap; align-items:center; gap:6px; padding-top:8px; border-top:1px solid #EDF2F7; margin-top:2px; }
+.docs-notedim-label{ font-size:11px; color:#888; width:100%; margin-bottom:2px; }
 
 /* Documents panel — navigation, badges, fichiers */
 .docs-nav-back {
@@ -14063,12 +14066,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
             <button type="button" class="hexa-meta-card-action" data-devis-download="${item.version}">📥 Télécharger</button>
             <button type="button" class="hexa-meta-card-action" data-devis-resend="${item.version}">📧 Renvoyer</button>
           </div>
-          ${item.has_notedim ? `
-          <div style="margin-top:8px;padding-top:8px;border-top:1px solid #eee;">
-            <div style="font-size:11px;color:#888;margin-bottom:4px;">Note de dimensionnement</div>
-            <button type="button" class="hexa-meta-card-action" data-notedim-preview="${item.version}">👁 Aperçu</button>
-            <button type="button" class="hexa-meta-card-action" data-notedim-download="${item.version}">📥 Télécharger</button>
-          </div>` : ''}
+          ${item.has_notedim ? `<div class="docs-notedim-row"><span class="docs-notedim-label">Note de dimensionnement</span><button type="button" class="hexa-meta-card-action" data-notedim-preview="${item.version}">👁 Aperçu</button><button type="button" class="hexa-meta-card-action" data-notedim-download="${item.version}">📥 Télécharger</button></div>` : ''}
         </div>`).join('');
       root.querySelectorAll('[data-devis-preview]').forEach(btn => {
         btn.addEventListener('click', () => openDevisPdfViewer(btn.dataset.devisPreview));
@@ -18140,6 +18138,11 @@ L'équipe Hexa Rénov'</textarea></label>
       <div class="pv-top">
         <div class="pv-brand">Hexa-Rénov'</div>
         <div class="pv-actions">
+          <div style="display:inline-flex;align-items:center;gap:8px;background:#002E5A;border-radius:8px;padding:8px 14px;margin-right:8px;">
+            <span style="font-size:13px;line-height:1;">🕐</span>
+            <span style="color:#9Fb8d4;font-size:10px;text-transform:uppercase;letter-spacing:0.1em;">Paris</span>
+            <span class="hexa-paris-clock-time" style="color:#ffffff;font-size:15px;font-weight:bold;font-variant-numeric:tabular-nums;letter-spacing:0.04em;">--:--:--</span>
+          </div>
           <button class="pv-btn pv-btn-ghost" id="pv-regie">📊 Simulateur régie</button>
           <button class="pv-btn pv-btn-ghost" id="pv-admin">⚙ Admin</button>
           <button class="pv-btn pv-btn-primary" id="pv-new">+ Nouveau</button>
@@ -18801,11 +18804,10 @@ L'équipe Hexa Rénov'</textarea></label>
 <script>
 (function(){
   function tickParisClock(){
+    var t = new Date().toLocaleTimeString('fr-FR', {timeZone:'Europe/Paris', hour:'2-digit', minute:'2-digit', second:'2-digit'});
     var el = document.getElementById('hexa-paris-clock-time');
-    if(!el) return;
-    el.textContent = new Date().toLocaleTimeString('fr-FR', {
-      timeZone: 'Europe/Paris', hour: '2-digit', minute: '2-digit', second: '2-digit'
-    });
+    if(el) el.textContent = t;
+    document.querySelectorAll('.hexa-paris-clock-time').forEach(function(e){ e.textContent = t; });
   }
   tickParisClock();
   setInterval(tickParisClock, 1000);
