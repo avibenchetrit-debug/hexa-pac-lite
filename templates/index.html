@@ -16029,10 +16029,6 @@ L'équipe Hexa Rénov'</textarea></label>
     M3_ADMIN.script_notion_url = cfg.script_notion_url || '';
     return M3_ADMIN;
   }
-  async function reloadAdminM3(){
-    M3_ADMIN = null;            // invalide le cache mémoire
-    return await fetchAdminM3(); // recharge depuis le serveur (/api/admin/m3)
-  }
   function defaultFormuleBarTh171(){
     return {
       tableau_montant_base:[
@@ -17070,7 +17066,7 @@ L'équipe Hexa Rénov'</textarea></label>
       const url = document.getElementById('adm-script-url')?.value || '';
       const r = await fetch('/api/admin/config', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ script_notion_url:url }) });
       await saveAdminParamsServer();
-      if (r.ok) { M3_ADMIN = M3_ADMIN || {}; M3_ADMIN.script_notion_url = url; window.updateScriptAppelButton?.(url); adminToast('✓ Paramètres enregistrés', '#0D6B3B'); await reloadAdminM3(); rerenderBody(); }
+      if (r.ok) { M3_ADMIN = M3_ADMIN || {}; M3_ADMIN.script_notion_url = url; window.updateScriptAppelButton?.(url); adminToast('✓ Paramètres enregistrés', '#0D6B3B'); }
       else adminToast("❌ Erreur lors de l'enregistrement", '#B91C1C');
     });
     document.querySelector('[data-save-sous-bloc="5-1"]')?.addEventListener('click', ()=>{
@@ -17188,13 +17184,13 @@ L'équipe Hexa Rénov'</textarea></label>
     document.getElementById('btn-save-formule-bar-th-171')?.addEventListener('click', async ()=>{
       const payload = collectFormuleBar();
       const r = await fetch('/api/admin/formule-bar-th-171', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
-      if (r.ok) { M3_ADMIN.formule_bar_th_171 = payload; adminToast('Formule BAR-TH-171 sauvegardée ✓', '#0D6B3B'); window.dispatchEvent(new CustomEvent('hexa-config-changed')); await reloadAdminM3(); rerenderBody(); }
+      if (r.ok) { M3_ADMIN.formule_bar_th_171 = payload; adminToast('Formule BAR-TH-171 sauvegardée ✓', '#0D6B3B'); window.dispatchEvent(new CustomEvent('hexa-config-changed')); }
       else adminToast('Erreur sauvegarde formule BAR-TH-171', '#B91C1C');
     });
     document.getElementById('btn-save-plafonds')?.addEventListener('click', async ()=>{
       const payload = collectPlafonds();
       const r = await fetch('/api/admin/plafonds-reglementaires', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
-      if (r.ok) { M3_ADMIN.plafonds_reglementaires = payload; adminToast('Plafonds sauvegardés ✓', '#0D6B3B'); window.dispatchEvent(new CustomEvent('hexa-config-changed')); await reloadAdminM3(); rerenderBody(); }
+      if (r.ok) { M3_ADMIN.plafonds_reglementaires = payload; adminToast('Plafonds sauvegardés ✓', '#0D6B3B'); window.dispatchEvent(new CustomEvent('hexa-config-changed')); }
       else adminToast('Erreur sauvegarde plafonds', '#B91C1C');
     });
     document.getElementById('btn-save-params-eco-energie')?.addEventListener('click', async ()=>{
@@ -17207,7 +17203,7 @@ L'équipe Hexa Rénov'</textarea></label>
         duree_vie_pac_ans:n('adm-eco-duree-vie')
       };
       const r = await fetch('/api/admin/params-eco-energie', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
-      if (r.ok) { M3_ADMIN.params_eco_energie = payload; adminToast('✓ Paramètres économiques sauvegardés', '#0D6B3B'); await reloadAdminM3(); rerenderBody(); }
+      if (r.ok) { M3_ADMIN.params_eco_energie = payload; adminToast('✓ Paramètres économiques sauvegardés', '#0D6B3B'); }
       else adminToast("❌ Erreur lors de l'enregistrement", '#B91C1C');
     });
     document.getElementById('btn-save-params-financement')?.addEventListener('click', async ()=>{
@@ -17224,7 +17220,7 @@ L'équipe Hexa Rénov'</textarea></label>
         libelles:{ option1:t('adm-fin-lib-opt1'), option2:t('adm-fin-lib-opt2'), option3:t('adm-fin-lib-opt3') }
       };
       const r = await fetch('/api/admin/params-financement', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
-      if (r.ok) { M3_ADMIN.params_financement = payload; adminToast('✓ Paramètres financement sauvegardés', '#0D6B3B'); await reloadAdminM3(); rerenderBody(); }
+      if (r.ok) { M3_ADMIN.params_financement = payload; adminToast('✓ Paramètres financement sauvegardés', '#0D6B3B'); }
       else adminToast("❌ Erreur lors de l'enregistrement", '#B91C1C');
     });
     document.getElementById('adm-add-delegataire')?.addEventListener('click', ()=>{
@@ -17246,13 +17242,13 @@ L'équipe Hexa Rénov'</textarea></label>
       const forfaits_mpr = {};
       document.querySelectorAll('.adm-m3-mpr').forEach(input=>{ forfaits_mpr[input.dataset.cat] = Number(String(input.value).replace(/\s/g,'').replace(',','.')) || 0; });
       const r = await fetch('/api/admin/m3', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ forfaits_mpr }) });
-      if (r.ok) { M3_ADMIN.forfaits_mpr = forfaits_mpr; adminToast('✓ Paramètres enregistrés', '#0D6B3B'); window.dispatchEvent(new CustomEvent('hexa-config-changed')); await reloadAdminM3(); rerenderBody(); }
+      if (r.ok) { M3_ADMIN.forfaits_mpr = forfaits_mpr; adminToast('✓ Paramètres enregistrés', '#0D6B3B'); window.dispatchEvent(new CustomEvent('hexa-config-changed')); }
       else adminToast("❌ Erreur lors de l'enregistrement", '#B91C1C');
     });
     document.getElementById('adm-save-bonif')?.addEventListener('click', async ()=>{
       const bonification_cee = { actif: !!document.getElementById('adm-bonif-actif')?.checked, multiplicateur: Number(document.getElementById('adm-bonif-mult')?.value || 5) };
       const r = await fetch('/api/admin/m3', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ bonification_cee }) });
-      if (r.ok) { M3_ADMIN.bonification_cee = bonification_cee; adminToast('✓ Paramètres enregistrés', '#0D6B3B'); window.dispatchEvent(new CustomEvent('hexa-config-changed')); await reloadAdminM3(); rerenderBody(); }
+      if (r.ok) { M3_ADMIN.bonification_cee = bonification_cee; adminToast('✓ Paramètres enregistrés', '#0D6B3B'); window.dispatchEvent(new CustomEvent('hexa-config-changed')); }
       else adminToast("❌ Erreur lors de l'enregistrement", '#B91C1C');
     });
     document.getElementById('adm-save-delegataires')?.addEventListener('click', async ()=>{
@@ -17263,7 +17259,7 @@ L'équipe Hexa Rénov'</textarea></label>
         actif: !!row.querySelector('.adm-del-actif')?.checked
       }));
       const r = await fetch('/api/admin/m3', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ delegataires }) });
-      if (r.ok) { M3_ADMIN.delegataires = delegataires; adminToast('✓ Paramètres enregistrés', '#0D6B3B'); window.dispatchEvent(new CustomEvent('hexa-config-changed')); await reloadAdminM3(); rerenderBody(); }
+      if (r.ok) { M3_ADMIN.delegataires = delegataires; adminToast('✓ Paramètres enregistrés', '#0D6B3B'); window.dispatchEvent(new CustomEvent('hexa-config-changed')); }
       else adminToast("❌ Erreur lors de l'enregistrement", '#B91C1C');
     });
     document.getElementById('adm-save-emails')?.addEventListener('click', async ()=>{
@@ -17275,7 +17271,7 @@ L'équipe Hexa Rénov'</textarea></label>
         contenu: card.querySelector('.adm-email-contenu')?.value || ''
       }));
       const r = await fetch('/api/admin/m3', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ modeles_email }) });
-      if (r.ok) { M3_ADMIN.modeles_email = modeles_email; adminToast('✓ Paramètres enregistrés', '#0D6B3B'); await reloadAdminM3(); rerenderBody(); }
+      if (r.ok) { M3_ADMIN.modeles_email = modeles_email; adminToast('✓ Paramètres enregistrés', '#0D6B3B'); }
       else adminToast("❌ Erreur lors de l'enregistrement", '#B91C1C');
     });
     document.getElementById('adm-save-m3')?.addEventListener('click', async ()=>{
@@ -17305,7 +17301,6 @@ L'équipe Hexa Rénov'</textarea></label>
         M3_ADMIN = payload;
         adminToast('Configuration MPR/CEE/Emails sauvegardée ✓', '#0D6B3B');
         window.dispatchEvent(new CustomEvent('hexa-config-changed'));
-        await reloadAdminM3(); rerenderBody();
       } else {
         adminToast('Erreur sauvegarde MPR/CEE/Emails', '#B91C1C');
       }
