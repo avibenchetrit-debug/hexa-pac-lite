@@ -7904,6 +7904,11 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       <button type="button" id="hexa-change-user">Changer d'utilisateur</button>
     </div>
   </div>
+  <div id="hexa-paris-clock" style="display:inline-flex;align-items:center;gap:8px;background:#002E5A;border-radius:8px;padding:8px 14px;margin-right:8px;">
+    <span style="font-size:13px;line-height:1;">🕐</span>
+    <span style="color:#9Fb8d4;font-size:10px;text-transform:uppercase;letter-spacing:0.1em;">Paris</span>
+    <span id="hexa-paris-clock-time" style="color:#ffffff;font-size:15px;font-weight:bold;font-variant-numeric:tabular-nums;letter-spacing:0.04em;">--:--:--</span>
+  </div>
   <button type="button" id="btn-script-appel" class="hexa-header-btn" title="Configurer dans Admin" disabled>📞 Script d'appel</button>
   <a href="#" class="topbar-btn-primary hexa-topbar-new" id="hexa-nav-new">+ Nouveau</a>
 </header>
@@ -18792,6 +18797,19 @@ L'équipe Hexa Rénov'</textarea></label>
   else document.addEventListener('DOMContentLoaded', init);
 })();
 
+</script>
+<script>
+(function(){
+  function tickParisClock(){
+    var el = document.getElementById('hexa-paris-clock-time');
+    if(!el) return;
+    el.textContent = new Date().toLocaleTimeString('fr-FR', {
+      timeZone: 'Europe/Paris', hour: '2-digit', minute: '2-digit', second: '2-digit'
+    });
+  }
+  tickParisClock();
+  setInterval(tickParisClock, 1000);
+})();
 </script>
 </body>
 </html>
