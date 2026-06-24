@@ -9352,6 +9352,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       afficherLoaderDpe(false);
     }
   }
+  window.lancerRechercheDpeAutomatique = lancerRechercheDpeAutomatique;
 
   // ---------------------------------------------------------------------------
   // Binding des listeners — identique création ET modification (PJAX safe)
@@ -9858,7 +9859,8 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     const cp5 = (cp || '').replace(/\D/g, '').slice(0, 5);
 
     if (typeof window.rechercheReglementaireAuto === 'function' && lat != null && lon != null) {
-      await window.rechercheReglementaireAuto(lat, lon, state.parcelle);
+      try { await window.rechercheReglementaireAuto(lat, lon, state.parcelle); }
+      catch (e) { console.debug('reglementaire auto KO (non bloquant):', e); }
     }
     if (typeof window.chargerDonneesAdresse === 'function' && adresse && cp5.length === 5) {
       await window.chargerDonneesAdresse(adresse, cp5, '');
@@ -11317,6 +11319,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       if (st) st.textContent = 'Recherche DPE indisponible — saisie manuelle';
     }
   }
+  window.lancerRechercheDpeSources = lancerRechercheDpeSources;
 
   document.querySelectorAll('.dpe-source-pill').forEach(pill => {
     pill.addEventListener('click', () => {
