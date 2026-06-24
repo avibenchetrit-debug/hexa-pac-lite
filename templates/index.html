@@ -9847,8 +9847,10 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
   async function confirmParcelle() {
     console.log('[DBG] confirmParcelle', {parcelle: state.parcelle, lat: state.centroid?.lat ?? state.lat, lon: state.centroid?.lon ?? state.lon});
     if (!state.parcelle) return;
-    const lat = state.centroid?.lat ?? state.lat;
-    const lon = state.centroid?.lon ?? state.lon;
+    const cLat = Number(state.centroid?.lat);
+    const cLon = Number(state.centroid?.lon);
+    const lat = Number.isFinite(cLat) ? cLat : Number(state.lat);
+    const lon = Number.isFinite(cLon) ? cLon : Number(state.lon);
     const latEl = $('lat-chantier');
     const lonEl = $('lon-chantier');
     if (latEl && lat != null) latEl.value = String(lat);
