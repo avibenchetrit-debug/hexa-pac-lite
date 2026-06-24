@@ -1527,7 +1527,7 @@
     /* En-tête de colonnes du devis : reste collé au 1er lot, pas de page vide en dessous */
     .lots-table-header { break-after: avoid; page-break-after: avoid; break-inside: avoid; }
     .lots-detail .section-title { break-after: avoid; page-break-after: avoid; }
-    .lots-detail .family:first-of-type { break-before: avoid; page-break-before: avoid; }
+    .lots-detail .family:first-of-type { break-before: auto; page-break-before: auto; break-inside: auto; page-break-inside: auto; }
     .family { break-before: auto; }
     .family-header { break-before: auto; }
 
