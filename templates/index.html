@@ -15721,14 +15721,10 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
         <div class="devis-modal-head"><div class="devis-modal-title">📧 Envoyer le devis par mail</div><button type="button" class="devis-close-btn" aria-label="Fermer">×</button></div>
         <div class="devis-modal-body" style="padding:22px;display:block;overflow:auto">
           <label>Destinataire<input type="email" id="mail-destinataire" value="${email}" style="width:100%"></label>
-          <label>Objet<input type="text" id="mail-objet" value="Votre devis Hexa Rénov' - ${numero}" style="width:100%"></label>
-          <label>Message<textarea id="mail-message" rows="6" style="width:100%">Bonjour ${prenom},
-
-Veuillez trouver ci-joint votre devis ainsi que la note de dimensionnement.
-
-Cordialement,
-L'équipe Hexa Rénov'</textarea></label>
-          <div class="mail-pj-list"><h4>Pièces jointes</h4><div>✓ Devis_${numero}.pdf</div><div>✓ NoteDim_${numero}.pdf</div></div>
+          <div style="margin-top:14px;padding:14px 16px;background:#EEF2F7;border-radius:8px;font-size:13px;color:#4A5567;line-height:1.5;">
+            Le prospect recevra <strong>2 emails</strong> : son devis et sa note de dimensionnement,
+            avec des liens sécurisés pour les consulter en ligne et les télécharger.
+          </div>
         </div>
         <div class="devis-modal-foot">
           <button type="button" class="adm-btn adm-btn-cancel" id="btn-cancel-mail">Annuler</button>
@@ -15747,15 +15743,12 @@ L'équipe Hexa Rénov'</textarea></label>
       btn.textContent = 'Envoi...';
       try{
         const auteur = (localStorage.getItem('hexa_user') || 'Anonyme');
-        const message = document.getElementById('mail-message')?.value || '';
         const r = await fetch(`/api/devis/${encodeURIComponent(numero)}/send`, {
           method:'POST',
           headers:{'Content-Type':'application/json'},
           body: JSON.stringify({
             auteur,
-            destinataire: document.getElementById('mail-destinataire')?.value || '',
-            objet: document.getElementById('mail-objet')?.value || '',
-            message_html: message.replace(/\n/g, '<br>')
+            destinataire: document.getElementById('mail-destinataire')?.value || ''
           })
         });
         const data = await r.json().catch(()=>({}));
