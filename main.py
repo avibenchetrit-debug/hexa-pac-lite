@@ -274,7 +274,11 @@ def load_parametres_admin():
 
 
 def save_parametres_admin_atomic(payload):
-    data = _deep_merge_defaults(payload if isinstance(payload, dict) else {}, DEFAULT_PARAMETRES_ADMIN)
+    payload = payload if isinstance(payload, dict) else {}
+    existing = load_parametres_admin()
+    if not isinstance(existing, dict):
+        existing = {}
+    data = _deep_merge_defaults(payload, existing)
     sous_traitants = data.get("sous_traitants")
     if not isinstance(sous_traitants, list) or not sous_traitants:
         data["sous_traitants"] = [dict(DEFAULT_SOUS_TRAITANTS[0])]
