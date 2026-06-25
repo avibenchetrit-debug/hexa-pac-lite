@@ -15251,6 +15251,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
               <option value="peu" ${sel(state.iso_toit,'peu')}>Peu isolé</option>
               <option value="non" ${sel(state.iso_toit,'non')}>Non isolé</option>
             </select>
+            <span style="display:block;font-size:10px;font-weight:400;color:#8A92A0;line-height:1.3;margin-top:3px;margin-bottom:0;">&lt; 5 ans/neuf = Très bien · 5-15 ans = Bien · +15 ans = Isolé · ancienne/origine = Peu · jamais = Non</span>
           </label>
           <label class="sim-field"><span>Mur</span>
             <select id="iso-mur" name="iso_mur">
@@ -15260,6 +15261,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
               <option value="peu" ${sel(state.iso_mur,'peu')}>Peu isolé</option>
               <option value="non" ${sel(state.iso_mur,'non')}>Non isolé</option>
             </select>
+            <span style="display:block;font-size:10px;font-weight:400;color:#8A92A0;line-height:1.3;margin-top:3px;margin-bottom:0;">&lt; 5 ans/neuf = Très bien · 5-15 ans = Bien · +15 ans = Isolé · ancienne/origine = Peu · brut = Non</span>
           </label>
           <label class="sim-field"><span>Menuiserie</span>
             <select id="iso-menuiserie" name="iso_menuiserie">
@@ -15267,6 +15269,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
               <option value="sur_vitrage" ${sel(state.iso_menuiserie,'sur_vitrage')}>Survitrage</option>
               <option value="simple" ${sel(state.iso_menuiserie,'simple')}>Simple vitrage</option>
             </select>
+            <span style="display:block;font-size:10px;font-weight:400;color:#8A92A0;line-height:1.3;margin-top:3px;margin-bottom:0;">2 vitres = Double · vitre ajoutée = Survitrage · 1 vitre = Simple</span>
           </label>
           <button class="sim-btn-note-dim" type="button" onclick="event.stopPropagation(); window.ouvrirNoteDim(); return false;">📋 Voir la note de dimensionnement</button>
         </div>
