@@ -17867,7 +17867,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
   let data = [];
   let leadsLoading = true;
   let leadsLoadError = '';
-  let sortKey='date', sortDir=-1, query='';
+  let sortKey='numero', sortDir=-1, query='';
   let selectedNumeros = new Set();
 
   const fmtDate = d => { try{ return new Date(d).toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric'}); }catch(_){ return d; } };

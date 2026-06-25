@@ -562,6 +562,42 @@ def _norm(text):
     return re.sub(r"[\s_\-]+", " ", text)
 
 
+def _split_nom_prenom(value):
+    s = str(value or "").strip()
+    if not s:
+        return "", ""
+    mots = s.split()
+    if len(mots) == 1:
+        return mots[0], ""
+    def _is_upper(w):
+        lettres = [c for c in w if c.isalpha()]
+        return bool(lettres) and all(c.isupper() for c in lettres)
+    i = 0
+    while i < len(mots) and _is_upper(mots[i]):
+        i += 1
+    if i == 0 or i == len(mots):
+        return mots[0], " ".join(mots[1:])
+    return " ".join(mots[:i]), " ".join(mots[i:])
+
+
+def _normalize_numero_pr(value):
+    m = re.search(r"(\d+)", str(value or "").strip())
+    return f"PR-{int(m.group(1)):06d}" if m else ""
+
+
+def _parse_date_fr(value):
+    m = re.match(r"^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{2,4})", str(value or "").strip())
+    if not m:
+        return ""
+    d, mo, y = int(m.group(1)), int(m.group(2)), int(m.group(3))
+    if y < 100:
+        y += 2000
+    try:
+        return datetime(y, mo, d, tzinfo=PARIS_TZ).isoformat(timespec="seconds")
+    except ValueError:
+        return ""
+
+
 _FIELD_ALIASES = {
     "nom": "nom",
     "prenom": "prenom",
@@ -588,6 +624,12 @@ _FIELD_ALIASES = {
     "note": "notes",
     "commentaire": "notes",
     "commentaires": "notes",
+    "nom prenom": "_nom_prenom",
+    "nomprenom": "_nom_prenom",
+    "n°": "numero",
+    "no": "numero",
+    "numero": "numero",
+    "cree le": "date",
 }
 
 STATUT_ALIASES = {
@@ -1590,8 +1632,14 @@ async def import_leads(file: UploadFile = File(...)) -> JSONResponse:
     imported = 0
 
     for idx, row in df.iterrows():
-        record = {field: str(row[col]).strip() for col, field in col_map.items()}
-        record = {k: v for k, v in record.items() if k in IMPORT_PROSPECT_FIELDS}
+        raw = {field: str(row[col]).strip() for col, field in col_map.items()}
+        # FIX1 : colonne combinee "Nom Prenom" -> split (sauf si nom/prenom explicites)
+        if raw.get("_nom_prenom") and not (raw.get("nom") or raw.get("prenom")):
+            raw["nom"], raw["prenom"] = _split_nom_prenom(raw["_nom_prenom"])
+        # FIX2 : numero + date du fichier (sinon auto)
+        file_numero = _normalize_numero_pr(raw.get("numero"))
+        file_date = _parse_date_fr(raw.get("date"))
+        record = {k: v for k, v in raw.items() if k in IMPORT_PROSPECT_FIELDS}
         if "statut" in record:
             record["statut"] = _normalize_statut(record.get("statut"))
         if "categorie" in record:
@@ -1602,11 +1650,11 @@ async def import_leads(file: UploadFile = File(...)) -> JSONResponse:
                 note_text = str(row[col]).strip()
 
         # Skip fully empty rows.
-        if not any(record.values()) and not note_text:
+        if not any(record.values()) and not note_text and not file_numero:
             continue
 
-        numero = _next_numero(leads)
-        prospect = {"numero": numero, "date": _now_iso()}
+        numero = file_numero or _next_numero(leads)
+        prospect = {"numero": numero, "date": file_date or _now_iso()}
         prospect.update({field: record.get(field, "") for field in IMPORT_PROSPECT_FIELDS})
         leads.append(prospect)
         imported += 1
