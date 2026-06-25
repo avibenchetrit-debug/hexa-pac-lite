@@ -7905,7 +7905,6 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     <span class="hexa-paris-clock-time" style="color:#ffffff;font-size:14px;font-weight:bold;font-variant-numeric:tabular-nums;letter-spacing:0.04em;">--:--:--</span>
   </div>
   <nav class="hexa-lite-nav">
-    <a href="#" class="hexa-nav-link" id="hexa-nav-home">Accueil</a>
   </nav>
   <div class="hexa-user-menu" id="hexa-user-menu">
     <button type="button" class="hexa-user-btn" id="hexa-user-btn">👤 — ▾</button>
@@ -18198,7 +18197,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     const v=document.createElement('div'); v.id='hexa-prospects-view';
     v.innerHTML = `
       <div class="pv-top">
-        <div class="pv-brand">Hexa-Rénov'</div>
+        <div class="pv-brand" id="pv-brand-home" style="cursor:pointer">Hexa-Rénov'</div>
         <div style="display:inline-flex;align-items:center;gap:8px;background:#002E5A;border-radius:8px;padding:6px 12px;margin-left:16px;">
           <span style="font-size:13px;line-height:1;">🕐</span>
           <span style="color:#9Fb8d4;font-size:10px;text-transform:uppercase;letter-spacing:0.1em;">Paris</span>
@@ -18431,6 +18430,8 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     if(search) search.addEventListener('input', e=>{ query=e.target.value; renderRows(); });
     const newBtn=document.getElementById('pv-new');
     if(newBtn) newBtn.addEventListener('click', openNewProspect);
+    const brand=document.getElementById('pv-brand-home');
+    if(brand) brand.addEventListener('click', ()=>showProspects());
     const admBtn=document.getElementById('pv-admin');
     if(admBtn) admBtn.addEventListener('click', ()=>{ if(window.HexaAdmin) window.HexaAdmin.open(); });
     const regieBtn=document.getElementById('pv-regie');
@@ -18856,10 +18857,8 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     else showProspects(); // accueil par défaut
 
     // Header de la fiche
-    const home=document.getElementById('hexa-nav-home');
     const logo=document.getElementById('hexa-logo-home');
     const neu=document.getElementById('hexa-nav-new');
-    if(home) home.addEventListener('click', e=>{ e.preventDefault(); showProspects(); });
     if(logo) logo.addEventListener('click', e=>{ e.preventDefault(); showProspects(); });
     if(neu) neu.addEventListener('click', e=>{ e.preventDefault(); openNewProspect(); });
     bindIdentityBannerLive();
