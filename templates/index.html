@@ -17893,7 +17893,6 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     { id:'pv-stats-filter-statut', field:'statut', emptyLabel:'Tous statuts' },
     { id:'pv-stats-filter-categorie', field:'categorie', emptyLabel:'Toutes catégories' },
     { id:'pv-stats-filter-source', field:'source', emptyLabel:'Toutes sources' },
-    { id:'pv-stats-filter-projet', field:'projet', emptyLabel:'Tous projets' },
   ];
 
   function escapeHtml(v){
@@ -18109,9 +18108,11 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     statsFilterFields.forEach(({ id, field, emptyLabel })=>{
       const el=document.getElementById(id); if(!el) return;
       const prev = el.value || '';
-      const vals = Array.from(new Set(data.map(p=>leadField(p, field)).filter(Boolean)))
-        .sort((a,b)=>a.localeCompare(b,'fr',{ sensitivity:'base' }));
-      el.innerHTML = '<option value="">'+emptyLabel+'</option>' + vals.map(v=>'<option value="'+escapeHtml(v)+'">'+escapeHtml(v)+'</option>').join('');
+      const vals = Array.from(new Set(data.map(p=>leadField(p, field)).filter(Boolean)));
+      if(field==='statut') vals.sort((a,b)=>statutOrder(a)-statutOrder(b));
+      else vals.sort((a,b)=>a.localeCompare(b,'fr',{ sensitivity:'base' }));
+      const labelFn = field==='statut' ? statutLabel : (v=>v);
+      el.innerHTML = '<option value="">'+emptyLabel+'</option>' + vals.map(v=>'<option value="'+escapeHtml(v)+'">'+escapeHtml(labelFn(v))+'</option>').join('');
       if(prev && vals.includes(prev)) el.value = prev;
     });
   }
@@ -18123,8 +18124,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     return data.filter(p=>{
       return (!selected.statut || leadField(p,'statut') === selected.statut)
         && (!selected.categorie || leadField(p,'categorie') === selected.categorie)
-        && (!selected.source || leadField(p,'source') === selected.source)
-        && (!selected.projet || leadField(p,'projet') === selected.projet);
+        && (!selected.source || leadField(p,'source') === selected.source);
     });
   }
   function computeStats(){
@@ -18217,7 +18217,6 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
             <select id="pv-stats-filter-statut" class="pv-stats-filter"><option value="">Tous statuts</option></select>
             <select id="pv-stats-filter-categorie" class="pv-stats-filter"><option value="">Toutes catégories</option></select>
             <select id="pv-stats-filter-source" class="pv-stats-filter"><option value="">Toutes sources</option></select>
-            <select id="pv-stats-filter-projet" class="pv-stats-filter"><option value="">Tous projets</option></select>
             <button id="pv-stats-reset" class="pv-btn pv-btn-ghost" style="padding:6px 10px;font-size:12px">Réinitialiser</button>
           </div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
