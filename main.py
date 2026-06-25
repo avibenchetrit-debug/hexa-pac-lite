@@ -1195,6 +1195,15 @@ def _doc_status(label, rec, date):
     return txt + ")"
 
 
+def _label_type_logement(val):
+    v = str(val or "").strip().lower()
+    if "maison" in v:
+        return "Maison individuelle"
+    if "appart" in v:
+        return "Appartement"
+    return str(val or "")
+
+
 def _enrich_dpe(rec):
     out = dict(rec)
     out["classe_energie"] = rec.get("etiquette_dpe", "")
@@ -1974,7 +1983,7 @@ def _build_devis_context(request: Request, numero: str) -> dict:
         "date_validite": (today + timedelta(days=60)).strftime("%d/%m/%Y"),
         "date_visite_technique": date_visite,
         "date_debut_travaux": "À déterminer",
-        "type_logement": prospect.get("type_logement", ""),
+        "type_logement": _label_type_logement(prospect.get("type_logement", "")),
         "surface_habitable": str(devis_value(prospect, "surface_habitable", "surface_logement_m2", default="")),
         "chauffage_actuel": str(devis_value(prospect, "chauffage_actuel", "mode_chauffage", default="")).capitalize(),
         "parcelle_cadastrale": prospect.get("parcelle_cadastrale", ""),
@@ -2055,7 +2064,7 @@ def _build_notedim_context(request: Request, numero: str) -> dict:
         "adresse_chantier": devis_value(prospect, "adresse", "adresse_chantier", default=""),
         "cp_chantier": cp_chantier,
         "ville_chantier": devis_value(prospect, "ville", "ville_chantier", default=""),
-        "type_logement": prospect.get("type_logement", ""),
+        "type_logement": _label_type_logement(prospect.get("type_logement", "")),
         "chauffage_actuel": str(devis_value(prospect, "chauffage_actuel", "mode_chauffage", default="")).capitalize(),
         **calculer_notedim(prospect, state, catalogue),
     }
