@@ -15230,7 +15230,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
           <div class="sim-ctx-item">
             <span class="sim-ctx-k">Surf. chauffée</span>
             <span class="sim-ctx-v sim-surf-wrap">
-              <input type="number" id="sim-surf-chauffee" value="${state.surface_chauffee ?? ''}" placeholder="—">
+              <input type="number" id="sim-surf-chauffee" value="${state.surface_chauffee != null && state.surface_chauffee !== '' ? Math.round(state.surface_chauffee) : ''}" placeholder="—">
               <em>m²</em>
               <button type="button" class="sim-info-btn" id="sim-surf-info" aria-label="Info surface">i</button>
             </span>
@@ -15455,7 +15455,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     if (sc) ['input','change'].forEach(evt => sc.addEventListener(evt,e=>{
       const raw=e.target.value;
       if (raw==='') { state.surface_forcee=false; state.surface_chauffee = state.surface_habitable!=null?state.surface_habitable*0.9:null; }
-      else { const v=parseFloat(raw); if(!isNaN(v)){ state.surface_chauffee=v; state.surface_forcee=true; } }
+      else { const v=parseFloat(raw); if(!isNaN(v)){ const cur=Number(state.surface_chauffee); if(!(Number.isFinite(cur)&&v===Math.round(cur))){ state.surface_chauffee=v; state.surface_forcee=true; } } }
       state.modele_force = false;
       scheduleSaveSimulatorState();
       patch();
