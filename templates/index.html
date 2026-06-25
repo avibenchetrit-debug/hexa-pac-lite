@@ -9188,7 +9188,6 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     }
     if (dpe.nb_niveau_logement) setChamp('nb_niveaux', dpe.nb_niveau_logement);
     if (dpe.hauteur_sous_plafond != null) setChamp('hsp', dpe.hauteur_sous_plafond);
-    if (dpe.altitude != null) setChamp('altitude', Math.round(Number(dpe.altitude)));
     if (dpe.hauteur_sous_plafond && dpe.nb_niveau_logement) {
       setChamp('hauteur_batiment', Math.round(dpe.hauteur_sous_plafond * dpe.nb_niveau_logement * 10) / 10);
     }
@@ -9243,7 +9242,6 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     }
     if (audit.nb_niveau_logement) setChamp('nb_niveaux', audit.nb_niveau_logement);
     if (audit.hauteur_sous_plafond != null) setChamp('hsp', audit.hauteur_sous_plafond);
-    if (audit.altitude != null) setChamp('altitude', Math.round(Number(audit.altitude)));
     if (audit.hauteur_sous_plafond && audit.nb_niveau_logement) {
       setChamp('hauteur_batiment', Math.round(audit.hauteur_sous_plafond * audit.nb_niveau_logement * 10) / 10);
     }
