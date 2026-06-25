@@ -8220,7 +8220,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
             <label><span class="label-row"><span>Type</span><span id="badge-type-logement" class="badge-source badge-dpe-auto" data-badge="dpe-auto" style="display:none"></span></span></label>
             <select name="type_logement">
               <option value="">— Sélectionner —</option>
-              <option value="maison" >Maison</option>
+              <option value="maison" >Maison individuelle</option>
               <option value="appartement" >Appartement</option>
             </select>
           </div>
@@ -18214,7 +18214,6 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
               <th data-k="date"><div class="pv-th-inner">Créé le <span class="pv-arrow">\u2195</span></div></th>
               <th data-k="nrp" class="pv-center"><div class="pv-th-inner">NRP <span class="pv-arrow">\u2195</span></div></th>
               <th data-k="dernnrp" class="pv-center"><div class="pv-th-inner">Dern. NRP <span class="pv-arrow">\u2195</span></div></th>
-              <th data-k="projet_initial"><div class="pv-th-inner">Projet initial <span class="pv-arrow">\u2195</span></div></th>
               <th data-k="source"><div class="pv-th-inner">Source <span class="pv-arrow">\u2195</span></div></th>
               <th class="pv-action-cell">Actions</th>
             </tr></thead>
@@ -18281,7 +18280,6 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
         +'<button class="pv-nrp-btn" data-act="inc" title="Ne répond pas (+1)">+</button>'
       +'</span></td>'
       +'<td class="pv-center pv-muted'+(last?' pv-dernnrp':'')+'"'+(last?' title="'+new Date(last).toLocaleString('fr-FR')+'"':'')+'>'+relTime(last)+'</td>'
-      +'<td>'+(p.projet_initial||'<span class="pv-muted">—</span>')+'</td>'
       +'<td>'+(p.source||'<span class="pv-muted">—</span>')+'</td>'
       +'<td class="pv-action-cell"><button type="button" class="pv-delete-btn" data-numero="'+p.numero+'" title="Supprimer">🗑</button></td>'
       +'</tr>';
