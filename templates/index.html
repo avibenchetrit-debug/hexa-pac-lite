@@ -9871,6 +9871,22 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       const cpDirect = (document.querySelector('[name="code_postal_chantier"]')?.value || '').replace(/\D/g,'').slice(0,5);
       await window.lancerRechercheDpeAutomatique(lat, lon, cpDirect);
     }
+
+    // Altitude IGN (impacte la note de dimensionnement)
+    if (Number.isFinite(lat) && Number.isFinite(lon)) {
+      try {
+        const altResp = await fetch(`/api/altitude?lat=${lat}&lon=${lon}`);
+        const altData = await altResp.json();
+        if (altData && altData.altitude != null) {
+          const altEl = document.getElementById('altitude-input') || document.querySelector('[name="altitude"]');
+          if (altEl) {
+            altEl.value = String(altData.altitude);
+            altEl.dispatchEvent(new Event('input', { bubbles: true }));
+            altEl.dispatchEvent(new Event('change', { bubbles: true }));
+          }
+        }
+      } catch (e) { console.debug('altitude IGN:', e); }
+    }
     if (typeof window.chargerDonneesAdresse === 'function' && adresse && cp5.length === 5) {
       await window.chargerDonneesAdresse(adresse, cp5, '');
     } else if (typeof window.lancerRechercheDpeSources === 'function') {
