@@ -2807,6 +2807,12 @@ body.panel-is-open {
       margin-bottom: 4px; display: block;
     }
     .field label .req { font-weight: 500; }
+    .field--requis-simu input,
+    .field--requis-simu select {
+      background: #FFF4E6 !important;
+      border: 1.5px solid #F57C00 !important;
+      border-left: 3px solid #E65100 !important;
+    }
     /* Champs auto-remplis API — vert / jaune / bleu */
     .field--auto-dpe-officiel input,
     .field--auto-dpe-officiel select,
@@ -3017,14 +3023,6 @@ body.panel-is-open {
     }
     .field-error:focus {
       outline-color: #dc2626;
-    }
-    .hint-required {
-      display: block;
-      font-size: 10px;
-      color: #6b7280;
-      font-style: italic;
-      margin-top: -2px;
-      margin-bottom: 2px;
     }
     .duplicate-modal-overlay{position:fixed;inset:0;z-index:5600;background:rgba(8,20,40,.55);display:flex;align-items:center;justify-content:center;padding:20px}
     .duplicate-modal{max-width:600px;width:100%;background:#fff;border-radius:12px;padding:20px;box-shadow:0 20px 60px rgba(0,46,90,.25)}
@@ -8875,11 +8873,6 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       label.querySelectorAll('.req').forEach(req => req.remove());
       if (requiredForSave.has(name)) {
         label.insertAdjacentHTML('beforeend', ' <span class="req">*</span>');
-      } else if ([
-        'adresse_chantier','code_postal_chantier','ville_chantier','type_logement','surface_logement_m2',
-        'hsp','mode_chauffage','type_emetteurs','alimentation_electrique','categorie'
-      ].includes(name) && !field.querySelector('.hint-required')) {
-        label.insertAdjacentHTML('afterend', '<span class="hint-required">Requis pour le devis</span>');
       }
     });
   }
@@ -9159,7 +9152,27 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
         if (wrapper) wrapper.classList.add('dpe-auto-filled');
       }
     });
+    if (window.majRequisSimu) window.majRequisSimu();
   }
+
+  window.REQUIS_SIMU_FIELDS = ['surface_logement_m2','code_postal_chantier','type_logement','hsp','altitude','type_emetteurs','mode_chauffage'];
+  window.majRequisSimu = function () {
+    (window.REQUIS_SIMU_FIELDS || []).forEach(function (nm) {
+      const el = document.querySelector('[name="' + nm + '"]');
+      if (!el) return;
+      const field = el.closest('.field');
+      if (!field) return;
+      const hasAuto = field.classList.contains('field--auto-dpe-officiel')
+        || field.classList.contains('field--auto-dpe-enrichi')
+        || field.classList.contains('field--auto-api');
+      const filled = el.value != null && String(el.value).trim() !== '';
+      field.classList.toggle('field--requis-simu', !filled && !hasAuto);
+    });
+  };
+  document.addEventListener('input',  function (e) { if (e.target && e.target.closest && e.target.closest('.field')) window.majRequisSimu(); });
+  document.addEventListener('change', function (e) { if (e.target && e.target.closest && e.target.closest('.field')) window.majRequisSimu(); });
+  if (document.readyState !== 'loading') window.majRequisSimu();
+  else document.addEventListener('DOMContentLoaded', function () { window.majRequisSimu(); });
 
   function appliquerDpeOfficiel(dpe) {
     if (!dpe) return;
