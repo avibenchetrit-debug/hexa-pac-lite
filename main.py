@@ -2327,10 +2327,10 @@ def _email_devis_html(prenom, apercu, pct_eco, lien_devis):
 </td></tr>
 <tr><td style="padding:18px 32px 8px 32px;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
-<td style="text-align:center;"><div style="font-size:22px;">🛡️</div><div style="color:#4A5567;font-size:11px;font-weight:bold;margin-top:4px;">Certifié RGE</div></td>
-<td style="text-align:center;"><div style="font-size:22px;">🤝</div><div style="color:#4A5567;font-size:11px;font-weight:bold;margin-top:4px;">Aides incluses</div></td>
-<td style="text-align:center;"><div style="font-size:22px;">⚡</div><div style="color:#4A5567;font-size:11px;font-weight:bold;margin-top:4px;">Réponse 24h</div></td>
-<td style="text-align:center;"><div style="font-size:22px;">📍</div><div style="color:#4A5567;font-size:11px;font-weight:bold;margin-top:4px;">France Rénov'</div></td>
+<td style="text-align:center;padding:0 6px;"><div style="font-size:22px;">🛡️</div><div style="color:#4A5567;font-size:11px;font-weight:bold;margin-top:4px;">Certifié RGE</div></td>
+<td style="text-align:center;padding:0 6px;"><div style="font-size:22px;">🤝</div><div style="color:#4A5567;font-size:11px;font-weight:bold;margin-top:4px;">Aides incluses</div></td>
+<td style="text-align:center;padding:0 6px;"><div style="font-size:22px;">⚡</div><div style="color:#4A5567;font-size:11px;font-weight:bold;margin-top:4px;">Réponse 24h</div></td>
+<td style="text-align:center;padding:0 6px;"><div style="font-size:22px;">📍</div><div style="color:#4A5567;font-size:11px;font-weight:bold;margin-top:4px;">France Rénov'</div></td>
 </tr></table>
 </td></tr>
 <tr><td style="padding:24px 32px;">
@@ -2370,9 +2370,9 @@ def _email_notedim_html(prenom, specs, lien_notedim):
 <tr><td style="padding:22px 32px 8px 32px;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F0F4F9;border-radius:8px;"><tr><td style="padding:6px 20px;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-<tr><td style="padding:14px 0;border-bottom:1px solid #E1E5EB;color:#8A92A0;font-size:14px;">Modèle préconisé</td><td style="padding:14px 0;border-bottom:1px solid #E1E5EB;color:#002E5A;font-size:14px;font-weight:bold;text-align:right;">{modele}</td></tr>
-<tr><td style="padding:14px 0;border-bottom:1px solid #E1E5EB;color:#8A92A0;font-size:14px;">ETAS 35°C / 55°C</td><td style="padding:14px 0;border-bottom:1px solid #E1E5EB;color:#002E5A;font-size:14px;font-weight:bold;text-align:right;">{etas35} % / {etas55} %</td></tr>
-<tr><td style="padding:14px 0;color:#8A92A0;font-size:14px;">Surface chauffée</td><td style="padding:14px 0;color:#002E5A;font-size:14px;font-weight:bold;text-align:right;">{surface} m²</td></tr>
+<tr><td style="padding:14px 0;border-bottom:1px solid #E1E5EB;color:#8A92A0;font-size:14px;white-space:nowrap;">Modèle préconisé</td><td style="padding:14px 0;border-bottom:1px solid #E1E5EB;color:#002E5A;font-size:14px;font-weight:bold;text-align:right;padding-left:16px;">{modele}</td></tr>
+<tr><td style="padding:14px 0;border-bottom:1px solid #E1E5EB;color:#8A92A0;font-size:14px;white-space:nowrap;">ETAS 35°C / 55°C</td><td style="padding:14px 0;border-bottom:1px solid #E1E5EB;color:#002E5A;font-size:14px;font-weight:bold;text-align:right;padding-left:16px;">{etas35} % / {etas55} %</td></tr>
+<tr><td style="padding:14px 0;color:#8A92A0;font-size:14px;white-space:nowrap;">Surface chauffée</td><td style="padding:14px 0;color:#002E5A;font-size:14px;font-weight:bold;text-align:right;padding-left:16px;">{surface} m²</td></tr>
 </table>
 </td></tr></table>
 </td></tr>
