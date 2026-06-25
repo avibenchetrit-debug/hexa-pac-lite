@@ -18793,6 +18793,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     }
     const nomEl=form.querySelector('[name="nom"]'); if(nomEl) nomEl.value=window.formatNomDisplay(nomEl.value);
     const prenomEl=form.querySelector('[name="prenom"]'); if(prenomEl) prenomEl.value=window.formatPrenomDisplay(prenomEl.value);
+    const telEl=form.querySelector('[name="telephone"]'); if(telEl && telEl.value) telEl.value=window.formaterTelephone(telEl.value);
   }
   async function openFiche(p){
     const numero = (p && p.numero) ? String(p.numero).trim() : '';
