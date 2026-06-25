@@ -1262,6 +1262,25 @@ def get_dpe_lookup(adresse: str = "", cp: str = "", lat: float | None = None,
         },
     })
 
+@app.get("/api/altitude")
+def get_altitude(lat: float, lon: float) -> JSONResponse:
+    url = ("https://data.geopf.fr/altimetrie/1.0/calcul/alti/rest/elevation.json?"
+           + urllib.parse.urlencode({"lon": lon, "lat": lat,
+                                     "resource": "ign_rge_alti_wld", "zonly": "true"}))
+    try:
+        with urllib.request.urlopen(url, timeout=8) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+        elevations = data.get("elevations") or []
+        if not elevations:
+            return JSONResponse({"altitude": None})
+        first = elevations[0]
+        z = float(first.get("z") if isinstance(first, dict) else first)  # zonly=true -> nombre direct
+        if z <= -99999:
+            return JSONResponse({"altitude": None})
+        return JSONResponse({"altitude": round(z)})
+    except Exception:
+        return JSONResponse({"altitude": None})
+
 @app.post("/api/catalogue-pac")
 async def post_catalogue_pac(request: Request) -> JSONResponse:
     try:
