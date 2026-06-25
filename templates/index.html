@@ -18087,12 +18087,13 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     return '';
   }
   function leadName(p){
-    const full = cleanVal(((p?.prenom || '') + ' ' + (p?.nom || '')).trim());
+    const full = cleanVal((window.formatPrenomDisplay(p?.prenom || '') + ' ' + window.formatNomDisplay(p?.nom || '')).trim());
     if(full) return full;
     return cleanVal(p?.nom_complet || p?.name || p?.numero || 'Sans nom');
   }
   function leadTel(p){
-    return cleanVal(p?.tel || p?.telephone || p?.phone || '—');
+    const t = cleanVal(p?.tel || p?.telephone || p?.phone || '');
+    return t ? window.formaterTelephone(t) : '—';
   }
   function statutLabel(k){
     if(STMAP[k]) return STMAP[k].label;
