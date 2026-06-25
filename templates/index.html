@@ -9173,6 +9173,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       setChamp('surface_logement_m2', Math.round(dpe.surface_habitable_logement));
     }
     if (dpe.annee_construction) setChamp('annee_construction', dpe.annee_construction);
+    else if (dpe.periode_construction) setChamp('annee_construction', dpe.periode_construction);
     if (dpe.ep_conso_5_usages_m2 != null) {
       setChamp('conso_kwh_m2', Math.round(dpe.ep_conso_5_usages_m2));
     }
@@ -9226,6 +9227,8 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       setChamp('surface_logement_m2', Math.round(audit.surface_habitable_logement));
     }
     if (audit.annee_construction) setChamp('annee_construction', audit.annee_construction);
+    else if (audit.periode_constuction) setChamp('annee_construction', audit.periode_constuction);
+    else if (audit.periode_construction) setChamp('annee_construction', audit.periode_construction);
     const ep = audit.cep_initial != null ? audit.cep_initial : audit.ep_conso_5_usages_m2;
     if (ep != null) {
       setChamp('conso_kwh_m2', Math.round(ep));
