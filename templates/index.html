@@ -18396,6 +18396,14 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
           renderRows();
           try {
             await saveLeadNRP(num, rec.nrp_count, rec.nrp_log);
+            // Auto : un NRP incrémenté fait passer "Nouveau" -> "À rappeler" (idempotent si déjà "À rappeler")
+            if(btn.dataset.act==='inc' && rec.nrp_count > 0 && rec.statut==='nouveau'){
+              rec.statut='rappeler';
+              renderRows();
+              refreshMasterStats(true);
+              try { await saveLeadStatus(num, 'rappeler'); }
+              catch(e2){ rec.statut='nouveau'; renderRows(); refreshMasterStats(true); toastMsg('❌ Erreur sauvegarde statut', '#B91C1C'); console.error(e2); }
+            }
           } catch(err) {
             rec.nrp_log = prevLog;
             rec.nrp_count = prevCount;
