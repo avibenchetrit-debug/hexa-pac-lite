@@ -8993,7 +8993,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
 
   function mapEnergieChauffage(energie) {
     const e = (energie || '').toLowerCase();
-    if (e.includes('gaz') || e.includes('réseau') || e.includes('reseau')) return 'gaz';
+    if (e.includes('gaz') || e.includes('propane') || e.includes('butane') || e.includes('gpl')) return 'gaz';
     if (e.includes('fioul') || e.includes('fuel')) return 'fioul';
     if (e.includes('électric') || e.includes('electric')) return 'electricite';
     if (e.includes('bois') || e.includes('granulé') || e.includes('granule') || e.includes('biomasse')) return 'bois';
