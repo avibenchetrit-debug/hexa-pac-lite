@@ -9233,9 +9233,13 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     if (!audit) return;
     const classe = audit.classe_energie || audit.classe_bilan_dpe || audit.etiquette_dpe;
     selectDpeLettre(classe);
-    const tb = (audit.type_batiment || '').toLowerCase();
-    if (tb === 'maison') setChamp('type_logement', 'maison');
-    else if (tb === 'appartement') setChamp('type_logement', 'appartement');
+    let tb = (audit.type_batiment || '').toLowerCase();
+    if (!tb) {
+      const dpeSrc = (window.dpeSourcesCache && window.dpeSourcesCache.sources && window.dpeSourcesCache.sources.dpe_officiel) || {};
+      tb = (dpeSrc.type_batiment || '').toLowerCase();
+    }
+    if (tb.includes('maison')) setChamp('type_logement', 'maison');
+    else if (tb.includes('appartement')) setChamp('type_logement', 'appartement');
     if (audit.surface_habitable_logement) {
       setChamp('surface_logement_m2', Math.round(audit.surface_habitable_logement));
     }
@@ -9895,6 +9899,14 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
             altEl.value = String(altData.altitude);
             altEl.dispatchEvent(new Event('input', { bubbles: true }));
             altEl.dispatchEvent(new Event('change', { bubbles: true }));
+            const altField = altEl.closest('.field');
+            if (altField) altField.classList.add('field-auto-officiel');
+            const altBadge = document.getElementById('badge-altitude');
+            if (altBadge) {
+              altBadge.textContent = 'IGN';
+              altBadge.className = 'badge-source badge-dpe-officiel';
+              altBadge.style.display = 'inline-flex';
+            }
           }
         }
       } catch (e) { console.debug('altitude IGN:', e); }
@@ -9949,6 +9961,10 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     mode_chauffage: 'chauffage',
     gestion_ecs: 'ecs',
     zone_climatique_chantier: 'zone',
+    hsp: 'hsp',
+    nb_niveaux: 'nb_niveaux',
+    hauteur_batiment: 'hauteur',
+    panneau_solaire: 'panneau',
   };
 
   let lastPayload = null;
@@ -9992,6 +10008,10 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     mode_chauffage: 'badge-mode-chauffage',
     gestion_ecs: 'badge-ecs',
     zone_climatique_chantier: 'badge-zone-clim',
+    hsp: 'badge-hsp',
+    nb_niveaux: 'badge-nb-niveaux',
+    hauteur_batiment: 'badge-hauteur',
+    panneau_solaire: 'badge-panneau',
   };
 
   function badgeClassSource(sourceKey) {
