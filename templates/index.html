@@ -9286,7 +9286,6 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
 
   window.OPTIONAL_BACKEND_APIS_ENABLED = true;
   window.fetchOptionalBackendApi = async function fetchOptionalBackendApi(url) {
-    console.log('[DBG] fetchOptional', url, 'flag=', window.OPTIONAL_BACKEND_APIS_ENABLED);
     if (!window.OPTIONAL_BACKEND_APIS_ENABLED) {
       console.debug('Endpoint pas encore branché:', url);
       return null;
@@ -9845,7 +9844,6 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
   }
 
   async function confirmParcelle() {
-    console.log('[DBG] confirmParcelle', {parcelle: state.parcelle, lat: state.centroid?.lat ?? state.lat, lon: state.centroid?.lon ?? state.lon});
     if (!state.parcelle) return;
     const cLat = Number(state.centroid?.lat);
     const cLon = Number(state.centroid?.lon);
@@ -9866,17 +9864,13 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       try { await window.rechercheReglementaireAuto(lat, lon, state.parcelle); }
       catch (e) { console.debug('reglementaire auto KO (non bloquant):', e); }
     }
-    console.log('[DBG] confirmParcelle DPE direct', {lat, lon});
     if (Number.isFinite(lat) && Number.isFinite(lon) && typeof window.lancerRechercheDpeAutomatique === 'function') {
       const cpDirect = (document.querySelector('[name="code_postal_chantier"]')?.value || '').replace(/\D/g,'').slice(0,5);
       await window.lancerRechercheDpeAutomatique(lat, lon, cpDirect);
     }
-    console.log('[DBG] avant branches', {adresse, cp5, hasCharger: typeof window.chargerDonneesAdresse, hasSources: typeof window.lancerRechercheDpeSources});
     if (typeof window.chargerDonneesAdresse === 'function' && adresse && cp5.length === 5) {
-      console.log('[DBG] -> chargerDonneesAdresse');
       await window.chargerDonneesAdresse(adresse, cp5, '');
     } else if (typeof window.lancerRechercheDpeSources === 'function') {
-      console.log('[DBG] -> lancerRechercheDpeSources');
       await window.lancerRechercheDpeSources(adresse, cp5);
     }
   }
@@ -10480,10 +10474,8 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
   }
 
   async function chargerDonneesAdresse(adresse, cp, banId) {
-    console.log('[DBG] chargerDonneesAdresse start', {adresse, cp});
     const cp5 = (cp || '').replace(/\D/g, '').slice(0, 5);
     if (!adresse || cp5.length !== 5) return;
-    console.log('[DBG] chargerDonneesAdresse passe le garde cp');
     const dpeStatus = document.getElementById('dpe-autofill-status');
     try {
       const urbsUrl = banId
@@ -10511,7 +10503,6 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
           if (lonEl) lonEl.value = lon;
         }
       }
-      console.log('[DBG] charger -> lance DPE', {lat, lon, cp5});
       if (!isNaN(lat) && !isNaN(lon) && cp5.length === 5) {
         if (typeof window.lancerRechercheDpeAutomatique === 'function') {
           await window.lancerRechercheDpeAutomatique(lat, lon, cp5);
@@ -10525,7 +10516,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       recalculerCategories();
       majBadgesReglementairesBandeau();
     } catch (e) {
-      console.log('[DBG] chargerDonneesAdresse CATCH erreur:', e);
+      console.debug('chargerDonneesAdresse:', e);
     }
   }
 
@@ -11318,7 +11309,6 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
   }
 
   async function lancerRechercheDpeSources(adresse, cp) {
-    console.log('[DBG] lancerRechercheDpeSources', {adresse, cp, lat: document.getElementById('lat-chantier')?.value, lon: document.getElementById('lon-chantier')?.value});
     const lat = document.getElementById('lat-chantier')?.value;
     const lon = document.getElementById('lon-chantier')?.value;
     const st = document.getElementById('dpe-source-status');
@@ -11328,10 +11318,8 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       if (lat && lon) { q.set('lat', lat); q.set('lon', lon); }
       const pNum = document.body.dataset.prospectNumero;
       if (pNum) q.set('prospect_numero', pNum);
-      console.log('[DBG] FETCH', '/api/dpe-lookup?' + q.toString());
       const data = await window.fetchOptionalBackendApi(`/api/dpe-lookup?${q.toString()}`);
       if (!data) return;
-      console.log('[DBG] data recu', data);
       majPillsDpeSources(data);
     } catch {
       if (st) st.textContent = 'Recherche DPE indisponible — saisie manuelle';
