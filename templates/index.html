@@ -11766,6 +11766,9 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     const digits = (v || '').replace(/\D/g, '').substring(0, 10);
     return digits.replace(/(\d{2})(?=\d)/g, '$1 ');
   }
+  window.formatNomDisplay = function (v) { return String(v || '').toUpperCase(); };
+  window.formatPrenomDisplay = function (v) { return String(v || '').toLowerCase().replace(/(^|[\s\-'])([a-zà-ÿ])/g, function (m, sep, c) { return sep + c.toUpperCase(); }); };
+  window.formaterTelephone = formaterTelephone;
   if (phoneInput) {
     phoneInput.addEventListener('input', (e) => {
       const ancien = e.target.value;
@@ -18305,9 +18308,9 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       +'<td class="pv-select-cell"><input type="checkbox" class="pv-select-checkbox pv-row-select" data-numero="'+p.numero+'" aria-label="Sélectionner '+(p.numero||'')+'"></td>'
       +'<td><span class="pv-pid">'+(p.numero||'—')+'</span></td>'
       +'<td>'+statutSelect(p)+'</td>'
-      +'<td class="pv-nom"><span class="pv-nom-only">'+(p.nom||'')+'</span> '+(p.prenom||'')+'</td>'
+      +'<td class="pv-nom"><span class="pv-nom-only">'+window.formatNomDisplay(p.nom)+'</span> '+window.formatPrenomDisplay(p.prenom)+'</td>'
       +'<td>'+(p.cp||'<span class="pv-muted">—</span>')+'</td>'
-      +'<td>'+(p.tel||p.telephone||'<span class="pv-muted">—</span>')+'</td>'
+      +'<td>'+((p.tel||p.telephone)?window.formaterTelephone(p.tel||p.telephone):'<span class="pv-muted">—</span>')+'</td>'
       +'<td>'+(p.email?'<span class="pv-mail">'+p.email+'</span>':'<span class="pv-muted">—</span>')+'</td>'
       +'<td>'+catBadge(p.categorie)+'</td>'
       +'<td class="pv-muted">'+(p.date?fmtDate(p.date):'—')+'</td>'
@@ -18788,6 +18791,8 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       btnSave.dataset.ctaMode='view';
       if(btnSave.tagName==='BUTTON') btnSave.textContent='MODIFIER';
     }
+    const nomEl=form.querySelector('[name="nom"]'); if(nomEl) nomEl.value=window.formatNomDisplay(nomEl.value);
+    const prenomEl=form.querySelector('[name="prenom"]'); if(prenomEl) prenomEl.value=window.formatPrenomDisplay(prenomEl.value);
   }
   async function openFiche(p){
     const numero = (p && p.numero) ? String(p.numero).trim() : '';
