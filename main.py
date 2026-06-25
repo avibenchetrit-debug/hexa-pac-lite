@@ -1151,14 +1151,16 @@ _DPE_MIN_DATE = "2021-07-01"   # DPE/audit valides depuis le 1er juillet 2021
 
 
 def _ademe_lines(dataset, sort_field, lat=None, lon=None, adresse="", cp="", qs=None):
-    params = {"size": "10", "sort": "-" + sort_field}
+    params = {"size": "10"}
     if lat is not None and lon is not None:
-        params["geo_distance"] = f"{lon}:{lat}:100m"   # ATTENTION : lon puis lat
+        # recherche geo : rayon 50m, tri par DISTANCE croissante (pas de sort -> data-fair trie par _geo_distance)
+        params["geo_distance"] = f"{lon}:{lat}:50m"   # ATTENTION : lon puis lat
     else:
         q = (str(adresse or "").strip() + " " + str(cp or "").strip()).strip()
         if not q:
             return []
         params["q"] = q
+        params["sort"] = "-" + sort_field   # fallback texte uniquement : tri par date decroissante
     if qs:
         params["qs"] = qs
     url = ("https://data.ademe.fr/data-fair/api/v1/datasets/" + dataset + "/lines?"
@@ -1169,6 +1171,28 @@ def _ademe_lines(dataset, sort_field, lat=None, lon=None, adresse="", cp="", qs=
         return data.get("results") or []
     except Exception:
         return []
+
+
+def _pick_best(lines, date_field):
+    """Meilleure ligne : la plus proche (lignes deja triees par distance en mode geo) ;
+    en cas d'egalite de distance, la plus recente. En mode texte (pas de _geo_distance), la 1ere."""
+    if not lines:
+        return None
+    first = lines[0]
+    if first.get("_geo_distance") is not None:   # mode geo : deja trie par distance croissante
+        d0 = first.get("_geo_distance") or 0.0
+        closest = [r for r in lines if abs((r.get("_geo_distance") or 0.0) - d0) < 1.0]
+        return max(closest, key=lambda r: str(r.get(date_field) or ""))   # egalite distance -> plus recent
+    return first   # mode texte : deja trie par date decroissante
+
+
+def _doc_status(label, rec, date):
+    num = rec.get("numero_dpe") or rec.get("n_audit") or ""
+    adr = rec.get("adresse_ban") or ""
+    txt = f"{label} trouvé (n°{num} du {date}"
+    if adr:
+        txt += f" — {adr}"
+    return txt + ")"
 
 
 def _enrich_dpe(rec):
@@ -1192,6 +1216,7 @@ def _enrich_audit(rec):
     out["emission_ges_initial"] = rec.get("emission_ges_5_usages_m2", "")
     out["altitude"] = rec.get("classe_altitude", "")
     out["date_etablissement_dpe"] = rec.get("date_etablissement_audit", "")  # le front lit cette cle
+    out["numero_dpe"] = rec.get("numero_dpe") or rec.get("n_audit", "")      # le numero d'audit est dans n_audit
     return out
 
 
@@ -1199,12 +1224,12 @@ def _enrich_audit(rec):
 def get_dpe_lookup(adresse: str = "", cp: str = "", lat: float | None = None,
                    lon: float | None = None, prospect_numero: str | None = None) -> JSONResponse:
     dpe_lines = _ademe_lines(DPE_DATASET, "date_etablissement_dpe", lat, lon, adresse, cp)
-    dpe = dpe_lines[0] if dpe_lines else None
+    dpe = _pick_best(dpe_lines, "date_etablissement_dpe")
     if dpe and str(dpe.get("date_etablissement_dpe") or "") < _DPE_MIN_DATE:
         dpe = None
     audit_lines = _ademe_lines(AUDIT_DATASET, "date_etablissement_audit", lat, lon, adresse, cp,
                                qs='categorie_scenario:"état initial"')
-    audit = audit_lines[0] if audit_lines else None
+    audit = _pick_best(audit_lines, "date_etablissement_audit")
     if audit and str(audit.get("date_etablissement_audit") or "") < _DPE_MIN_DATE:
         audit = None
 
@@ -1216,17 +1241,17 @@ def get_dpe_lookup(adresse: str = "", cp: str = "", lat: float | None = None,
         status_text = "Aucun DPE/Audit trouvé — saisie manuelle"
     elif audit and not dpe:
         source, badge = "audit_officiel", "AUDIT OFFICIEL"
-        status_text = f"Audit officiel trouvé (n°{audit.get('numero_dpe', '')} du {audit_date})"
+        status_text = _doc_status("Audit officiel", audit, audit_date)
     elif dpe and not audit:
         source, badge = "dpe_officiel", "DPE OFFICIEL"
-        status_text = f"DPE officiel trouvé (n°{dpe.get('numero_dpe', '')} du {dpe_date})"
+        status_text = _doc_status("DPE officiel", dpe, dpe_date)
     else:
         if audit_date > dpe_date:
             source, badge = "audit_officiel", "AUDIT OFFICIEL"
-            status_text = f"Audit officiel trouvé (n°{audit.get('numero_dpe', '')} du {audit_date})"
+            status_text = _doc_status("Audit officiel", audit, audit_date)
         else:
             source, badge = "dpe_officiel", "DPE OFFICIEL"
-            status_text = f"DPE officiel trouvé (n°{dpe.get('numero_dpe', '')} du {dpe_date})"
+            status_text = _doc_status("DPE officiel", dpe, dpe_date)
 
     return JSONResponse({
         "source": source, "badge": badge, "status_text": status_text,
@@ -1236,7 +1261,6 @@ def get_dpe_lookup(adresse: str = "", cp: str = "", lat: float | None = None,
             "urbs_enrichi": {},
         },
     })
-
 
 @app.post("/api/catalogue-pac")
 async def post_catalogue_pac(request: Request) -> JSONResponse:
