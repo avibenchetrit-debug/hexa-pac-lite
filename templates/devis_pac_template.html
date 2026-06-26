@@ -1510,6 +1510,8 @@
     /* Le sous-total ne doit jamais être seul en haut d'une page : il colle à ce qui précède */
     .lot-subtotal { break-inside: avoid; page-break-inside: avoid; break-before: avoid; page-break-before: avoid; }
     .family-header, .section-title { break-after: avoid; page-break-after: avoid; }
+    /* Detail technique : titre + en-tete colonnes ne collent PAS au 1er lot (flux continu) */
+    .lots-detail .section-title, .lots-detail .lots-table-header { break-after: auto !important; page-break-after: auto !important; }
 
     /* Footers société gérés en overlay PDF : on masque uniquement les strips footer-info + spacer.
        Le bloc certifications RGE reste en flux (visible en PDF comme en HTML). */
