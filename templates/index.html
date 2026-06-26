@@ -15754,8 +15754,8 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     const wrap = document.createElement('div');
     wrap.id = 'devis-modal-overlay';
     wrap.className = 'devis-modal-overlay';
-    const devisUrl = `/api/devis/${encodeURIComponent(numero)}/preview`;
-    const notedimUrl = `/api/notedim/${encodeURIComponent(numero)}/preview`;
+    const devisUrl = `/api/devis/${encodeURIComponent(numero)}/preview?t=${Date.now()}`;
+    const notedimUrl = `/api/notedim/${encodeURIComponent(numero)}/preview?t=${Date.now()}`;
     wrap.innerHTML = `
       <div class="devis-modal-box" role="dialog" aria-modal="true">
         <div class="devis-modal-head">
@@ -15783,7 +15783,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       });
     });
     document.getElementById('devis-pdf-btn')?.addEventListener('click', ()=>{
-      const url = currentKind === 'notedim' ? `/api/notedim/${encodeURIComponent(numero)}/pdf` : `/api/devis/${encodeURIComponent(numero)}/pdf`;
+      const url = currentKind === 'notedim' ? `/api/notedim/${encodeURIComponent(numero)}/pdf?t=${Date.now()}` : `/api/devis/${encodeURIComponent(numero)}/pdf?t=${Date.now()}`;
       window.open(url, '_blank');
     });
     document.getElementById('devis-send-btn')?.addEventListener('click', ()=>openSendDevisMailModal(numero));
