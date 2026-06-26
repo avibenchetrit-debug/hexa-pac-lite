@@ -1,0 +1,59 @@
+[
+  {
+    "id": "demandeur",
+    "label": "Demandeur",
+    "icon": "👤",
+    "sous_categories": [
+      {"id": "attestation_tva",  "label": "Attestation TVA",        "icon": "📋", "statut": "Ok / Manquant", "max_docs": 1, "types_acceptes": ["PDF"]},
+      {"id": "avis_imposition",  "label": "Avis d'imposition",      "icon": "🏛", "statut": "Ok / Manquant", "max_docs": 3, "types_acceptes": ["PDF"]},
+      {"id": "cni_passeport",    "label": "CNI / Passeport",        "icon": "🪪", "statut": "Ok / Manquant", "max_docs": 3, "types_acceptes": ["PDF"]},
+      {"id": "facture_energie",  "label": "Facture énergie",        "icon": "⚡", "statut": "Ok / Manquant", "max_docs": 1, "types_acceptes": ["PDF"]},
+      {"id": "justif_propriete", "label": "Justificatif propriété", "icon": "🏠", "statut": "Ok / Manquant", "max_docs": 1, "types_acceptes": ["PDF"]},
+      {"id": "rib_particulier",  "label": "RIB du particulier",     "icon": "🏦", "statut": "Ok / Manquant", "max_docs": 1, "types_acceptes": ["PDF"]}
+    ]
+  },
+  {
+    "id": "urbanisme",
+    "label": "Urbanisme",
+    "icon": "🏗",
+    "sous_categories": [
+      {"id": "arrete",    "label": "Arrêté",    "icon": "📜", "statut": null, "max_docs": 3, "types_acceptes": ["PDF"]},
+      {"id": "daact",     "label": "DAACT",     "icon": "📄", "statut": null, "max_docs": 3, "types_acceptes": ["PDF"]},
+      {"id": "mandat",    "label": "Mandat",    "icon": "✍️", "statut": null, "max_docs": 3, "types_acceptes": ["PDF"]},
+      {"id": "recepisse", "label": "Récépissé", "icon": "🧾", "statut": null, "max_docs": 3, "types_acceptes": ["PDF"]}
+    ]
+  },
+  {
+    "id": "divers",
+    "label": "Divers",
+    "icon": "📎",
+    "sous_categories": [
+      {"id": "autres", "label": "Autres documents", "icon": "📄", "statut": null, "max_docs": 20, "types_acceptes": ["PDF", "PNG", "JPEG"]}
+    ]
+  },
+  {
+    "id": "bar_th_171_mpr",
+    "label": "BAR-TH 171 + MPR",
+    "icon": "🔥",
+    "sous_categories": [
+      {"id": "att_chauffage",        "label": "Attestation de chauffage",          "icon": "🔥", "statut": null, "max_docs": 1,  "types_acceptes": ["PDF"]},
+      {"id": "att_fluide",           "label": "Attestation manipulation fluide",   "icon": "💧", "statut": null, "max_docs": 1,  "types_acceptes": ["PDF"]},
+      {"id": "att_mise_service",     "label": "Attestation mise en service",       "icon": "✅", "statut": null, "max_docs": 1,  "types_acceptes": ["PDF"]},
+      {"id": "att_refus_amo",        "label": "Attestation refus AMO",             "icon": "📄", "statut": null, "max_docs": 1,  "types_acceptes": ["PDF"]},
+      {"id": "att_honneur",          "label": "Attestation sur l'honneur",         "icon": "📋", "statut": null, "max_docs": 1,  "types_acceptes": ["PDF"]},
+      {"id": "avis_impo_locataire",  "label": "Avis d'imposition locataire (si SCI)", "icon": "🏛", "statut": null, "max_docs": 2,  "types_acceptes": ["PDF"]},
+      {"id": "cadre_contribution",   "label": "Cadre de contribution",             "icon": "📝", "statut": null, "max_docs": 1,  "types_acceptes": ["PDF"]},
+      {"id": "cofrac",               "label": "COFRAC",                            "icon": "🔬", "statut": null, "max_docs": 2,  "types_acceptes": ["PDF"]},
+      {"id": "devis_signe",          "label": "Devis signé",                       "icon": "✍️", "statut": null, "max_docs": 1,  "types_acceptes": ["PDF"]},
+      {"id": "autorisation_exploit", "label": "Autorisation exploitation",         "icon": "✅", "statut": null, "max_docs": 1,  "types_acceptes": ["PDF"]},
+      {"id": "photo_chantier",       "label": "Photo chantier",                    "icon": "📸", "statut": null, "max_docs": 50, "types_acceptes": ["PNG", "JPEG"]},
+      {"id": "photo_linky",          "label": "Photo compteur Linky",              "icon": "⚡", "statut": null, "max_docs": 1,  "types_acceptes": ["PNG", "JPEG"]},
+      {"id": "photo_etat_initial",   "label": "Photo état initial",                "icon": "🏠", "statut": null, "max_docs": 50, "types_acceptes": ["PNG", "JPEG"]},
+      {"id": "facture_solde",        "label": "Facture solde",                     "icon": "💶", "statut": null, "max_docs": 1,  "types_acceptes": ["PDF"]},
+      {"id": "liste_travaux",        "label": "Liste travaux réalisés",            "icon": "📋", "statut": null, "max_docs": 1,  "types_acceptes": ["PDF"]},
+      {"id": "note_dimensionnement", "label": "Note de dimensionnement",           "icon": "📐", "statut": null, "max_docs": 1,  "types_acceptes": ["PDF"]},
+      {"id": "plan_cadastral",       "label": "Plan cadastral",                    "icon": "🗺", "statut": null, "max_docs": 1,  "types_acceptes": ["PDF", "PNG", "JPEG"]},
+      {"id": "visite_technique",     "label": "Visite technique",                  "icon": "🔍", "statut": null, "max_docs": 1,  "types_acceptes": ["PDF"]}
+    ]
+  }
+]

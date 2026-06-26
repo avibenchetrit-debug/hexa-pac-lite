@@ -63,6 +63,8 @@ DEVIS_DIR = os.path.join(DATA_DIR, "devis")
 DEVIS_META_PATH = os.path.join(DEVIS_DIR, "devis_meta.json")
 REPO_CATALOGUE_PATH = os.path.join(REPO_DATA_DIR, "catalogue_pac.json")
 REPO_BAREMES_PATH = os.path.join(REPO_DATA_DIR, "baremes.json")
+DOCUMENTS_CATEGORIES_PATH = os.path.join(DATA_DIR, "documents_categories.json")
+REPO_DOCUMENTS_CATEGORIES_PATH = os.path.join(REPO_DATA_DIR, "documents_categories.json")
 
 DEFAULT_DELEGATAIRES = [
     {"nom": "PICOTY", "mwh_precaire": 12.50, "mwh_classique": 7.20, "actif": True}
@@ -392,6 +394,7 @@ def _init_storage():
     _seed_json_file(DEVIS_ENVOYES_PATH, [])
     _seed_json_file(CATALOGUE_PATH, DEFAULT_CATALOGUE_PAC, REPO_CATALOGUE_PATH)
     _seed_json_file(BAREMES_PATH, {}, REPO_BAREMES_PATH)
+    _seed_json_file(DOCUMENTS_CATEGORIES_PATH, [], REPO_DOCUMENTS_CATEGORIES_PATH)
     os.makedirs(DEVIS_DIR, exist_ok=True)
     os.makedirs(STATES_SIMULATEUR_DIR, exist_ok=True)
     _seed_json_file(DEVIS_META_PATH, {})
@@ -1331,6 +1334,12 @@ def get_altitude(lat: float, lon: float) -> JSONResponse:
         return JSONResponse({"altitude": round(z)})
     except Exception:
         return JSONResponse({"altitude": None})
+
+@app.get("/api/documents/categories")
+def get_documents_categories() -> JSONResponse:
+    cats = _read_json(DOCUMENTS_CATEGORIES_PATH, [])
+    return JSONResponse(cats if isinstance(cats, list) else [])
+
 
 @app.post("/api/catalogue-pac")
 async def post_catalogue_pac(request: Request) -> JSONResponse:
