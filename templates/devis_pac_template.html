@@ -64,7 +64,7 @@
       page-break-inside: avoid;
       break-inside: avoid;
     }
-    .sub-line-header { page-break-after: avoid; break-after: avoid; }
+    .sub-line-header { break-inside: avoid; }
     .lot-description {
       font-size: 9pt;
       color: #4b5563;
@@ -1494,10 +1494,10 @@
     .recap-block, .signature-box { break-inside: avoid; page-break-inside: avoid; }
     /* Lots et sous-lignes sécables pour remplir les pages au maximum */
     .lot { break-inside: auto; page-break-inside: auto; }
-    .lot-header { break-after: avoid; page-break-after: avoid; break-inside: avoid; }
+    .lot-header { break-inside: avoid; orphans: 2; widows: 2; }
     .sub-line { break-inside: auto; page-break-inside: auto; }
     /* Le titre de sous-ligne (montant) reste collé au début de ses specs */
-    .sub-line-header { break-inside: avoid; page-break-inside: avoid; break-after: avoid; page-break-after: avoid; }
+    .sub-line-header { break-inside: avoid; page-break-inside: avoid; }
     /* Le bloc specs peut se couper, mais pas au milieu d'une ligne */
     .specs { break-inside: auto; page-break-inside: auto; orphans: 2; widows: 2; }
     .specs-row { break-inside: avoid; page-break-inside: avoid; }
@@ -1524,8 +1524,8 @@
     .footer-with-cert .certifications { display: flex !important; }
 
     /* En-tête de colonnes du devis : reste collé au 1er lot, pas de page vide en dessous */
-    .lots-table-header { break-after: avoid; page-break-after: avoid; break-inside: avoid; }
-    .lots-detail .section-title { break-after: avoid; page-break-after: avoid; }
+    .lots-table-header { break-inside: avoid; }
+    .lots-detail .section-title { orphans: 2; widows: 2; }
     .lots-detail .family:first-of-type { break-before: auto; page-break-before: auto; break-inside: auto; page-break-inside: auto; }
     .family { break-before: auto; }
     .family-header { break-before: auto; }
