@@ -7734,6 +7734,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
 .adm-trash-empty{ background:#fff; border:1px solid #E2E8F0; border-radius:12px; padding:16px; color:#9CA3AF; }
 .pv-nom{ font-weight:700; color:#002E5A; }
 .pv-muted{ color:#9CA3AF; }
+.pv-tel{ font-weight:600; }
 .pv-mail{ color:#002E5A; text-decoration:none; }
 .pv-mail:hover{ color:#E2214B; }
 .pv-pid{ display:inline-block; background:#002E5A; color:#fff; font-size:11px; font-weight:700; padding:3px 8px; border-radius:6px; }
@@ -18309,7 +18310,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       +'<td>'+statutSelect(p)+'</td>'
       +'<td class="pv-nom"><span class="pv-nom-only">'+window.formatNomDisplay(p.nom)+'</span> '+window.formatPrenomDisplay(p.prenom)+'</td>'
       +'<td>'+(p.cp||'<span class="pv-muted">—</span>')+'</td>'
-      +'<td>'+((p.tel||p.telephone)?window.formaterTelephone(p.tel||p.telephone):'<span class="pv-muted">—</span>')+'</td>'
+      +'<td>'+((p.tel||p.telephone)?'<span class="pv-tel">'+window.formaterTelephone(p.tel||p.telephone)+'</span>':'<span class="pv-muted">—</span>')+'</td>'
       +'<td>'+(p.email?'<span class="pv-mail">'+p.email+'</span>':'<span class="pv-muted">—</span>')+'</td>'
       +'<td>'+catBadge(p.categorie)+'</td>'
       +'<td class="pv-muted">'+(p.date?fmtDate(p.date):'—')+'</td>'
