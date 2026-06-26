@@ -2093,6 +2093,12 @@ def _build_devis_context(request: Request, numero: str) -> dict:
                 "taux_pct": _fin.get("taux_pct"),
                 "duree_mois": _fin.get("duree_mois"),
                 "premiere_echeance_jours": _fin.get("premiere_echeance_jours"),
+                # Éco 20 ans calculée par le simulateur, transmise telle quelle (pas de recalcul)
+                "eco_20_ans": state.get("eco_20_ans"),
+                "annee_rentable": state.get("annee_rentable"),
+                "inflation_avant_pct": state.get("inflation_avant_pct"),
+                "inflation_elec_pct": state.get("inflation_elec_pct"),
+                "energie_avant": state.get("energie_avant"),
             }
     context["projet_apercu"] = projet_apercu
     return context
