@@ -2083,6 +2083,9 @@ def _build_devis_context(request: Request, numero: str) -> dict:
         _eco_pendant = round(_fav - _total_credit)
         _eco_apres = round(_fav - _fap)
         if _fav > 0 and _eco_pendant > 0 and _eco_apres > 0:
+            _eco20_raw = state.get("eco_20_ans")
+            _eco20_fmt = (f"{round(float_value(_eco20_raw)):,}".replace(",", " ")
+                          if str(_eco20_raw).strip() not in ("", "None") else None)
             projet_apercu = {
                 "facture_avant": round(_fav),
                 "facture_apres": round(_fap),
@@ -2095,6 +2098,7 @@ def _build_devis_context(request: Request, numero: str) -> dict:
                 "premiere_echeance_jours": _fin.get("premiere_echeance_jours"),
                 # Éco 20 ans calculée par le simulateur, transmise telle quelle (pas de recalcul)
                 "eco_20_ans": state.get("eco_20_ans"),
+                "eco_20_ans_fmt": _eco20_fmt,
                 "annee_rentable": state.get("annee_rentable"),
                 "inflation_avant_pct": state.get("inflation_avant_pct"),
                 "inflation_elec_pct": state.get("inflation_elec_pct"),
