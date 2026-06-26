@@ -1578,17 +1578,10 @@
     /* Le hero reste entier (jamais coupé) */
     .document .hero { break-inside: avoid; page-break-inside: avoid; }
 
-    /* ===== TEST TEMPORAIRE : force fragmentabilité totale zone détail ===== */
-    .lots-detail, .lots-detail *, .family, .lot, .lot-header, .sub-line, .sub-line-header,
-    .pac-desc-block, .pac-specs-table, .pac-specs-table * {
-      break-inside: auto !important; page-break-inside: auto !important;
-      break-before: auto !important; page-break-before: auto !important;
-      break-after: auto !important; page-break-after: auto !important;
-    }
-    .pac-specs-table, .pac-specs-table tbody, .pac-specs-table tr, .pac-specs-table td {
-      display: block !important;
-    }
-    /* ===== FIN TEST TEMPORAIRE ===== */
+    /* Détail technique sécable sans casser les colonnes : la table se coupe entre lignes */
+    .lots-detail, .family, .lot, .pac-desc-block, .sub-line { break-inside: auto !important; page-break-inside: auto !important; }
+    .pac-specs-table { break-inside: auto !important; page-break-inside: auto !important; }
+    .pac-specs-table tr { break-inside: avoid !important; page-break-inside: avoid !important; }
   }
 
 
