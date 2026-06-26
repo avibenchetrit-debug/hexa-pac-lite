@@ -15,7 +15,7 @@ import unicodedata
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
-from fastapi import FastAPI, File, HTTPException, Request, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -65,6 +65,7 @@ REPO_CATALOGUE_PATH = os.path.join(REPO_DATA_DIR, "catalogue_pac.json")
 REPO_BAREMES_PATH = os.path.join(REPO_DATA_DIR, "baremes.json")
 DOCUMENTS_CATEGORIES_PATH = os.path.join(DATA_DIR, "documents_categories.json")
 REPO_DOCUMENTS_CATEGORIES_PATH = os.path.join(REPO_DATA_DIR, "documents_categories.json")
+DOCUMENTS_DIR = os.path.join(DATA_DIR, "documents")
 
 DEFAULT_DELEGATAIRES = [
     {"nom": "PICOTY", "mwh_precaire": 12.50, "mwh_classique": 7.20, "actif": True}
@@ -396,6 +397,7 @@ def _init_storage():
     _seed_json_file(BAREMES_PATH, {}, REPO_BAREMES_PATH)
     _seed_json_file(DOCUMENTS_CATEGORIES_PATH, [], REPO_DOCUMENTS_CATEGORIES_PATH)
     os.makedirs(DEVIS_DIR, exist_ok=True)
+    os.makedirs(DOCUMENTS_DIR, exist_ok=True)
     os.makedirs(STATES_SIMULATEUR_DIR, exist_ok=True)
     _seed_json_file(DEVIS_META_PATH, {})
     save_parametres_admin_atomic(load_parametres_admin())
@@ -2596,6 +2598,209 @@ async def download_notedim(numero: str, version: int):
     if not os.path.exists(path):
         raise HTTPException(status_code=404, detail="Note de dimensionnement introuvable")
     return FileResponse(path, media_type="application/pdf", filename=os.path.basename(path))
+
+
+# ---------------------------------------------------------------------------
+# Documents prospect : stockage par dossier + index.json + upload/statut
+# ---------------------------------------------------------------------------
+TYPE_TO_EXT = {"PDF": {"pdf"}, "PNG": {"png"}, "JPEG": {"jpeg", "jpg"}}
+EXT_NORM = {"pdf": ".pdf", "png": ".png", "jpeg": ".jpg", "jpg": ".jpg"}
+DOC_MEDIA_TYPE = {".pdf": "application/pdf", ".png": "image/png", ".jpg": "image/jpeg"}
+
+
+def _doc_err(msg, code=400):
+    return JSONResponse({"status": "error", "msg": msg}, status_code=code)
+
+
+def _slug(text):
+    t = unicodedata.normalize("NFKD", str(text or ""))
+    t = "".join(c for c in t if not unicodedata.combining(c))
+    return re.sub(r"[^A-Za-z0-9]+", "_", t).strip("_")
+
+
+def _doc_filename(civilite, nom, prenom, label, ext):
+    parts = [_slug(civilite), _slug(nom).upper(), _slug(prenom).title(), _slug(label)]
+    return ("_".join(p for p in parts if p) or "Document") + ext
+
+
+def _prospect_docs_dir(numero):
+    safe = re.sub(r"[^A-Za-z0-9_-]", "", str(numero))
+    return os.path.join(DOCUMENTS_DIR, safe)
+
+
+def _docs_index_path(numero):
+    return os.path.join(_prospect_docs_dir(numero), "index.json")
+
+
+def _read_docs_index(numero):
+    docs = _read_json(_docs_index_path(numero), [])
+    return docs if isinstance(docs, list) else []
+
+
+def _write_docs_index(numero, docs):
+    os.makedirs(_prospect_docs_dir(numero), exist_ok=True)
+    _atomic_write_json(_docs_index_path(numero), docs)
+
+
+def _find_doc_slot(cat_id, sous_id, ss_id=None):
+    for cat in _read_json(DOCUMENTS_CATEGORIES_PATH, []):
+        if cat.get("id") != cat_id:
+            continue
+        for sous in cat.get("sous_categories", []):
+            if sous.get("id") != sous_id:
+                continue
+            if ss_id:
+                for ss in (sous.get("sous_sous_categories") or []):
+                    if ss.get("id") == ss_id:
+                        return ss
+                return None
+            return sous
+    return None
+
+
+def _doc_path_safe(numero, filename):
+    pdir = os.path.abspath(_prospect_docs_dir(numero))
+    path = os.path.abspath(os.path.join(pdir, os.path.basename(filename)))
+    if not path.startswith(pdir + os.sep):
+        return None
+    return path if os.path.exists(path) else None
+
+
+@app.post("/prospect/{numero}/document")
+async def upload_document(
+    numero: str,
+    fichier: UploadFile = File(...),
+    categorie_id: str = Form(...),
+    sous_categorie_id: str = Form(...),
+    sous_sous_categorie_id: str = Form(""),
+    civilite: str = Form(""),
+    nom: str = Form(""),
+    prenom: str = Form(""),
+    auteur: str = Form(""),
+) -> JSONResponse:
+    if not _find_lead(numero):
+        return _doc_err("Prospect introuvable", 404)
+    ss = (sous_sous_categorie_id or "").strip() or None
+    slot = _find_doc_slot(categorie_id, sous_categorie_id, ss)
+    if not slot:
+        return _doc_err("Catégorie inconnue", 400)
+    ext_raw = os.path.splitext(fichier.filename or "")[1].lower().lstrip(".")
+    allowed = set()
+    for t in slot.get("types_acceptes", ["PDF"]):
+        allowed |= TYPE_TO_EXT.get(str(t).upper(), set())
+    if ext_raw not in allowed:
+        return _doc_err("Type de fichier non accepté (" + ", ".join(slot.get("types_acceptes", [])) + ")", 400)
+    ext = EXT_NORM.get(ext_raw, "." + ext_raw)
+    data = await fichier.read()
+    if len(data) > 20 * 1024 * 1024:
+        return _doc_err("Fichier trop volumineux (max 20 Mo)", 400)
+    docs = _read_docs_index(numero)
+    same = [d for d in docs
+            if (d.get("categorie_id"), d.get("sous_categorie_id"), d.get("sous_sous_categorie_id") or None)
+            == (categorie_id, sous_categorie_id, ss)]
+    max_docs = int(slot.get("max_docs") or 1)
+    pdir = _prospect_docs_dir(numero)
+    os.makedirs(pdir, exist_ok=True)
+    fname = _doc_filename(civilite, nom, prenom, slot.get("label", "Document"), ext)
+    if max_docs == 1:
+        for d in same:
+            old = os.path.join(pdir, d["filename"])
+            if os.path.exists(old):
+                os.remove(old)
+        docs = [d for d in docs if d not in same]
+    else:
+        if len(same) >= max_docs:
+            return _doc_err("Maximum " + str(max_docs) + " fichier(s) atteint", 400)
+        names = {d["filename"] for d in docs}
+        if fname in names:
+            stem, e = os.path.splitext(fname)
+            i = 2
+            while stem + "_" + str(i) + e in names:
+                i += 1
+            fname = stem + "_" + str(i) + e
+    fname = os.path.basename(fname)
+    with open(os.path.join(pdir, fname), "wb") as f:
+        f.write(data)
+    docs.append({
+        "filename": fname,
+        "categorie_id": categorie_id,
+        "sous_categorie_id": sous_categorie_id,
+        "sous_sous_categorie_id": ss,
+        "taille_octets": len(data),
+        "date_upload": _now_iso(),
+        "auteur": (auteur or "").strip() or "Avi B.",
+        "commentaire": "",
+    })
+    _write_docs_index(numero, docs)
+    return JSONResponse({"status": "ok", "filename": fname})
+
+
+@app.get("/prospect/{numero}/documents/status")
+def documents_status(numero: str) -> JSONResponse:
+    docs = _read_docs_index(numero)
+    counts = {}
+    for d in docs:
+        key = str(d.get("categorie_id")) + "/" + str(d.get("sous_categorie_id"))
+        counts[key] = counts.get(key, 0) + 1
+    statuts = {}
+    for cat in _read_json(DOCUMENTS_CATEGORIES_PATH, []):
+        for sous in cat.get("sous_categories", []):
+            if sous.get("statut") == "Ok / Manquant":
+                key = str(cat.get("id")) + "/" + str(sous.get("id"))
+                statuts[key] = "ok" if counts.get(key, 0) > 0 else "manquant"
+    return JSONResponse({"counts": counts, "statuts": statuts, "documents": docs})
+
+
+@app.get("/prospect/{numero}/document/{filename}")
+def download_document(numero: str, filename: str):
+    path = _doc_path_safe(numero, filename)
+    if not path:
+        raise HTTPException(status_code=404, detail="Document introuvable")
+    media = DOC_MEDIA_TYPE.get(os.path.splitext(path)[1].lower(), "application/octet-stream")
+    return FileResponse(path, media_type=media, filename=os.path.basename(path))
+
+
+@app.get("/prospect/{numero}/document/{filename}/view")
+def view_document(numero: str, filename: str):
+    path = _doc_path_safe(numero, filename)
+    if not path:
+        raise HTTPException(status_code=404, detail="Document introuvable")
+    media = DOC_MEDIA_TYPE.get(os.path.splitext(path)[1].lower(), "application/octet-stream")
+    return FileResponse(path, media_type=media, headers={"Content-Disposition": "inline"})
+
+
+@app.delete("/prospect/{numero}/document/{filename}")
+def delete_document(numero: str, filename: str) -> JSONResponse:
+    safe = os.path.basename(filename)
+    docs = _read_docs_index(numero)
+    new = [d for d in docs if d.get("filename") != safe]
+    if len(new) == len(docs):
+        return _doc_err("Document introuvable", 404)
+    path = os.path.join(_prospect_docs_dir(numero), safe)
+    if os.path.exists(path):
+        os.remove(path)
+    _write_docs_index(numero, new)
+    return JSONResponse({"status": "ok"})
+
+
+@app.put("/prospect/{numero}/document/{filename}/commentaire")
+async def comment_document(numero: str, filename: str, request: Request) -> JSONResponse:
+    try:
+        payload = await request.json()
+    except ValueError:
+        payload = {}
+    safe = os.path.basename(filename)
+    docs = _read_docs_index(numero)
+    found = False
+    for d in docs:
+        if d.get("filename") == safe:
+            d["commentaire"] = str(payload.get("commentaire") or "")
+            found = True
+            break
+    if not found:
+        return _doc_err("Document introuvable", 404)
+    _write_docs_index(numero, docs)
+    return JSONResponse({"status": "ok"})
 
 
 @app.post("/api/modeles-email/{numero}/envoyer")

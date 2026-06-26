@@ -14194,6 +14194,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       fd.append('civilite', form?.querySelector('[name=civilite]')?.value || '');
       fd.append('nom', form?.querySelector('[name=nom]')?.value || '');
       fd.append('prenom', form?.querySelector('[name=prenom]')?.value || '');
+      fd.append('auteur', (localStorage.getItem('hexa_user') || '').trim());
       const xhr = new XMLHttpRequest();
       xhr.open('POST', `/prospect/${currentProspect}/document`);
       xhr.setRequestHeader('X-Requested-With', 'fetch');
