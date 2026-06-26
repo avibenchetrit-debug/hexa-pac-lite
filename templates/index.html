@@ -18247,9 +18247,9 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
               <th data-k="numero"><div class="pv-th-inner">N° <span class="pv-arrow">\u2195</span></div></th>
               <th data-k="statut"><div class="pv-th-inner">Statut <span class="pv-arrow">\u2195</span></div></th>
               <th data-k="nomprenom"><div class="pv-th-inner">Nom Prénom <span class="pv-arrow">\u2195</span></div></th>
-              <th data-k="cp"><div class="pv-th-inner">CP <span class="pv-arrow">\u2195</span></div></th>
               <th data-k="tel"><div class="pv-th-inner">Téléphone <span class="pv-arrow">\u2195</span></div></th>
               <th data-k="email"><div class="pv-th-inner">E-mail <span class="pv-arrow">\u2195</span></div></th>
+              <th data-k="cp"><div class="pv-th-inner">CP <span class="pv-arrow">\u2195</span></div></th>
               <th data-k="categorie"><div class="pv-th-inner">Catégorie <span class="pv-arrow">\u2195</span></div></th>
               <th data-k="date"><div class="pv-th-inner">Créé le <span class="pv-arrow">\u2195</span></div></th>
               <th data-k="nrp" class="pv-center"><div class="pv-th-inner">NRP <span class="pv-arrow">\u2195</span></div></th>
@@ -18309,9 +18309,9 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       +'<td><span class="pv-pid">'+(p.numero||'—')+'</span></td>'
       +'<td>'+statutSelect(p)+'</td>'
       +'<td class="pv-nom"><span class="pv-nom-only">'+window.formatNomDisplay(p.nom)+'</span> '+window.formatPrenomDisplay(p.prenom)+'</td>'
-      +'<td>'+(p.cp||'<span class="pv-muted">—</span>')+'</td>'
       +'<td>'+((p.tel||p.telephone)?'<span class="pv-tel">'+window.formaterTelephone(p.tel||p.telephone)+'</span>':'<span class="pv-muted">—</span>')+'</td>'
       +'<td>'+(p.email?'<span class="pv-mail">'+p.email+'</span>':'<span class="pv-muted">—</span>')+'</td>'
+      +'<td>'+(p.cp||'<span class="pv-muted">—</span>')+'</td>'
       +'<td>'+catBadge(p.categorie)+'</td>'
       +'<td class="pv-muted">'+(p.date?fmtDate(p.date):'—')+'</td>'
       +'<td class="pv-nrp-cell"><span class="pv-nrp-ctl">'
