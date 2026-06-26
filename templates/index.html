@@ -14866,12 +14866,15 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       type_logement: state.type_logement || '',
       surface_chauffee: state.surface_chauffee || '',
       option: state.option || '',
-      // Éco 20 ans calculée par roi() côté simulateur, transmise telle quelle au devis
-      eco_20_ans: lastRoi ? Math.round(lastRoi.total20) : null,
-      annee_rentable: lastRoi ? lastRoi.anneeRentable : null,
-      inflation_avant_pct: lastRoi ? Math.round(lastRoi.infAvant * 100) : null,
-      inflation_elec_pct: lastRoi ? Math.round(lastRoi.inflElec * 100) : null,
-      energie_avant: state.energie_avant || ''
+      // Éco 20 ans (roi()) : incluses uniquement si lastRoi existe, sinon clés omises
+      // pour ne pas écraser une valeur déjà persistée (merge côté backend).
+      ...(lastRoi ? {
+        eco_20_ans: Math.round(lastRoi.total20),
+        annee_rentable: lastRoi.anneeRentable,
+        inflation_avant_pct: Math.round(lastRoi.infAvant * 100),
+        inflation_elec_pct: Math.round(lastRoi.inflElec * 100),
+        energie_avant: state.energie_avant || ''
+      } : {})
     };
   }
   function scheduleSaveSimulatorState(){

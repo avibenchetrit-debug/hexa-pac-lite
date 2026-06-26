@@ -450,8 +450,9 @@ def load_state_simulateur(numero: str) -> dict:
 
 
 def save_state_simulateur_atomic(numero: str, payload: dict) -> dict:
-    state = payload if isinstance(payload, dict) else {}
-    state = dict(state)
+    incoming = payload if isinstance(payload, dict) else {}
+    state = load_state_simulateur(numero)
+    state.update(incoming)
     state["numero_prospect"] = numero
     state["updated_at"] = _now_paris_iso()
     _atomic_write_json(_state_simulateur_path(numero), state)
