@@ -2192,8 +2192,8 @@ def _html_to_pdf_playwright(html_content: str, request: Request) -> bytes:
                     print_background=True,
                     display_header_footer=True,
                     header_template="<span></span>",
-                    footer_template='<div style="width:100%; font-family:\'Inter\', Helvetica, Arial, sans-serif; font-size:8px; color:#9AA3AE; text-align:center;"><span class="pageNumber"></span>/<span class="totalPages"></span></div>',
-                    margin={"top": "0", "bottom": "1cm", "left": "0", "right": "0"},
+                    footer_template="""<div style="width:100%; box-sizing:border-box; padding:0 24px; font-family:'Inter',Helvetica,Arial,sans-serif;"><table style="width:100%; border:0; border-collapse:collapse;"><tr><td style="text-align:left; vertical-align:bottom; font-size:7px; color:#6B7480; line-height:1.45;"><div><strong style="color:#002E5A;">SAS HEXA RÉNOV'</strong> · 58 Rue de la Sablière, 92600 Asnières-sur-Seine · RCS Nanterre 845 229 152 · SIRET 845 229 152 00028 · TVA FR 89 845 229 152</div><div>RGE CertiRénov' n° CR-2025-92-0052 · Assurance Décennale &amp; RC Pro — MIC Insurance n° AXE2502159 · Validité : 19/03/2026 au 18/03/2027</div><div>info@hexa-renov.fr · 09 70 70 25 11</div></td><td style="text-align:right; vertical-align:bottom; white-space:nowrap; font-size:8px; color:#9AA3AE; padding-left:12px;">Page <span class="pageNumber"></span> / <span class="totalPages"></span></td></tr></table></div>""",
+                    margin={"top": "0", "bottom": "1.4cm", "left": "0", "right": "0"},
                 )
             finally:
                 browser.close()
