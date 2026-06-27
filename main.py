@@ -2190,7 +2190,10 @@ def _html_to_pdf_playwright(html_content: str, request: Request) -> bytes:
                 pdf_bytes = page.pdf(
                     format="A4",
                     print_background=True,
-                    margin={"top": "0", "bottom": "0", "left": "0", "right": "0"},
+                    display_header_footer=True,
+                    header_template="<span></span>",
+                    footer_template='<div style="width:100%; font-family:\'Inter\', Helvetica, Arial, sans-serif; font-size:8px; color:#9AA3AE; text-align:center;"><span class="pageNumber"></span>/<span class="totalPages"></span></div>',
+                    margin={"top": "0", "bottom": "1cm", "left": "0", "right": "0"},
                 )
             finally:
                 browser.close()
