@@ -16844,6 +16844,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
             <div class="adm-title">⚙ Administration — pilotage tarifaire</div>
             <div class="adm-head-actions">
               <button type="button" class="adm-btn adm-btn-ghost" id="adm-backup">⬇ Telecharger une sauvegarde</button>
+              <button type="button" class="adm-btn adm-btn-ghost" id="adm-backup-github">☁ Tester le backup GitHub</button>
               <button type="button" class="adm-btn adm-btn-ghost" id="adm-lock">🔒 Verrouiller Admin</button>
               <button type="button" class="adm-close" id="adm-close" aria-label="Fermer">&times;</button>
             </div>
@@ -17164,6 +17165,19 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       if (!adminUnlocked()) { openAdminPasswordModal(); return; }
       let token=''; try { token = JSON.parse(localStorage.getItem('hexa_admin_unlocked')||'{}').token||''; } catch(_){}
       window.location.href = '/api/admin/backup?token=' + encodeURIComponent(token);
+    });
+    document.getElementById('adm-backup-github')?.addEventListener('click', async ()=>{
+      if (!adminUnlocked()) { openAdminPasswordModal(); return; }
+      let token=''; try { token = JSON.parse(localStorage.getItem('hexa_admin_unlocked')||'{}').token||''; } catch(_){}
+      adminToast('Backup GitHub en cours…', '#002E5A');
+      try {
+        const r = await fetch('/api/admin/backup-github?token=' + encodeURIComponent(token), { method:'POST' });
+        const d = await r.json().catch(()=>({}));
+        if (!r.ok) throw new Error(d.detail || ('HTTP ' + r.status));
+        adminToast('Backup GitHub : ' + (d.message || 'ok'), '#0D6B3B');
+      } catch(e) {
+        adminToast('Backup GitHub echoue : ' + e.message, '#B91C1C');
+      }
     });
     document.getElementById('adm-save-script-url')?.addEventListener('click', async ()=>{
       const url = document.getElementById('adm-script-url')?.value || '';

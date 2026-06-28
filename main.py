@@ -43,6 +43,7 @@ from services.service_devis import (
     value as devis_value,
     _format_date_fr,
 )
+from services.backup_github import start_backup_scheduler
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 TEMPLATES_DIR = os.path.join(BASE_DIR, "templates")
@@ -918,6 +919,7 @@ async def startup_event():
     _init_storage()
     _migrate_leads_schema()
     _admin_password()
+    start_backup_scheduler(DATA_DIR)
 
 
 def _extract_texte(payload_form, payload_json):
@@ -1929,6 +1931,14 @@ def admin_backup(token: str = "") -> FileResponse:
         filename=f"hexa-backup-{stamp}.zip",
         background=BackgroundTask(shutil.rmtree, tmp_dir, True),
     )
+
+
+@app.post("/api/admin/backup-github")
+def admin_backup_github(token: str = "") -> JSONResponse:
+    if not _verify_admin_token(token):
+        raise HTTPException(status_code=401, detail="Acces admin requis")
+    from services.backup_github import run_backup_once
+    return JSONResponse({"ok": True, "message": run_backup_once(DATA_DIR)})
 
 
 @app.get("/api/admin/config")
