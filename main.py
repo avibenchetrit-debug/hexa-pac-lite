@@ -7,6 +7,7 @@ import json
 import os
 import re
 import shutil
+import tempfile
 # import smtplib  # legacy SMTP disabled: devis are sent with Resend.
 import time
 import urllib.parse
@@ -19,6 +20,7 @@ from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from starlette.background import BackgroundTask
 
 from services.service_devis import (
     calculer_devis,
@@ -228,6 +230,24 @@ def _admin_secret() -> bytes:
 def _sign_admin_token(payload: str) -> str:
     sig = hmac.new(_admin_secret(), payload.encode("utf-8"), hashlib.sha256).digest()
     return base64.urlsafe_b64encode(sig).decode("ascii").rstrip("=")
+
+
+ADMIN_UNLOCK_SECONDS = 12 * 3600  # 12h, aligne sur le front (ADMIN_UNLOCK_MS)
+
+
+def _verify_admin_token(token: str) -> bool:
+    if not token or "." not in token:
+        return False
+    payload, _, sig = token.rpartition(".")
+    if not payload.startswith("admin:"):
+        return False
+    if not hmac.compare_digest(sig, _sign_admin_token(payload)):
+        return False
+    try:
+        issued = int(payload.split(":", 1)[1])
+    except (ValueError, IndexError):
+        return False
+    return (time.time() - issued) <= ADMIN_UNLOCK_SECONDS
 
 
 def _sign_devis_token(numero: str) -> str:
@@ -1892,6 +1912,23 @@ async def admin_auth(request: Request) -> JSONResponse:
     token_payload = f"admin:{issued}"
     token = f"{token_payload}.{_sign_admin_token(token_payload)}"
     return JSONResponse({"ok": True, "token": token})
+
+
+@app.get("/api/admin/backup")
+def admin_backup(token: str = "") -> FileResponse:
+    if not _verify_admin_token(token):
+        raise HTTPException(status_code=401, detail="Acces admin requis")
+    stamp = datetime.now(ZoneInfo("Europe/Paris")).strftime("%Y%m%d-%H%M%S")
+    tmp_dir = tempfile.mkdtemp(prefix="hexa-backup-")
+    archive = shutil.make_archive(
+        os.path.join(tmp_dir, f"hexa-backup-{stamp}"), "zip", root_dir=DATA_DIR
+    )
+    return FileResponse(
+        archive,
+        media_type="application/zip",
+        filename=f"hexa-backup-{stamp}.zip",
+        background=BackgroundTask(shutil.rmtree, tmp_dir, True),
+    )
 
 
 @app.get("/api/admin/config")

@@ -16843,6 +16843,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
           <div class="adm-head">
             <div class="adm-title">⚙ Administration — pilotage tarifaire</div>
             <div class="adm-head-actions">
+              <button type="button" class="adm-btn adm-btn-ghost" id="adm-backup">⬇ Telecharger une sauvegarde</button>
               <button type="button" class="adm-btn adm-btn-ghost" id="adm-lock">🔒 Verrouiller Admin</button>
               <button type="button" class="adm-close" id="adm-close" aria-label="Fermer">&times;</button>
             </div>
@@ -17158,6 +17159,11 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       localStorage.removeItem('hexa_admin_unlocked');
       close();
       adminToast('Admin verrouillé', '#002E5A');
+    });
+    document.getElementById('adm-backup')?.addEventListener('click', ()=>{
+      if (!adminUnlocked()) { openAdminPasswordModal(); return; }
+      let token=''; try { token = JSON.parse(localStorage.getItem('hexa_admin_unlocked')||'{}').token||''; } catch(_){}
+      window.location.href = '/api/admin/backup?token=' + encodeURIComponent(token);
     });
     document.getElementById('adm-save-script-url')?.addEventListener('click', async ()=>{
       const url = document.getElementById('adm-script-url')?.value || '';
@@ -17771,7 +17777,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
   document.addEventListener('mouseout', e=>{ if(e.target.closest('.adm-tip')) hideTip(); });
   document.addEventListener('click', e=>{ const t=e.target.closest('.adm-tip'); if(t){ showTip(t); setTimeout(hideTip,3500); } });
 
-  const ADMIN_UNLOCK_MS = 60 * 60 * 1000;
+  const ADMIN_UNLOCK_MS = 12 * 60 * 60 * 1000;
   function adminUnlocked(){
     try {
       const raw = localStorage.getItem('hexa_admin_unlocked');
