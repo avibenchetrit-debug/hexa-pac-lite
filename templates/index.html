@@ -13172,7 +13172,16 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
   window.fermerCommentaires = window.fermerNotesInternes;
 
   window.ajouterNoteInterne = async function () {
-    if (!currentProspect) return;
+    if (!currentProspect) {
+      const fallback = (document.body.dataset.prospectNumero || window.HexaCurrentProspect?.numero || '').trim();
+      if (fallback) {
+        currentProspect = fallback;
+      } else {
+        const msg = 'Enregistrez d’abord le prospect avant d’ajouter une note.';
+        window.showToast ? window.showToast(msg, 'error') : alert(msg);
+        return;
+      }
+    }
     const el = document.getElementById('notes-panel-editable');
     const btn = document.getElementById('notes-panel-submit');
     const html = (el?.innerHTML || '').trim();
