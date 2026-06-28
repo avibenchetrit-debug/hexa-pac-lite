@@ -1857,6 +1857,84 @@ async def set_lead_rappel(numero: str, request: Request) -> JSONResponse:
     return JSONResponse({"ok": True, "lead": _lead_for_response(leads[index])})
 
 
+@app.post("/api/leads/{numero}/action-done")
+async def lead_action_done(numero: str, request: Request) -> JSONResponse:
+    """Clôture une action (rdv|rappel) : archive l'objet courant dans
+    actions_log, le met à None, et applique les transitions de statut.
+    Payload : {kind:'rdv'|'rappel', resultat?, par, maj_statut?, reprogramme?}.
+    Transitions (resultat 'fait') : rdv -> statut 'contacte' (sauf maj_statut
+    False) ; rappel -> si reprogramme{date} reposer un rappel, sinon si
+    maj_statut passer 'contacte'. resultat 'annule' : pas de transition."""
+    payload = await _read_request_payload(request)
+    kind = str(payload.get("kind") or "").strip().lower()
+    if kind not in ("rdv", "rappel"):
+        raise HTTPException(status_code=400, detail="kind invalide (attendu 'rdv' ou 'rappel').")
+    resultat = str(payload.get("resultat") or "fait").strip().lower() or "fait"
+    par = _normalize_assigne(payload.get("par"))
+    maj_statut = payload.get("maj_statut")
+
+    # Reprogrammation (optionnelle) : validee en amont si une date est fournie.
+    reprogramme = payload.get("reprogramme")
+    repro = reprogramme if isinstance(reprogramme, dict) else None
+    repro_date = str((repro or {}).get("date") or "").strip()
+    if repro_date:
+        rdt = _parse_paris_dt(repro_date)
+        if rdt is None or rdt.date().isoformat() != repro_date:
+            raise HTTPException(
+                status_code=400,
+                detail="Date de reprogrammation invalide (attendu 'YYYY-MM-DD').",
+            )
+
+    leads = _read_leads()
+    index = _find_lead_index(leads, numero)
+    if index is None:
+        raise HTTPException(status_code=404, detail="Prospect non trouvé")
+    lead = leads[index]
+
+    courant = lead.get(kind)
+    if not isinstance(courant, dict):
+        raise HTTPException(status_code=400, detail=f"Aucun {kind} actif à clôturer.")
+
+    now = _now_paris_iso()
+    # Archive l'action courante, puis la retire.
+    log = lead.get("actions_log")
+    if not isinstance(log, list):
+        log = []
+    log.append({
+        "type": kind,
+        "snapshot": courant,
+        "resultat": resultat,
+        "fait_par": par,
+        "fait_at": now,
+    })
+    lead["actions_log"] = log
+    lead[kind] = None
+
+    # Transitions de statut (uniquement si resultat == "fait").
+    if resultat == "fait":
+        if kind == "rdv" and maj_statut is not False:
+            lead["statut"] = "contacte"
+            lead["statut_updated_at"] = now
+        elif kind == "rappel":
+            if repro_date:
+                # Reprogrammer prime sur le passage a contacte.
+                lead["rappel"] = {
+                    "date": repro_date,
+                    "assigne_a": _normalize_assigne((repro or {}).get("assigne_a")) or par,
+                    "motif": str((repro or {}).get("motif") or "").strip(),
+                    "origine": "manuel",
+                    "cree_par": par,
+                    "cree_at": now,
+                }
+            elif maj_statut:
+                lead["statut"] = "contacte"
+                lead["statut_updated_at"] = now
+
+    lead["updated_at"] = _now_iso()
+    _atomic_write_json(LEADS_PATH, leads)
+    return JSONResponse({"ok": True, "lead": _lead_for_response(lead)})
+
+
 @app.delete("/api/leads/{numero}")
 def delete_lead(numero: str) -> JSONResponse:
     leads = _read_leads()
