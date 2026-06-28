@@ -1672,6 +1672,61 @@ async def set_lead_rdv(numero: str, request: Request) -> JSONResponse:
     return JSONResponse({"ok": True, "lead": _lead_for_response(leads[index])})
 
 
+@app.post("/api/leads/{numero}/rappel")
+async def set_lead_rappel(numero: str, request: Request) -> JSONResponse:
+    """Pose/replace le rappel actif d'un prospect (1 actif par lead). Si un
+    rappel existe déjà, l'ancien est archivé dans actions_log (reprogramme)
+    avant d'écrire le nouveau. PAS de changement de statut.
+    Payload : {date:'YYYY-MM-DD', assigne_a, motif, par}."""
+    payload = await _read_request_payload(request)
+    date = str(payload.get("date") or "").strip()
+    # Validation stricte : date présente ET re-sérialisable à l'identique
+    # (round-trip) pour rejeter le non zero-paddé '2026-7-5' que strptime
+    # accepterait sinon.
+    dt = _parse_paris_dt(date)
+    if not date or dt is None or dt.date().isoformat() != date:
+        raise HTTPException(
+            status_code=400,
+            detail="Date de rappel invalide (attendu 'YYYY-MM-DD').",
+        )
+    motif = str(payload.get("motif") or "").strip()  # libre, peut être vide
+    par = _normalize_assigne(payload.get("par"))
+    assigne_a = _normalize_assigne(payload.get("assigne_a")) or par
+
+    leads = _read_leads()
+    index = _find_lead_index(leads, numero)
+    if index is None:
+        raise HTTPException(status_code=404, detail="Prospect non trouvé")
+
+    now_paris = _now_paris_iso()
+    # Reposer = remplace + archive l'ancien rappel s'il existe.
+    ancien = leads[index].get("rappel")
+    if isinstance(ancien, dict):
+        log = leads[index].get("actions_log")
+        if not isinstance(log, list):
+            log = []
+        log.append({
+            "type": "rappel",
+            "snapshot": ancien,
+            "resultat": "reprogramme",
+            "fait_par": par,
+            "fait_at": now_paris,
+        })
+        leads[index]["actions_log"] = log
+
+    leads[index]["rappel"] = {
+        "date": date,
+        "assigne_a": assigne_a,
+        "motif": motif,
+        "origine": "manuel",
+        "cree_par": par,
+        "cree_at": now_paris,
+    }
+    leads[index]["updated_at"] = _now_iso()
+    _atomic_write_json(LEADS_PATH, leads)
+    return JSONResponse({"ok": True, "lead": _lead_for_response(leads[index])})
+
+
 @app.delete("/api/leads/{numero}")
 def delete_lead(numero: str) -> JSONResponse:
     leads = _read_leads()
