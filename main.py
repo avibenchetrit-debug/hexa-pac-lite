@@ -1629,6 +1629,49 @@ async def update_lead_nrp(numero: str, request: Request) -> JSONResponse:
     return JSONResponse({"success": True, "nrp_count": raw_count})
 
 
+@app.post("/api/leads/{numero}/rdv")
+async def set_lead_rdv(numero: str, request: Request) -> JSONResponse:
+    """Pose/replace le RDV actif d'un prospect (1 actif par lead).
+    Payload : {date:'YYYY-MM-DD', heure:'HH:MM', type:'tel'|'visite',
+    assigne_a, par}. Pose aussi le statut 'rdv'. Format technique stocké tel
+    quel ; l'affichage FR se fait côté interface."""
+    payload = await _read_request_payload(request)
+    date = str(payload.get("date") or "").strip()
+    heure = str(payload.get("heure") or "").strip()
+    # Validation stricte du format via le parseur Paris (YYYY-MM-DD + HH:MM
+    # zero-paddés). _parse_paris_dt renvoie None si l'un est absent/mal formé.
+    if not date or not heure or _parse_paris_dt(f"{date}T{heure}") is None:
+        raise HTTPException(
+            status_code=400,
+            detail="Date/heure RDV invalides (attendu date 'YYYY-MM-DD' et heure 'HH:MM').",
+        )
+    rdv_type = str(payload.get("type") or "").strip().lower()
+    if rdv_type not in RDV_TYPES:
+        rdv_type = "tel"
+    par = _normalize_assigne(payload.get("par"))
+    assigne_a = _normalize_assigne(payload.get("assigne_a")) or par
+
+    leads = _read_leads()
+    index = _find_lead_index(leads, numero)
+    if index is None:
+        raise HTTPException(status_code=404, detail="Prospect non trouvé")
+
+    now_paris = _now_paris_iso()
+    leads[index]["rdv"] = {
+        "date": date,
+        "heure": heure,
+        "type": rdv_type,
+        "assigne_a": assigne_a,
+        "cree_par": par,
+        "cree_at": now_paris,
+    }
+    leads[index]["statut"] = "rdv"
+    leads[index]["statut_updated_at"] = now_paris
+    leads[index]["updated_at"] = _now_iso()
+    _atomic_write_json(LEADS_PATH, leads)
+    return JSONResponse({"ok": True, "lead": _lead_for_response(leads[index])})
+
+
 @app.delete("/api/leads/{numero}")
 def delete_lead(numero: str) -> JSONResponse:
     leads = _read_leads()
