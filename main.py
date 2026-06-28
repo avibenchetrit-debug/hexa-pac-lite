@@ -568,6 +568,30 @@ def _now_paris_iso():
     return datetime.now(PARIS_TZ).isoformat(timespec="seconds")
 
 
+def _today_paris():
+    """Date du jour dans le fuseau Paris (objet date)."""
+    return datetime.now(PARIS_TZ).date()
+
+
+def _parse_paris_dt(value):
+    """Parseur défensif : ISO ('YYYY-MM-DDTHH:MM[:SS][+tz]') ou date seule
+    ('YYYY-MM-DD') -> datetime aware en PARIS_TZ, ou None si illisible.
+    Un datetime naïf se voit rattacher PARIS_TZ."""
+    raw = str(value or "").strip()
+    if not raw:
+        return None
+    try:
+        dt = datetime.fromisoformat(raw)
+    except ValueError:
+        try:
+            dt = datetime.strptime(raw, "%Y-%m-%d")
+        except ValueError:
+            return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=PARIS_TZ)
+    return dt
+
+
 def _next_numero(leads):
     """Return the next PR-000XXX numero based on the current max in leads."""
     max_n = 0
@@ -711,6 +735,22 @@ FIELD_ALIASES = {
     "phase_electrique": "alimentation_electrique",
 }
 
+# --- Système "À traiter" (rappels / RDV / multicanal) ---------------------
+# Identités déclaratives (non authentifiées) : indicatif, PAS un filtre dur.
+ASSIGNES_VALIDES = {"avi", "joelle", "maurice"}
+RDV_TYPES = {"tel", "visite"}
+CANAUX_VALIDES = {"appel", "sms", "email"}  # whatsapp plus tard
+# Plafonds de tentatives SANS réponse par canal avant "injoignable"
+# (les 3 doivent être atteints). À terme : configurables côté admin.
+PLAFONDS_CANAL = {"appel": 8, "sms": 5, "email": 5}
+
+
+def _normalize_assigne(value):
+    """Normalise une identité déclarative en minuscule. Tolérant : ne rejette
+    jamais une valeur inconnue (cf. CONCEPTION_RAPPELS.md decision 7)."""
+    return str(value or "").strip().lower()
+
+
 PROSPECT_FIELDS = [
     # Champs existants (à conserver)
     "numero",
@@ -789,6 +829,13 @@ PROSPECT_FIELDS = [
     # Logs
     "nrp_count",
     "nrp_log",
+
+    # Système "À traiter" (rappels / RDV / actions)
+    "rdv",                 # objet | None : {date,heure,type,assigne_a,cree_par,cree_at}
+    "rappel",              # objet | None : {date,assigne_a,motif,origine,cree_par,cree_at}
+    "actions_log",         # liste : historique des actions closes
+    "statut_updated_at",   # iso Paris : déjà écrit par /status, déclaré pour cohérence
+    "injoignable_at",      # iso Paris : posé quand statut -> injoignable
 ]
 
 DEFAULT_PROSPECT_VALUES = {
@@ -796,6 +843,9 @@ DEFAULT_PROSPECT_VALUES = {
     "statut": "nouveau",
     "nrp_count": 0,
     "nrp_log": [],
+    "rdv": None,
+    "rappel": None,
+    "actions_log": [],
 }
 
 IMPORT_PROSPECT_FIELDS = [
@@ -852,6 +902,13 @@ def _lead_for_response(lead: dict) -> dict:
         normalized["nrp_log"] = []
     if not isinstance(normalized.get("nrp_count"), int):
         normalized["nrp_count"] = len(normalized["nrp_log"])
+    # "À traiter" : rdv/rappel = dict ou None (jamais "" issu d'un vieux default) ;
+    # actions_log = liste.
+    for k in ("rdv", "rappel"):
+        if not isinstance(normalized.get(k), dict):
+            normalized[k] = None
+    if not isinstance(normalized.get("actions_log"), list):
+        normalized["actions_log"] = []
     return normalized
 
 
@@ -905,6 +962,14 @@ def _migrate_leads_schema():
             changed = True
         if not isinstance(item.get("nrp_count"), int):
             item["nrp_count"] = len(item["nrp_log"])
+            changed = True
+        # "À traiter" : rdv/rappel -> dict ou None ; actions_log -> liste.
+        for k in ("rdv", "rappel"):
+            if not isinstance(item.get(k), dict) and item.get(k) is not None:
+                item[k] = None
+                changed = True
+        if not isinstance(item.get("actions_log"), list):
+            item["actions_log"] = []
             changed = True
         if item != before:
             normalized_count += 1

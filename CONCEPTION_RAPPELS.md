@@ -54,7 +54,7 @@ entry = {
 
 **`count-echanges`** = **nb total d'entrées** tous canaux (`index.html:7842-7844`).
 
-**NRP** : champ `nrp` présent en lecture mais **jamais posé** ; **aucune route `/nrp`** (le front `index.html:18034` appelle `/api/leads/{n}/nrp` → 404 aujourd'hui). NRP **non câblé serveur**.
+**NRP** : champ `nrp` présent en lecture mais **jamais posé** comme résultat d'échange. ⚠️ **Correction d'audit (2026-06-28)** : la route `POST /api/leads/{numero}/nrp` **EXISTE DÉJÀ** (`main.py:1540`) et **est utilisée** par le front (`templates/index.html:18034`, payload `{nrp_count, nrp_log}` = **set de compteur absolu**, valeur calculée côté client). Elle n'écrit pas d'échange et ne pose pas de rappel. ⇒ on **ne l'écrase pas** : on la **branche selon la forme du payload** (legacy `{nrp_count}` → comportement actuel inchangé ; nouveau `{par, canal?}` → échange+auto-rappel+injoignable). Voir §10 décision 6.
 
 ### Reco : ÉTENDRE Échanges (source unique), pas de `contacts_log` séparé
 - Canal déjà là ; résultat à moitié (`nrp`) → schéma déjà prévu pour porter un résultat.
@@ -112,7 +112,7 @@ actions_log[] = { type:"rdv"|"rappel"|"detection", snapshot:{…},
 |---|---|
 | `POST /api/leads/{n}/rdv` `{date,heure,type,assigne_a,par}` | écrit `lead.rdv`, statut auto → `rdv` |
 | `POST /api/leads/{n}/rappel` `{date,assigne_a,motif,par}` | écrit `lead.rappel` (origine `manuel`) |
-| `POST /api/leads/{n}/nrp` `{par,canal?}` **(à créer)** | append échange `{type:appel,resultat:nrp,origine:manuel,contenu:"Appel — pas de réponse"}` ; `nrp_count++`/`nrp_log` ; pose `rappel{date:demain,assigne_a:par,origine:nrp}` ; si plafonds atteints → statut `injoignable` + `rappel=null` |
+| `POST /api/leads/{n}/nrp` `{par,canal?}` **(route existante, BRANCHÉE)** | branche selon payload : legacy `{nrp_count}` inchangé ; nouveau `{par,canal?}` → append échange `{type:appel,resultat:nrp,origine:manuel,contenu:"Appel — pas de réponse"}` ; `nrp_count++`/`nrp_log` ; pose `rappel{date:demain,assigne_a:par,origine:nrp}` ; si plafonds atteints → statut `injoignable` + `rappel=null` |
 | `POST /api/leads/{n}/contact` `{canal,resultat,par,contenu?}` | (option) action manuelle multicanal = append échange + recalcul compteurs |
 | `POST /api/leads/{n}/action-done` `{kind,resultat,par,maj_statut?}` | archive `rdv`/`rappel` courant dans `actions_log`, le met à null, MAJ statut si demandé. Défauts : RDV fait → `contacte` ; rappel fait → proposer **reprogrammer** ou `contacte` |
 | `GET /api/a-traiter?assigne=tous\|avi\|…` | calcule + trie la liste (voir §6) |
@@ -171,3 +171,7 @@ Sources : `date_envoi_devis` (lead), `echanges.json`, `states_simulateur/{n}.jso
 3. **NRP sans texte** : relâcher `contenu` obligatoire, **contenu auto = « Appel — pas de réponse »**.
 4. **« Marquer fait » — transitions par défaut** : RDV fait → statut **`contacte`** ; rappel fait → **proposer** soit **reprogrammer un rappel**, soit passer **`contacte`**.
 5. **Plafonds** : **8 appels / 5 sms / 5 emails**, `injoignable` quand **les 3 atteints** — **confirmé**. WhatsApp plus tard.
+6. **Route NRP — branchement rétro-compatible** (validé 2026-06-28) : la route `/api/leads/{n}/nrp` existe déjà (set compteur) et reste utilisée par le front. On **branche** selon le payload (`nrp_count` présent → legacy inchangé ; sinon `{par,canal?}` → nouveau comportement). Pas de route séparée.
+7. **`assigne`/`par` inconnu — TOLÉRANT** (validé 2026-06-28) : on normalise en minuscule, **pas de 400** (identité déclarative non authentifiée). `ASSIGNES_VALIDES` sert d'indicatif, pas de filtre dur.
+8. **Endpoint `/contact` inclus dès l'étape 1, sous-étape 1** (validé 2026-06-28) : fondation multicanal générique (`{canal,resultat,par,contenu?}`) ; le NRP-event en est le cas particulier `canal=appel,resultat=nrp` + auto-rappel.
+9. **Statut `injoignable` hors whitelist `/status`** : posé **uniquement** côté serveur (route nrp), jamais via `/api/leads/{n}/status`.
