@@ -7954,8 +7954,8 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       <span id="psb-nom" class="prospect-sticky-nom psb-name prospect-nom">—</span>
     </div>
     <div class="prospect-sticky-contact psb-contact">
-      <a id="psb-tel" href="#" class="prospect-sticky-tel">—</a>
-      <a id="psb-email" href="#" class="prospect-sticky-email">—</a>
+      <span id="psb-tel" class="prospect-sticky-tel">—</span>
+      <span id="psb-email" class="prospect-sticky-email">—</span>
     </div>
     <div class="prospect-sticky-badges psb-badges">
       <span id="psb-badge-usage" class="psb-badge" style="display:none"></span>
@@ -18761,9 +18761,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     const nomBanner = nom ? nom.toUpperCase() : '';
     nomEl.textContent = (prenomBanner || nomBanner) ? ((prenomBanner || '—') + ' ' + (nomBanner || '—')) : '—';
     telEl.textContent = tel || '—';
-    telEl.href = tel ? ('tel:' + tel.replace(/\D/g,'')) : '#';
     emailEl.textContent = email || '—';
-    emailEl.href = email ? ('mailto:' + email) : '#';
 
     const usageMap = {
       proprietaire_occupant: { label:'PROPRIÉTAIRE OCCUPANT', bg:'#FDE8EC', fg:'#B01830' },
