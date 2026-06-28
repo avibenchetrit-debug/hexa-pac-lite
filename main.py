@@ -1935,6 +1935,58 @@ async def lead_action_done(numero: str, request: Request) -> JSONResponse:
     return JSONResponse({"ok": True, "lead": _lead_for_response(lead)})
 
 
+@app.post("/api/leads/{numero}/contact")
+async def lead_contact(numero: str, request: Request) -> JSONResponse:
+    """Action manuelle multicanal : journalise un echange (canal+resultat) et
+    recalcule les compteurs. Fondation dont le NRP est un cas particulier ;
+    ici PAS de bascule injoignable ni d'auto-rappel (centralises dans /nrp).
+    Payload : {canal:'appel'|'sms'|'email', resultat:'repondu'|'nrp'|'envoye'|
+    'recu', par, contenu?, maj_statut?}."""
+    payload = await _read_request_payload(request)
+    canal = str(payload.get("canal") or "appel").strip().lower()
+    if canal not in CANAUX_VALIDES:
+        canal = "appel"
+    resultat = str(payload.get("resultat") or "").strip().lower()
+    if resultat not in ("repondu", "nrp", "envoye", "recu"):
+        raise HTTPException(
+            status_code=400,
+            detail="resultat invalide (attendu repondu|nrp|envoye|recu).",
+        )
+    par = _normalize_assigne(payload.get("par"))
+    maj_statut = payload.get("maj_statut")
+
+    leads = _read_leads()
+    index = _find_lead_index(leads, numero)
+    if index is None:
+        raise HTTPException(status_code=404, detail="Prospect non trouvé")
+    lead = leads[index]
+
+    # Libelle auto si contenu vide (selon canal + resultat).
+    libelles = {
+        ("appel", "repondu"): "Appel — répondu",
+        ("appel", "nrp"): "Appel — pas de réponse",
+        ("sms", "envoye"): "SMS envoyé",
+        ("sms", "recu"): "SMS reçu",
+        ("email", "envoye"): "Email envoyé",
+        ("email", "recu"): "Email reçu",
+    }
+    contenu = str(payload.get("contenu") or "").strip() or libelles.get(
+        (canal, resultat), f"{canal} — {resultat}"
+    )
+    _append_echange(numero, canal=canal, contenu=contenu, resultat=resultat,
+                    origine="manuel", auteur=par)
+
+    # Transition douce : 1re reponse sur un lead "nouveau" (si demandee).
+    if resultat == "repondu" and lead.get("statut") == "nouveau" and maj_statut:
+        lead["statut"] = "contacte"
+        lead["statut_updated_at"] = _now_paris_iso()
+    lead["updated_at"] = _now_iso()
+    _atomic_write_json(LEADS_PATH, leads)
+
+    compteurs = _compteurs_canal(numero)
+    return JSONResponse({"ok": True, "compteurs": compteurs, "lead": _lead_for_response(lead)})
+
+
 @app.delete("/api/leads/{numero}")
 def delete_lead(numero: str) -> JSONResponse:
     leads = _read_leads()
