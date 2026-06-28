@@ -1654,10 +1654,88 @@ async def update_lead_status(numero: str, request: Request) -> JSONResponse:
     return JSONResponse({"success": True, "statut": new_status})
 
 
+def _nrp_event(numero, payload):
+    """NRP-EVENT : NRP manuel => echange appel/nrp + compteur + auto-rappel
+    lendemain + bascule 'injoignable' si les 3 plafonds canal sont atteints.
+    Payload : {par, canal?} (canal defaut 'appel')."""
+    par = _normalize_assigne(payload.get("par"))
+    canal = str(payload.get("canal") or "appel").strip().lower()
+    if canal not in CANAUX_VALIDES:
+        canal = "appel"
+
+    leads = _read_leads()
+    index = _find_lead_index(leads, numero)
+    if index is None:
+        raise HTTPException(status_code=404, detail="Prospect non trouvé")
+    lead = leads[index]
+    now = _now_paris_iso()
+
+    # a. echange appel/nrp (contenu auto) — ecrit AVANT le calcul des compteurs.
+    _append_echange(numero, canal=canal, contenu="Appel — pas de réponse",
+                    resultat="nrp", origine="manuel", auteur=par)
+
+    # b. compteur nrp (count == longueur du log).
+    nrp_log = lead.get("nrp_log")
+    if not isinstance(nrp_log, list):
+        nrp_log = []
+    nrp_log.append(now)
+    lead["nrp_log"] = nrp_log
+    lead["nrp_count"] = len(nrp_log)
+    lead["nrp_updated_at"] = now
+
+    # c. auto-rappel lendemain (archive l'ancien rappel s'il existe).
+    ancien = lead.get("rappel")
+    if isinstance(ancien, dict):
+        log = lead.get("actions_log")
+        if not isinstance(log, list):
+            log = []
+        log.append({
+            "type": "rappel",
+            "snapshot": ancien,
+            "resultat": "reprogramme",
+            "fait_par": par,
+            "fait_at": now,
+        })
+        lead["actions_log"] = log
+    demain = (_today_paris() + timedelta(days=1)).isoformat()
+    lead["rappel"] = {
+        "date": demain,
+        "assigne_a": par,
+        "motif": "NRP — rappel auto",
+        "origine": "nrp",
+        "cree_par": par,
+        "cree_at": now,
+    }
+
+    # d. injoignable si les 3 plafonds canal atteints (tentatives sans reponse).
+    compteurs = _compteurs_canal(numero)
+    if all(compteurs.get(c, 0) >= seuil for c, seuil in PLAFONDS_CANAL.items()):
+        lead["statut"] = "injoignable"
+        lead["statut_updated_at"] = now
+        lead["injoignable_at"] = now
+        lead["rappel"] = None  # injoignable annule le rappel auto
+
+    # e. persistance + reponse.
+    lead["updated_at"] = _now_iso()
+    _atomic_write_json(LEADS_PATH, leads)
+    return JSONResponse({
+        "ok": True,
+        "nrp_count": lead["nrp_count"],
+        "statut": lead.get("statut", ""),
+        "rappel": lead.get("rappel"),
+        "compteurs": compteurs,
+        "lead": _lead_for_response(lead),
+    })
+
+
 @app.post("/api/leads/{numero}/nrp")
 async def update_lead_nrp(numero: str, request: Request) -> JSONResponse:
-    """Met à jour le compteur NRP (Ne Répond Pas) depuis l'Accueil."""
+    """Met à jour le compteur NRP. Branche selon le payload (decision 6) :
+    avec 'nrp_count' => LEGACY (set compteur, inchangee) ; sinon => NRP-EVENT
+    (echange + auto-rappel + injoignable)."""
     payload = await _read_request_payload(request)
+    if "nrp_count" not in payload:
+        return _nrp_event(numero, payload)
     raw_count = payload.get("nrp_count")
     if isinstance(raw_count, str) and raw_count.isdigit():
         raw_count = int(raw_count)
