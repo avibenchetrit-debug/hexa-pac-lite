@@ -1043,6 +1043,10 @@ def _exchange_for_front(entry):
     contenu = str((entry or {}).get("contenu", ""))
     created_at = (entry or {}).get("created_at", "")
     auteur = (entry or {}).get("auteur") or (entry or {}).get("created_by") or "Anonyme"
+    # resultat généralise l'ancien flag nrp booléen ; origine défaut "manuel".
+    resultat = str((entry or {}).get("resultat") or "").strip()
+    if not resultat and (entry or {}).get("nrp"):
+        resultat = "nrp"
     return {
         "type": (entry or {}).get("type", "sms"),
         "contenu": contenu,
@@ -1052,8 +1056,56 @@ def _exchange_for_front(entry):
         "created_at": created_at,
         "created_by": auteur,
         "auteur": auteur,
-        "nrp": bool((entry or {}).get("nrp")),
+        "nrp": bool((entry or {}).get("nrp")) or resultat == "nrp",
+        "resultat": resultat,
+        "origine": str((entry or {}).get("origine") or "manuel").strip() or "manuel",
     }
+
+
+def _append_echange(numero, *, canal="sms", contenu="", resultat="", origine="manuel",
+                    objet="", template_id="", auteur="Anonyme"):
+    """Append un échange à echanges.json et renvoie l'entry créée.
+    Source unique réutilisée par echanges_ajax, /nrp et /contact.
+    Même schéma que l'historique existant, enrichi de resultat/origine."""
+    canal = str(canal or "sms").strip() or "sms"
+    contenu = str(contenu or "")
+    auteur = str(auteur or "").strip() or "Anonyme"
+    entry = {
+        "type": canal,
+        "contenu": contenu,
+        "contenu_html": html.escape(contenu).replace("\n", "<br>"),
+        "objet": objet or "",
+        "template_id": template_id or "",
+        "created_at": _now_iso(),
+        "created_by": auteur,
+        "auteur": auteur,
+        "resultat": str(resultat or "").strip(),
+        "origine": str(origine or "manuel").strip() or "manuel",
+    }
+    echanges = _read_echanges()
+    echanges.setdefault(numero, []).append(entry)
+    _atomic_write_json(ECHANGES_PATH, echanges)
+    return entry
+
+
+def _compteurs_canal(numero):
+    """Compte par canal (appel/sms/email) les tentatives SANS réponse, base du
+    calcul 'injoignable'. Compte une entrée si resultat ∈ {nrp, envoye}
+    (sortant non répondu) ou via l'ancien flag nrp booléen. Exclut repondu,
+    recu (entrant) et les échanges génériques sans resultat (conservateur)."""
+    compteurs = {c: 0 for c in CANAUX_VALIDES}
+    for e in _read_echanges().get(numero, []):
+        if not isinstance(e, dict):
+            continue
+        canal = str(e.get("type") or "").strip().lower()
+        if canal not in compteurs:
+            continue
+        resultat = str(e.get("resultat") or "").strip().lower()
+        if not resultat and e.get("nrp"):
+            resultat = "nrp"
+        if resultat in ("nrp", "envoye"):
+            compteurs[canal] += 1
+    return compteurs
 
 
 def _find_lead(numero: str) -> dict | None:
@@ -1955,20 +2007,18 @@ async def echanges_ajax(numero: str, request: Request) -> JSONResponse:
         return JSONResponse({"ok": False, "msg": "Texte vide"}, status_code=400)
 
     auteur = str(payload.get("auteur") or payload.get("created_by") or "").strip() or "Anonyme"
-    entry = {
-        "type": str(payload.get("type") or "sms").strip() or "sms",
-        "contenu": contenu,
-        "contenu_html": html.escape(contenu).replace("\n", "<br>"),
-        "objet": payload.get("objet") or "",
-        "template_id": payload.get("template_id") or "",
-        "created_at": _now_iso(),
-        "created_by": auteur,
-        "auteur": auteur,
-    }
+    _append_echange(
+        numero,
+        canal=str(payload.get("type") or "sms"),
+        contenu=contenu,
+        resultat=str(payload.get("resultat") or ""),
+        origine=str(payload.get("origine") or "manuel"),
+        objet=payload.get("objet") or "",
+        template_id=payload.get("template_id") or "",
+        auteur=auteur,
+    )
     echanges = _read_echanges()
-    echanges.setdefault(numero, []).append(entry)
-    _atomic_write_json(ECHANGES_PATH, echanges)
-    return JSONResponse({"ok": True, "count": len(echanges[numero])})
+    return JSONResponse({"ok": True, "count": len(echanges.get(numero, []))})
 
 
 @app.get("/api/admin/m3")
