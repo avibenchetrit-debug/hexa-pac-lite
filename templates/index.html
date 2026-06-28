@@ -5331,8 +5331,16 @@ body.panel-is-open .prospect-shell-sticky {
 #notes-panel-list {
   max-height: 60vh;
   overflow-y: auto;
+  overflow-x: hidden;
   padding-right: 8px;
 }
+/* Notes : forcer tout contenu (y compris HTML colle : tableaux, largeurs fixes) a tenir dans le cadre, jamais de scroll horizontal */
+#notes-panel-list article,
+#notes-panel-list article * { max-width: 100% !important; overflow-wrap: break-word; word-break: break-word; }
+#notes-panel-list article table { width: 100% !important; table-layout: fixed; }
+#notes-panel-list article td,
+#notes-panel-list article th { white-space: normal !important; }
+#notes-panel-list article img { max-width: 100% !important; height: auto; }
 .notes-accordion-toolbar {
   display: flex;
   justify-content: flex-end;
@@ -5537,6 +5545,8 @@ body.panel-is-open .prospect-shell-sticky {
 .comments-panel-editable {
   flex: 1; min-height: 80px; max-height: 160px;
   padding: 10px 12px; overflow-y: auto;
+  overflow-x: hidden;
+  overflow-wrap: break-word; word-break: break-word;
   color: var(--text-primary);
   font-family: inherit; font-size: 13px; line-height: 1.5;
   outline: none;
@@ -13026,6 +13036,11 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
         e.preventDefault();
         window.ajouterNoteInterne();
       }
+    });
+    document.getElementById('notes-panel-editable')?.addEventListener('paste', (e) => {
+      e.preventDefault();
+      const text = (e.clipboardData || window.clipboardData).getData('text/plain');
+      document.execCommand('insertText', false, text);
     });
     document.getElementById('notes-panel-submit')?.addEventListener('click', () => window.ajouterNoteInterne());
   }
