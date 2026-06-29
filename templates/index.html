@@ -2876,6 +2876,8 @@ body.panel-is-open {
     .atraiter-tel { color:#002E5A; text-decoration:none; }
     .atraiter-tel:hover { color:#E2214B; }
     .atraiter-who { font-size:12px; color:#64748B; }
+    .atraiter-user { border:1px solid #E2E8F0; background:#fff; color:#002E5A; border-radius:9px; padding:6px 11px; font-size:13px; font-weight:700; cursor:pointer; font-family:inherit; }
+    .atraiter-user:hover { border-color:#002E5A; background:#F4F8FC; }
     .atraiter-done { flex-shrink:0; padding:4px 10px; font-size:11px; }
     .sub-bloc-title {
       font-size: 11px;
@@ -18160,6 +18162,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
   function setHexaUser(key) {
     try { localStorage.setItem('hexa_user', key); } catch(_) {}
     updateUserHeader();
+    if (document.getElementById('atraiter-panel') && typeof loadATraiter === 'function') loadATraiter();
   }
   function updateUserHeader() {
     const btn = document.getElementById('hexa-user-btn');
@@ -18394,7 +18397,8 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
           <div class="atraiter-head">
             <h2 class="atraiter-title">À traiter aujourd'hui <span id="atraiter-total" class="atraiter-total">0</span></h2>
             <div class="atraiter-filter">
-              <button type="button" class="pv-btn pv-btn-ghost atraiter-tab" data-scope="moi">Moi</button>
+              <button type="button" id="atraiter-user" class="atraiter-user" title="Changer d'utilisateur">👤 —</button>
+              <button type="button" class="pv-btn pv-btn-ghost atraiter-tab" id="atraiter-tab-moi" data-scope="moi">Moi</button>
               <button type="button" class="pv-btn pv-btn-ghost atraiter-tab is-active" data-scope="tous">Tous</button>
             </div>
           </div>
@@ -18752,11 +18756,20 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
   }
 
   // --- Navigation + bandeau identité ---
+  function updateAtraiterIdentity(){
+    const key = currentHexaUser();
+    const name = HEXA_USERS[key] || '';
+    const u = document.getElementById('atraiter-user');
+    if(u) u.textContent = '👤 ' + (name || '—');
+    const moi = document.getElementById('atraiter-tab-moi');
+    if(moi) moi.textContent = name || 'Moi';
+  }
   let atraiterScope = 'tous';
   async function loadATraiter(){
     const list = document.getElementById('atraiter-list');
     const totalEl = document.getElementById('atraiter-total');
     if(!list) return;
+    updateAtraiterIdentity();
     const me = String(currentHexaUser()||'').toLowerCase();
     const assigne = (atraiterScope === 'moi' && me) ? me : 'tous';
     let data;
@@ -18796,6 +18809,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     const panel = document.getElementById('atraiter-panel');
     if(!panel || panel.dataset.bound) return;
     panel.dataset.bound = '1';
+    document.getElementById('atraiter-user')?.addEventListener('click', function(){ showUserModal(); });
     panel.querySelectorAll('.atraiter-tab').forEach(function(btn){
       btn.addEventListener('click', function(){
         atraiterScope = btn.dataset.scope === 'moi' ? 'moi' : 'tous';
