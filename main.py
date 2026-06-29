@@ -749,6 +749,8 @@ RDV_IMMINENT_MIN = 30
 DETECT_DEVIS_J = 3
 DETECT_JAMAIS_CONTACTE_J = 2
 DETECT_SIMU_J = 3
+# Borne haute "jamais contacté" : ignore les leads créés il y a plus de N jours.
+DETECT_JAMAIS_CONTACTE_MAX_J = 30
 
 
 def _normalize_assigne(value):
@@ -2163,12 +2165,14 @@ def _detection_items(lead, ctx):
             if st and tdt and (st not in rejets or tdt > rejets[st]):
                 rejets[st] = tdt
 
-    def _emit(subtype, trigger_value, label, seuil_j):
+    def _emit(subtype, trigger_value, label, seuil_j, max_j=None):
         tdt = _parse_paris_dt(trigger_value)
         if tdt is None:
             return
         since = (today - tdt.date()).days
         if since < seuil_j:
+            return
+        if max_j is not None and since > max_j:
             return
         rej = rejets.get(subtype)
         if rej is not None and rej >= tdt:
@@ -2183,7 +2187,7 @@ def _detection_items(lead, ctx):
         if not isinstance(nrp, int):
             nrp = len(lead.get("nrp_log") or [])
         if nrp == 0 and not ctx["echanges"].get(numero):
-            _emit("jamais_contacte_2j", lead.get("date"), "Jamais contacté", DETECT_JAMAIS_CONTACTE_J)
+            _emit("jamais_contacte_2j", lead.get("date"), "Jamais contacté", DETECT_JAMAIS_CONTACTE_J, DETECT_JAMAIS_CONTACTE_MAX_J)
 
     upd = ctx["simu_updated"].get(numero)
     if upd and numero not in ctx["devis_sent"] and statut != "devis_envoye" \

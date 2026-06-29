@@ -18923,7 +18923,7 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
       const r = await fetch('/api/a-traiter?assigne=tous', { cache:'no-store' });
       if(!r.ok) return;
       const data = await r.json(); const c = data.counts || {};
-      const n = (c.du_jour||0) + (c.retards||0);
+      const n = (c.total != null) ? c.total : ((c.du_jour||0) + (c.retards||0));
       const badge = document.getElementById('hexa-atraiter-badge');
       const nEl = document.getElementById('hexa-atraiter-badge-n');
       if(badge && nEl){
