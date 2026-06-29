@@ -7761,7 +7761,8 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
 .pv-stats-statut-pill:hover{border-color:#002E5A;background:#E6F1FB}
 .pv-stats-statut-pill.active{background:#002E5A;color:#fff;border-color:#002E5A}
 .pv-stats-statut-pill b{font-weight:700}
-.pv-stats-detail-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:0.5px solid #F0F5FA;gap:10px}
+.pv-stats-detail-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:0.5px solid #F0F5FA;gap:10px;cursor:pointer}
+.pv-stats-detail-row:hover{background:#F4F8FC}
 .pv-stats-detail-row:last-child{border-bottom:none}
 .pv-stats-detail-row .nom{font-weight:600;color:#002E5A}
 .pv-stats-detail-row .tel{color:#4A5568;font-size:11.5px}
@@ -18350,6 +18351,13 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
     const detailEl=document.getElementById('pv-stats-detail');
     const titleEl=document.getElementById('pv-stats-detail-title');
     if(!totalEl || !statutsEl || !detailEl || !titleEl) return;
+    if(!detailEl.dataset.clickBound){
+      detailEl.dataset.clickBound = '1';
+      detailEl.addEventListener('click', function(e){
+        const row = e.target.closest('.pv-stats-detail-row');
+        if(row && row.dataset.numero) window.openFicheByNumero(row.dataset.numero);
+      });
+    }
     const rows = getStatsFilteredLeads();
     totalEl.textContent = String(rows.length);
     const byStatut = new Map();
@@ -18377,7 +18385,7 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
         const leads = rows.filter(p=>(leadField(p,'statut') || 'sans_statut') === picked);
         titleEl.textContent = statutLabel(picked) + ' (' + leads.length + ' lead' + (leads.length>1?'s':'') + ')';
         detailEl.innerHTML = leads.length
-          ? leads.map(p=>'<div class="pv-stats-detail-row"><span class="nom">'+escapeHtml(leadName(p))+'</span><span class="tel">'+escapeHtml(leadTel(p))+'</span></div>').join('')
+          ? leads.map(p=>'<div class="pv-stats-detail-row" data-numero="'+escapeHtml(String(p.numero||''))+'"><span class="nom">'+escapeHtml(leadName(p))+'</span><span class="tel">'+escapeHtml(leadTel(p))+'</span></div>').join('')
           : '<div class="pv-muted">Aucun lead sur ce statut.</div>';
       });
     });
