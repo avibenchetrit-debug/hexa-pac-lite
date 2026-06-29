@@ -251,6 +251,13 @@ def _verify_admin_token(token: str) -> bool:
     return (time.time() - issued) <= ADMIN_UNLOCK_SECONDS
 
 
+def _require_admin(request: Request) -> None:
+    """Vérifie le token admin (header X-Admin-Token ou query ?token=) ; 401 sinon."""
+    token = request.headers.get("X-Admin-Token") or request.query_params.get("token") or ""
+    if not _verify_admin_token(token):
+        raise HTTPException(status_code=401, detail="Acces admin requis")
+
+
 def _sign_devis_token(numero: str) -> str:
     payload = f"devis:{numero}"
     sig = hmac.new(_admin_secret(), payload.encode("utf-8"), hashlib.sha256).digest()
@@ -2532,6 +2539,7 @@ async def get_admin_params():
 @app.post("/api/admin/params")
 async def save_admin_params(request: Request):
     """Sauvegarde les paramètres Admin (écriture atomique)."""
+    _require_admin(request)
     payload = await _read_request_payload(request)
     save_parametres_admin_atomic(payload)
     return {"success": True}
@@ -2545,6 +2553,7 @@ async def get_formule_bar_th_171():
 
 @app.post("/api/admin/formule-bar-th-171")
 async def save_formule_bar_th_171(request: Request):
+    _require_admin(request)
     payload = await _read_request_payload(request)
     params = load_parametres_admin()
     params["formule_bar_th_171"] = payload
@@ -2560,6 +2569,7 @@ async def get_plafonds_reglementaires():
 
 @app.post("/api/admin/plafonds-reglementaires")
 async def save_plafonds_reglementaires(request: Request):
+    _require_admin(request)
     payload = await _read_request_payload(request)
     params = load_parametres_admin()
     params["plafonds_reglementaires"] = payload
@@ -2575,6 +2585,7 @@ async def get_params_eco_energie():
 
 @app.post("/api/admin/params-eco-energie")
 async def save_params_eco_energie(request: Request):
+    _require_admin(request)
     payload = await _read_request_payload(request)
     params = load_parametres_admin()
     params["params_eco_energie"] = payload
@@ -2590,6 +2601,7 @@ async def get_params_financement():
 
 @app.post("/api/admin/params-financement")
 async def save_params_financement(request: Request):
+    _require_admin(request)
     payload = await _read_request_payload(request)
     params = load_parametres_admin()
     params["params_financement"] = payload
@@ -2644,6 +2656,7 @@ def get_admin_config() -> JSONResponse:
 
 @app.post("/api/admin/config")
 async def post_admin_config(request: Request) -> JSONResponse:
+    _require_admin(request)
     payload = await _read_request_payload(request)
     baremes = _read_json(BAREMES_PATH, {})
     if not isinstance(baremes, dict):
@@ -2655,6 +2668,7 @@ async def post_admin_config(request: Request) -> JSONResponse:
 
 @app.post("/api/admin/m3")
 async def post_admin_m3(request: Request) -> JSONResponse:
+    _require_admin(request)
     payload = await _read_request_payload(request)
     baremes = _read_json(BAREMES_PATH, {})
     if not isinstance(baremes, dict):
