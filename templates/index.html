@@ -2813,6 +2813,12 @@ body.panel-is-open {
       border: 1.5px solid #F57C00 !important;
       border-left: 3px solid #E65100 !important;
     }
+    /* Orange "requis" cote simulateur (statique : selects toujours remplis) */
+    .sim-field--requis select {
+      background: #FFF4E6 !important;
+      border: 1.5px solid #F57C00 !important;
+      border-left: 3px solid #E65100 !important;
+    }
     /* Champs auto-remplis API — vert / jaune / bleu */
     .field--auto-dpe-officiel input,
     .field--auto-dpe-officiel select,
@@ -9313,7 +9319,7 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
     if (window.majRequisSimu) window.majRequisSimu();
   }
 
-  window.REQUIS_SIMU_FIELDS = ['surface_logement_m2','code_postal_chantier','type_logement','hsp','altitude','type_emetteurs','mode_chauffage'];
+  window.REQUIS_SIMU_FIELDS = ['surface_logement_m2','code_postal_chantier','type_logement','hsp','altitude','type_emetteurs','mode_chauffage','rfr','nombre_personnes'];
   window.majRequisSimu = function () {
     (window.REQUIS_SIMU_FIELDS || []).forEach(function (nm) {
       const el = document.querySelector('[name="' + nm + '"]');
@@ -15466,7 +15472,7 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
 
         <div class="sim-block">
           <div class="sim-block-title">ISOLATION DU LOGEMENT</div>
-          <label class="sim-field"><span>Toit / Comble</span>
+          <label class="sim-field sim-field--requis"><span>Toit / Comble</span>
             <select id="iso-toit" name="iso_toit">
               <option value="tres_bien" ${sel(state.iso_toit,'tres_bien')}>Très bien isolé</option>
               <option value="bien" ${sel(state.iso_toit,'bien')}>Bien isolé</option>
@@ -15476,7 +15482,7 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
             </select>
             <span style="display:block;font-size:10px;font-weight:400;color:#8A92A0;line-height:1.3;margin-top:3px;margin-bottom:0;">&lt; 5 ans/neuf = Très bien · 5-15 ans = Bien · +15 ans = Isolé · ancienne/origine = Peu · jamais = Non</span>
           </label>
-          <label class="sim-field"><span>Mur</span>
+          <label class="sim-field sim-field--requis"><span>Mur</span>
             <select id="iso-mur" name="iso_mur">
               <option value="tres_bien" ${sel(state.iso_mur,'tres_bien')}>Très bien isolé</option>
               <option value="bien" ${sel(state.iso_mur,'bien')}>Bien isolé</option>
@@ -15486,7 +15492,7 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
             </select>
             <span style="display:block;font-size:10px;font-weight:400;color:#8A92A0;line-height:1.3;margin-top:3px;margin-bottom:0;">&lt; 5 ans/neuf = Très bien · 5-15 ans = Bien · +15 ans = Isolé · ancienne/origine = Peu · brut = Non</span>
           </label>
-          <label class="sim-field"><span>Menuiserie</span>
+          <label class="sim-field sim-field--requis"><span>Menuiserie</span>
             <select id="iso-menuiserie" name="iso_menuiserie">
               <option value="double" ${sel(state.iso_menuiserie,'double')}>Double vitrage</option>
               <option value="sur_vitrage" ${sel(state.iso_menuiserie,'sur_vitrage')}>Survitrage</option>
@@ -15505,7 +15511,7 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
               <option value="etas_140_plus" ${sel(state.etas,'etas_140_plus')}>≥ 140 %</option>
             </select>
           </label>
-          <label class="sim-field"><span>Service</span>
+          <label class="sim-field sim-field--requis"><span>Service</span>
             <select id="sim-service">
               <option value="chauffage_seul" ${sel(state.service,'chauffage_seul')}>Chauffage seul</option>
               <option value="chauffage_ecs" ${sel(state.service,'chauffage_ecs')}>Chauffage + ECS</option>
