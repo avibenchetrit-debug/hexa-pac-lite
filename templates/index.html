@@ -7782,6 +7782,16 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
 .hexa-user-dropdown.open{ display:block; }
 .hexa-user-dropdown button{ width:100%; border:none; background:transparent; color:#002E5A; text-align:left; padding:9px 10px; border-radius:8px; cursor:pointer; font-family:inherit; font-size:13px; }
 .hexa-user-dropdown button:hover{ background:#F4F8FC; }
+.hexa-atraiter-badge{ display:inline-flex; align-items:center; gap:6px; border:1px solid #E2E8F0; background:#fff; color:#002E5A; border-radius:9px; padding:7px 12px; font-size:13px; font-weight:700; cursor:pointer; font-family:inherit; }
+.hexa-atraiter-badge:hover{ border-color:#002E5A; background:#F4F8FC; }
+.hexa-atraiter-badge.has-retard{ background:#FDE8EC; border-color:#E2214B; color:#E2214B; }
+.hexa-atraiter-badge.has-imminent{ animation:hexaPulse 1.4s ease-in-out infinite; }
+@keyframes hexaPulse{ 0%,100%{ box-shadow:0 0 0 0 rgba(226,33,75,.45);} 50%{ box-shadow:0 0 0 6px rgba(226,33,75,0);} }
+.hexa-rdv-banner{ position:fixed; top:70px; right:20px; z-index:4000; display:flex; align-items:center; gap:12px; background:#002E5A; color:#fff; border-radius:10px; padding:12px 16px; box-shadow:0 12px 32px rgba(16,32,64,.28); font-size:14px; opacity:0; transform:translateY(-8px); transition:opacity .2s, transform .2s; }
+.hexa-rdv-banner.show{ opacity:1; transform:translateY(0); }
+.hexa-rdv-banner button{ border:none; border-radius:7px; padding:6px 10px; font-weight:700; cursor:pointer; font-family:inherit; font-size:12px; }
+.hexa-rdv-banner-open{ background:#fff; color:#002E5A; }
+.hexa-rdv-banner-close{ background:transparent; color:#fff; }
 .hexa-user-modal{ position:fixed; inset:0; z-index:5000; display:flex; align-items:center; justify-content:center; background:rgba(8,20,40,.55); }
 .hexa-user-box{ width:min(420px,92vw); background:#fff; border-radius:14px; padding:24px; box-shadow:0 20px 60px rgba(0,0,0,.28); text-align:center; }
 .hexa-user-title{ color:#002E5A; font-size:18px; font-weight:800; margin-bottom:18px; }
@@ -7970,6 +7980,7 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
     <span class="hexa-paris-clock-time" style="color:#ffffff;font-size:14px;font-weight:bold;font-variant-numeric:tabular-nums;letter-spacing:0.04em;">--:--:--</span>
   </div>
   <nav class="hexa-lite-nav">
+    <button type="button" id="hexa-atraiter-badge" class="hexa-atraiter-badge" title="À traiter aujourd'hui" style="display:none">🔔 <span id="hexa-atraiter-badge-n">0</span></button>
   </nav>
   <div class="hexa-user-menu" id="hexa-user-menu">
     <button type="button" class="hexa-user-btn" id="hexa-user-btn">👤 — ▾</button>
@@ -18837,6 +18848,51 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
       if(row && row.dataset.numero) window.openFicheByNumero(row.dataset.numero);
     });
   }
+  let hexaRdvNotified = (()=>{ try{ return new Set(JSON.parse(localStorage.getItem('hexa_rdv_notified')||'[]')); }catch(_){ return new Set(); } })();
+  function hexaSaveNotified(){ try{ localStorage.setItem('hexa_rdv_notified', JSON.stringify([...hexaRdvNotified].slice(-200))); }catch(_){} }
+  function showRdvImminentBanner(it){
+    const nom = ((it.prenom||'')+' '+(it.nom||'')).trim() || it.numero || '';
+    const heure = (it.source && it.source.heure) || '';
+    const bar = document.createElement('div');
+    bar.className = 'hexa-rdv-banner';
+    bar.innerHTML = '<span>🔔 RDV imminent : <strong>'+escapeHtml(nom)+'</strong> à '+escapeHtml(heure)+'</span>'
+      + '<button type="button" class="hexa-rdv-banner-open">Ouvrir</button>'
+      + '<button type="button" class="hexa-rdv-banner-close" aria-label="Fermer">✕</button>';
+    document.body.appendChild(bar);
+    bar.querySelector('.hexa-rdv-banner-open').addEventListener('click', ()=>{ window.openFicheByNumero(it.numero); bar.remove(); });
+    bar.querySelector('.hexa-rdv-banner-close').addEventListener('click', ()=>bar.remove());
+    setTimeout(()=>bar.classList.add('show'), 10);
+    setTimeout(()=>{ bar.classList.remove('show'); setTimeout(()=>bar.remove(), 300); }, 30000);
+    try{ const ac=new (window.AudioContext||window.webkitAudioContext)(); const o=ac.createOscillator(), g=ac.createGain();
+      o.connect(g); g.connect(ac.destination); o.type='sine'; o.frequency.value=880;
+      g.gain.setValueAtTime(0.05, ac.currentTime); g.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime+0.4);
+      o.start(); o.stop(ac.currentTime+0.4); }catch(_){}
+  }
+  async function pollATraiterBadge(){
+    try{
+      const r = await fetch('/api/a-traiter?assigne=tous', { cache:'no-store' });
+      if(!r.ok) return;
+      const data = await r.json(); const c = data.counts || {};
+      const n = (c.du_jour||0) + (c.retards||0);
+      const badge = document.getElementById('hexa-atraiter-badge');
+      const nEl = document.getElementById('hexa-atraiter-badge-n');
+      if(badge && nEl){
+        nEl.textContent = n;
+        badge.style.display = n>0 ? 'inline-flex' : 'none';
+        badge.classList.toggle('has-retard', (c.retards||0)>0);
+        badge.classList.toggle('has-imminent', (c.rdv_imminent||0)>0);
+      }
+      const me = String(currentHexaUser()||'').toLowerCase();
+      if(me){
+        (data.items||[]).forEach(it=>{
+          if(it.kind!=='rdv' || it.etat!=='imminent' || it.assigne_a!==me) return;
+          if(hexaRdvNotified.has(it.id)) return;
+          hexaRdvNotified.add(it.id); hexaSaveNotified();
+          showRdvImminentBanner(it);
+        });
+      }
+    }catch(_){}
+  }
   function showProspects(){
     document.body.classList.add('hexa-view-prospects');
     window.scrollTo(0,0);
@@ -18845,6 +18901,7 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
     }
     bindATraiter();
     loadATraiter();
+    pollATraiterBadge();
   }
   const FIELD_ALIASES = {
     telephone: ['telephone', 'tel', 'phone'],
@@ -19256,6 +19313,9 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
     updateIdentityBanner();
     ensureUserSelected();
     bindSuiviCard();
+    document.getElementById('hexa-atraiter-badge')?.addEventListener('click', function(){ showProspects(); const el=document.getElementById('atraiter-panel'); if(el) el.scrollIntoView({behavior:'smooth', block:'start'}); });
+    pollATraiterBadge();
+    setInterval(pollATraiterBadge, 120000);
   }
   if(document.readyState!=='loading') init();
   else document.addEventListener('DOMContentLoaded', init);
