@@ -2840,6 +2840,11 @@ body.panel-is-open {
       margin: 16px 0 14px; padding-top: 16px;
       border-top: 1px solid #E8EFF7;
     }
+    /* Bloc "Suivi / À rappeler" (tête de fiche) — layout uniquement */
+    .suivi-actions { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:10px; }
+    .suivi-compteurs { display:flex; flex-wrap:wrap; gap:8px; }
+    .suivi-actif { margin-bottom:6px; }
+    .suivi-vide { color:#94A3B8; font-size:13px; font-style:italic; }
     .sub-bloc-title {
       font-size: 11px;
       font-weight: 600;
@@ -7995,6 +8000,76 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
 <form id="form-prospect" class="fiche-form" method="post" novalidate
         action="">
     <fieldset >
+
+    <!-- BLOC SUIVI / À RAPPELER (tête de fiche — actions du lead) -->
+      <div class="card" id="card-suivi">
+        <div class="card-title"><span class="num-card">🔔</span> Suivi / À rappeler</div>
+
+        <!-- Action en cours (RDV / rappel actif) — rempli en JS à l'étape 3b -->
+        <div id="suivi-actif" class="suivi-actif">
+          <div class="suivi-vide">Aucune action programmée.</div>
+        </div>
+
+        <!-- Contact rapide -->
+        <div class="card-subtitle">Contact rapide</div>
+        <div class="suivi-actions">
+          <button type="button" class="btn btn-secondary" id="suivi-appel-repondu">📞 Appel répondu</button>
+          <button type="button" class="btn btn-secondary" id="suivi-nrp">📵 NRP</button>
+          <button type="button" class="btn btn-secondary" id="suivi-sms">💬 SMS envoyé</button>
+          <button type="button" class="btn btn-secondary" id="suivi-email">✉️ Email envoyé</button>
+        </div>
+        <div class="suivi-compteurs">
+          <span class="pv-nrp-count pv-nrp-0" id="suivi-cpt-appel">— /8 appels</span>
+          <span class="pv-nrp-count pv-nrp-0" id="suivi-cpt-sms">— /5 sms</span>
+          <span class="pv-nrp-count pv-nrp-0" id="suivi-cpt-email">— /5 emails</span>
+        </div>
+
+        <!-- Programmer un RDV -->
+        <div class="card-subtitle">Programmer un RDV</div>
+        <div class="row row-3">
+          <div class="field"><label>Date</label><input type="date" id="suivi-rdv-date"></div>
+          <div class="field"><label>Heure</label><input type="time" id="suivi-rdv-heure"></div>
+          <div class="field"><label>Type</label>
+            <select id="suivi-rdv-type">
+              <option value="tel">Appel</option>
+              <option value="visite">Visite</option>
+            </select>
+          </div>
+        </div>
+        <div class="row row-2" style="margin-top:12px;">
+          <div class="field"><label>Assigné à</label>
+            <select id="suivi-rdv-assigne">
+              <option value="avi">Avi</option>
+              <option value="joelle">Joelle</option>
+              <option value="maurice">Maurice</option>
+            </select>
+          </div>
+          <div class="field" style="justify-content:flex-end;">
+            <button type="button" class="btn btn-secondary" id="suivi-rdv-poser">Poser le RDV</button>
+          </div>
+        </div>
+
+        <!-- Programmer un rappel -->
+        <div class="card-subtitle">Programmer un rappel</div>
+        <div class="row row-3">
+          <div class="field"><label>Date</label><input type="date" id="suivi-rap-date"></div>
+          <div class="field" style="grid-column:span 2;"><label>Motif</label>
+            <input type="text" id="suivi-rap-motif" placeholder="Ex. relancer devis envoyé">
+          </div>
+        </div>
+        <div class="row row-2" style="margin-top:12px;">
+          <div class="field"><label>Assigné à</label>
+            <select id="suivi-rap-assigne">
+              <option value="avi">Avi</option>
+              <option value="joelle">Joelle</option>
+              <option value="maurice">Maurice</option>
+            </select>
+          </div>
+          <div class="field" style="justify-content:flex-end;">
+            <button type="button" class="btn btn-secondary" id="suivi-rap-poser">Poser le rappel</button>
+          </div>
+        </div>
+      </div>
 
     <!-- BLOC 1 -->
       <div class="card">
