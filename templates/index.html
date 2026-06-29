@@ -18799,13 +18799,16 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
       const telHtml = tel ? '<a href="tel:'+escapeHtml(tel)+'" class="atraiter-tel" onclick="event.stopPropagation()">'+escapeHtml(tel)+'</a>' : '—';
       const kind = it.kind==='rdv' ? 'RDV' : (it.kind==='rappel' ? 'Rappel' : 'Détection');
       const b = etatBadge[it.etat] || [it.etat,'atb-jour'];
-      const when = it.kind==='rdv'
-        ? escapeHtml(((it.source&&it.source.date)||'')+' '+((it.source&&it.source.heure)||''))
-        : escapeHtml((it.source&&it.source.date)||'');
-      const who = escapeHtml(suiviAssigneLabel(it.assigne_a));
-      const doneBtn = (it.kind==='rdv'||it.kind==='rappel')
-        ? '<button type="button" class="pv-btn pv-btn-ghost atraiter-done" data-kind="'+it.kind+'" data-numero="'+escapeHtml(it.numero||'')+'">Marquer fait</button>'
-        : '';
+      let when;
+      if(it.kind==='rdv') when = escapeHtml(((it.source&&it.source.date)||'')+' '+((it.source&&it.source.heure)||''));
+      else if(it.kind==='rappel') when = escapeHtml((it.source&&it.source.date)||'');
+      else when = escapeHtml((it.label||'Détection') + (it.since_days!=null ? ' · '+it.since_days+' j' : ''));
+      const who = it.kind==='detection' ? '—' : escapeHtml(suiviAssigneLabel(it.assigne_a));
+      let doneBtn = '';
+      if(it.kind==='rdv'||it.kind==='rappel')
+        doneBtn = '<button type="button" class="pv-btn pv-btn-ghost atraiter-done" data-kind="'+it.kind+'" data-numero="'+escapeHtml(it.numero||'')+'">Marquer fait</button>';
+      else if(it.kind==='detection')
+        doneBtn = '<button type="button" class="pv-btn pv-btn-ghost atraiter-done" data-kind="detection" data-subtype="'+escapeHtml(it.subtype||'')+'" data-trigger="'+escapeHtml(it.trigger_at||'')+'" data-numero="'+escapeHtml(it.numero||'')+'">Marquer traité</button>';
       return '<div class="atraiter-row" data-numero="'+escapeHtml(it.numero||'')+'">'
         + '<span class="atraiter-badge '+b[1]+'">'+b[0]+'</span>'
         + '<span class="atraiter-kind">'+kind+'</span>'
@@ -18833,13 +18836,15 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
       if(done){
         e.stopPropagation();
         const numero = done.dataset.numero, kind = done.dataset.kind;
+        const body = { kind, resultat:'fait', par: currentHexaUser() };
+        if(kind==='detection'){ body.subtype = done.dataset.subtype; body.trigger_at = done.dataset.trigger; }
         try {
           const r = await fetch('/api/leads/'+encodeURIComponent(numero)+'/action-done', {
             method:'POST', headers:{'Content-Type':'application/json'},
-            body: JSON.stringify({ kind, resultat:'fait', par: currentHexaUser() })
+            body: JSON.stringify(body)
           });
           if(!r.ok){ const bb=await r.json().catch(()=>({})); toastMsg('Erreur : '+(bb.detail||('HTTP '+r.status)),'#B91C1C'); return; }
-          toastMsg('✓ '+(kind==='rdv'?'RDV':'Rappel')+' marqué fait','#0D6B3B');
+          toastMsg('✓ '+(kind==='rdv'?'RDV':kind==='rappel'?'Rappel':'Détection')+(kind==='detection'?' traitée':' marqué fait'),'#0D6B3B');
           loadATraiter();
         } catch(_){ toastMsg('Erreur réseau','#B91C1C'); }
         return;

@@ -745,6 +745,10 @@ CANAUX_VALIDES = {"appel", "sms", "email"}  # whatsapp plus tard
 PLAFONDS_CANAL = {"appel": 8, "sms": 5, "email": 5}
 # Fenêtre "imminent" d'un RDV (minutes avant l'échéance). À terme : admin.
 RDV_IMMINENT_MIN = 30
+# Seuils des détections automatiques (jours). À terme : configurables admin.
+DETECT_DEVIS_J = 3
+DETECT_JAMAIS_CONTACTE_J = 2
+DETECT_SIMU_J = 3
 
 
 def _normalize_assigne(value):
@@ -1871,10 +1875,38 @@ async def lead_action_done(numero: str, request: Request) -> JSONResponse:
     maj_statut passer 'contacte'. resultat 'annule' : pas de transition."""
     payload = await _read_request_payload(request)
     kind = str(payload.get("kind") or "").strip().lower()
-    if kind not in ("rdv", "rappel"):
-        raise HTTPException(status_code=400, detail="kind invalide (attendu 'rdv' ou 'rappel').")
-    resultat = str(payload.get("resultat") or "fait").strip().lower() or "fait"
+    if kind not in ("rdv", "rappel", "detection"):
+        raise HTTPException(status_code=400, detail="kind invalide (attendu 'rdv', 'rappel' ou 'detection').")
     par = _normalize_assigne(payload.get("par"))
+
+    # Détection : pas d'objet sur le lead ; on mémorise un REJET dans actions_log
+    # (re-déclenche seulement sur un trigger postérieur, cf. CONCEPTION §10.2).
+    if kind == "detection":
+        subtype = str(payload.get("subtype") or "").strip()
+        if not subtype:
+            raise HTTPException(status_code=400, detail="subtype requis pour une détection.")
+        leads = _read_leads()
+        index = _find_lead_index(leads, numero)
+        if index is None:
+            raise HTTPException(status_code=404, detail="Prospect non trouvé")
+        lead = leads[index]
+        log = lead.get("actions_log")
+        if not isinstance(log, list):
+            log = []
+        log.append({
+            "type": "detection",
+            "subtype": subtype,
+            "trigger_at": str(payload.get("trigger_at") or "").strip(),
+            "resultat": str(payload.get("resultat") or "traite").strip() or "traite",
+            "fait_par": par,
+            "fait_at": _now_paris_iso(),
+        })
+        lead["actions_log"] = log
+        lead["updated_at"] = _now_iso()
+        _atomic_write_json(LEADS_PATH, leads)
+        return JSONResponse({"ok": True, "lead": _lead_for_response(lead)})
+
+    resultat = str(payload.get("resultat") or "fait").strip().lower() or "fait"
     maj_statut = payload.get("maj_statut")
 
     # Reprogrammation (optionnelle) : validee en amont si une date est fournie.
@@ -2061,10 +2093,110 @@ def _atraiter_rappel_item(lead, rappel, today):
     return item
 
 
+def _atraiter_detection_item(lead, subtype, label, since_days, trigger_dt):
+    """Construit un item de détection (kind=detection, visible par tous)."""
+    iso = trigger_dt.isoformat(timespec="seconds")
+    item = {
+        "id": f"{lead.get('numero')}:detection:{subtype}",
+        "numero": lead.get("numero"),
+        "nom": lead.get("nom"),
+        "prenom": lead.get("prenom"),
+        "telephone": lead.get("telephone"),
+        "statut": lead.get("statut"),
+        "kind": "detection",
+        "etat": "detection",
+        "assigne_a": "",
+        "subtype": subtype,
+        "label": label,
+        "since_days": since_days,
+        "trigger_at": iso,
+        "echeance": iso,
+        "source": {"date": trigger_dt.date().isoformat()},
+    }
+    item["_bucket"] = 4
+    item["_sort"] = -since_days
+    return item
+
+
+def _build_detection_ctx(today):
+    """Pré-charge les sources des détections (1 lecture chacune)."""
+    devis_sent = set()
+    for d in _read_devis_envoyes():
+        if isinstance(d, dict):
+            n = str(d.get("numero_prospect") or "").strip()
+            if n:
+                devis_sent.add(n)
+    simu_updated = {}
+    try:
+        for fn in os.listdir(STATES_SIMULATEUR_DIR):
+            if not fn.endswith(".json"):
+                continue
+            st = _read_json(os.path.join(STATES_SIMULATEUR_DIR, fn), {})
+            if isinstance(st, dict):
+                n = str(st.get("numero_prospect") or "").strip()
+                u = st.get("updated_at")
+                if n and u:
+                    simu_updated[n] = u
+    except OSError:
+        pass
+    return {
+        "today": today,
+        "echanges": _read_echanges(),
+        "devis_sent": devis_sent,
+        "simu_updated": simu_updated,
+    }
+
+
+def _detection_items(lead, ctx):
+    """0..n détections pour un lead, en respectant la mémoire de rejet
+    (actions_log type=detection : re-déclenche seulement sur trigger postérieur)."""
+    numero = str(lead.get("numero") or "").strip()
+    statut = _normalize_statut(lead.get("statut", ""))
+    today = ctx["today"]
+    out = []
+
+    rejets = {}
+    for e in (lead.get("actions_log") or []):
+        if isinstance(e, dict) and e.get("type") == "detection":
+            st = e.get("subtype")
+            tdt = _parse_paris_dt(e.get("trigger_at"))
+            if st and tdt and (st not in rejets or tdt > rejets[st]):
+                rejets[st] = tdt
+
+    def _emit(subtype, trigger_value, label, seuil_j):
+        tdt = _parse_paris_dt(trigger_value)
+        if tdt is None:
+            return
+        since = (today - tdt.date()).days
+        if since < seuil_j:
+            return
+        rej = rejets.get(subtype)
+        if rej is not None and rej >= tdt:
+            return
+        out.append(_atraiter_detection_item(lead, subtype, label, since, tdt))
+
+    if statut == "devis_envoye":
+        _emit("devis_3j", lead.get("date_envoi_devis"), "Devis envoyé sans réponse", DETECT_DEVIS_J)
+
+    if statut in ("", "nouveau"):
+        nrp = lead.get("nrp_count")
+        if not isinstance(nrp, int):
+            nrp = len(lead.get("nrp_log") or [])
+        if nrp == 0 and not ctx["echanges"].get(numero):
+            _emit("jamais_contacte_2j", lead.get("date"), "Jamais contacté", DETECT_JAMAIS_CONTACTE_J)
+
+    upd = ctx["simu_updated"].get(numero)
+    if upd and numero not in ctx["devis_sent"] and statut != "devis_envoye" \
+            and not str(lead.get("date_envoi_devis") or "").strip():
+        _emit("simu_3j", upd, "Simulation sans devis", DETECT_SIMU_J)
+
+    return out
+
+
 @app.get("/api/a-traiter")
 def get_a_traiter(assigne: str = "tous") -> JSONResponse:
     """Agrège et trie tout ce qui demande une action aujourd'hui (cf. §6).
-    Détections = STUB (liste vide) jusqu'à l'étape 5.
+    Détections automatiques (devis 3j / jamais contacté 2j / simu 3j).
     Filtre ?assigne=tous|avi|joelle|maurice (RDV/rappel par assigne_a ;
     détections visibles par tous)."""
     now = datetime.now(PARIS_TZ)
@@ -2075,6 +2207,7 @@ def get_a_traiter(assigne: str = "tous") -> JSONResponse:
     if filtre in ("", "tous"):
         filtre = None
 
+    detect_ctx = _build_detection_ctx(today)
     items = []
     for lead in _read_leads():
         if _is_deleted(lead):
@@ -2089,10 +2222,7 @@ def get_a_traiter(assigne: str = "tous") -> JSONResponse:
             item = _atraiter_rappel_item(lead, rappel, today)
             if item is not None:
                 items.append(item)
-
-    # Détections automatiques : STUB (étape 5 remplacera cette liste vide).
-    detections = []
-    items.extend(detections)
+        items.extend(_detection_items(lead, detect_ctx))
 
     # Filtre par personne : RDV/rappel par assigne_a ; détections par tous.
     if filtre is not None:
