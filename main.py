@@ -743,6 +743,8 @@ CANAUX_VALIDES = {"appel", "sms", "email"}  # whatsapp plus tard
 # Plafonds de tentatives SANS réponse par canal avant "injoignable"
 # (les 3 doivent être atteints). À terme : configurables côté admin.
 PLAFONDS_CANAL = {"appel": 8, "sms": 5, "email": 5}
+# Fenêtre "imminent" d'un RDV (minutes avant l'échéance). À terme : admin.
+RDV_IMMINENT_MIN = 30
 
 
 def _normalize_assigne(value):
@@ -1985,6 +1987,140 @@ async def lead_contact(numero: str, request: Request) -> JSONResponse:
 
     compteurs = _compteurs_canal(numero)
     return JSONResponse({"ok": True, "compteurs": compteurs, "lead": _lead_for_response(lead)})
+
+
+# --- GET /api/a-traiter : agrégation + tri de la liste "À traiter" ----------
+# Buckets de tri (cf. CONCEPTION_RAPPELS.md §6) :
+#   1 = retards (RDV passés + rappels date<today), échéance croissante
+#   2 = RDV du jour (dont imminents), par heure
+#   3 = rappels du jour, par ancienneté (cree_at asc)
+#   4 = détections (STUB étape 1, rempli à l'étape 5)
+def _atraiter_item(lead, kind, source, etat, echeance_dt):
+    """Construit un item de la liste 'À traiter' (champs d'affichage + source)."""
+    ident = f"{lead.get('numero')}:{kind}:{source.get('date', '')}"
+    if kind == "rdv":
+        ident += f":{source.get('heure', '')}"
+    return {
+        "id": ident,
+        "numero": lead.get("numero"),
+        "nom": lead.get("nom"),
+        "prenom": lead.get("prenom"),
+        "telephone": lead.get("telephone"),
+        "statut": lead.get("statut"),
+        "kind": kind,
+        "etat": etat,
+        "assigne_a": _normalize_assigne(source.get("assigne_a")),
+        "echeance": echeance_dt.isoformat(timespec="seconds"),
+        "source": source,
+    }
+
+
+def _atraiter_rdv_item(lead, rdv, now, today, imminent_delta):
+    """Dérive l'item RDV (ou None si illisible / a_venir exclu). États scope
+    jour : retard (dt<now), imminent (0..30 min), aujourdhui (date=today)."""
+    date = str(rdv.get("date") or "").strip()
+    heure = str(rdv.get("heure") or "").strip()
+    dt = _parse_paris_dt(f"{date}T{heure}") if (date and heure) else _parse_paris_dt(date)
+    if dt is None:
+        return None
+    if dt < now:
+        etat, bucket = "retard", 1
+    elif dt - now <= imminent_delta:
+        etat, bucket = "imminent", 2
+    elif dt.date() == today:
+        etat, bucket = "aujourdhui", 2
+    else:
+        return None  # a_venir : exclu du scope jour
+    item = _atraiter_item(lead, "rdv", rdv, etat, dt)
+    item["_bucket"] = bucket
+    item["_sort"] = dt  # tri par heure (buckets 1 et 2)
+    return item
+
+
+def _atraiter_rappel_item(lead, rappel, today):
+    """Dérive l'item rappel (ou None si illisible / futur exclu). États scope
+    jour : retard (date<today), aujourdhui (date=today)."""
+    date = str(rappel.get("date") or "").strip()
+    dt = _parse_paris_dt(date)
+    if dt is None:
+        return None
+    jour = dt.date()
+    if jour < today:
+        etat, bucket, sort = "retard", 1, dt  # échéance (minuit du jour)
+    elif jour == today:
+        # ancienneté = cree_at asc ; fallback échéance si absent.
+        etat, bucket = "aujourdhui", 3
+        sort = str(rappel.get("cree_at") or "") or dt.isoformat()
+    else:
+        return None  # futur : exclu du scope jour
+    item = _atraiter_item(lead, "rappel", rappel, etat, dt)
+    item["_bucket"] = bucket
+    item["_sort"] = sort
+    return item
+
+
+@app.get("/api/a-traiter")
+def get_a_traiter(assigne: str = "tous") -> JSONResponse:
+    """Agrège et trie tout ce qui demande une action aujourd'hui (cf. §6).
+    Détections = STUB (liste vide) jusqu'à l'étape 5.
+    Filtre ?assigne=tous|avi|joelle|maurice (RDV/rappel par assigne_a ;
+    détections visibles par tous)."""
+    now = datetime.now(PARIS_TZ)
+    today = now.date()
+    imminent_delta = timedelta(minutes=RDV_IMMINENT_MIN)
+
+    filtre = _normalize_assigne(assigne)
+    if filtre in ("", "tous"):
+        filtre = None
+
+    items = []
+    for lead in _read_leads():
+        if _is_deleted(lead):
+            continue
+        rdv = lead.get("rdv")
+        if isinstance(rdv, dict):
+            item = _atraiter_rdv_item(lead, rdv, now, today, imminent_delta)
+            if item is not None:
+                items.append(item)
+        rappel = lead.get("rappel")
+        if isinstance(rappel, dict):
+            item = _atraiter_rappel_item(lead, rappel, today)
+            if item is not None:
+                items.append(item)
+
+    # Détections automatiques : STUB (étape 5 remplacera cette liste vide).
+    detections = []
+    items.extend(detections)
+
+    # Filtre par personne : RDV/rappel par assigne_a ; détections par tous.
+    if filtre is not None:
+        items = [
+            it for it in items
+            if it["kind"] == "detection" or it.get("assigne_a") == filtre
+        ]
+
+    # Tri global par buckets, puis critère interne (échéance / ancienneté).
+    items.sort(key=lambda it: (it["_bucket"], it["_sort"]))
+
+    counts = {
+        "total": len(items),
+        "retards": sum(1 for it in items if it["etat"] == "retard"),
+        "rdv_imminent": sum(
+            1 for it in items if it["kind"] == "rdv" and it["etat"] == "imminent"
+        ),
+        "du_jour": sum(1 for it in items if it["etat"] in ("imminent", "aujourdhui")),
+    }
+
+    # Retire les champs de tri internes avant sérialisation.
+    for it in items:
+        it.pop("_bucket", None)
+        it.pop("_sort", None)
+
+    return JSONResponse({
+        "generated_at": now.isoformat(timespec="seconds"),
+        "counts": counts,
+        "items": items,
+    })
 
 
 @app.delete("/api/leads/{numero}")
