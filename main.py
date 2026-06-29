@@ -2609,6 +2609,31 @@ async def save_params_financement(request: Request):
     return {"success": True}
 
 
+@app.post("/api/admin/purge-echanges-orphelins")
+async def purge_echanges_orphelins(request: Request) -> JSONResponse:
+    """Purge les échanges dont le numéro n'a AUCUN lead (vrai orphelin).
+    Les leads soft-deleted (corbeille) gardent leur enregistrement -> NON
+    orphelins (historique préservé pour une restauration). dry_run par défaut ;
+    {"confirm": true} pour supprimer réellement."""
+    _require_admin(request)
+    payload = await _read_request_payload(request)
+    confirm = bool(payload.get("confirm"))
+    echanges = _read_echanges()
+    numeros_leads = {str(l.get("numero") or "").strip() for l in _read_leads()}
+    orphelins = sorted(n for n in echanges.keys() if str(n).strip() not in numeros_leads)
+    if confirm:
+        for n in orphelins:
+            echanges.pop(n, None)
+        _atomic_write_json(ECHANGES_PATH, echanges)
+    return JSONResponse({
+        "ok": True,
+        "dry_run": not confirm,
+        "orphelins": orphelins,
+        "nb_supprimes": len(orphelins) if confirm else 0,
+        "nb_restants": len(echanges),
+    })
+
+
 @app.post("/api/admin/auth")
 async def admin_auth(request: Request) -> JSONResponse:
     payload = await _read_request_payload(request)
