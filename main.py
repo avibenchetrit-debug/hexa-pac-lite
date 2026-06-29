@@ -1123,6 +1123,17 @@ def _compteurs_canal(numero):
     return compteurs
 
 
+def _dernier_repondu(numero):
+    """Date ISO du dernier échange resultat='repondu' (appel répondu), ou chaine vide."""
+    best = ""
+    for e in _read_echanges().get(numero, []):
+        if isinstance(e, dict) and str(e.get("resultat") or "").strip().lower() == "repondu":
+            ts = str(e.get("created_at") or "")
+            if ts > best:
+                best = ts
+    return best
+
+
 def _find_lead(numero: str) -> dict | None:
     wanted = str(numero or "").strip()
     for lead in _read_leads():
@@ -1636,6 +1647,7 @@ def get_lead(numero: str) -> JSONResponse:
         if str(lead.get("numero", "")).strip() == wanted:
             data = _lead_for_response(lead)
             data["compteurs"] = _compteurs_canal(wanted)
+            data["dernier_repondu"] = _dernier_repondu(wanted)
             return JSONResponse(data)
     raise HTTPException(status_code=404, detail="Prospect introuvable")
 

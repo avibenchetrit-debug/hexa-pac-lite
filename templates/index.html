@@ -2857,6 +2857,7 @@ body.panel-is-open {
     .suivi-compteurs { display:flex; flex-wrap:wrap; gap:8px; }
     .suivi-actif { margin-bottom:4px; }
     .suivi-vide { color:#94A3B8; font-size:13px; font-style:italic; }
+    .suivi-dernier { font-size:12px; color:#0D6B3B; font-weight:600; margin-top:6px; }
     #card-suivi .suivi-item { font-size:13px; padding:2px 0; display:flex; align-items:center; gap:8px; justify-content:space-between; }
     #card-suivi .suivi-line { min-width:0; }
     #card-suivi .suivi-done { padding:4px 10px; font-size:11px; flex-shrink:0; }
@@ -8089,6 +8090,7 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
           <span class="pv-nrp-count pv-nrp-0" id="suivi-cpt-sms">— /5 sms</span>
           <span class="pv-nrp-count pv-nrp-0" id="suivi-cpt-email">— /5 emails</span>
         </div>
+        <div class="suivi-dernier" id="suivi-dernier-repondu" style="display:none"></div>
 
         <!-- Programmer un RDV -->
         <div class="card-subtitle">Programmer un RDV</div>
@@ -19215,6 +19217,16 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
       el.classList.toggle('pv-nrp-n', proche);
       el.classList.toggle('pv-nrp-0', !proche);
     });
+    // 2b) Dernier contact réussi (appel répondu)
+    const drEl = document.getElementById('suivi-dernier-repondu');
+    if(drEl){
+      const dr = lead && lead.dernier_repondu;
+      if(dr){
+        const d = new Date(dr);
+        drEl.textContent = '✅ Dernier contact réussi : ' + (isNaN(d.getTime()) ? String(dr).slice(0,10) : d.toLocaleDateString('fr-FR'));
+        drEl.style.display = '';
+      } else { drEl.textContent = ''; drEl.style.display = 'none'; }
+    }
     // 3) Pre-selection "assigne" = utilisateur courant
     const me = String(currentHexaUser()||'').toLowerCase();
     if (me && HEXA_USERS[me]){
