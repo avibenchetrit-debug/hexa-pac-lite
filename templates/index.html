@@ -18763,8 +18763,6 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
     const name = HEXA_USERS[key] || '';
     const u = document.getElementById('atraiter-user');
     if(u) u.textContent = '👤 ' + (name || '—');
-    const moi = document.getElementById('atraiter-tab-moi');
-    if(moi) moi.textContent = name || 'Moi';
   }
   let atraiterScope = 'tous';
   async function loadATraiter(){
