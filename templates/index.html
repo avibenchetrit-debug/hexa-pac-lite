@@ -2851,7 +2851,9 @@ body.panel-is-open {
     .suivi-compteurs { display:flex; flex-wrap:wrap; gap:8px; }
     .suivi-actif { margin-bottom:4px; }
     .suivi-vide { color:#94A3B8; font-size:13px; font-style:italic; }
-    #card-suivi .suivi-item { font-size:13px; padding:2px 0; }
+    #card-suivi .suivi-item { font-size:13px; padding:2px 0; display:flex; align-items:center; gap:8px; justify-content:space-between; }
+    #card-suivi .suivi-line { min-width:0; }
+    #card-suivi .suivi-done { padding:4px 10px; font-size:11px; flex-shrink:0; }
     .sub-bloc-title {
       font-size: 11px;
       font-weight: 600;
@@ -18937,17 +18939,19 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       const rdv = lead && lead.rdv;
       if (rdv && typeof rdv === 'object'){
         const t = rdv.type === 'visite' ? 'Visite' : 'Appel';
-        parts.push('<div class="suivi-item">📅 <strong>RDV</strong> '
+        parts.push('<div class="suivi-item"><span class="suivi-line">📅 <strong>RDV</strong> '
           + escapeHtml(rdv.date||'') + ' ' + escapeHtml(rdv.heure||'')
-          + ' · ' + t + ' · ' + escapeHtml(suiviAssigneLabel(rdv.assigne_a)) + '</div>');
+          + ' · ' + t + ' · ' + escapeHtml(suiviAssigneLabel(rdv.assigne_a)) + '</span>'
+          + '<button type="button" class="btn btn-secondary suivi-done" data-kind="rdv">Marquer fait</button></div>');
       }
       const rap = lead && lead.rappel;
       if (rap && typeof rap === 'object'){
         const motif = String(rap.motif||'').trim();
-        parts.push('<div class="suivi-item">🔁 <strong>Rappel</strong> '
+        parts.push('<div class="suivi-item"><span class="suivi-line">🔁 <strong>Rappel</strong> '
           + escapeHtml(rap.date||'')
           + (motif ? ' · ' + escapeHtml(motif) : '')
-          + ' · ' + escapeHtml(suiviAssigneLabel(rap.assigne_a)) + '</div>');
+          + ' · ' + escapeHtml(suiviAssigneLabel(rap.assigne_a)) + '</span>'
+          + '<button type="button" class="btn btn-secondary suivi-done" data-kind="rappel">Marquer fait</button></div>');
       }
       box.innerHTML = parts.length ? parts.join('')
         : '<div class="suivi-vide">Aucune action programmée.</div>';
@@ -19029,6 +19033,71 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     updateIdentityBanner();
     document.body.classList.remove('hexa-view-prospects'); window.scrollTo(0,0);
   }
+  // ---- Bloc Suivi : actions (3c-3e) ----
+  async function suiviPost(path, body){
+    const numero = String(document.body.dataset.prospectNumero||'').trim();
+    if(!numero){ toastMsg('Aucun prospect ouvert', '#B91C1C'); return null; }
+    let res;
+    try {
+      res = await fetch('/api/leads/' + encodeURIComponent(numero) + path, {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify(Object.assign({ par: currentHexaUser() }, body))
+      });
+    } catch(e){ toastMsg('Erreur réseau', '#B91C1C'); return null; }
+    if(!res.ok){
+      const b = await res.json().catch(()=>({}));
+      toastMsg('Erreur : ' + (b.detail || ('HTTP '+res.status)), '#B91C1C');
+      return null;
+    }
+    // rafraichit #suivi-actif + compteurs sans ecraser les champs en cours d\'edition
+    try { renderSuivi(await fetchProspect(numero)); } catch(_){}
+    return res;
+  }
+  function bindSuiviCard(){
+    const card = document.getElementById('card-suivi');
+    if(!card || card.dataset.bound) return;
+    card.dataset.bound = '1';
+    const v = id => (document.getElementById(id)?.value || '').trim();
+    // 1) Poser RDV
+    document.getElementById('suivi-rdv-poser')?.addEventListener('click', async () => {
+      const date = v('suivi-rdv-date'), heure = v('suivi-rdv-heure');
+      if(!date || !heure){ toastMsg('Date et heure du RDV requises', '#B91C1C'); return; }
+      const r = await suiviPost('/rdv', { date, heure, type: v('suivi-rdv-type'), assigne_a: v('suivi-rdv-assigne') });
+      if(r) toastMsg('✓ RDV posé', '#0D6B3B');
+    });
+    // 2) Poser rappel
+    document.getElementById('suivi-rap-poser')?.addEventListener('click', async () => {
+      const date = v('suivi-rap-date');
+      if(!date){ toastMsg('Date du rappel requise', '#B91C1C'); return; }
+      const r = await suiviPost('/rappel', { date, motif: v('suivi-rap-motif'), assigne_a: v('suivi-rap-assigne') });
+      if(r) toastMsg('✓ Rappel posé', '#0D6B3B');
+    });
+    // 3) Contacts rapides
+    document.getElementById('suivi-appel-repondu')?.addEventListener('click', async () => {
+      const r = await suiviPost('/contact', { canal:'appel', resultat:'repondu', maj_statut:true });
+      if(r) toastMsg('✓ Appel répondu', '#0D6B3B');
+    });
+    document.getElementById('suivi-sms')?.addEventListener('click', async () => {
+      const r = await suiviPost('/contact', { canal:'sms', resultat:'envoye', maj_statut:true });
+      if(r) toastMsg('✓ SMS enregistré', '#0D6B3B');
+    });
+    document.getElementById('suivi-email')?.addEventListener('click', async () => {
+      const r = await suiviPost('/contact', { canal:'email', resultat:'envoye', maj_statut:true });
+      if(r) toastMsg('✓ Email enregistré', '#0D6B3B');
+    });
+    // 4) NRP (chemin event : pas de nrp_count)
+    document.getElementById('suivi-nrp')?.addEventListener('click', async () => {
+      const r = await suiviPost('/nrp', {});
+      if(r) toastMsg('✓ NRP enregistré', '#0D6B3B');
+    });
+    // 5) Marquer fait (delegation : boutons generes par renderSuivi)
+    card.addEventListener('click', async (e) => {
+      const btn = e.target.closest('.suivi-done'); if(!btn) return;
+      const kind = btn.dataset.kind; if(kind!=='rdv' && kind!=='rappel') return;
+      const r = await suiviPost('/action-done', { kind, resultat:'fait' });
+      if(r) toastMsg('✓ ' + (kind==='rdv'?'RDV':'Rappel') + ' marqué fait', '#0D6B3B');
+    });
+  }
   window.openFicheByNumero = function(numero) {
     if (!numero) return;
     openFiche({ numero });
@@ -19066,6 +19135,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     bindIdentityBannerLive();
     updateIdentityBanner();
     ensureUserSelected();
+    bindSuiviCard();
   }
   if(document.readyState!=='loading') init();
   else document.addEventListener('DOMContentLoaded', init);
