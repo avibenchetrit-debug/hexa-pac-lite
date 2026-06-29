@@ -2840,10 +2840,16 @@ body.panel-is-open {
       margin: 16px 0 14px; padding-top: 16px;
       border-top: 1px solid #E8EFF7;
     }
-    /* Bloc "Suivi / À rappeler" (tête de fiche) — layout uniquement */
-    .suivi-actions { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:10px; }
+    /* Bloc "Suivi / À rappeler" (tête de fiche) — layout compact, scopé #card-suivi */
+    #card-suivi { padding: 12px 16px; }
+    #card-suivi .card-subtitle { margin: 9px 0 7px; padding-top: 8px; }
+    #card-suivi .row { margin-bottom: 8px; }
+    #card-suivi .field > label { margin-bottom: 2px; font-size: 12px; }
+    #card-suivi .field input,
+    #card-suivi .field select { height: 36px; min-height: 36px; }
+    .suivi-actions { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:6px; }
     .suivi-compteurs { display:flex; flex-wrap:wrap; gap:8px; }
-    .suivi-actif { margin-bottom:6px; }
+    .suivi-actif { margin-bottom:4px; }
     .suivi-vide { color:#94A3B8; font-size:13px; font-style:italic; }
     .sub-bloc-title {
       font-size: 11px;
@@ -2904,6 +2910,7 @@ body.panel-is-open {
     .field input[type=email],
     .field input[type=number],
     .field input[type=date],
+    .field input[type=time],
     .field select {
       height: 40px;
       min-height: 40px;
@@ -8036,7 +8043,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
             </select>
           </div>
         </div>
-        <div class="row row-2" style="margin-top:12px;">
+        <div class="row row-2">
           <div class="field"><label>Assigné à</label>
             <select id="suivi-rdv-assigne">
               <option value="avi">Avi</option>
@@ -8057,7 +8064,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
             <input type="text" id="suivi-rap-motif" placeholder="Ex. relancer devis envoyé">
           </div>
         </div>
-        <div class="row row-2" style="margin-top:12px;">
+        <div class="row row-2">
           <div class="field"><label>Assigné à</label>
             <select id="suivi-rap-assigne">
               <option value="avi">Avi</option>
