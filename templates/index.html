@@ -2876,6 +2876,17 @@ body.panel-is-open {
     .atraiter-tel { color:#002E5A; text-decoration:none; }
     .atraiter-tel:hover { color:#E2214B; }
     .atraiter-who { font-size:12px; color:#64748B; }
+    .atraiter-toggle { display:inline-flex; align-items:center; gap:8px; background:none; border:none; padding:0; cursor:pointer; font-family:inherit; }
+    .atraiter-chevron { color:#002E5A; font-size:13px; transition:transform .15s; display:inline-block; }
+    .atraiter-panel.is-open .atraiter-chevron { transform:rotate(90deg); }
+    .atraiter-body { display:none; }
+    .atraiter-panel.is-open .atraiter-body { display:block; max-height:300px; overflow-y:auto; margin-top:10px; }
+    .atraiter-detgroup { margin-top:8px; }
+    .atraiter-detgroup-toggle { width:100%; text-align:left; background:#F8FAFC; border:1px solid #E2E8F0; border-radius:8px; padding:8px 10px; cursor:pointer; font-family:inherit; font-size:13px; font-weight:600; color:#1A4A7A; display:flex; align-items:center; gap:8px; }
+    .atraiter-detgroup-toggle:hover { background:#EEF2F7; }
+    .atraiter-detchev { margin-left:auto; transition:transform .15s; }
+    .atraiter-detgroup.is-open .atraiter-detchev { transform:rotate(90deg); }
+    .atraiter-detrows { margin-top:6px; display:flex; flex-direction:column; gap:6px; }
     .atraiter-user { border:1px solid #E2E8F0; background:#fff; color:#002E5A; border-radius:9px; padding:6px 11px; font-size:13px; font-weight:700; cursor:pointer; font-family:inherit; }
     .atraiter-user:hover { border-color:#002E5A; background:#F4F8FC; }
     .atraiter-done { flex-shrink:0; padding:4px 10px; font-size:11px; }
@@ -18408,14 +18419,16 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
       <div class="pv-wrap">
         <section id="atraiter-panel" class="atraiter-panel">
           <div class="atraiter-head">
-            <h2 class="atraiter-title">À traiter aujourd'hui <span id="atraiter-total" class="atraiter-total">0</span></h2>
+            <button type="button" id="atraiter-toggle" class="atraiter-toggle" aria-expanded="false"><span class="atraiter-chevron">▸</span><span class="atraiter-title">À traiter aujourd'hui <span id="atraiter-total" class="atraiter-total">0</span></span></button>
             <div class="atraiter-filter">
               <button type="button" id="atraiter-user" class="atraiter-user" title="Changer d'utilisateur">👤 —</button>
               <button type="button" class="pv-btn pv-btn-ghost atraiter-tab" id="atraiter-tab-moi" data-scope="moi">Moi</button>
               <button type="button" class="pv-btn pv-btn-ghost atraiter-tab is-active" data-scope="tous">Tous</button>
             </div>
           </div>
-          <div id="atraiter-list" class="atraiter-list"></div>
+          <div id="atraiter-body" class="atraiter-body">
+            <div id="atraiter-list" class="atraiter-list"></div>
+          </div>
         </section>
         <section id="pv-stats-master" style="background:#FAFBFC;border:0.5px solid #E2E8F0;border-radius:12px;padding:12px 16px;margin-bottom:16px">
           <div id="pv-stats-filter" style="display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-bottom:14px">
@@ -18791,9 +18804,8 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
     } catch(e){ list.innerHTML = '<div class="atraiter-empty">Erreur de chargement.</div>'; return; }
     const items = data.items || [];
     if(totalEl) totalEl.textContent = (data.counts && data.counts.total!=null) ? data.counts.total : items.length;
-    if(!items.length){ list.innerHTML = '<div class="atraiter-empty">Rien à traiter ' + (atraiterScope==='moi'?'pour vous ':'') + "aujourd'hui 🎉</div>"; return; }
     const etatBadge = { retard:['Retard','atb-retard'], imminent:['Imminent','atb-imminent'], aujourdhui:["Aujourd'hui",'atb-jour'], detection:['Détection','atb-detec'] };
-    list.innerHTML = items.map(function(it){
+    function rowHtml(it){
       const nom = escapeHtml(((it.prenom||'')+' '+(it.nom||'')).trim() || it.numero || '');
       const tel = String(it.telephone||'').trim();
       const telHtml = tel ? '<a href="tel:'+escapeHtml(tel)+'" class="atraiter-tel" onclick="event.stopPropagation()">'+escapeHtml(tel)+'</a>' : '—';
@@ -18817,12 +18829,38 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
         + '<span class="atraiter-tel-cell">'+telHtml+'</span>'
         + '<span class="atraiter-who">'+who+'</span>'
         + doneBtn + '</div>';
-    }).join('');
+    }
+    const actions = items.filter(function(it){ return it.kind==='rdv' || it.kind==='rappel'; });
+    const dets = items.filter(function(it){ return it.kind==='detection'; });
+    let html = '';
+    if(actions.length) html += actions.map(rowHtml).join('');
+    else html += '<div class="atraiter-empty">Aucun RDV ni rappel ' + (atraiterScope==='moi'?'pour vous ':'') + "aujourd'hui.</div>";
+    if(dets.length){
+      const labels = { jamais_contacte_2j:'jamais contactés', simu_3j:'simu sans devis', devis_3j:'devis sans réponse' };
+      const byType = {}; dets.forEach(function(d){ byType[d.subtype] = (byType[d.subtype]||0)+1; });
+      const parts = Object.keys(byType).map(function(k){ return byType[k] + ' ' + (labels[k]||k); });
+      html += '<div class="atraiter-detgroup" id="atraiter-detgroup">'
+        + '<button type="button" class="atraiter-detgroup-toggle" id="atraiter-detgroup-toggle">'
+        + '🔎 Détections (' + dets.length + ') — ' + escapeHtml(parts.join(' · '))
+        + ' <span class="atraiter-detchev">▸</span></button>'
+        + '<div class="atraiter-detrows" id="atraiter-detrows" style="display:none">'
+        + dets.map(rowHtml).join('')
+        + '</div></div>';
+    }
+    list.innerHTML = html;
   }
   function bindATraiter(){
     const panel = document.getElementById('atraiter-panel');
     if(!panel || panel.dataset.bound) return;
     panel.dataset.bound = '1';
+    // accordeon : replie par defaut, etat memorise
+    if(localStorage.getItem('hexa_atraiter_open') === '1') panel.classList.add('is-open');
+    const toggle = document.getElementById('atraiter-toggle');
+    if(toggle) toggle.addEventListener('click', function(){
+      const open = panel.classList.toggle('is-open');
+      toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+      try{ localStorage.setItem('hexa_atraiter_open', open ? '1' : '0'); }catch(_){}
+    });
     document.getElementById('atraiter-user')?.addEventListener('click', function(){ showUserModal(); });
     panel.querySelectorAll('.atraiter-tab').forEach(function(btn){
       btn.addEventListener('click', function(){
@@ -18832,6 +18870,13 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
       });
     });
     document.getElementById('atraiter-list').addEventListener('click', async function(e){
+      const grp = e.target.closest('.atraiter-detgroup-toggle');
+      if(grp){
+        const rows = document.getElementById('atraiter-detrows');
+        const g = document.getElementById('atraiter-detgroup');
+        if(rows){ const show = rows.style.display==='none'; rows.style.display = show ? 'flex' : 'none'; if(g) g.classList.toggle('is-open', show); }
+        return;
+      }
       const done = e.target.closest('.atraiter-done');
       if(done){
         e.stopPropagation();
