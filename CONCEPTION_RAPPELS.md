@@ -1,7 +1,9 @@
 # Conception — Système « Aucun lead ne m'échappe »
 
-> État : **conception validée, avant spec d'implémentation de l'étape 1.**
-> Dernière mise à jour : 2026-06-28. Aucun code applicatif écrit à ce stade.
+> État : **étape 1 (backend socle) TERMINÉE, testée et poussée** (commit `fcdf1d2`).
+> Tous les endpoints d'écriture + `GET /api/a-traiter` sont faits et validés sur
+> Railway (détections en stub jusqu'à l'étape 5). Prochaine étape : **étape 2 — bloc fiche** (UI).
+> Dernière mise à jour : 2026-06-29.
 > Ce fichier sert de reprise en session fraîche.
 
 ## 1. Vision
@@ -108,14 +110,16 @@ actions_log[] = { type:"rdv"|"rappel"|"detection", snapshot:{…},
 
 ## 5. Endpoints
 
-| Endpoint | Effet |
-|---|---|
-| `POST /api/leads/{n}/rdv` `{date,heure,type,assigne_a,par}` | écrit `lead.rdv`, statut auto → `rdv` |
-| `POST /api/leads/{n}/rappel` `{date,assigne_a,motif,par}` | écrit `lead.rappel` (origine `manuel`) |
-| `POST /api/leads/{n}/nrp` `{par,canal?}` **(route existante, BRANCHÉE)** | branche selon payload : legacy `{nrp_count}` inchangé ; nouveau `{par,canal?}` → append échange `{type:appel,resultat:nrp,origine:manuel,contenu:"Appel — pas de réponse"}` ; `nrp_count++`/`nrp_log` ; pose `rappel{date:demain,assigne_a:par,origine:nrp}` ; si plafonds atteints → statut `injoignable` + `rappel=null` |
-| `POST /api/leads/{n}/contact` `{canal,resultat,par,contenu?}` | (option) action manuelle multicanal = append échange + recalcul compteurs |
-| `POST /api/leads/{n}/action-done` `{kind,resultat,par,maj_statut?}` | archive `rdv`/`rappel` courant dans `actions_log`, le met à null, MAJ statut si demandé. Défauts : RDV fait → `contacte` ; rappel fait → proposer **reprogrammer** ou `contacte` |
-| `GET /api/a-traiter?assigne=tous\|avi\|…` | calcule + trie la liste (voir §6) |
+> **Tous FAITS, testés et poussés** (commit `fcdf1d2`, validés sur Railway).
+
+| Endpoint | État | Effet |
+|---|---|---|
+| `POST /api/leads/{n}/rdv` `{date,heure,type,assigne_a,par}` | ✅ FAIT | écrit `lead.rdv`, statut auto → `rdv` (`main.py:1764`) |
+| `POST /api/leads/{n}/rappel` `{date,assigne_a,motif,par}` | ✅ FAIT | écrit `lead.rappel` (origine `manuel`), archive l'ancien si reposé (`main.py:1807`) |
+| `POST /api/leads/{n}/nrp` `{par,canal?}` **(route existante, BRANCHÉE)** | ✅ FAIT | branche selon payload : legacy `{nrp_count}` inchangé ; nouveau `{par,canal?}` → append échange `{type:appel,resultat:nrp,origine:manuel,contenu:"Appel — pas de réponse"}` ; `nrp_count++`/`nrp_log` ; pose `rappel{date:demain,assigne_a:par,origine:nrp}` ; si plafonds atteints → statut `injoignable` + `rappel=null` (`main.py:1733`) |
+| `POST /api/leads/{n}/contact` `{canal,resultat,par,contenu?}` | ✅ FAIT | action manuelle multicanal = append échange + recalcul compteurs (`main.py:1940`) |
+| `POST /api/leads/{n}/action-done` `{kind,resultat,par,maj_statut?}` | ✅ FAIT | archive `rdv`/`rappel` courant dans `actions_log`, le met à null, MAJ statut si demandé. Défauts : RDV fait → `contacte` ; rappel fait → proposer **reprogrammer** ou `contacte` (`main.py:1862`) |
+| `GET /api/a-traiter?assigne=tous\|avi\|…` | ✅ FAIT | calcule + trie la liste (voir §6) ; détections en **stub** jusqu'à l'étape 5 (`main.py:2062`). Testé 15/15 (tous les états, tri buckets, filtre, counts) |
 
 Détections = **non stockées**, calculées dans `/api/a-traiter`. « Marquer fait » d'une détection = enregistrement de **rejet** dans `actions_log` (`type:detection`, `subtype`, `trigger_at`) ; re-déclenche seulement sur **nouveau** trigger postérieur.
 
@@ -158,7 +162,7 @@ Sources : `date_envoi_devis` (lead), `echanges.json`, `states_simulateur/{n}.jso
 
 ## 9. Étapes (chacune testable seule)
 
-1. **Backend socle** — champs `rdv/rappel/actions_log` + statut `injoignable` (PROSPECT_FIELDS/defaults/migration) ; endpoints dédiés (`rdv`, `rappel`, **`nrp` à créer** → échange+auto-rappel, `action-done`, option `contact`) ; `GET /api/a-traiter` (agrégation+tri ; détections en stub). Enrichir l'échange (`resultat`,`origine`). *Test : curl pose RDV/rappel/NRP → `/api/a-traiter` renvoie/trie → `action-done` archive.*
+1. ✅ **FAIT** — **Backend socle** — champs `rdv/rappel/actions_log` + statut `injoignable` (PROSPECT_FIELDS/defaults/migration) ; endpoints dédiés (`rdv`, `rappel`, `nrp` branché → échange+auto-rappel, `action-done`, `contact`) ; `GET /api/a-traiter` (agrégation+tri ; détections en stub). Échange enrichi (`resultat`,`origine`). **Testé sur Railway : `/api/a-traiter` 15/15 (états, tri buckets, filtre assigne, counts).** Commit `fcdf1d2`.
 2. **Bloc fiche** — section « RDV / Rappel » + boutons d'action manuelle multicanal (appel/sms/email avec résultat), bouton NRP câblé. *Test sur une fiche.*
 3. **Liste Accueil** — bloc « À traiter aujourd'hui » en haut de `#hexa-prospects-view` (réutilise `pv-table`), filtre moi/tous, « marquer fait », lignes → fiche. *Test bout en bout.*
 4. **Badge + notif 30 min** — badge topbar (poll) + bandeau RDV imminent + son. *Test.*
