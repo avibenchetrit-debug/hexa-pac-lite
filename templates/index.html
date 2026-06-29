@@ -2854,6 +2854,29 @@ body.panel-is-open {
     #card-suivi .suivi-item { font-size:13px; padding:2px 0; display:flex; align-items:center; gap:8px; justify-content:space-between; }
     #card-suivi .suivi-line { min-width:0; }
     #card-suivi .suivi-done { padding:4px 10px; font-size:11px; flex-shrink:0; }
+    /* Liste "À traiter aujourd'hui" (accueil) */
+    .atraiter-panel { background:#FFFFFF; border:1px solid #E2E8F0; border-radius:12px; padding:14px 16px; margin-bottom:16px; }
+    .atraiter-head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:10px; }
+    .atraiter-title { font-size:16px; font-weight:700; color:#002E5A; margin:0; display:flex; align-items:center; gap:8px; }
+    .atraiter-total { display:inline-flex; align-items:center; justify-content:center; min-width:24px; height:22px; padding:0 7px; background:#E2214B; color:#fff; border-radius:11px; font-size:12px; font-weight:700; }
+    .atraiter-filter { display:inline-flex; gap:6px; }
+    .atraiter-tab.is-active { background:#002E5A; color:#fff; }
+    .atraiter-list { display:flex; flex-direction:column; gap:6px; }
+    .atraiter-empty { color:#94A3B8; font-size:14px; font-style:italic; padding:6px 0; }
+    .atraiter-row { display:grid; grid-template-columns:92px 64px 1fr auto auto auto auto; align-items:center; gap:12px; padding:8px 10px; border:1px solid #EEF2F7; border-radius:8px; cursor:pointer; transition:background .12s; }
+    .atraiter-row:hover { background:#F4F8FC; }
+    .atraiter-badge { text-align:center; font-size:11px; font-weight:700; padding:3px 8px; border-radius:6px; text-transform:uppercase; letter-spacing:.03em; }
+    .atb-retard { color:#E2214B; background:#FDE8EC; }
+    .atb-imminent { color:#B45309; background:#FEF3C7; }
+    .atb-jour { color:#0D6B3B; background:#E6F4ED; }
+    .atb-detec { color:#1A4A7A; background:#E8EFF7; }
+    .atraiter-kind { font-size:12px; font-weight:600; color:#475569; }
+    .atraiter-nom { font-weight:600; color:#1A202C; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .atraiter-when { font-size:13px; color:#475569; font-variant-numeric:tabular-nums; }
+    .atraiter-tel { color:#002E5A; text-decoration:none; }
+    .atraiter-tel:hover { color:#E2214B; }
+    .atraiter-who { font-size:12px; color:#64748B; }
+    .atraiter-done { flex-shrink:0; padding:4px 10px; font-size:11px; }
     .sub-bloc-title {
       font-size: 11px;
       font-weight: 600;
@@ -18367,6 +18390,16 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
         </div>
       </div>
       <div class="pv-wrap">
+        <section id="atraiter-panel" class="atraiter-panel">
+          <div class="atraiter-head">
+            <h2 class="atraiter-title">À traiter aujourd'hui <span id="atraiter-total" class="atraiter-total">0</span></h2>
+            <div class="atraiter-filter">
+              <button type="button" class="pv-btn pv-btn-ghost atraiter-tab" data-scope="moi">Moi</button>
+              <button type="button" class="pv-btn pv-btn-ghost atraiter-tab is-active" data-scope="tous">Tous</button>
+            </div>
+          </div>
+          <div id="atraiter-list" class="atraiter-list"></div>
+        </section>
         <section id="pv-stats-master" style="background:#FAFBFC;border:0.5px solid #E2E8F0;border-radius:12px;padding:12px 16px;margin-bottom:16px">
           <div id="pv-stats-filter" style="display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-bottom:14px">
             <span style="font-size:18px;font-weight:600;color:#002E5A"><span id="pv-stats-total">0</span> leads</span>
@@ -18719,12 +18752,85 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
   }
 
   // --- Navigation + bandeau identité ---
+  let atraiterScope = 'tous';
+  async function loadATraiter(){
+    const list = document.getElementById('atraiter-list');
+    const totalEl = document.getElementById('atraiter-total');
+    if(!list) return;
+    const me = String(currentHexaUser()||'').toLowerCase();
+    const assigne = (atraiterScope === 'moi' && me) ? me : 'tous';
+    let data;
+    try {
+      const r = await fetch('/api/a-traiter?assigne=' + encodeURIComponent(assigne), { cache:'no-store' });
+      if(!r.ok) throw new Error('HTTP '+r.status);
+      data = await r.json();
+    } catch(e){ list.innerHTML = '<div class="atraiter-empty">Erreur de chargement.</div>'; return; }
+    const items = data.items || [];
+    if(totalEl) totalEl.textContent = (data.counts && data.counts.total!=null) ? data.counts.total : items.length;
+    if(!items.length){ list.innerHTML = '<div class="atraiter-empty">Rien à traiter ' + (atraiterScope==='moi'?'pour vous ':'') + "aujourd'hui 🎉</div>"; return; }
+    const etatBadge = { retard:['Retard','atb-retard'], imminent:['Imminent','atb-imminent'], aujourdhui:["Aujourd'hui",'atb-jour'], detection:['Détection','atb-detec'] };
+    list.innerHTML = items.map(function(it){
+      const nom = escapeHtml(((it.prenom||'')+' '+(it.nom||'')).trim() || it.numero || '');
+      const tel = String(it.telephone||'').trim();
+      const telHtml = tel ? '<a href="tel:'+escapeHtml(tel)+'" class="atraiter-tel" onclick="event.stopPropagation()">'+escapeHtml(tel)+'</a>' : '—';
+      const kind = it.kind==='rdv' ? 'RDV' : (it.kind==='rappel' ? 'Rappel' : 'Détection');
+      const b = etatBadge[it.etat] || [it.etat,'atb-jour'];
+      const when = it.kind==='rdv'
+        ? escapeHtml(((it.source&&it.source.date)||'')+' '+((it.source&&it.source.heure)||''))
+        : escapeHtml((it.source&&it.source.date)||'');
+      const who = escapeHtml(suiviAssigneLabel(it.assigne_a));
+      const doneBtn = (it.kind==='rdv'||it.kind==='rappel')
+        ? '<button type="button" class="pv-btn pv-btn-ghost atraiter-done" data-kind="'+it.kind+'" data-numero="'+escapeHtml(it.numero||'')+'">Marquer fait</button>'
+        : '';
+      return '<div class="atraiter-row" data-numero="'+escapeHtml(it.numero||'')+'">'
+        + '<span class="atraiter-badge '+b[1]+'">'+b[0]+'</span>'
+        + '<span class="atraiter-kind">'+kind+'</span>'
+        + '<span class="atraiter-nom">'+nom+'</span>'
+        + '<span class="atraiter-when">'+when+'</span>'
+        + '<span class="atraiter-tel-cell">'+telHtml+'</span>'
+        + '<span class="atraiter-who">'+who+'</span>'
+        + doneBtn + '</div>';
+    }).join('');
+  }
+  function bindATraiter(){
+    const panel = document.getElementById('atraiter-panel');
+    if(!panel || panel.dataset.bound) return;
+    panel.dataset.bound = '1';
+    panel.querySelectorAll('.atraiter-tab').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        atraiterScope = btn.dataset.scope === 'moi' ? 'moi' : 'tous';
+        panel.querySelectorAll('.atraiter-tab').forEach(b=>b.classList.toggle('is-active', b===btn));
+        loadATraiter();
+      });
+    });
+    document.getElementById('atraiter-list').addEventListener('click', async function(e){
+      const done = e.target.closest('.atraiter-done');
+      if(done){
+        e.stopPropagation();
+        const numero = done.dataset.numero, kind = done.dataset.kind;
+        try {
+          const r = await fetch('/api/leads/'+encodeURIComponent(numero)+'/action-done', {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({ kind, resultat:'fait', par: currentHexaUser() })
+          });
+          if(!r.ok){ const bb=await r.json().catch(()=>({})); toastMsg('Erreur : '+(bb.detail||('HTTP '+r.status)),'#B91C1C'); return; }
+          toastMsg('✓ '+(kind==='rdv'?'RDV':'Rappel')+' marqué fait','#0D6B3B');
+          loadATraiter();
+        } catch(_){ toastMsg('Erreur réseau','#B91C1C'); }
+        return;
+      }
+      const row = e.target.closest('.atraiter-row');
+      if(row && row.dataset.numero) window.openFicheByNumero(row.dataset.numero);
+    });
+  }
   function showProspects(){
     document.body.classList.add('hexa-view-prospects');
     window.scrollTo(0,0);
     if (typeof window.hexaRefreshProspectsTable === 'function') {
       window.hexaRefreshProspectsTable();
     }
+    bindATraiter();
+    loadATraiter();
   }
   const FIELD_ALIASES = {
     telephone: ['telephone', 'tel', 'phone'],
