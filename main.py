@@ -1621,7 +1621,9 @@ def get_lead(numero: str) -> JSONResponse:
     wanted = str(numero or "").strip()
     for lead in _read_leads():
         if str(lead.get("numero", "")).strip() == wanted:
-            return JSONResponse(_lead_for_response(lead))
+            data = _lead_for_response(lead)
+            data["compteurs"] = _compteurs_canal(wanted)
+            return JSONResponse(data)
     raise HTTPException(status_code=404, detail="Prospect introuvable")
 
 

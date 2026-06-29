@@ -2851,6 +2851,7 @@ body.panel-is-open {
     .suivi-compteurs { display:flex; flex-wrap:wrap; gap:8px; }
     .suivi-actif { margin-bottom:4px; }
     .suivi-vide { color:#94A3B8; font-size:13px; font-style:italic; }
+    #card-suivi .suivi-item { font-size:13px; padding:2px 0; }
     .sub-bloc-title {
       font-size: 11px;
       font-weight: 600;
@@ -18924,6 +18925,54 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     if(!response.ok) throw new Error('HTTP ' + response.status);
     return response.json();
   }
+  function suiviAssigneLabel(key){
+    const k = String(key||'').toLowerCase();
+    return HEXA_USERS[k] || key || '—';
+  }
+  function renderSuivi(lead){
+    // 1) Action en cours (RDV / rappel actif)
+    const box = document.getElementById('suivi-actif');
+    if (box){
+      const parts = [];
+      const rdv = lead && lead.rdv;
+      if (rdv && typeof rdv === 'object'){
+        const t = rdv.type === 'visite' ? 'Visite' : 'Appel';
+        parts.push('<div class="suivi-item">📅 <strong>RDV</strong> '
+          + escapeHtml(rdv.date||'') + ' ' + escapeHtml(rdv.heure||'')
+          + ' · ' + t + ' · ' + escapeHtml(suiviAssigneLabel(rdv.assigne_a)) + '</div>');
+      }
+      const rap = lead && lead.rappel;
+      if (rap && typeof rap === 'object'){
+        const motif = String(rap.motif||'').trim();
+        parts.push('<div class="suivi-item">🔁 <strong>Rappel</strong> '
+          + escapeHtml(rap.date||'')
+          + (motif ? ' · ' + escapeHtml(motif) : '')
+          + ' · ' + escapeHtml(suiviAssigneLabel(rap.assigne_a)) + '</div>');
+      }
+      box.innerHTML = parts.length ? parts.join('')
+        : '<div class="suivi-vide">Aucune action programmée.</div>';
+    }
+    // 2) Compteurs multicanal (tentatives SANS reponse) vs plafonds
+    const cpt = (lead && lead.compteurs) || {};
+    [['appel','suivi-cpt-appel',8,'appels'],
+     ['sms','suivi-cpt-sms',5,'sms'],
+     ['email','suivi-cpt-email',5,'emails']].forEach(function(row){
+      const k=row[0], id=row[1], max=row[2], lbl=row[3];
+      const el = document.getElementById(id); if(!el) return;
+      const n = Number(cpt[k]) || 0;
+      el.textContent = n + '/' + max + ' ' + lbl;
+      el.title = lbl + ' sans réponse (plafond ' + max + ')';
+      const proche = n >= max - 1;
+      el.classList.toggle('pv-nrp-n', proche);
+      el.classList.toggle('pv-nrp-0', !proche);
+    });
+    // 3) Pre-selection "assigne" = utilisateur courant
+    const me = String(currentHexaUser()||'').toLowerCase();
+    if (me && HEXA_USERS[me]){
+      const a = document.getElementById('suivi-rdv-assigne'); if(a) a.value = me;
+      const b = document.getElementById('suivi-rap-assigne'); if(b) b.value = me;
+    }
+  }
   function hydrateProspectForm(lead){
     const form=document.getElementById('form-prospect'); if(!form) return;
     clearProspectForm();
@@ -18957,6 +19006,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     const nomEl=form.querySelector('[name="nom"]'); if(nomEl) nomEl.value=window.formatNomDisplay(nomEl.value);
     const prenomEl=form.querySelector('[name="prenom"]'); if(prenomEl) prenomEl.value=window.formatPrenomDisplay(prenomEl.value);
     const telEl=form.querySelector('[name="telephone"]'); if(telEl && telEl.value) telEl.value=window.formaterTelephone(telEl.value);
+    renderSuivi(lead);
   }
   async function openFiche(p){
     const numero = (p && p.numero) ? String(p.numero).trim() : '';
