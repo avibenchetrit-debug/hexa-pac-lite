@@ -6702,6 +6702,8 @@ body.sim-left-open .hexa-app-shell__main{
 .sim-info-btn:hover{ border-color:var(--c-navy,#002E5A); color:var(--c-navy,#002E5A); }
 .sim-info-pop, .sim-roi-pop{ background:#FFF8E6; border:1px solid var(--c-warn,#B45309); border-radius:8px;
   padding:10px 12px; font-size:11.5px; line-height:1.5; color:#5A4410; margin-top:8px; }
+.sim-roi-pop ul, .sim-roi-phrase ul{ margin:6px 0 0; padding-left:18px; }
+.sim-roi-pop li, .sim-roi-phrase li{ margin:4px 0; }
 
 /* Champs (paramètres PAC) — alignés en 2 colonnes égales */
 .sim-row2{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
@@ -15410,23 +15412,50 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
     const av = eur(state.facture_avant);
     const ap = eur(totalApres);
     if (!r.anneeRentable){
-      return `Cette configuration se rentabilise au-delà de 20 ans. Ajustez l'option de financement ou le modèle.`;
+      return `Cette configuration se rentabilise au-delà de 20 ans. Ajustez le financement ou le modèle pour améliorer la rentabilité.`;
     }
     if (r.estCredit && delta >= 0){
-      return `Aujourd'hui : ${av}/mois de ${energieLbl}, perdus. Demain : ${ap}/mois (${eur(state.facture_apres)} d'électricité + ${eur(c.mensOpt)} qui remboursent votre installation). Vous payez ${eur(delta)} de moins chaque mois, sans rien avancer. Crédit terminé, vous tombez à ${eur(state.facture_apres)}/mois.`;
+      return `<ul>
+<li>Aujourd'hui : ${av}/mois de ${energieLbl} — de l'argent perdu.</li>
+<li>Demain : ${ap}/mois (${eur(state.facture_apres)} d'électricité + ${eur(c.mensOpt)} qui remboursent votre installation).</li>
+<li>Vous payez déjà <b>${eur(delta)} de moins</b> chaque mois, sans rien avancer.</li>
+<li>Crédit terminé : votre facture tombe à <b>${eur(state.facture_apres)}/mois</b>.</li>
+</ul>`;
     }
     if (r.estCredit){
-      return `Pendant le crédit, vous payez ${ap}/mois, un peu plus qu'aujourd'hui — mais cet argent rembourse VOTRE installation, il n'est pas perdu. Crédit soldé, votre facture tombe à ${eur(state.facture_apres)}/mois. Gagnant dès la ${r.anneeRentable}ᵉ année.`;
+      return `<ul>
+<li>Pendant le crédit : ${ap}/mois (un peu plus qu'aujourd'hui).</li>
+<li>Mais cet argent rembourse <b>votre installation</b> — il n'est pas perdu.</li>
+<li>Crédit soldé : votre facture tombe à <b>${eur(state.facture_apres)}/mois</b>.</li>
+<li><b>Gagnant dès la ${r.anneeRentable}ᵉ année.</b></li>
+</ul>`;
     }
-    return `Vous avancez ${eur(c.g29)}. Vos économies de chauffage (${av} → ${eur(state.facture_apres)}/mois) vous les rendent en ${r.anneeRentable} ans. Ensuite, c'est gain pur.`;
+    return `<ul>
+<li>Vous avancez <b>${eur(c.g29)}</b>, une seule fois.</li>
+<li>Vos économies de chauffage (${av} → ${eur(state.facture_apres)}/mois) vous remboursent en <b>${r.anneeRentable} ans</b>.</li>
+<li>Ensuite, <b>tout ce que vous économisez est pour vous.</b></li>
+</ul>`;
   }
 
   // Explication du calcul en langage très simple
   function explicationCalcul(c, r, energieLbl){
     if (r.estCredit){
-      return `<b>"Mais le crédit, je le paie quand même ?"</b> Oui — avec l'argent que vous donniez déjà au ${energieLbl}. Avant, ${eur(state.facture_avant)}/mois partaient en fumée chez votre fournisseur. Maintenant, ${eur(c.mensOpt)} de votre mensualité remboursent un équipement qui devient le vôtre. Vous ne payez pas la pompe à chaleur en plus de votre chauffage — vous la payez à la place, pour moins cher. Et le ${energieLbl} augmente d'environ ${Math.round(r.infAvant*100)}%/an, pas votre crédit. Crédit soldé, vous ne payez plus que ${eur(state.facture_apres)}/mois.`;
+      return `<b>« Mais le crédit, je le paie quand même ? »</b> Oui — mais avec l'argent que vous donniez déjà à votre ${energieLbl} :
+<ul>
+<li><b>Avant</b> : ${eur(state.facture_avant)}/mois partaient chez votre fournisseur, sans rien vous rapporter.</li>
+<li><b>Maintenant</b> : ${eur(c.mensOpt)}/mois remboursent votre propre installation.</li>
+<li>Vous ne payez pas la pompe à chaleur en plus de votre chauffage — vous la payez à la place, et pour moins cher.</li>
+<li>Le prix du ${energieLbl} augmente d'environ ${Math.round(r.infAvant*100)}%/an. Votre crédit, lui, ne bouge pas.</li>
+<li><b>Crédit soldé</b> : vous ne payez plus que ${eur(state.facture_apres)}/mois.</li>
+</ul>`;
     }
-    return `<b>En clair :</b> vous avancez ${eur(c.g29)} une fois. Vos économies de chauffage remboursent cette somme en ${r.anneeRentable} ans. Ensuite vous gardez tout : sur 20 ans, ça fait ${eur(r.total20)} dans votre poche. Le ${energieLbl} augmente d'environ ${Math.round(r.infAvant*100)}%/an, donc l'écart se creuse en votre faveur chaque année.`;
+    return `<b>En clair :</b>
+<ul>
+<li>Vous avancez ${eur(c.g29)} une seule fois.</li>
+<li>Vos économies de chauffage vous remboursent cette somme en ${r.anneeRentable} ans.</li>
+<li>Ensuite, tout est pour vous : sur 20 ans, ça fait ${eur(r.total20)} dans votre poche.</li>
+<li>Le prix du ${energieLbl} augmente d'environ ${Math.round(r.infAvant*100)}%/an → l'écart se creuse en votre faveur chaque année.</li>
+</ul>`;
   }
 
 
@@ -15599,7 +15628,7 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
             ${!r.anneeRentable ? `Rentabilité au-delà de 20 ans` : r.estCredit ? (delta>=0 ? `Moins cher dès le <b>1er mois</b>` : `Rentable dès la <b>${r.anneeRentable}ᵉ année</b>`) : `Remboursé en <b>${r.anneeRentable} ans</b>`}
             <button type="button" class="sim-info-btn" id="sim-roi-info" aria-label="Détail calcul">i</button>
           </div>
-          <p class="sim-roi-phrase">${phraseRoi}</p>
+          <div class="sim-roi-phrase">${phraseRoi}</div>
           <div class="sim-roi-big-wrap">${r.anneeRentable?`<span class="sim-roi-big">${eur(r.total20)}</span><span class="sim-roi-big-sub">économisés sur 20 ans</span>`:''}</div>
           <div class="sim-roi-pop" id="sim-roi-pop" hidden>
             ${explicationCalcul(c, r, energieLbl)}
