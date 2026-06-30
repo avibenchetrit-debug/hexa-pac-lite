@@ -2878,6 +2878,9 @@ def _build_devis_context(request: Request, numero: str) -> dict:
             _eco20_raw = state.get("eco_20_ans")
             _eco20_fmt = (f"{round(float_value(_eco20_raw)):,}".replace(",", " ")
                           if str(_eco20_raw).strip() not in ("", "None") else None)
+            _opt = str(state.get("option") or "").strip()
+            _mode = {"opt1": "credit", "opt2": "ecoptz", "opt3": "comptant"}.get(_opt) or ("comptant" if round(_mens) <= 0 else "credit")
+            _duree_vie = int(float_value((admin.get("params_eco_energie") or {}).get("duree_vie_pac_ans", 20)) or 20)
             projet_apercu = {
                 "facture_avant": round(_fav),
                 "facture_apres": round(_fap),
@@ -2895,6 +2898,8 @@ def _build_devis_context(request: Request, numero: str) -> dict:
                 "inflation_avant_pct": state.get("inflation_avant_pct"),
                 "inflation_elec_pct": state.get("inflation_elec_pct"),
                 "energie_avant": state.get("energie_avant"),
+                "mode": _mode,
+                "duree_vie_pac_ans": _duree_vie,
             }
     context["projet_apercu"] = projet_apercu
     return context
