@@ -16208,7 +16208,7 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
       });
       const body = await r.json().catch(()=>({}));
       if (!r.ok) {
-        return { ok:false, error: body?.detail || body?.msg || `HTTP ${r.status}` };
+        return { ok:false, status: r.status, error: body?.detail || body?.msg || `HTTP ${r.status}` };
       }
       return { ok:true, body };
     } catch (e) {
@@ -16216,14 +16216,14 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
     }
   }
 
-  function adminToast(text, color){
+  function adminToast(text, color, ms){
     const t=document.createElement('div');
     t.className='pv-toast';
     t.textContent=text;
     t.style.setProperty('--toast-c', color || '#002E5A');
     document.body.appendChild(t);
     requestAnimationFrame(()=>t.classList.add('show'));
-    setTimeout(()=>{ t.classList.remove('show'); setTimeout(()=>t.remove(),220); }, 2000);
+    setTimeout(()=>{ t.classList.remove('show'); setTimeout(()=>t.remove(),220); }, ms || 2000);
   }
 
   function adminEscape(v){
@@ -17298,7 +17298,9 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
     } else {
       saveConfig(false);
       window.dispatchEvent(new CustomEvent('hexa-config-changed'));
-      adminToast("❌ Erreur lors de l'enregistrement", '#B91C1C');
+      const diag = `❌ Échec enregistrement catalogue — HTTP ${server.status || 'réseau'} : ${server.error || 'erreur inconnue'} (${payload.length} modèles envoyés)`;
+      console.error('[catalogue-pac] échec POST', { status: server.status, error: server.error, nbModeles: payload.length, payload });
+      adminToast(diag, '#B91C1C', 9000);
     }
   }
 
