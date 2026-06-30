@@ -19301,6 +19301,10 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
   async function openFiche(p){
     const numero = (p && p.numero) ? String(p.numero).trim() : '';
     if(!numero) return;
+    // Changement de prospect : repartir propre — fermer tous les panneaux ouverts
+    // Ordre important : simulateur d'abord (sinon le wrap closeAllPanels le rouvre via rAF)
+    if (typeof window.fermerSimulationsDrawer === 'function') window.fermerSimulationsDrawer();
+    if (typeof window.fermerTousPanneaux === 'function') window.fermerTousPanneaux();
     window.resetGlobalsFiche();
     clearProspectForm();
     document.body.dataset.prospectNumero = numero;
@@ -19389,6 +19393,10 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
     openFiche({ numero });
   };
   function openNewProspect(){
+    // Changement de prospect : repartir propre — fermer tous les panneaux ouverts
+    // Ordre important : simulateur d'abord (sinon le wrap closeAllPanels le rouvre via rAF)
+    if (typeof window.fermerSimulationsDrawer === 'function') window.fermerSimulationsDrawer();
+    if (typeof window.fermerTousPanneaux === 'function') window.fermerTousPanneaux();
     window.resetGlobalsFiche();
     clearProspectForm();
     setFieldValue('usage_bien', 'proprietaire_occupant');
