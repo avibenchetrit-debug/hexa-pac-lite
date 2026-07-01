@@ -14630,6 +14630,7 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
   };
   const T_INT_DIM = 20;
   const FACTEUR_SECURITE_DIM = 1.10;
+  const TOLERANCE_DIM_KW = 1; // un modele couvre le besoin s'il est au plus 1 kW sous la note
 
   function chargerCatalogueDepuisStorage(){
     try {
@@ -14993,7 +14994,7 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
         alerte: `⚠ Puissance demandée (${fmtKw(puissance_requise)} kW) inférieure au plus petit modèle catalogue (${fmtKw(minKw)} kW). Risque de cycles courts, vérifier le dimensionnement.`
       };
     }
-    const modele = sorted.find((m) => puissanceModele(m) >= puissance_requise);
+    const modele = sorted.find((m) => puissanceModele(m) >= puissance_requise - TOLERANCE_DIM_KW);
     if (modele) return { modele, sous_dimensionnement: false, alerte: null };
     if (puissance_requise > maxKw) {
       return {
