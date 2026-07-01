@@ -3116,6 +3116,16 @@ async def devis_pdf(numero: str, request: Request):
 async def devis_public(numero: str, token: str, request: Request):
     if not _verify_devis_token(numero, token):
         raise HTTPException(status_code=403, detail="Lien invalide")
+    _items = _sent_devis_items(numero)
+    if _items:
+        _item = _items[0]
+        _html_file = _item.get("html_file")
+        if _html_file and os.path.exists(_html_file):
+            _pdf_url = f"/devis-public/{numero}/{token}/pdf"
+            return HTMLResponse(_inject_devis_bar(_read_text(_html_file), _devis_bar_html(_pdf_url)))
+        _pdf_file = _item.get("file")
+        if _pdf_file and os.path.exists(_pdf_file):
+            return FileResponse(_pdf_file, media_type="application/pdf", headers={"Content-Disposition": "inline"})
     html_devis = _render_devis_html(request, numero)
     barre = (
         '<div style="position:fixed;top:0;left:0;right:0;z-index:9999;'
@@ -3144,6 +3154,11 @@ async def devis_public(numero: str, token: str, request: Request):
 async def devis_public_pdf(numero: str, token: str, request: Request):
     if not _verify_devis_token(numero, token):
         raise HTTPException(status_code=403, detail="Lien invalide")
+    _items = _sent_devis_items(numero)
+    if _items:
+        _pdf_file = _items[0].get("file")
+        if _pdf_file and os.path.exists(_pdf_file):
+            return FileResponse(_pdf_file, media_type="application/pdf", filename=f"Devis_{numero}.pdf")
     pdf_bytes = _html_to_pdf_playwright(_render_devis_html(request, numero), request)
     return StreamingResponse(
         io.BytesIO(pdf_bytes),
