@@ -17309,8 +17309,6 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
       window.dispatchEvent(new CustomEvent('hexa-config-changed'));
       adminToast('✓ Paramètres enregistrés', '#0D6B3B');
     } else {
-      saveConfig(false);
-      window.dispatchEvent(new CustomEvent('hexa-config-changed'));
       const diag = `❌ Échec enregistrement catalogue — HTTP ${server.status || 'réseau'} : ${server.error || 'erreur inconnue'} (${payload.length} modèles envoyés)`;
       console.error('[catalogue-pac] échec POST', { status: server.status, error: server.error, nbModeles: payload.length, payload });
       adminToast(diag, '#B91C1C', 9000);
@@ -17868,7 +17866,7 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
     const addRow = document.getElementById('adm-add')?.closest('.adm-add-row') || document.querySelector('.adm-add-row');
     addRow.appendChild(form);
     document.getElementById('af-cancel').addEventListener('click', ()=>form.remove());
-    document.getElementById('af-add').addEventListener('click', ()=>{
+    document.getElementById('af-add').addEventListener('click', async ()=>{
       const num = v => parseFloat(String(v).replace(/\s/g,'').replace(',','.'))||0;
       const ref=(document.getElementById('af-ref').value||'').trim();
       if(!ref){ alert('Indique au moins une référence interne.'); return; }
@@ -17886,6 +17884,7 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
         ttc: Math.round(num(document.getElementById('af-ttc').value))
       };
       window.HexaConfig.models.push(m);
+      await saveCatalogueAdmin();
       rerenderBody();
     });
   }
