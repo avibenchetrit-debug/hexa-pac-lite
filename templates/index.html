@@ -9324,7 +9324,7 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
     if (window.majRequisSimu) window.majRequisSimu();
   }
 
-  window.REQUIS_SIMU_FIELDS = ['surface_logement_m2','code_postal_chantier','type_logement','hsp','altitude','type_emetteurs','mode_chauffage','rfr','nombre_personnes'];
+  window.REQUIS_SIMU_FIELDS = ['surface_logement_m2','code_postal_chantier','type_logement','hsp','altitude','type_emetteurs','mode_chauffage','alimentation_electrique','rfr','nombre_personnes'];
   window.majRequisSimu = function () {
     (window.REQUIS_SIMU_FIELDS || []).forEach(function (nm) {
       const el = document.querySelector('[name="' + nm + '"]');
