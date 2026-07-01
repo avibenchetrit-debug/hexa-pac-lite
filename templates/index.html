@@ -19008,7 +19008,8 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
       }
     }catch(_){}
   }
-  function showProspects(){
+  function showProspects(opts){
+    opts = opts || {};
     document.body.classList.add('hexa-view-prospects');
     window.scrollTo(0,0);
     if (typeof window.hexaRefreshProspectsTable === 'function') {
@@ -19017,6 +19018,7 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
     bindATraiter();
     loadATraiter();
     pollATraiterBadge();
+    if (!opts.skipHistory && location.pathname !== '/') history.pushState({view:'list'}, '', '/');
   }
   const FIELD_ALIASES = {
     telephone: ['telephone', 'tel', 'phone'],
@@ -19314,9 +19316,11 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
     const telEl=form.querySelector('[name="telephone"]'); if(telEl && telEl.value) telEl.value=window.formaterTelephone(telEl.value);
     renderSuivi(lead);
   }
-  async function openFiche(p){
+  async function openFiche(p, opts){
+    opts = opts || {};
     const numero = (p && p.numero) ? String(p.numero).trim() : '';
     if(!numero) return;
+    const wasOnFiche = !document.body.classList.contains('hexa-view-prospects') && !!String(document.body.dataset.prospectNumero||'').trim();
     // Changement de prospect : repartir propre — fermer tous les panneaux ouverts
     // Ordre important : simulateur d'abord (sinon le wrap closeAllPanels le rouvre via rAF)
     if (typeof window.fermerSimulationsDrawer === 'function') window.fermerSimulationsDrawer();
@@ -19330,6 +19334,11 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
       const lead = await fetchProspect(numero);
       hydrateProspectForm(lead);
     } catch (err) {
+      if (opts.strict) {
+        if (String(err && err.message || '').includes('404')) { hexaFail404(numero); return; }
+        toastMsg('Erreur de chargement, réessayez', '#B91C1C');
+        return;
+      }
       hydrateProspectForm(Object.assign({}, p || {}, { numero }));
       console.warn('Prospect non hydraté depuis le serveur:', err);
     }
@@ -19338,6 +19347,11 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
     }
     updateIdentityBanner();
     document.body.classList.remove('hexa-view-prospects'); window.scrollTo(0,0);
+    if (!opts.skipHistory) {
+      const url = '/prospect/' + encodeURIComponent(numero);
+      if (wasOnFiche) history.replaceState({view:'fiche', numero}, '', url);
+      else history.pushState({view:'fiche', numero}, '', url);
+    }
   }
   // ---- Bloc Suivi : actions (3c-3e) ----
   async function suiviPost(path, body){
@@ -19404,11 +19418,24 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
       if(r) toastMsg('✓ ' + (kind==='rdv'?'RDV':'Rappel') + ' marqué fait', '#0D6B3B');
     });
   }
-  window.openFicheByNumero = function(numero) {
+  function hexaFail404(numero){
+    showProspects({ skipHistory: true });
+    if (location.pathname !== '/') history.replaceState({view:'list'}, '', '/');
+    toastMsg('Prospect introuvable : ' + numero, '#B91C1C');
+  }
+  function hexaRouteFromPath(){
+    const path = location.pathname || '/';
+    const m = path.match(/^\/prospect\/(.+)$/);
+    if (m) { window.openFicheByNumero(decodeURIComponent(m[1]), { skipHistory: true }); return; }
+    if (path === '/nouveau' || (path === '/' && location.hash === '#nouveau')) { openNewProspect({ skipHistory: true }); return; }
+    showProspects({ skipHistory: true });
+  }
+  window.openFicheByNumero = function(numero, opts) {
     if (!numero) return;
-    openFiche({ numero });
+    openFiche({ numero }, Object.assign({ strict: true }, opts || {}));
   };
-  function openNewProspect(){
+  function openNewProspect(opts){
+    opts = opts || {};
     // Changement de prospect : repartir propre — fermer tous les panneaux ouverts
     // Ordre important : simulateur d'abord (sinon le wrap closeAllPanels le rouvre via rAF)
     if (typeof window.fermerSimulationsDrawer === 'function') window.fermerSimulationsDrawer();
@@ -19427,6 +19454,7 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
     }
     updateIdentityBanner();
     document.body.classList.remove('hexa-view-prospects'); window.scrollTo(0,0);
+    if (!opts.skipHistory && location.pathname !== '/nouveau') history.pushState({view:'nouveau'}, '', '/nouveau');
   }
 
   function init(){
@@ -19434,8 +19462,8 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
     if(view) document.body.appendChild(view);
     bindView(); renderRows();
     refreshMasterStats(true);
-    if (window.location.hash === '#nouveau') openNewProspect();
-    else showProspects(); // accueil par défaut
+    hexaRouteFromPath();
+    window.addEventListener('popstate', function(){ hexaRouteFromPath(); });
 
     // Header de la fiche
     const logo=document.getElementById('hexa-logo-home');

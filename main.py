@@ -1345,12 +1345,26 @@ def _generate_devis_pdf(numero: str) -> bytes:
 # ---------------------------------------------------------------------------
 # Pages
 # ---------------------------------------------------------------------------
-@app.get("/", response_class=HTMLResponse)
-async def index() -> HTMLResponse:
-    """Serve the main page exactly as provided (no templating/transformation)."""
+def _serve_index_html() -> HTMLResponse:
+    """Serve the CRM SPA (index.html) as-is - the client reads the URL to open the right screen."""
     index_path = os.path.join(TEMPLATES_DIR, "index.html")
     with open(index_path, encoding="utf-8") as f:
         return HTMLResponse(content=f.read())
+
+
+@app.get("/", response_class=HTMLResponse)
+async def index() -> HTMLResponse:
+    return _serve_index_html()
+
+
+@app.get("/nouveau", response_class=HTMLResponse)
+async def index_nouveau() -> HTMLResponse:
+    return _serve_index_html()
+
+
+@app.get("/prospect/{numero}", response_class=HTMLResponse)
+async def index_prospect(numero: str) -> HTMLResponse:
+    return _serve_index_html()
 
 
 @app.get("/health")
