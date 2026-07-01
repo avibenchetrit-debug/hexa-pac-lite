@@ -468,6 +468,15 @@ def _read_devis_envoyes():
     return sent if isinstance(sent, list) else []
 
 
+def _sent_devis_items(numero):
+    items = _read_devis_meta().get(numero, [])
+    return items if isinstance(items, list) else []
+
+
+def _next_sent_version(numero):
+    return len(_sent_devis_items(numero)) + 1
+
+
 def _state_simulateur_path(numero: str) -> str:
     safe = re.sub(r"[^A-Za-z0-9_.-]", "_", str(numero or ""))
     return os.path.join(STATES_SIMULATEUR_DIR, f"{safe}.json")
@@ -2786,7 +2795,7 @@ def _notedim_path(numero: str, version: int) -> str:
     return os.path.join(DEVIS_DIR, f"{numero}_notedim_v{version}.pdf")
 
 
-def _build_devis_context(request: Request, numero: str) -> dict:
+def _build_devis_context(request: Request, numero: str, version: int | None = None) -> dict:
     prospect = _find_lead(numero)
     if not prospect:
         raise HTTPException(status_code=404, detail="Prospect introuvable")
@@ -2836,7 +2845,7 @@ def _build_devis_context(request: Request, numero: str) -> dict:
         "cp_chantier": cp_chantier,
         "ville_chantier": ville_chantier,
         "usage_bien": prospect.get("usage_bien", "proprietaire_occupant"),
-        "numero_devis": generer_numero_devis(prospect),
+        "numero_devis": generer_numero_devis(prospect, version if version is not None else _next_sent_version(numero)),
         "numero_dossier": _next_numero_dossier(),
         "date_emission": today.strftime("%d/%m/%Y"),
         "date_validite": (today + timedelta(days=60)).strftime("%d/%m/%Y"),
@@ -2952,8 +2961,8 @@ def _render_template_response(request: Request, template_name: str, context: dic
     return HTMLResponse(content=html_content)
 
 
-def _render_devis_html(request: Request, numero: str) -> str:
-    ctx = _build_devis_context(request, numero)
+def _render_devis_html(request: Request, numero: str, version: int | None = None) -> str:
+    ctx = _build_devis_context(request, numero, version)
     name = ctx.pop("_error_template", "devis_pac.html")
     ctx.setdefault("request", request)
     return templates.env.get_template(name).render(ctx)
