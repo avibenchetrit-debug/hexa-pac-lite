@@ -277,6 +277,24 @@ def _public_devis_url(request: Request, numero: str) -> str:
     return f"{base}/devis-public/{numero}/{_sign_devis_token(numero)}"
 
 
+def _sign_devis_token_v(numero: str, version) -> str:
+    payload = f"devis:{numero}:{version}"
+    sig = hmac.new(_admin_secret(), payload.encode("utf-8"), hashlib.sha256).digest()
+    return base64.urlsafe_b64encode(sig).decode("ascii").rstrip("=")
+
+
+def _verify_devis_token_v(numero: str, version, token: str) -> bool:
+    import hmac as _hmac
+    return _hmac.compare_digest(token, _sign_devis_token_v(numero, version))
+
+
+def _public_devis_url_v(request: Request, numero: str, version) -> str:
+    base = str(request.base_url).rstrip("/")
+    if base.startswith("http://"):
+        base = "https://" + base[len("http://"):]
+    return f"{base}/devis-public/{numero}/{version}/{_sign_devis_token_v(numero, version)}"
+
+
 def _sign_notedim_token(numero: str) -> str:
     payload = f"notedim:{numero}"
     sig = hmac.new(_admin_secret(), payload.encode("utf-8"), hashlib.sha256).digest()
@@ -314,6 +332,25 @@ def _atomic_write_json(path, obj):
         f.flush()
         os.fsync(f.fileno())
     os.replace(tmp, path)
+
+
+def _write_text(path, text):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    tmp = f"{path}.tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        f.write(text)
+        f.flush()
+        os.fsync(f.fileno())
+    os.replace(tmp, path)
+
+
+def _read_text(path):
+    with open(path, encoding="utf-8") as f:
+        return f.read()
+
+
+def _devis_html_path(numero: str, version) -> str:
+    return os.path.join(DEVIS_DIR, f"{numero}_v{version}.html")
 
 
 def _deep_merge_defaults(data, defaults):
@@ -3025,12 +3062,14 @@ def _write_pdf(path: str, pdf_bytes: bytes) -> str:
     return path
 
 
-def _ensure_devis_pdf(numero: str, request: Request, version: int | None = None) -> tuple[str, int]:
-    version = version or _next_devis_version(numero)
-    path = _devis_path(numero, version)
-    if not os.path.exists(path):
-        _write_pdf(path, _html_to_pdf_playwright(_render_devis_html(request, numero), request))
-    return path, version
+def _ensure_devis_pdf(numero: str, request: Request, version: int | None = None) -> tuple[str, str, int]:
+    version = version or _next_sent_version(numero)
+    html = _render_devis_html(request, numero, version)
+    html_path = _devis_html_path(numero, version)
+    _write_text(html_path, html)
+    pdf_path = _devis_path(numero, version)
+    _write_pdf(pdf_path, _html_to_pdf_playwright(html, request))
+    return pdf_path, html_path, version
 
 
 def _ensure_notedim_pdf(numero: str, request: Request, version: int) -> str:
@@ -3111,6 +3150,63 @@ async def devis_public_pdf(numero: str, token: str, request: Request):
         media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="Devis_{numero}.pdf"'},
     )
+
+
+def _devis_bar_html(pdf_url: str) -> str:
+    return (
+        '<div style="position:fixed;top:0;left:0;right:0;z-index:9999;'
+        'background:#F4F6F9;border-bottom:1px solid #E1E5EB;'
+        'display:flex;align-items:center;justify-content:space-between;'
+        'padding:12px 24px;font-family:Arial,Helvetica,sans-serif;">'
+        '<div>'
+        '<img src="/static/Logo.svg" alt="Hexa Renov" style="height:32px;width:auto;vertical-align:middle;">'
+        '<span style="color:#002E5A;font-weight:700;font-size:15px;margin-left:14px;vertical-align:middle;">Votre devis</span>'
+        '</div>'
+        '<a href="' + pdf_url + '" '
+        'style="background:#E2214B;color:#ffffff;padding:10px 20px;border-radius:6px;'
+        'font-weight:700;font-size:14px;text-decoration:none;">Telecharger le PDF</a>'
+        '</div>'
+        '<div style="height:58px;"></div>'
+    )
+
+
+def _inject_devis_bar(html_devis: str, bar: str) -> str:
+    import re as _re
+    if _re.search(r'<body[^>]*>', html_devis):
+        return _re.sub(r'(<body[^>]*>)', lambda m: m.group(1) + bar, html_devis, count=1)
+    return bar + html_devis
+
+
+@app.get("/devis-public/{numero}/{version}/{token}", response_class=HTMLResponse)
+async def devis_public_versionne(numero: str, version: int, token: str, request: Request):
+    if not _verify_devis_token_v(numero, version, token):
+        raise HTTPException(status_code=403, detail="Lien invalide")
+    items = _sent_devis_items(numero)
+    if version < 1 or version > len(items):
+        raise HTTPException(status_code=404, detail="Version introuvable")
+    item = items[version - 1]
+    html_file = item.get("html_file")
+    if html_file and os.path.exists(html_file):
+        pdf_url = f"/devis-public/{numero}/{version}/{token}/pdf"
+        return HTMLResponse(_inject_devis_bar(_read_text(html_file), _devis_bar_html(pdf_url)))
+    pdf_file = item.get("file")
+    if pdf_file and os.path.exists(pdf_file):
+        return FileResponse(pdf_file, media_type="application/pdf", headers={"Content-Disposition": "inline"})
+    raise HTTPException(status_code=404, detail="Devis introuvable")
+
+
+@app.get("/devis-public/{numero}/{version}/{token}/pdf")
+async def devis_public_versionne_pdf(numero: str, version: int, token: str, request: Request):
+    if not _verify_devis_token_v(numero, version, token):
+        raise HTTPException(status_code=403, detail="Lien invalide")
+    items = _sent_devis_items(numero)
+    if version < 1 or version > len(items):
+        raise HTTPException(status_code=404, detail="Version introuvable")
+    item = items[version - 1]
+    pdf_file = item.get("file")
+    if not pdf_file or not os.path.exists(pdf_file):
+        raise HTTPException(status_code=404, detail="Devis introuvable")
+    return FileResponse(pdf_file, media_type="application/pdf", filename=f"Devis_{numero}.pdf")
 
 
 @app.get("/notedim-public/{numero}/{token}", response_class=HTMLResponse)
@@ -3283,7 +3379,8 @@ async def _send_devis(numero: str, payload: dict, request: Request) -> dict:
     if not api_key:
         raise HTTPException(status_code=400, detail="RESEND_API_KEY non configurée")
 
-    devis_path, version = _ensure_devis_pdf(numero, request)
+    version = _next_sent_version(numero)
+    devis_path, devis_html, version = _ensure_devis_pdf(numero, request, version)
     notedim_path = _ensure_notedim_pdf(numero, request, version)
 
     # Aperçu éco (bandeau email devis) — peut être None
@@ -3306,7 +3403,7 @@ async def _send_devis(numero: str, payload: dict, request: Request) -> dict:
     }
 
     prenom = html.escape(str(prospect.get("prenom") or ""))
-    lien_devis = _public_devis_url(request, numero)
+    lien_devis = _public_devis_url_v(request, numero, version)
     lien_notedim = _public_notedim_url(request, numero)
 
     import resend
@@ -3351,6 +3448,7 @@ async def _send_devis(numero: str, payload: dict, request: Request) -> dict:
         "sent_at": now,
         "email": email_to,
         "file": devis_path,
+        "html_file": devis_html,
         "notedim_file": notedim_path,
         "resend_id": result.get("id") if isinstance(result, dict) else "",
         "statut": "envoye",
