@@ -15015,6 +15015,7 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
       return;
     }
     state.modele_pac = modele.label || modele.nom || modele.ref;
+    if (modele.id !== state.modele_pac_id) state.user_modified_price = false;
     state.modele_pac_id = modele.id;
     if (!state.user_modified_price) state.prix_pac = Math.round(modele.prix_ttc || 0);
     state.sous_dimensionnement = !!selection.sous_dimensionnement;
@@ -15721,7 +15722,8 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
         if (!selected) return;
         state.modele_pac_id = selected.id;
         state.modele_pac = selected.label;
-        if (!state.user_modified_price) state.prix_pac = Math.round(selected.prix_ttc || 0);
+        state.user_modified_price = false;
+        state.prix_pac = Math.round(selected.prix_ttc || 0);
         state.modele_force = true;
         state.sous_dimensionnement = false;
         scheduleSaveSimulatorState();
