@@ -14983,36 +14983,52 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
     return set.sort();
   }
 
-  function selectionnerTroisPac(note, simState){
+  function meilleurModeleMarque(cands, note){
+    const sorted = cands.slice().sort(function(a, b){ return (puissanceModele(a) - puissanceModele(b)) || ((a.prix_ttc || 0) - (b.prix_ttc || 0)); });
+    return sorted.find(function(m){ return puissanceModele(m) >= note; }) || sorted[sorted.length - 1];
+  }
+  function selectionnerParNiveau(note, simState){
     const TOL = TOLERANCE_DIM_KW;   // 1 kW sous la note
     const CAP = 2;                  // note + 2 kW = borne haute anti-surdimensionnement
-    const marque = (simState && simState.marque) || '';
+    const cfg = (typeof MARQUES_CONFIG === 'object' && MARQUES_CONFIG) ? MARQUES_CONFIG : {};
+    const niveaux = window.HEXA_NIVEAUX || [];
     const compat = getCatalogueCompatibles(simState);          // ECS/DUO + phase
-    const dimensionnes = compat.filter(m => {                  // Regle N1 : dimension d'abord
+    const dimensionnes = compat.filter(function(m){
       const p = puissanceModele(m);
-      return p >= note - TOL && p <= note + CAP;
+      return p >= note - TOL && p <= note + CAP;               // Regle N1 : dimension d'abord
     });
-    const gamme = dimensionnes
-      .filter(m => ((m.marque || '') === marque))              // marque ensuite
-      .sort((a, b) => (puissanceModele(a) - puissanceModele(b)) || ((a.prix_ttc || 0) - (b.prix_ttc || 0)));
-    if (!gamme.length) {
-      return { ok: false, marque: marque, note: note, propositions: [], raison: marque ? ('Aucun modele ' + marque + ' bien dimensionne pour ' + note + ' kW') : 'Aucune gamme selectionnee' };
-    }
-    const essentiel = gamme[0];                                             // plus petit qui couvre (>= note-1)
-    const recommande = gamme.find(m => puissanceModele(m) >= note) || gamme[gamme.length - 1]; // plus petit >= note, sinon le plus grand dispo
-    const confort = gamme.find(m => puissanceModele(m) > puissanceModele(recommande)) || null;  // cran au-dessus (<= note+2)
-    const propositions = [];
-    if (essentiel && essentiel.id !== recommande.id) propositions.push({ tier: 'essentiel', modele: essentiel, recommande: false });
-    propositions.push({ tier: 'recommande', modele: recommande, recommande: true });
-    if (confort && confort.id !== recommande.id) propositions.push({ tier: 'confort', modele: confort, recommande: false });
-    return { ok: true, marque: marque, note: note, propositions: propositions };
+    let cartes = [];
+    niveaux.forEach(function(niv){
+      const marquesDuNiveau = Object.keys(cfg).filter(function(mq){ return cfg[mq] && cfg[mq].niveau === niv.key; });
+      const cartesNiv = [];
+      marquesDuNiveau.forEach(function(mq){
+        const cands = dimensionnes.filter(function(m){ return (m.marque || '') === mq; });
+        if (!cands.length) return;
+        cartesNiv.push({ niveau: niv.key, marque: mq, modele: meilleurModeleMarque(cands, note) });
+      });
+      cartesNiv.sort(function(a, b){ return (a.modele.prix_ttc || 0) - (b.modele.prix_ttc || 0); }); // prix croissant dans le niveau
+      cartes = cartes.concat(cartesNiv);
+    });
+    ['essentiel', 'confort'].forEach(function(dropKey){                 // cap 4 : Essentiel saute avant Confort+, jamais Recommande
+      while (cartes.length > 4){
+        let idx = -1;
+        for (let i = cartes.length - 1; i >= 0; i--){ if (cartes[i].niveau === dropKey){ idx = i; break; } }
+        if (idx === -1) break;
+        cartes.splice(idx, 1);
+      }
+    });
+    if (!cartes.length) return { ok: false, note: note, cartes: [], raison: 'Aucun modele bien dimensionne pour ' + note + ' kW (verifier gamme/dimensionnement)' };
+    let preIdx = cartes.findIndex(function(c){ return c.niveau === 'recommande'; });
+    if (preIdx < 0) preIdx = 0;
+    cartes = cartes.map(function(c, i){ return { niveau: c.niveau, marque: c.marque, modele: c.modele, preselected: i === preIdx }; });
+    return { ok: true, note: note, cartes: cartes };
   }
-  window.selectionnerTroisPac = selectionnerTroisPac;
+  window.selectionnerParNiveau = selectionnerParNiveau;
   window.marquesDisponibles = marquesDisponibles;
-  window.debugTroisPac = function(note, marque){
-    const r = selectionnerTroisPac(Number(note), Object.assign({}, state, { marque: marque }));
-    if (r.ok) console.log('[debugTroisPac]', note, 'kW /', marque, '=>', r.propositions.map(p => p.tier + ':' + (p.modele.label || p.modele.nom) + ' (' + puissanceModele(p.modele) + 'kW, ' + (p.modele.prix_ttc || 0) + 'EUR)' + (p.recommande ? ' *RECO*' : '')).join('  |  '));
-    else console.log('[debugTroisPac]', note, 'kW /', marque, '=> FALLBACK -', r.raison);
+  window.debugNiveaux = function(note){
+    const r = selectionnerParNiveau(Number(note), state);
+    if (r.ok) console.log('[debugNiveaux]', note, 'kW =>', r.cartes.map(function(c){ return c.niveau + ':' + c.marque + ':' + (c.modele.label || c.modele.nom) + ' (' + puissanceModele(c.modele) + 'kW, ' + (c.modele.prix_ttc || 0) + 'EUR)' + (c.preselected ? ' *PRESEL*' : ''); }).join('  |  '));
+    else console.log('[debugNiveaux]', note, 'kW => FALLBACK -', r.raison);
     return r;
   };
 
@@ -15179,7 +15195,7 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
     state.iso_mur = dim.iso_mur;
     state.iso_menuiserie = dim.iso_menuiserie;
     state.puissance_requise_kw = dim.puissance_kw;
-    try { console.debug('[3pac]', dim.puissance_kw + ' kW |', marquesDisponibles().map(mq => mq + '=' + (selectionnerTroisPac(dim.puissance_kw, Object.assign({}, state, { marque: mq })).propositions.length || 0) + 'c').join('  ')); } catch (_) {}
+    try { const _rn = selectionnerParNiveau(dim.puissance_kw, state); console.debug('[niveaux]', dim.puissance_kw + ' kW |', _rn.ok ? _rn.cartes.map(function(c){ return c.niveau + ':' + c.marque + '(' + puissanceModele(c.modele) + 'kW)'; }).join('  ') : 'fallback'); } catch (_) {}
 
     const forcedModele = state.modele_force ? getModeleActuel() : null;
     let selection;
