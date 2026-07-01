@@ -184,7 +184,7 @@ def calculer_cee_bar_th_171(prospect, state_simulateur, admin_params):
     surface = float_value(value(state_simulateur, "surface_chauffee", default=0))
     if surface <= 0:
         surface = float_value(value(prospect, "surface_habitable", "surface_logement_m2", default=90))
-    zone = value(state_simulateur, "zone", default=calculer_zone_climatique(value(prospect, "cp_chantier", "code_postal_chantier", "cp")))
+    zone = normalize_zone("", value(prospect, "cp_chantier", "code_postal_chantier", "cp"))
 
     if etas < 111:
         return {"montant": 0, "erreur": "Non éligible / ETAS insuffisant", "details": {"etas": etas}}

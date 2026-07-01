@@ -23,6 +23,7 @@ from fastapi.templating import Jinja2Templates
 from starlette.background import BackgroundTask
 
 from services.service_devis import (
+    DEPT_ZONE,
     calculer_devis,
     calculer_economie_devis,
     calculer_financement_devis,
@@ -1322,6 +1323,13 @@ async def get_baremes():
 # ---------------------------------------------------------------------------
 # A) Leads
 # ---------------------------------------------------------------------------
+
+
+@app.get("/api/zones-departements")
+def get_zones_departements() -> JSONResponse:
+    """Table reglementaire departement -> zone climatique (H1/H2/H3).
+    Source UNIQUE partagee par le simulateur (front) et le devis (backend)."""
+    return JSONResponse(DEPT_ZONE)
 
 
 @app.get("/api/catalogue-pac")
@@ -2838,7 +2846,7 @@ def _build_devis_context(request: Request, numero: str) -> dict:
         "surface_habitable": str(devis_value(prospect, "surface_habitable", "surface_logement_m2", default="")),
         "chauffage_actuel": str(devis_value(prospect, "chauffage_actuel", "mode_chauffage", default="")).capitalize(),
         "parcelle_cadastrale": prospect.get("parcelle_cadastrale", ""),
-        "zone_climatique": calculer_zone_climatique(cp_chantier, prospect.get("zone_climatique") or prospect.get("zone_climatique_chantier")),
+        "zone_climatique": calculer_zone_climatique(cp_chantier),
         "modele_pac": modele_obj.get("nom") or modele_obj.get("ref") or "",
         "description_specs": description_specs,
         "sous_traitant": sous_traitant_context,

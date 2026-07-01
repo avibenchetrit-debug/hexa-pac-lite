@@ -14608,6 +14608,7 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
   let GRILLE = {};
   let CATALOGUE_PAC = [];
   let M3_CONFIG = null;
+  let DEPT_ZONE_BACKEND = null;  // table reglementaire dept->zone, chargee depuis /api/zones-departements (source unique backend)
 
   const TEMP_BASE_ZONE = { H1: -7, H2: -4, H3: 0 };
   const TEMP_BASE_SOUS_ZONE = { H1A: -9, H1B: -8, H1C: -7, H2A: -4, H2B: -5, H2C: -3, H2D: -2, H3: 0 };
@@ -14754,6 +14755,10 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
         const rM3 = await fetch('/api/admin/m3', { cache:'no-store' });
         if (rM3.ok) M3_CONFIG = await rM3.json();
       } catch(_) {}
+      try {
+        const rZones = await fetch('/api/zones-departements', { cache:'no-store' });
+        if (rZones.ok) DEPT_ZONE_BACKEND = await rZones.json();
+      } catch(_) {}
       window.__hexaCataloguePacCache = CATALOGUE_PAC.map(m => m.raw || m);
     } catch(e) {
       console.error('Barèmes/catalogue non chargés:', e);
@@ -14849,6 +14854,14 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
     if (zone.startsWith('H2')) return 'H2';
     if (zone.startsWith('H3')) return 'H3';
     return '';
+  }
+
+  // Zone reglementaire derivee du CP via la table backend (source unique : /api/zones-departements).
+  // Extraction identique a normalize_zone() backend : dept = cp[:3] si 97x sinon cp[:2], repli H1.
+  function zoneReglementaireFromCp(cp){
+    const s = String(cp || '').trim();
+    const dept = s.startsWith('97') ? s.slice(0, 3) : s.slice(0, 2).toUpperCase();
+    return (DEPT_ZONE_BACKEND && DEPT_ZONE_BACKEND[dept]) || 'H1';
   }
 
   function temperatureExterieureBase(state){
@@ -15186,10 +15199,10 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
              || document.querySelector('[name="zone_climatique"]')?.value
              || window.__hexaZoneClim;
     if (zc){
-      const z=normaliserZone(zc);
-      state.zone_detail = z;
-      state.zone = zonePrincipale(z);
+      state.zone_detail = normaliserZone(zc);   // detail fiche : affichage seulement
     }
+    // Zone CEE = source unique reglementaire (CP -> table backend) ; la fiche ne peut plus surclasser
+    state.zone = zoneReglementaireFromCp(state.cp_chantier);
     // Énergie avant (bloc 7)
     const mc = document.querySelector('select[name="mode_chauffage"]')?.value;
     if (mc) state.energie_avant = mc;
