@@ -144,6 +144,11 @@ DEFAULT_PLAFONDS_REGLEMENTAIRES = {
     },
 }
 
+DEFAULT_MARQUES = {
+    "ATLANTIC": {"positionnement": "A completer en admin", "avantages": ["A completer", "A completer", "A completer"]},
+    "THALEOS": {"positionnement": "A completer en admin", "avantages": ["A completer", "A completer", "A completer"]},
+}
+
 DEFAULT_PARAMS_ECO_ENERGIE = {
     "conso_zone_kwh_m2_an": {"h1": 150, "h2": 130, "h3": 110},
     "scop_defaut": 3.5,
@@ -2692,6 +2697,22 @@ async def save_formule_bar_th_171(request: Request):
     payload = await _read_request_payload(request)
     params = load_parametres_admin()
     params["formule_bar_th_171"] = payload
+    save_parametres_admin_atomic(params)
+    return {"success": True}
+
+
+@app.get("/api/admin/marques")
+async def get_marques():
+    params = load_parametres_admin()
+    return params.get("marques", DEFAULT_MARQUES)
+
+
+@app.post("/api/admin/marques")
+async def save_marques(request: Request):
+    _require_admin(request)
+    payload = await _read_request_payload(request)
+    params = load_parametres_admin()
+    params["marques"] = payload
     save_parametres_admin_atomic(params)
     return {"success": True}
 
