@@ -14609,6 +14609,11 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
   let CATALOGUE_PAC = [];
   let M3_CONFIG = null;
   let MARQUES_CONFIG = null;
+  window.HEXA_NIVEAUX = [
+    { key:'essentiel',  label:'Essentiel',  icone:'🌱' },
+    { key:'recommande', label:'Recommandé', icone:'⭐' },
+    { key:'confort',    label:'Confort +',  icone:'👑' },
+  ];
   let DEPT_ZONE_BACKEND = null;  // table reglementaire dept->zone, chargee depuis /api/zones-departements (source unique backend)
 
   const TEMP_BASE_ZONE = { H1: -7, H2: -4, H3: 0 };
@@ -16612,6 +16617,30 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
         <div class="adm-actions"><button type="button" class="adm-btn-save" id="btn-save-params-financement">Enregistrer</button></div>
       </div>`;
   }
+  function renderMarquesSection(){
+    const cfg = (M3_ADMIN && M3_ADMIN.marques) || {};
+    const dispo = (typeof window.marquesDisponibles === 'function') ? window.marquesDisponibles() : [];
+    const marques = Array.from(new Set([].concat(Object.keys(cfg), dispo))).sort();
+    const niveaux = window.HEXA_NIVEAUX || [];
+    const esc = (s) => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    if (!marques.length) return '<p class="adm-section-help">Aucune marque au catalogue.</p>';
+    const rows = marques.map(function(mq){
+      const c = cfg[mq] || {};
+      const av = Array.isArray(c.avantages) ? c.avantages : [];
+      const opts = '<option value="">— à ranger —</option>' + niveaux.map(function(n){
+        return '<option value="' + n.key + '"' + (c.niveau === n.key ? ' selected' : '') + '>' + n.icone + ' ' + n.label + '</option>';
+      }).join('');
+      return '<div class="adm-card" data-marque="' + esc(mq) + '">'
+        + '<div class="adm-fields-row"><label>Marque</label><strong>' + esc(mq) + '</strong></div>'
+        + '<div class="adm-fields-row"><label>Niveau de gamme</label><select class="adm-marque-niveau">' + opts + '</select></div>'
+        + '<div class="adm-fields-row"><label>Positionnement</label><input type="text" class="adm-marque-pos" value="' + esc(c.positionnement) + '"></div>'
+        + '<div class="adm-fields-row"><label>Avantage 1</label><input type="text" class="adm-marque-av" data-idx="0" value="' + esc(av[0]) + '"></div>'
+        + '<div class="adm-fields-row"><label>Avantage 2</label><input type="text" class="adm-marque-av" data-idx="1" value="' + esc(av[1]) + '"></div>'
+        + '<div class="adm-fields-row"><label>Avantage 3</label><input type="text" class="adm-marque-av" data-idx="2" value="' + esc(av[2]) + '"></div>'
+        + '</div>';
+    }).join('');
+    return rows + '<div class="adm-actions"><button type="button" class="adm-btn-save" id="btn-save-marques">Enregistrer</button></div>';
+  }
   function admBloc(id, title, content){
     return `<div class="adm-bloc" data-bloc-id="${id}" data-open="false">
       <div class="adm-bloc-header" data-toggle-bloc="${id}">
@@ -17094,7 +17123,7 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
       <div class="adm-add-row"><button type="button" class="adm-btn adm-btn-add" id="adm-add">+ Ajouter une pompe à chaleur</button></div>
       <div class="adm-legend"><div class="adm-legend-row"><span class="adm-dot adm-dot1"></span><span>Option 1 — vente directe : marge brute − CAC − visite − COFRAC − urbanisme.</span></div><div class="adm-legend-row"><span class="adm-dot adm-dot2"></span><span>Option 2 — prix de cession : marge garantie au-dessus de (coût + visite + COFRAC + urbanisme). La régie revend au-dessus et garde le surplus ; la colonne « Commission régie » montre ce qu'elle gagne si elle revend à ton prix catalogue.</span></div><div class="adm-legend-row"><span>Marges théoriques — calculées sur un MPR forfaitaire de 5 000 € (estimation commune à tous les modèles), pas un calcul réel par prospect.</span></div></div>
       <div class="adm-actions"><button type="button" class="adm-btn-save" id="adm-save-catalogue">Enregistrer</button></div>`;
-    const adminBody = `${admBloc('1','1. Réglages généraux',admSousBloc('1-1','1.1 Coût Hexa',coutHexa)+admSousBloc('1-2','1.2 Vente Hexa',venteHexa))}${admBloc('2','2. MPR',admSousBloc('2-1','2.1 Forfait MPR',renderMprFields())+admSousBloc('2-2','2.2 Plafonds réglementaires',renderPlafondsSection()))}${admBloc('3','3. CEE',admSousBloc('3-1','3.1 Formule BAR-TH-171 (PAC Air-Eau)',renderFormuleBarSection())+admSousBloc('3-2','3.2 Bonification CEE',renderBonificationFields())+admSousBloc('3-3','3.3 Délégataires CEE',renderDelegatairesFields()))}${admBloc('4','4. Sous-traitants',renderSousTraitantsSection())}${admBloc('5','5. Commercial',admSousBloc('5-1','5.1 Options commerciales',optionsCommerciales)+admSousBloc('5-2','5.2 Modèles et marges nettes',modelesMarges))}${admBloc('6','6. Modèles email',renderEmailsFields())}${admBloc('7','7. Corbeille des leads','<div id="adm-trash" class="adm-trash-empty">Chargement...</div>')}${admBloc('8','8. Paramètres économiques',admSousBloc('8-1',"8.1 Hypothèses économie d'énergie",renderParamsEcoEnergie())+admSousBloc('8-2','8.2 Hypothèses financement',renderParamsFinancement()))}`;
+    const adminBody = `${admBloc('1','1. Réglages généraux',admSousBloc('1-1','1.1 Coût Hexa',coutHexa)+admSousBloc('1-2','1.2 Vente Hexa',venteHexa))}${admBloc('2','2. MPR',admSousBloc('2-1','2.1 Forfait MPR',renderMprFields())+admSousBloc('2-2','2.2 Plafonds réglementaires',renderPlafondsSection()))}${admBloc('3','3. CEE',admSousBloc('3-1','3.1 Formule BAR-TH-171 (PAC Air-Eau)',renderFormuleBarSection())+admSousBloc('3-2','3.2 Bonification CEE',renderBonificationFields())+admSousBloc('3-3','3.3 Délégataires CEE',renderDelegatairesFields()))}${admBloc('4','4. Sous-traitants',renderSousTraitantsSection())}${admBloc('5','5. Commercial',admSousBloc('5-1','5.1 Options commerciales',optionsCommerciales)+admSousBloc('5-2','5.2 Modèles et marges nettes',modelesMarges))}${admBloc('6','6. Modèles email',renderEmailsFields())}${admBloc('7','7. Corbeille des leads','<div id="adm-trash" class="adm-trash-empty">Chargement...</div>')}${admBloc('8','8. Paramètres économiques',admSousBloc('8-1',"8.1 Hypothèses économie d'énergie",renderParamsEcoEnergie())+admSousBloc('8-2','8.2 Hypothèses financement',renderParamsFinancement()))}${admBloc('9','9. Gammes & Marques', renderMarquesSection())}`;
     return `
       <div class="adm-overlay" id="adm-overlay">
         <div class="adm-modal">
@@ -17600,6 +17629,19 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
       const r = await fetch('/api/admin/plafonds-reglementaires', { method:'POST', headers: window.adminHeaders(), body: JSON.stringify(payload) });
       if (r.ok) { M3_ADMIN.plafonds_reglementaires = payload; adminToast('Plafonds sauvegardés ✓', '#0D6B3B'); window.dispatchEvent(new CustomEvent('hexa-config-changed')); }
       else adminToast('Erreur sauvegarde plafonds', '#B91C1C');
+    });
+    document.getElementById('btn-save-marques')?.addEventListener('click', async ()=>{
+      const payload = {};
+      document.querySelectorAll('#adm-bloc-content-9 .adm-card[data-marque]').forEach(function(card){
+        const mq = card.getAttribute('data-marque');
+        const niveau = card.querySelector('.adm-marque-niveau') ? card.querySelector('.adm-marque-niveau').value : '';
+        const positionnement = card.querySelector('.adm-marque-pos') ? card.querySelector('.adm-marque-pos').value : '';
+        const avantages = Array.from(card.querySelectorAll('.adm-marque-av')).sort(function(a,b){return Number(a.dataset.idx)-Number(b.dataset.idx);}).map(function(el){return el.value || '';});
+        payload[mq] = { niveau: niveau, positionnement: positionnement, avantages: avantages };
+      });
+      const r = await fetch('/api/admin/marques', { method:'POST', headers: window.adminHeaders(), body: JSON.stringify(payload) });
+      if (r.ok) { M3_ADMIN.marques = payload; adminToast('Gammes & marques sauvegardées ✓', '#0D6B3B'); window.dispatchEvent(new CustomEvent('hexa-config-changed')); }
+      else adminToast('Erreur sauvegarde marques', '#B91C1C');
     });
     document.getElementById('btn-save-params-eco-energie')?.addEventListener('click', async ()=>{
       const n = id => Number(String(document.getElementById(id)?.value ?? '').replace(',','.')) || 0;

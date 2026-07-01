@@ -145,8 +145,9 @@ DEFAULT_PLAFONDS_REGLEMENTAIRES = {
 }
 
 DEFAULT_MARQUES = {
-    "ATLANTIC": {"positionnement": "A completer en admin", "avantages": ["A completer", "A completer", "A completer"]},
-    "THALEOS": {"positionnement": "A completer en admin", "avantages": ["A completer", "A completer", "A completer"]},
+    "ATLANTIC": {"niveau": "recommande", "positionnement": "A completer en admin", "avantages": ["A completer", "A completer", "A completer"]},
+    "THALEOS": {"niveau": "essentiel", "positionnement": "A completer en admin", "avantages": ["A completer", "A completer", "A completer"]},
+    "DAIKIN": {"niveau": "confort", "positionnement": "A completer en admin", "avantages": ["A completer", "A completer", "A completer"]},
 }
 
 DEFAULT_PARAMS_ECO_ENERGIE = {
@@ -2666,6 +2667,7 @@ def get_admin_m3() -> JSONResponse:
             "plafonds_reglementaires": load_parametres_admin().get("plafonds_reglementaires", DEFAULT_PLAFONDS_REGLEMENTAIRES),
             "params_eco_energie": load_parametres_admin().get("params_eco_energie", DEFAULT_PARAMS_ECO_ENERGIE),
             "params_financement": load_parametres_admin().get("params_financement", DEFAULT_PARAMS_FINANCEMENT),
+            "marques": load_parametres_admin().get("marques", DEFAULT_MARQUES),
         }
     )
 
