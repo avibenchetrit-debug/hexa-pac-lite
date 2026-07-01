@@ -2358,13 +2358,68 @@ def restore_lead(numero: str) -> JSONResponse:
 
 @app.delete("/api/leads/{numero}/purge")
 def purge_lead(numero: str) -> JSONResponse:
+    numero = str(numero or "").strip()
+    if not numero:
+        raise HTTPException(status_code=400, detail="Numero requis")
+    removed = {
+        "lead": False, "state": False, "devis_meta": False,
+        "devis_envoyes": 0, "notes": False, "echanges": False, "fichiers": [],
+    }
+
+    # 1) Enregistrement lead (match EXACT par numero via _find_lead_index)
     leads = _read_leads()
     index = _find_lead_index(leads, numero)
-    if index is None:
-        raise HTTPException(status_code=404, detail="Prospect introuvable")
-    del leads[index]
-    _atomic_write_json(LEADS_PATH, leads)
-    return JSONResponse({"ok": True})
+    if index is not None:
+        del leads[index]
+        _atomic_write_json(LEADS_PATH, leads)
+        removed["lead"] = True
+
+    # 2) State simulateur (fichier dedie au numero)
+    state_path = _state_simulateur_path(numero)
+    if os.path.exists(state_path):
+        os.remove(state_path)
+        removed["state"] = True
+
+    # 3) Devis meta (cle exacte)
+    meta = _read_devis_meta()
+    if numero in meta:
+        meta.pop(numero, None)
+        _atomic_write_json(DEVIS_META_PATH, meta)
+        removed["devis_meta"] = True
+
+    # 4) Devis envoyes (filtre EXACT sur numero_prospect)
+    sent = _read_devis_envoyes()
+    kept = [e for e in sent if str((e or {}).get("numero_prospect", "")) != numero]
+    if len(kept) != len(sent):
+        _atomic_write_json(DEVIS_ENVOYES_PATH, kept)
+        removed["devis_envoyes"] = len(sent) - len(kept)
+
+    # 5) Notes (cle exacte)
+    notes = _read_notes()
+    if numero in notes:
+        notes.pop(numero, None)
+        _atomic_write_json(NOTES_PATH, notes)
+        removed["notes"] = True
+
+    # 6) Echanges (cle exacte)
+    echanges = _read_echanges()
+    if numero in echanges:
+        echanges.pop(numero, None)
+        _atomic_write_json(ECHANGES_PATH, echanges)
+        removed["echanges"] = True
+
+    # 7) Fichiers devis/notedim — match EXACT ancre par regex (jamais de prefixe partiel)
+    if os.path.isdir(DEVIS_DIR):
+        pat = re.compile(rf"^{re.escape(numero)}(_v\d+\.(?:pdf|html)|_notedim_v\d+\.pdf)$")
+        for name in os.listdir(DEVIS_DIR):
+            if pat.match(name):
+                try:
+                    os.remove(os.path.join(DEVIS_DIR, name))
+                    removed["fichiers"].append(name)
+                except OSError:
+                    pass
+
+    return JSONResponse({"ok": True, "numero": numero, "supprime": removed})
 
 
 @app.post("/prospect/ajax")
