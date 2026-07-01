@@ -14796,7 +14796,6 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
     surface_habitable: null,
     surface_chauffee: null,
     surface_forcee: false,
-    etas: 'etas_140_plus',
     service: 'chauffage_seul',
     prix_pac: null,
     facture_avant: 200,            // €/mois
@@ -15302,7 +15301,7 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
     else if (typeLogement.toLowerCase().includes('appart')) typeLogement = 'Appartement';
     else return { montant: 0, erreur: 'Type logement inconnu' };
 
-    const etas = Number(state.etas) || 140;
+    const etas = 140; // ETAS supprime (audit : retombait toujours sur 140)
     const surface = Number(state.surface_chauffee) || 0;
     const zone = state.zone || 'H2';
     const categorie = state.categorie || 'modeste';
@@ -15374,7 +15373,7 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
     if (factureApresCalc != null && factureApresCalc > 0) state.facture_apres = factureApresCalc;
     const contextePret = !!state.categorie && !!state.zone && Number.isFinite(dim.surface_chauffee) && dim.surface_chauffee > 0;
     const sKey = trancheSurface(state.surface_chauffee);
-    const node = GRILLE[state.etas]?.[sKey];
+    const node = GRILLE['etas_140_plus']?.[sKey]; // ETAS supprime (valeur figee, ecrasee ensuite par forfaits_mpr)
     let ceeBrut = 0;
     let mprDevis    = contextePret ? (node?.mpr_devis?.[state.zone]?.[state.categorie] ?? 0) : 0;
     if (M3_CONFIG?.forfaits_mpr && state.categorie in M3_CONFIG.forfaits_mpr) {
@@ -15603,11 +15602,12 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
 
         <div class="sim-section-label">Paramètres PAC</div>
         <div class="sim-row2">
-          <label class="sim-field"><span>ETAS de la PAC</span>
-            <select id="sim-etas">
-              <option value="etas_111_139" ${sel(state.etas,'etas_111_139')}>111 % – 139 %</option>
-              <option value="etas_140_plus" ${sel(state.etas,'etas_140_plus')}>≥ 140 %</option>
+          <label class="sim-field sim-field--requis"><span>Gamme</span>
+            <select id="sim-marque">
+              <option value="">— Choisir une marque —</option>
+              ${marquesDisponibles().map(function(mq){ return '<option value="' + mq + '" ' + sel(state.marque, mq) + '>' + mq + '</option>'; }).join('')}
             </select>
+            ${(MARQUES_CONFIG && state.marque && MARQUES_CONFIG[state.marque] && MARQUES_CONFIG[state.marque].positionnement) ? ('<span style="display:block;font-size:10px;font-weight:400;color:#8A92A0;line-height:1.3;margin-top:3px;">' + MARQUES_CONFIG[state.marque].positionnement + '</span>') : ''}
           </label>
           <label class="sim-field sim-field--requis"><span>Service</span>
             <select id="sim-service">
@@ -15746,7 +15746,7 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
   function bind(){
     const onIn=(id,fn)=>{ const el=document.getElementById(id); if(!el)return;
       const ev=el.tagName==='SELECT'?'change':'input'; el.addEventListener(ev,e=>{fn(e.target.value); scheduleSaveSimulatorState(); refresh();}); };
-    onIn('sim-etas',v=>{ state.etas=v; state.modele_force=false; });
+    onIn('sim-marque',v=>{ state.marque=v; state.modele_force=false; });
     onIn('sim-service',v=>{ state.service=v; state.modele_force=false; });
     onIn('iso-toit',v=>{ state.iso_toit=v; state.modele_force=false; });
     onIn('iso-mur',v=>{ state.iso_mur=v; state.modele_force=false; });
