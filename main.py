@@ -147,9 +147,9 @@ DEFAULT_PLAFONDS_REGLEMENTAIRES = {
 DEFAULT_BAREMES_ANAH = {"hors_idf":{"_description":"RFR maximum par catégorie selon nombre de personnes du foyer (Hors IDF) - source XLS","tres_modeste":{"1":17363,"2":25393,"3":30540,"4":35676,"5":40835,"personne_supplementaire":5151},"modeste":{"1":22259,"2":32553,"3":39148,"4":45735,"5":52348,"personne_supplementaire":6598},"intermediaire":{"1":31185,"2":45842,"3":55196,"4":64550,"5":73907,"personne_supplementaire":9357},"superieur":{"_description":"Au-dessus du plafond intermédiaire"}},"idf":{"_description":"RFR maximum par catégorie selon nombre de personnes du foyer (IDF) - source XLS","tres_modeste":{"1":24031,"2":35270,"3":42357,"4":49455,"5":56580,"personne_supplementaire":7116},"modeste":{"1":29253,"2":42933,"3":51564,"4":60208,"5":68877,"personne_supplementaire":8663},"intermediaire":{"1":40851,"2":60051,"3":71846,"4":84562,"5":96817,"personne_supplementaire":12257}}}
 
 DEFAULT_MARQUES = {
-    "ATLANTIC": {"niveau": "recommande", "positionnement": "A completer en admin", "avantages": ["A completer", "A completer", "A completer"]},
-    "THALEOS": {"niveau": "essentiel", "positionnement": "A completer en admin", "avantages": ["A completer", "A completer", "A completer"]},
-    "DAIKIN": {"niveau": "confort", "positionnement": "A completer en admin", "avantages": ["A completer", "A completer", "A completer"]},
+    "ATLANTIC": {"prefixes": ["ATL"], "niveau": "recommande", "positionnement": "A completer en admin", "avantages": ["A completer", "A completer", "A completer"]},
+    "THALEOS": {"prefixes": ["THA"], "niveau": "essentiel", "positionnement": "A completer en admin", "avantages": ["A completer", "A completer", "A completer"]},
+    "DAIKIN": {"prefixes": ["DAI"], "niveau": "confort", "positionnement": "A completer en admin", "avantages": ["A completer", "A completer", "A completer"]},
 }
 
 DEFAULT_PARAMS_ECO_ENERGIE = {
