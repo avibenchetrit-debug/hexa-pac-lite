@@ -19125,7 +19125,9 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
     function rowHtml(it){
       const nom = escapeHtml(((it.prenom||'')+' '+(it.nom||'')).trim() || it.numero || '');
       const tel = String(it.telephone||'').trim();
-      const telHtml = tel ? '<a href="tel:'+escapeHtml(tel)+'" class="atraiter-tel" onclick="event.stopPropagation()">'+escapeHtml(tel)+'</a>' : '—';
+      const telRaw = tel.replace(/\D/g,'');
+      const telFmt = telRaw.replace(/(\d{2})(?=\d)/g, '$1 ').trim();
+      const telHtml = tel ? '<a href="tel:'+escapeHtml(telRaw||tel)+'" class="atraiter-tel" onclick="event.stopPropagation()">'+escapeHtml(telFmt||tel)+'</a>' : '—';
       const kind = it.kind==='rdv' ? 'RDV' : (it.kind==='rappel' ? 'Rappel' : 'Détection');
       const b = etatBadge[it.etat] || [it.etat,'atb-jour'];
       let when;
