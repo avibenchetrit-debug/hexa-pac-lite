@@ -144,6 +144,8 @@ DEFAULT_PLAFONDS_REGLEMENTAIRES = {
     },
 }
 
+DEFAULT_BAREMES_ANAH = {"hors_idf":{"_description":"RFR maximum par catégorie selon nombre de personnes du foyer (Hors IDF) - source XLS","tres_modeste":{"1":17363,"2":25393,"3":30540,"4":35676,"5":40835,"personne_supplementaire":5151},"modeste":{"1":22259,"2":32553,"3":39148,"4":45735,"5":52348,"personne_supplementaire":6598},"intermediaire":{"1":31185,"2":45842,"3":55196,"4":64550,"5":73907,"personne_supplementaire":9357},"superieur":{"_description":"Au-dessus du plafond intermédiaire"}},"idf":{"_description":"RFR maximum par catégorie selon nombre de personnes du foyer (IDF) - source XLS","tres_modeste":{"1":24031,"2":35270,"3":42357,"4":49455,"5":56580,"personne_supplementaire":7116},"modeste":{"1":29253,"2":42933,"3":51564,"4":60208,"5":68877,"personne_supplementaire":8663},"intermediaire":{"1":40851,"2":60051,"3":71846,"4":84562,"5":96817,"personne_supplementaire":12257}}}
+
 DEFAULT_MARQUES = {
     "ATLANTIC": {"niveau": "recommande", "positionnement": "A completer en admin", "avantages": ["A completer", "A completer", "A completer"]},
     "THALEOS": {"niveau": "essentiel", "positionnement": "A completer en admin", "avantages": ["A completer", "A completer", "A completer"]},
@@ -199,6 +201,7 @@ DEFAULT_PARAMETRES_ADMIN = {
     "sous_traitants": DEFAULT_SOUS_TRAITANTS,
     "formule_bar_th_171": DEFAULT_FORMULE_BAR_TH_171,
     "plafonds_reglementaires": DEFAULT_PLAFONDS_REGLEMENTAIRES,
+    "baremes_anah": DEFAULT_BAREMES_ANAH,
 }
 
 
@@ -442,6 +445,7 @@ def _admin_payload_with_m3():
     admin["delegataires"] = _read_delegataires()
     admin["formule_bar_th_171"] = admin.get("formule_bar_th_171", DEFAULT_FORMULE_BAR_TH_171)
     admin["plafonds_reglementaires"] = admin.get("plafonds_reglementaires", DEFAULT_PLAFONDS_REGLEMENTAIRES)
+    admin["baremes_anah"] = admin.get("baremes_anah", DEFAULT_BAREMES_ANAH)
     return admin
 
 
@@ -2665,6 +2669,7 @@ def get_admin_m3() -> JSONResponse:
             "modeles_email": _read_modeles_email(),
             "formule_bar_th_171": load_parametres_admin().get("formule_bar_th_171", DEFAULT_FORMULE_BAR_TH_171),
             "plafonds_reglementaires": load_parametres_admin().get("plafonds_reglementaires", DEFAULT_PLAFONDS_REGLEMENTAIRES),
+            "baremes_anah": load_parametres_admin().get("baremes_anah", DEFAULT_BAREMES_ANAH),
             "params_eco_energie": load_parametres_admin().get("params_eco_energie", DEFAULT_PARAMS_ECO_ENERGIE),
             "params_financement": load_parametres_admin().get("params_financement", DEFAULT_PARAMS_FINANCEMENT),
             "marques": load_parametres_admin().get("marques", DEFAULT_MARQUES),
@@ -2731,6 +2736,22 @@ async def save_plafonds_reglementaires(request: Request):
     payload = await _read_request_payload(request)
     params = load_parametres_admin()
     params["plafonds_reglementaires"] = payload
+    save_parametres_admin_atomic(params)
+    return {"success": True}
+
+
+@app.get("/api/admin/baremes-anah")
+async def get_baremes_anah():
+    params = load_parametres_admin()
+    return params.get("baremes_anah", DEFAULT_BAREMES_ANAH)
+
+
+@app.post("/api/admin/baremes-anah")
+async def save_baremes_anah(request: Request):
+    _require_admin(request)
+    payload = await _read_request_payload(request)
+    params = load_parametres_admin()
+    params["baremes_anah"] = payload
     save_parametres_admin_atomic(params)
     return {"success": True}
 
