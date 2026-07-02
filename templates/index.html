@@ -14816,6 +14816,7 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
 
   const DEFAULT_SIM_STATE = {
     niveau_actif: 'recommande',
+    show_all_models: false,
     numero: null,
     categorie: '',
     zone: '',
@@ -15604,6 +15605,7 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
     let actif = state.niveau_actif;
     if (keys.indexOf(actif) < 0) actif = (keys.indexOf('recommande') >= 0) ? 'recommande' : keys[0];
     const preId = res.preselection ? res.preselection.modeleId : null;
+    const selId = state.modele_force ? state.modele_pac_id : preId;   // ● sur le modele reellement choisi
     const tabs = (window.HEXA_NIVEAUX || []).map(function(nd){
       const dispo = keys.indexOf(nd.key) >= 0;
       const cls = 'sim-niv-tab' + (nd.key === actif ? ' active' : '') + (dispo ? '' : ' disabled');
@@ -15614,7 +15616,7 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
         const avHtml = (Array.isArray(mo.avantages) ? mo.avantages : []).filter(function(a){ return a && String(a).trim(); }).map(function(a){ return '<span class="sim-av-chip">✓ ' + esc(a) + '</span>'; }).join('');
         const rows = mo.modeles.map(function(m){
           const reste = resteAChargePourPrix(m.prix_ttc);
-          const sel = (m.id === preId);
+          const sel = (m.id === selId);
           return '<div class="sim-mod-row' + (sel ? ' selected' : '') + '" data-modele-id="' + esc(m.id) + '">'
             + '<span class="sim-mod-radio">' + (sel ? '●' : '○') + '</span>'
             + '<span class="sim-mod-nom">' + esc(m.label || m.nom) + '</span>'
@@ -15634,15 +15636,42 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
       + '<div class="sim-niv-panels">' + panels + '</div>'
       + '<div class="sim-cards-foot"><a href="#" class="sim-voir-tous">· Voir tous les modèles ·</a></div>';
   }
+  function selectionnerModeleParId(id){
+    const selected = (CATALOGUE_PAC || []).find(function(m){ return m.id === id; });
+    if (!selected) return;
+    state.modele_pac_id = selected.id;
+    state.modele_pac = selected.label;
+    state.user_modified_price = false;
+    state.prix_pac = Math.round(selected.prix_ttc || 0);
+    state.modele_force = true;
+    state.sous_dimensionnement = false;
+    if (typeof scheduleSaveSimulatorState === 'function') scheduleSaveSimulatorState();
+    refresh();
+  }
   if (!window.__simNivBound) {
     window.__simNivBound = true;
     document.addEventListener('click', function(e){
-      const tab = e.target && e.target.closest ? e.target.closest('.sim-niv-tab') : null;
+      if (!e.target || !e.target.closest) return;
+      const tab = e.target.closest('.sim-niv-tab');
       if (tab && !tab.classList.contains('disabled')) {
         const k = tab.getAttribute('data-niv');
         state.niveau_actif = k;
         document.querySelectorAll('.sim-niv-tab').forEach(function(t){ t.classList.toggle('active', t.getAttribute('data-niv') === k); });
         document.querySelectorAll('.sim-niv-panel').forEach(function(p){ p.hidden = (p.getAttribute('data-niv') !== k); });
+        return;
+      }
+      const voir = e.target.closest('.sim-voir-tous');
+      if (voir) {
+        e.preventDefault();
+        state.show_all_models = true;
+        const wrap = document.querySelector('.sim-allmodels');
+        if (wrap) wrap.hidden = false;
+        return;
+      }
+      const row = e.target.closest('.sim-mod-row');
+      if (row) {
+        selectionnerModeleParId(row.getAttribute('data-modele-id'));
+        return;
       }
     });
   }
@@ -15749,9 +15778,9 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
             <span>Prix PAC fourni posé <i>· note de dimensionnement</i></span>
             <span class="sim-pnl-edit-wrap">
               <span class="sim-pnl-edit"><input type="text" inputmode="numeric" id="sim-prix" value="${new Intl.NumberFormat('fr-FR').format(state.prix_pac||0)}"><em>€</em></span>
-              <select id="sim-modele-select" class="sim-model-select">
+              <span class="sim-allmodels"${state.show_all_models ? '' : ' hidden'}><select id="sim-modele-select" class="sim-model-select">
                 ${catalogueOptionsOrdonnees(state).map(m => `<option value="${m.id}" ${m.id===state.modele_pac_id?'selected':''}>${m.label} · ${puissanceModele(m)} kW · ${eur(m.prix_ttc)}</option>`).join('')}
-              </select>
+              </select></span>
               ${state.sous_dimensionnement ? '<span class="sim-warn-badge">⚠ Vérifier</span>' : ''}
             </span>
           </div>
