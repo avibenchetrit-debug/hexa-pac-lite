@@ -7893,6 +7893,8 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
 
 /* ===== Badge statut déroulant custom ===== */
 .pv-statut-wrap{ position:relative; display:inline-block; }
+.fiche-statut-row{ display:flex; align-items:center; gap:10px; margin:2px 0 12px; }
+.fiche-statut-lbl{ font-size:12px; font-weight:700; color:#4A5568; }
 .pv-statut{ display:inline-flex; align-items:center; gap:6px; border:none; border-radius:9999px; padding:5px 11px; font-size:11.5px; font-weight:700; cursor:pointer; font-family:inherit; box-shadow:0 1px 2px rgba(16,32,64,.12); transition:transform .08s; }
 .pv-statut:hover{ transform:translateY(-1px); }
 .pv-statut-label{ pointer-events:none; }
@@ -8171,6 +8173,7 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
       <div class="card">
         <div class="card-title"><span class="num-card">1</span> Origine &amp; Statut</div>
         <input type="hidden" name="statut" id="statut-input" value="">
+        <div class="fiche-statut-row"><span class="fiche-statut-lbl">Statut</span><span id="fiche-statut-slot"></span></div>
         <div class="row row-1">
           <div class="field" data-required="source" data-label="Source du prospect">
             <label>Provenance <span class="req">*</span></label>
@@ -19535,6 +19538,47 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
       const b = document.getElementById('suivi-rap-assigne'); if(b) b.value = me;
     }
   }
+  function renderFicheStatut(lead){
+    const slot = document.getElementById('fiche-statut-slot');
+    if(!slot) return;
+    const numero = String((lead && lead.numero) || document.body.dataset.prospectNumero || '').trim();
+    if(!numero){ slot.innerHTML = ''; return; }
+    const cur = (lead && STMAP[lead.statut]) ? lead.statut : 'nouveau';
+    slot.innerHTML = statutSelect({ numero: numero, statut: cur });
+    const wrap = slot.querySelector('.pv-statut-wrap');
+    if(!wrap) return;
+    const btn = wrap.querySelector('.pv-statut');
+    const menu = wrap.querySelector('.pv-statut-menu');
+    if(!btn || !menu) return;
+    btn.addEventListener('click', function(e){
+      e.stopPropagation();
+      const open = menu.classList.contains('open');
+      document.querySelectorAll('.pv-statut-menu.open').forEach(function(m){ m.classList.remove('open'); });
+      if(!open){ menu.classList.add('open'); positionMenu(btn, menu); }
+    });
+    menu.querySelectorAll('.pv-statut-opt').forEach(function(opt){
+      opt.addEventListener('click', async function(e){
+        e.stopPropagation();
+        const k = opt.dataset.k; const prev = cur;
+        menu.classList.remove('open');
+        if(k === prev) return;
+        const hidden = document.getElementById('statut-input'); if(hidden) hidden.value = k;
+        const rec = Array.isArray(data) ? data.find(function(x){ return String(x.numero) === numero; }) : null;
+        if(rec) rec.statut = k;
+        renderFicheStatut({ numero: numero, statut: k });
+        try {
+          await saveLeadStatus(numero, k);
+          celebrateStatut(k);
+        } catch(err){
+          if(hidden) hidden.value = prev;
+          if(rec) rec.statut = prev;
+          renderFicheStatut({ numero: numero, statut: prev });
+          toastMsg('❌ Erreur de sauvegarde', '#B91C1C');
+          console.error(err);
+        }
+      });
+    });
+  }
   function hydrateProspectForm(lead){
     const form=document.getElementById('form-prospect'); if(!form) return;
     clearProspectForm();
@@ -19569,6 +19613,7 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
     const prenomEl=form.querySelector('[name="prenom"]'); if(prenomEl) prenomEl.value=window.formatPrenomDisplay(prenomEl.value);
     const telEl=form.querySelector('[name="telephone"]'); if(telEl && telEl.value) telEl.value=window.formaterTelephone(telEl.value);
     renderSuivi(lead);
+    renderFicheStatut(lead);
   }
   async function openFiche(p, opts){
     opts = opts || {};
