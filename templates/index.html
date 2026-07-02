@@ -14679,9 +14679,19 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
   }
 
   function marqueDepuisRef(ref){
-    const p = String(ref || '').trim().toUpperCase().split(/[-\s]/)[0];
+    const token = String(ref || '').trim().toUpperCase().split(/[-\s]/)[0];
+    if (!token) return '';
+    const cfg = (typeof MARQUES_CONFIG === 'object' && MARQUES_CONFIG) ? MARQUES_CONFIG : null;
+    if (cfg) {
+      for (const mq in cfg) {
+        const pfx = (cfg[mq] && Array.isArray(cfg[mq].prefixes)) ? cfg[mq].prefixes : [];
+        for (let i = 0; i < pfx.length; i++) {
+          if (String(pfx[i] || '').trim().toUpperCase() === token) return mq;
+        }
+      }
+    }
     const MAP = { ATL: 'ATLANTIC', THA: 'THALEOS', DAI: 'DAIKIN' };
-    return MAP[p] || '';
+    return MAP[token] || '';
   }
   function normalizeModelePac(modele, idx){
     const raw = Object.assign({}, modele || {});
@@ -14801,6 +14811,7 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
       try {
         const rMq = await fetch('/api/admin/marques', { cache:'no-store' });
         if (rMq.ok) MARQUES_CONFIG = await rMq.json();
+        if (serverCatalogue.length) CATALOGUE_PAC = nettoyerCatalogue(catalogue); // re-derive marques avec prefixes charges
       } catch(_) {}
       try {
         const rZones = await fetch('/api/zones-departements', { cache:'no-store' });
@@ -16804,29 +16815,38 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
         <div class="adm-actions"><button type="button" class="adm-btn-save" id="btn-save-params-financement">Enregistrer</button></div>
       </div>`;
   }
+  function marqueCardHtml(mq, c){
+    c = c || {};
+    const esc = (s) => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    const av = Array.isArray(c.avantages) ? c.avantages : [];
+    const pfx = Array.isArray(c.prefixes) ? c.prefixes : [];
+    const niveaux = window.HEXA_NIVEAUX || [];
+    const opts = '<option value="">— à ranger —</option>' + niveaux.map(function(n){
+      return '<option value="' + n.key + '"' + (c.niveau === n.key ? ' selected' : '') + '>' + n.icone + ' ' + n.label + '</option>';
+    }).join('');
+    return '<div class="adm-card" data-marque="' + esc(mq) + '">'
+      + '<div class="adm-fields-row"><label>Marque</label><strong>' + esc(mq) + '</strong></div>'
+      + '<div class="adm-fields-row"><label>Préfixes de réf. (séparés par virgule)</label><input type="text" class="adm-marque-prefixes" value="' + esc(pfx.join(', ')) + '" placeholder="ex. ATL"></div>'
+      + '<div class="adm-fields-row"><label>Niveau de gamme</label><select class="adm-marque-niveau">' + opts + '</select></div>'
+      + '<div class="adm-fields-row"><label>Positionnement</label><input type="text" class="adm-marque-pos" value="' + esc(c.positionnement) + '"></div>'
+      + '<div class="adm-fields-row"><label>Avantage 1</label><input type="text" class="adm-marque-av" data-idx="0" value="' + esc(av[0]) + '"></div>'
+      + '<div class="adm-fields-row"><label>Avantage 2</label><input type="text" class="adm-marque-av" data-idx="1" value="' + esc(av[1]) + '"></div>'
+      + '<div class="adm-fields-row"><label>Avantage 3</label><input type="text" class="adm-marque-av" data-idx="2" value="' + esc(av[2]) + '"></div>'
+      + '</div>';
+  }
   function renderMarquesSection(){
     const cfg = (M3_ADMIN && M3_ADMIN.marques) || {};
     const dispo = (typeof window.marquesDisponibles === 'function') ? window.marquesDisponibles() : [];
     const marques = Array.from(new Set([].concat(Object.keys(cfg), dispo))).sort();
-    const niveaux = window.HEXA_NIVEAUX || [];
-    const esc = (s) => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-    if (!marques.length) return '<p class="adm-section-help">Aucune marque au catalogue.</p>';
-    const rows = marques.map(function(mq){
-      const c = cfg[mq] || {};
-      const av = Array.isArray(c.avantages) ? c.avantages : [];
-      const opts = '<option value="">— à ranger —</option>' + niveaux.map(function(n){
-        return '<option value="' + n.key + '"' + (c.niveau === n.key ? ' selected' : '') + '>' + n.icone + ' ' + n.label + '</option>';
-      }).join('');
-      return '<div class="adm-card" data-marque="' + esc(mq) + '">'
-        + '<div class="adm-fields-row"><label>Marque</label><strong>' + esc(mq) + '</strong></div>'
-        + '<div class="adm-fields-row"><label>Niveau de gamme</label><select class="adm-marque-niveau">' + opts + '</select></div>'
-        + '<div class="adm-fields-row"><label>Positionnement</label><input type="text" class="adm-marque-pos" value="' + esc(c.positionnement) + '"></div>'
-        + '<div class="adm-fields-row"><label>Avantage 1</label><input type="text" class="adm-marque-av" data-idx="0" value="' + esc(av[0]) + '"></div>'
-        + '<div class="adm-fields-row"><label>Avantage 2</label><input type="text" class="adm-marque-av" data-idx="1" value="' + esc(av[1]) + '"></div>'
-        + '<div class="adm-fields-row"><label>Avantage 3</label><input type="text" class="adm-marque-av" data-idx="2" value="' + esc(av[2]) + '"></div>'
-        + '</div>';
-    }).join('');
-    return rows + '<div class="adm-actions"><button type="button" class="adm-btn-save" id="btn-save-marques">Enregistrer</button></div>';
+    const rows = marques.length
+      ? marques.map(function(mq){ return marqueCardHtml(mq, cfg[mq] || {}); }).join('')
+      : '<p class="adm-section-help">Aucune marque au catalogue.</p>';
+    return rows
+      + '<div class="adm-add-row" style="display:flex;gap:8px;align-items:center;margin:10px 0">'
+      +   '<input type="text" id="adm-new-marque-nom" placeholder="Nom de la nouvelle marque (ex. FRISQUET)">'
+      +   '<button type="button" class="adm-btn" id="btn-add-marque">+ Ajouter une marque</button>'
+      + '</div>'
+      + '<div class="adm-actions"><button type="button" class="adm-btn-save" id="btn-save-marques">Enregistrer</button></div>';
   }
   function admBloc(id, title, content){
     return `<div class="adm-bloc" data-bloc-id="${id}" data-open="false">
@@ -17839,12 +17859,29 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
         const mq = card.getAttribute('data-marque');
         const niveau = card.querySelector('.adm-marque-niveau') ? card.querySelector('.adm-marque-niveau').value : '';
         const positionnement = card.querySelector('.adm-marque-pos') ? card.querySelector('.adm-marque-pos').value : '';
+        const prefixes = card.querySelector('.adm-marque-prefixes')
+          ? card.querySelector('.adm-marque-prefixes').value.split(',').map(function(s){ return String(s).trim().toUpperCase(); }).filter(function(s){ return s; })
+          : [];
         const avantages = Array.from(card.querySelectorAll('.adm-marque-av')).sort(function(a,b){return Number(a.dataset.idx)-Number(b.dataset.idx);}).map(function(el){return el.value || '';});
-        payload[mq] = { niveau: niveau, positionnement: positionnement, avantages: avantages };
+        payload[mq] = { prefixes: prefixes, niveau: niveau, positionnement: positionnement, avantages: avantages };
       });
       const r = await fetch('/api/admin/marques', { method:'POST', headers: window.adminHeaders(), body: JSON.stringify(payload) });
       if (r.ok) { M3_ADMIN.marques = payload; adminToast('Gammes & marques sauvegardées ✓', '#0D6B3B'); window.dispatchEvent(new CustomEvent('hexa-config-changed')); }
       else adminToast('Erreur sauvegarde marques', '#B91C1C');
+    });
+    document.getElementById('btn-add-marque')?.addEventListener('click', function(){
+      const inp = document.getElementById('adm-new-marque-nom');
+      const nom = (inp && inp.value ? inp.value : '').trim().toUpperCase();
+      if (!nom) { adminToast('Nom de marque requis', '#B91C1C'); return; }
+      const cont = document.getElementById('adm-bloc-content-9');
+      if (!cont) return;
+      if (cont.querySelector('.adm-card[data-marque="' + nom + '"]')) { adminToast('Marque déjà présente', '#B45309'); return; }
+      const addRow = cont.querySelector('.adm-add-row');
+      const tmp = document.createElement('div');
+      tmp.innerHTML = marqueCardHtml(nom, {});
+      const card = tmp.firstChild;
+      if (addRow && addRow.parentNode) addRow.parentNode.insertBefore(card, addRow);
+      if (inp) inp.value = '';
     });
     document.getElementById('btn-save-params-eco-energie')?.addEventListener('click', async ()=>{
       const n = id => Number(String(document.getElementById(id)?.value ?? '').replace(',','.')) || 0;
