@@ -6745,6 +6745,8 @@ body.sim-left-open .hexa-app-shell__main{
 .sim-voir-tous{ font-size:10.5px; color:#8A92A0; text-decoration:none; cursor:pointer; }
 .sim-voir-tous:hover{ text-decoration:underline; }
 .sim-cards-fallback{ background:#FEF3C7; border:1px solid #F59E0B; color:#B45309; border-radius:10px; padding:12px; font-size:11.5px; line-height:1.5; margin:6px 0; }
+.sim-cards-fallback strong{ display:block; margin-bottom:4px; font-size:12px; }
+.sim-niv-tab svg{ vertical-align:-2px; margin-right:2px; }
 @media (max-width:640px){ .sim-mod-row{ grid-template-columns:20px 1fr 50px 76px; column-gap:6px; } .sim-av-chip{ font-size:9.5px; } }
 .sim-model-select:focus{ outline:none; border-color:var(--c-navy,#002E5A); box-shadow:0 0 0 3px rgba(0,46,90,.12); }
 .sim-zone-badge{ display:inline-flex; align-items:center; justify-content:center; min-width:48px; padding:4px 12px; border-radius:6px; background:#1A4A7A; color:#fff; font-size:12px; font-weight:800; }
@@ -15158,6 +15160,7 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
       type_logement: state.type_logement || '',
       surface_chauffee: state.surface_chauffee || '',
       option: state.option || '',
+      niveau_actif: state.niveau_actif || 'recommande',
       // Éco 20 ans (roi()) : incluses uniquement si lastRoi existe, sinon clés omises
       // pour ne pas écraser une valeur déjà persistée (merge côté backend).
       ...(lastRoi ? {
@@ -15206,6 +15209,7 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
       if (saved.type_logement) state.type_logement = saved.type_logement;
       if (saved.surface_chauffee) { state.surface_chauffee = Number(saved.surface_chauffee); state.surface_forcee = true; }
       if (saved.option) state.option = saved.option;
+      if (saved.niveau_actif) state.niveau_actif = saved.niveau_actif;
       state.modele_force = !!saved.modele_pac_id;
     } catch(e) {
       console.warn('Aucun state simulateur sauvegardé', e);
@@ -15229,8 +15233,10 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
       state.sous_dimensionnement = false;
       selection = { modele: forcedModele, sous_dimensionnement: false, forced: true };
     } else {
-      selection = selectionnerPAC(dim.puissance_kw, CATALOGUE_PAC, state);
-      appliquerSelectionPac(selection);
+      const _pn = selectionnerParNiveau(dim.puissance_kw, state);
+      const _pm = (_pn.ok && _pn.preselection && _pn.preselection.modeleId) ? (CATALOGUE_PAC || []).find(function(m){ return m.id === _pn.preselection.modeleId; }) : null;
+      if (_pm) { selection = { modele: _pm, sous_dimensionnement: false }; appliquerSelectionPac(selection); }
+      else { selection = selectionnerPAC(dim.puissance_kw, CATALOGUE_PAC, state); appliquerSelectionPac(selection); }
     }
 
     state.selection_alerte = selection?.alerte || null;
@@ -15593,13 +15599,24 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
   function niveauMeta(key){
     return (window.HEXA_NIVEAUX || []).find(function(n){ return n.key === key; }) || { key: key, label: key, icone: '' };
   }
+  function niveauSvg(key){
+    const P = {
+      essentiel: '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17 8C8 10 5.9 16.17 3.82 21.34l1.89.66.95-2.3c.48.17.98.3 1.34.3C19 20 22 3 22 3c-1 2-8 2.25-13 3.25S2 11.5 2 13.5s1.75 3.75 1.75 3.75C7 8 17 8 17 8z"/></svg>',
+      recommande: '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>',
+      confort: '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M5 16L3 5l5.5 5L12 4l3.5 6L21 5l-2 11H5zm0 3h14v2H5v-2z"/></svg>'
+    };
+    return P[key] || '';
+  }
   function renderNiveaux(){
     const esc = function(s){ return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
     const note = Number(state.puissance_requise_kw) || 0;
+    const noteFmt = (Math.round(note*10)/10);
     const res = (typeof selectionnerParNiveau === 'function') ? selectionnerParNiveau(note, state) : { ok:false, niveaux:[] };
     if (!res.ok || !res.niveaux.length) {
       return '<div class="sim-section-label">Votre PAC recommandée</div>'
-        + '<div class="sim-cards-fallback">⚠ Aucun modèle bien dimensionné pour ' + (Math.round(note*10)/10) + ' kW. Vérifiez le dimensionnement. <a href="#" class="sim-voir-tous">Voir tous les modèles</a></div>';
+        + '<div class="sim-cards-fallback"><strong>⚠ Aucune PAC bien dimensionnée</strong>'
+        + 'pour une puissance de ' + noteFmt + ' kW. Ajustez le dimensionnement (isolation, surface), '
+        + 'ou <a href="#" class="sim-voir-tous">voir tous les modèles</a>.</div>';
     }
     const keys = res.niveaux.map(function(n){ return n.key; });
     let actif = state.niveau_actif;
@@ -15609,7 +15626,7 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
     const tabs = (window.HEXA_NIVEAUX || []).map(function(nd){
       const dispo = keys.indexOf(nd.key) >= 0;
       const cls = 'sim-niv-tab' + (nd.key === actif ? ' active' : '') + (dispo ? '' : ' disabled');
-      return '<button type="button" class="' + cls + '" data-niv="' + nd.key + '"' + (dispo ? '' : ' disabled') + '>' + nd.icone + ' ' + esc(nd.label) + '</button>';
+      return '<button type="button" class="' + cls + '" data-niv="' + nd.key + '"' + (dispo ? '' : ' disabled') + '>' + niveauSvg(nd.key) + ' ' + esc(nd.label) + '</button>';
     }).join('');
     const panels = res.niveaux.map(function(n){
       const marquesHtml = n.marques.map(function(mo){
@@ -15753,13 +15770,7 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
 
         <div class="sim-section-label">Paramètres PAC</div>
         <div class="sim-row2">
-          <label class="sim-field sim-field--requis"><span>Gamme</span>
-            <select id="sim-marque">
-              <option value="">— Choisir une marque —</option>
-              ${marquesDisponibles().map(function(mq){ return '<option value="' + mq + '" ' + sel(state.marque, mq) + '>' + mq + '</option>'; }).join('')}
-            </select>
-            ${(MARQUES_CONFIG && state.marque && MARQUES_CONFIG[state.marque] && MARQUES_CONFIG[state.marque].positionnement) ? ('<span style="display:block;font-size:10px;font-weight:400;color:#8A92A0;line-height:1.3;margin-top:3px;">' + MARQUES_CONFIG[state.marque].positionnement + '</span>') : ''}
-          </label>
+
           <label class="sim-field sim-field--requis"><span>Service</span>
             <select id="sim-service">
               <option value="chauffage_seul" ${sel(state.service,'chauffage_seul')}>Chauffage seul</option>
@@ -15899,7 +15910,6 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
   function bind(){
     const onIn=(id,fn)=>{ const el=document.getElementById(id); if(!el)return;
       const ev=el.tagName==='SELECT'?'change':'input'; el.addEventListener(ev,e=>{fn(e.target.value); scheduleSaveSimulatorState(); refresh();}); };
-    onIn('sim-marque',v=>{ state.marque=v; state.modele_force=false; });
     onIn('sim-service',v=>{ state.service=v; state.modele_force=false; });
     onIn('iso-toit',v=>{ state.iso_toit=v; state.modele_force=false; });
     onIn('iso-mur',v=>{ state.iso_mur=v; state.modele_force=false; });
