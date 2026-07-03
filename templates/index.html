@@ -7895,6 +7895,14 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
 .pv-statut-wrap{ position:relative; display:inline-block; }
 .fiche-statut-row{ display:flex; align-items:center; gap:10px; margin:2px 0 12px; }
 .fiche-statut-lbl{ font-size:12px; font-weight:700; color:#4A5568; }
+.fiche-vt-row{ display:flex; align-items:center; gap:10px; margin:2px 0 12px; flex-wrap:wrap; }
+.fiche-vt-lbl{ font-size:12px; font-weight:700; color:#4A5568; }
+.fiche-vt-badge{ display:inline-flex; align-items:center; gap:6px; border-radius:9999px; padding:5px 11px; font-size:11.5px; font-weight:700; background:#CCFBF1; color:#0F766E; }
+.fiche-vt-btn{ border:none; border-radius:9999px; padding:5px 11px; font-size:11.5px; font-weight:700; cursor:pointer; font-family:inherit; }
+.fiche-vt-valider{ background:#CCFBF1; color:#0F766E; }
+.fiche-vt-refuser{ background:#FFEDD5; color:#C2410C; }
+.fiche-vt-annuler{ font-size:11px; color:#8A92A0; text-decoration:none; cursor:pointer; }
+.fiche-vt-annuler:hover{ text-decoration:underline; }
 .pv-statut{ display:inline-flex; align-items:center; gap:6px; border:none; border-radius:9999px; padding:5px 11px; font-size:11.5px; font-weight:700; cursor:pointer; font-family:inherit; box-shadow:0 1px 2px rgba(16,32,64,.12); transition:transform .08s; }
 .pv-statut:hover{ transform:translateY(-1px); }
 .pv-statut-label{ pointer-events:none; }
@@ -8174,6 +8182,7 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
         <div class="card-title"><span class="num-card">1</span> Origine &amp; Statut</div>
         <input type="hidden" name="statut" id="statut-input" value="">
         <div class="fiche-statut-row"><span class="fiche-statut-lbl">Statut</span><span id="fiche-statut-slot"></span></div>
+        <div class="fiche-vt-row"><span class="fiche-vt-lbl">Visite technique</span><span id="fiche-vt-slot"></span></div>
         <div class="row row-1">
           <div class="field" data-required="source" data-label="Source du prospect">
             <label>Provenance <span class="req">*</span></label>
@@ -18428,6 +18437,9 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
     { k:"nouveau",  label:"Nouveau",      bg:"#E0ECFB", fg:"#1D4ED8" },
     { k:"rappeler", label:"À rappeler",   bg:"#FEF3C7", fg:"#B45309" },
     { k:"rdv",      label:"RDV pris",     bg:"#EDE9FE", fg:"#6D28D9" },
+    { k:"vt_envoye", label:"Envoyé en VT", bg:"#CFFAFE", fg:"#0E7490" },
+    { k:"vt_valide", label:"VT validé",    bg:"#CCFBF1", fg:"#0F766E" },
+    { k:"vt_refuse", label:"VT refusé",    bg:"#FFEDD5", fg:"#C2410C" },
     { k:"devis",    label:"Devis",        bg:"#E0F2FE", fg:"#0369A1" },
     { k:"devis_envoye", label:"Devis envoyé", bg:"#DCFCE7", fg:"#15803D" },
     { k:"signe",    label:"Signé",        bg:"#DCFCE7", fg:"#15803D" },
@@ -19658,6 +19670,39 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
       });
     });
   }
+  function renderFicheVt(lead){
+    const slot = document.getElementById('fiche-vt-slot');
+    if(!slot) return;
+    const numero = String((lead && lead.numero) || document.body.dataset.prospectNumero || '').trim();
+    if(!numero){ slot.innerHTML = ''; return; }
+    const validee = !!(lead && lead.vt_validee);
+    const vtDate = (lead && lead.vt_date) ? String(lead.vt_date) : '';
+    const esc = function(s){ return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
+    let dateLbl = vtDate;
+    const m = vtDate.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if(m) dateLbl = m[3] + '/' + m[2] + '/' + m[1];
+    if(validee){
+      slot.innerHTML = '<span class="fiche-vt-badge">✅ VT validée' + (dateLbl ? ' le ' + esc(dateLbl) : '') + '</span> <a href="#" class="fiche-vt-annuler">Annuler</a>';
+    } else {
+      slot.innerHTML = '<button type="button" class="fiche-vt-btn fiche-vt-valider">✅ Valider la VT</button> <button type="button" class="fiche-vt-btn fiche-vt-refuser">❌ VT refusée</button>';
+    }
+    async function postVt(action){
+      try {
+        const res = await fetch('/api/leads/' + encodeURIComponent(numero) + '/vt', {
+          method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ action: action })
+        });
+        if(!res.ok) throw new Error('HTTP ' + res.status);
+        toastMsg('✓ VT ' + (action === 'valider' ? 'validée' : action === 'refuser' ? 'refusée' : 'annulée'), '#0D6B3B');
+        if (typeof window.openFicheByNumero === 'function') window.openFicheByNumero(numero);
+      } catch(err){
+        toastMsg('❌ Erreur VT', '#B91C1C');
+        console.error(err);
+      }
+    }
+    const bV = slot.querySelector('.fiche-vt-valider'); if(bV) bV.addEventListener('click', function(){ postVt('valider'); });
+    const bR = slot.querySelector('.fiche-vt-refuser'); if(bR) bR.addEventListener('click', function(){ postVt('refuser'); });
+    const bA = slot.querySelector('.fiche-vt-annuler'); if(bA) bA.addEventListener('click', function(e){ e.preventDefault(); postVt('annuler'); });
+  }
   function hydrateProspectForm(lead){
     const form=document.getElementById('form-prospect'); if(!form) return;
     clearProspectForm();
@@ -19693,6 +19738,7 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
     const telEl=form.querySelector('[name="telephone"]'); if(telEl && telEl.value) telEl.value=window.formaterTelephone(telEl.value);
     renderSuivi(lead);
     renderFicheStatut(lead);
+    renderFicheVt(lead);
   }
   async function openFiche(p, opts){
     opts = opts || {};
