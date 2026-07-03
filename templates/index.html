@@ -17797,7 +17797,7 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
   async function refreshGammesState(){
     let rows = [];
     try {
-      const r = await fetch('/api/admin/gammes', { cache:'no-store' });
+      const r = await fetch('/api/admin/gammes', { cache:'no-store', headers: { 'X-Admin-Token': window.adminHeaders()['X-Admin-Token'] } });
       if (r.ok) rows = await r.json();
     } catch(_) { return; }
     const byRef = {};
@@ -17826,7 +17826,7 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
     fd.append('ref', m.ref);
     fd.append('gamme', inp.value.trim());
     try {
-      const r = await fetch('/api/admin/gammes', { method:'POST', body: fd });
+      const r = await fetch('/api/admin/gammes', { method:'POST', headers: { 'X-Admin-Token': window.adminHeaders()['X-Admin-Token'] }, body: fd });
       const body = await r.json().catch(()=>({}));
       if (!r.ok){ adminToast(body.detail || ('Échec (HTTP '+r.status+')'), '#ef4444'); return; }
       inp.value = body.gamme || '';
