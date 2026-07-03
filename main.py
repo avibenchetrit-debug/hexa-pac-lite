@@ -757,6 +757,15 @@ STATUT_ALIASES = {
     "rappeler": "rappeler",
     "rdv": "rdv",
     "rdv pris": "rdv",
+    "envoye en vt": "vt_envoye",
+    "envoyé en vt": "vt_envoye",
+    "vt_envoye": "vt_envoye",
+    "vt valide": "vt_valide",
+    "vt validé": "vt_valide",
+    "vt_valide": "vt_valide",
+    "vt refuse": "vt_refuse",
+    "vt refusé": "vt_refuse",
+    "vt_refuse": "vt_refuse",
     "devis": "devis",
     "devis envoye": "devis_envoye",
     "devis envoyé": "devis_envoye",
@@ -908,6 +917,10 @@ PROSPECT_FIELDS = [
     "actions_log",         # liste : historique des actions closes
     "statut_updated_at",   # iso Paris : déjà écrit par /status, déclaré pour cohérence
     "injoignable_at",      # iso Paris : posé quand statut -> injoignable
+
+    # Visite technique (marque permanente, independante du statut)
+    "vt_validee",          # bool : VT validee (autorise le devis complet)
+    "vt_date",             # iso Paris : date de validation VT
 ]
 
 DEFAULT_PROSPECT_VALUES = {
@@ -918,6 +931,7 @@ DEFAULT_PROSPECT_VALUES = {
     "rdv": None,
     "rappel": None,
     "actions_log": [],
+    "vt_validee": False,
 }
 
 IMPORT_PROSPECT_FIELDS = [
@@ -1747,7 +1761,7 @@ async def update_lead_status(numero: str, request: Request) -> JSONResponse:
     """Met à jour le statut d'un prospect depuis l'Accueil."""
     payload = await _read_request_payload(request)
     new_status = _normalize_statut(str(payload.get("statut") or "").strip())
-    allowed = {"nouveau", "contacte", "rappeler", "rdv", "devis", "devis_envoye", "signe", "perdu"}
+    allowed = {"nouveau", "contacte", "rappeler", "rdv", "vt_envoye", "vt_valide", "vt_refuse", "devis", "devis_envoye", "signe", "perdu"}
     if new_status not in allowed:
         raise HTTPException(status_code=400, detail=f"Statut invalide : {new_status}")
     leads = _read_leads()
@@ -1759,6 +1773,46 @@ async def update_lead_status(numero: str, request: Request) -> JSONResponse:
     leads[index]["updated_at"] = _now_iso()
     _atomic_write_json(LEADS_PATH, leads)
     return JSONResponse({"success": True, "statut": new_status})
+
+
+@app.post("/api/leads/{numero}/vt")
+async def update_lead_vt(numero: str, request: Request) -> JSONResponse:
+    """Visite technique : valide / refuse / annule la marque VT.
+
+    La marque (vt_validee + vt_date) est INDEPENDANTE du statut commercial (Option 2) :
+    - valider : vt_validee=True + vt_date + statut='vt_valide'
+    - refuser : statut='vt_refuse' (ne pose PAS la marque)
+    - annuler : vt_validee=False + vt_date='' (ne touche PAS au statut)
+    Le statut posé reste modifiable manuellement ensuite via la pilule.
+    """
+    payload = await _read_request_payload(request)
+    action = str(payload.get("action") or "").strip().lower()
+    leads = _read_leads()
+    index = _find_lead_index(leads, numero)
+    if index is None:
+        raise HTTPException(status_code=404, detail="Prospect non trouvé")
+    now_paris = _now_paris_iso()
+    if action == "valider":
+        leads[index]["vt_validee"] = True
+        leads[index]["vt_date"] = now_paris
+        leads[index]["statut"] = "vt_valide"
+        leads[index]["statut_updated_at"] = now_paris
+    elif action == "refuser":
+        leads[index]["statut"] = "vt_refuse"
+        leads[index]["statut_updated_at"] = now_paris
+    elif action == "annuler":
+        leads[index]["vt_validee"] = False
+        leads[index]["vt_date"] = ""
+    else:
+        raise HTTPException(status_code=400, detail="Action VT invalide")
+    leads[index]["updated_at"] = _now_iso()
+    _atomic_write_json(LEADS_PATH, leads)
+    return JSONResponse({
+        "success": True,
+        "vt_validee": bool(leads[index].get("vt_validee", False)),
+        "vt_date": leads[index].get("vt_date", ""),
+        "statut": leads[index].get("statut", ""),
+    })
 
 
 def _nrp_event(numero, payload):
