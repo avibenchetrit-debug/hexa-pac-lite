@@ -200,6 +200,14 @@ DEFAULT_PARAMETRES_ADMIN = {
         "prix_travaux_induits_ht": 1200,
         "frais_ecair_pct": 12,
     },
+    "ballon_thermo": {
+        "modeles": [
+            {"ref": "ballon-1", "nom": "Ballon thermodynamique 1", "fourniture_ht": 0},
+            {"ref": "ballon-2", "nom": "Ballon thermodynamique 2", "fourniture_ht": 0},
+        ],
+        "prix_pose_ht": 0,
+        "forfaits_mpr": {"tres_modeste": 1200, "modeste": 800, "intermediaire": 400, "superieur": 0},
+    },
     "sous_traitants": DEFAULT_SOUS_TRAITANTS,
     "formule_bar_th_171": DEFAULT_FORMULE_BAR_TH_171,
     "plafonds_reglementaires": DEFAULT_PLAFONDS_REGLEMENTAIRES,

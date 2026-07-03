@@ -16879,6 +16879,31 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
       <div class="adm-actions"><button type="button" class="adm-btn-save" id="adm-save-mpr">Enregistrer</button></div>
     </div>`;
   }
+  function renderBallonThermoFields(){
+    const cfg = (window.HexaConfig && window.HexaConfig.ballon_thermo) || {};
+    const modeles = (Array.isArray(cfg.modeles) && cfg.modeles.length) ? cfg.modeles : [
+      { ref:'ballon-1', nom:'Ballon thermodynamique 1', fourniture_ht:0 },
+      { ref:'ballon-2', nom:'Ballon thermodynamique 2', fourniture_ht:0 }
+    ];
+    const pose = cfg.prix_pose_ht != null ? cfg.prix_pose_ht : 0;
+    const forfaits = cfg.forfaits_mpr || { tres_modeste:1200, modeste:800, intermediaire:400, superieur:0 };
+    const modelesRows = modeles.slice(0,2).map((m,i)=>`
+      <div class="adm-field adm-field-row"><span class="adm-lab">Modèle ${i+1} — libellé</span><input type="text" class="adm-bt-nom" data-idx="${i}" data-ref="${adminEscape(m.ref||('ballon-'+(i+1)))}" value="${adminEscape(m.nom||'')}"></div>
+      <div class="adm-field adm-field-row"><span class="adm-lab">Modèle ${i+1} — fourniture</span><span class="adm-euro"><input type="text" inputmode="numeric" class="adm-bt-fourniture adm-money" data-idx="${i}" value="${adminEscape(m.fourniture_ht != null ? m.fourniture_ht : 0)}"><i>€ HT</i></span></div>`).join('');
+    return `<div class="adm-card">
+      ${modelesRows}
+      <div class="adm-field adm-field-row"><span class="adm-lab">Pose commune</span><span class="adm-euro"><input type="text" inputmode="numeric" class="adm-bt-pose adm-money" value="${adminEscape(pose)}"><i>€ HT</i></span></div>
+      ${[
+        ['tres_modeste','TMO (Très modeste)'],
+        ['modeste','MO (Modeste)'],
+        ['intermediaire','INT (Intermédiaire)'],
+        ['superieur','SUP (Supérieur)']
+      ].map(([k,l])=>`<div class="adm-field adm-field-row"><span class="adm-lab">MPR ${l}</span><span class="adm-euro"><input type="text" inputmode="numeric" class="adm-bt-mpr adm-money" data-cat="${k}" value="${adminEscape(forfaits[k] != null ? forfaits[k] : 0)}"><i>€</i></span></div>`).join('')}
+      <p class="adm-section-help">2 modèles (libellé + fourniture), pose commune, et forfaits MaPrimeRénov' par catégorie. Servent quand un ballon est ajouté au devis.</p>
+      <div class="adm-actions"><button type="button" class="adm-btn-save" id="btn-save-ballon-thermo">Enregistrer</button></div>
+    </div>`;
+  }
+
   function renderBonificationFields(){
     const cfg = M3_ADMIN || {};
     const bonif = cfg.bonification_cee || { actif:true, multiplicateur:5 };
@@ -17047,6 +17072,7 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
     return {
       params: cfg.params || {},
       prix_vente_devis: cfg.prix_vente_devis || DEFAULT.prix_vente_devis,
+      ballon_thermo: cfg.ballon_thermo || DEFAULT.ballon_thermo,
       sous_traitants: cfg.sous_traitants || DEFAULT.sous_traitants
     };
   }
@@ -17088,6 +17114,14 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
       prix_pose_ht: 3500,
       prix_travaux_induits_ht: 1200,
       frais_ecair_pct: 12
+    },
+    ballon_thermo: {
+      modeles: [
+        { ref:'ballon-1', nom:'Ballon thermodynamique 1', fourniture_ht:0 },
+        { ref:'ballon-2', nom:'Ballon thermodynamique 2', fourniture_ht:0 }
+      ],
+      prix_pose_ht: 0,
+      forfaits_mpr: { tres_modeste:1200, modeste:800, intermediaire:400, superieur:0 }
     },
     sous_traitants: [{
       id:'italisol',
@@ -17330,7 +17364,7 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
       <div class="adm-add-row"><button type="button" class="adm-btn adm-btn-add" id="adm-add">+ Ajouter une pompe à chaleur</button></div>
       <div class="adm-legend"><div class="adm-legend-row"><span class="adm-dot adm-dot1"></span><span>Option 1 — vente directe : marge brute − CAC − visite − COFRAC − urbanisme.</span></div><div class="adm-legend-row"><span class="adm-dot adm-dot2"></span><span>Option 2 — prix de cession : marge garantie au-dessus de (coût + visite + COFRAC + urbanisme). La régie revend au-dessus et garde le surplus ; la colonne « Commission régie » montre ce qu'elle gagne si elle revend à ton prix catalogue.</span></div><div class="adm-legend-row"><span>Marges théoriques — calculées sur un MPR forfaitaire de 5 000 € (estimation commune à tous les modèles), pas un calcul réel par prospect.</span></div></div>
       <div class="adm-actions"><button type="button" class="adm-btn-save" id="adm-save-catalogue">Enregistrer</button></div>`;
-    const adminBody = `${admBloc('1','1. Réglages généraux',admSousBloc('1-1','1.1 Coût Hexa',coutHexa)+admSousBloc('1-2','1.2 Vente Hexa',venteHexa))}${admBloc('2','2. MPR',admSousBloc('2-1','2.1 Forfait MPR',renderMprFields())+admSousBloc('2-2','2.2 Plafonds réglementaires',renderPlafondsSection())+admSousBloc('2-3','2.3 Barèmes ANAH (plafonds RFR)',renderBaremesAnahSection()))}${admBloc('3','3. CEE',admSousBloc('3-1','3.1 Formule BAR-TH-171 (PAC Air-Eau)',renderFormuleBarSection())+admSousBloc('3-2','3.2 Bonification CEE',renderBonificationFields())+admSousBloc('3-3','3.3 Délégataires CEE',renderDelegatairesFields()))}${admBloc('4','4. Sous-traitants',renderSousTraitantsSection())}${admBloc('5','5. Commercial',admSousBloc('5-1','5.1 Options commerciales',optionsCommerciales)+admSousBloc('5-2','5.2 Modèles et marges nettes',modelesMarges))}${admBloc('6','6. Modèles email',renderEmailsFields())}${admBloc('7','7. Corbeille des leads','<div id="adm-trash" class="adm-trash-empty">Chargement...</div>')}${admBloc('8','8. Paramètres économiques',admSousBloc('8-1',"8.1 Hypothèses économie d'énergie",renderParamsEcoEnergie())+admSousBloc('8-2','8.2 Hypothèses financement',renderParamsFinancement()))}${admBloc('9','9. Gammes & Marques', renderMarquesSection())}`;
+    const adminBody = `${admBloc('1','1. Réglages généraux',admSousBloc('1-1','1.1 Coût Hexa',coutHexa)+admSousBloc('1-2','1.2 Vente Hexa',venteHexa))}${admBloc('2','2. MPR',admSousBloc('2-1','2.1 Forfait MPR',renderMprFields())+admSousBloc('2-2','2.2 Plafonds réglementaires',renderPlafondsSection())+admSousBloc('2-3','2.3 Barèmes ANAH (plafonds RFR)',renderBaremesAnahSection()))}${admBloc('3','3. CEE',admSousBloc('3-1','3.1 Formule BAR-TH-171 (PAC Air-Eau)',renderFormuleBarSection())+admSousBloc('3-2','3.2 Bonification CEE',renderBonificationFields())+admSousBloc('3-3','3.3 Délégataires CEE',renderDelegatairesFields()))}${admBloc('4','4. Sous-traitants',renderSousTraitantsSection())}${admBloc('5','5. Commercial',admSousBloc('5-1','5.1 Options commerciales',optionsCommerciales)+admSousBloc('5-2','5.2 Modèles et marges nettes',modelesMarges)+admSousBloc('5-3','5.3 Ballon thermodynamique',renderBallonThermoFields()))}${admBloc('6','6. Modèles email',renderEmailsFields())}${admBloc('7','7. Corbeille des leads','<div id="adm-trash" class="adm-trash-empty">Chargement...</div>')}${admBloc('8','8. Paramètres économiques',admSousBloc('8-1',"8.1 Hypothèses économie d'énergie",renderParamsEcoEnergie())+admSousBloc('8-2','8.2 Hypothèses financement',renderParamsFinancement()))}${admBloc('9','9. Gammes & Marques', renderMarquesSection())}`;
     return `
       <div class="adm-overlay" id="adm-overlay">
         <div class="adm-modal">
@@ -17392,6 +17426,29 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
     try { localStorage.setItem(LS_KEY, JSON.stringify(cfg)); } catch(_){}
     await saveAdminParamsServer();
     adminToast('✓ Prix de vente sauvegardés', '#0D6B3B');
+  }
+
+  async function saveBallonThermo(){
+    const cfg = window.HexaConfig || loadConfig();
+    const num = (el) => parseFloat(String((el && el.value) || '0').replace(/\s/g,'').replace(',','.')) || 0;
+    const noms = Array.from(document.querySelectorAll('.adm-bt-nom'));
+    const fournis = Array.from(document.querySelectorAll('.adm-bt-fourniture'));
+    const modeles = noms.map((el,i)=>({
+      ref: el.dataset.ref || ('ballon-'+(i+1)),
+      nom: (el.value||'').trim(),
+      fourniture_ht: num(fournis[i])
+    }));
+    const forfaits = {};
+    document.querySelectorAll('.adm-bt-mpr').forEach(el=>{ forfaits[el.dataset.cat] = num(el); });
+    cfg.ballon_thermo = {
+      modeles: modeles,
+      prix_pose_ht: num(document.querySelector('.adm-bt-pose')),
+      forfaits_mpr: forfaits
+    };
+    window.HexaConfig = cfg;
+    try { localStorage.setItem(LS_KEY, JSON.stringify(cfg)); } catch(_){}
+    await saveAdminParamsServer();
+    adminToast('✓ Ballon thermodynamique sauvegardé', '#0D6B3B');
   }
 
   function collectSousTraitants(){
@@ -17686,6 +17743,7 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
       }
     });
     document.getElementById('btn-save-prix-vente-devis')?.addEventListener('click', savePrixVenteDevis);
+    document.getElementById('btn-save-ballon-thermo')?.addEventListener('click', saveBallonThermo);
     document.getElementById('btn-add-sous-traitant')?.addEventListener('click', ()=>{
       window.HexaConfig.sous_traitants = collectSousTraitants();
       window.HexaConfig.sous_traitants.push({ id:'st_' + Date.now(), entreprise:'', siret:'', adresse:'', rge:'', rge_validite_du:'', rge_validite_au:'', assurance:'', actif:false });
