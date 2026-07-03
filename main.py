@@ -3064,6 +3064,7 @@ def _build_devis_context(request: Request, numero: str, version: int | None = No
         "description_specs": description_specs,
         "sous_traitant": sous_traitant_context,
         "avec_sous_traitant": avec_sous_traitant,
+        "pre_devis": not avec_sous_traitant,  # modèle 2-temps : pré-devis = sans sous-traité
         "sous_traitant_texte": format_sous_traitant(sous_traitant),
         **formatted_calculs,
     }
@@ -3259,8 +3260,12 @@ async def validate_devis(numero: str) -> JSONResponse:
 
 
 @app.get("/api/devis/{numero}/preview", response_class=HTMLResponse)
-async def devis_preview(numero: str, request: Request) -> HTMLResponse:
-    return _render_template_response(request, "devis_pac.html", _build_devis_context(request, numero))
+async def devis_preview(numero: str, request: Request, variante: str | None = None) -> HTMLResponse:
+    if variante is None:
+        _lead = _find_lead(numero)
+        variante = "devis" if (_lead and _lead.get("vt_validee")) else "pre_devis"
+    avec_sous_traitant = (variante == "devis")
+    return _render_template_response(request, "devis_pac.html", _build_devis_context(request, numero, avec_sous_traitant=avec_sous_traitant))
 
 
 @app.get("/api/notedim/{numero}/preview", response_class=HTMLResponse)
@@ -3269,14 +3274,18 @@ async def notedim_preview(numero: str, request: Request) -> HTMLResponse:
 
 
 @app.get("/api/devis/{numero}/pdf")
-async def devis_pdf(numero: str, request: Request):
-    pdf_bytes = _html_to_pdf_playwright(_render_devis_html(request, numero), request)
-    version = _next_devis_version(numero)
-    _write_pdf(_devis_path(numero, version), pdf_bytes)
+async def devis_pdf(numero: str, request: Request, variante: str | None = None):
+    if variante is None:
+        _lead = _find_lead(numero)
+        variante = "devis" if (_lead and _lead.get("vt_validee")) else "pre_devis"
+    avec_sous_traitant = (variante == "devis")
+    # Aperçu : rendu + stream éphémère. NE fige AUCUNE version (seul _send_devis fige).
+    pdf_bytes = _html_to_pdf_playwright(_render_devis_html(request, numero, avec_sous_traitant=avec_sous_traitant), request)
+    fname = "Devis" if variante == "devis" else "Pre-devis"
     return StreamingResponse(
         io.BytesIO(pdf_bytes),
         media_type="application/pdf",
-        headers={"Content-Disposition": f'attachment; filename="Devis_{numero}.pdf"'},
+        headers={"Content-Disposition": f'attachment; filename="{fname}_{numero}.pdf"'},
     )
 
 
@@ -3290,11 +3299,12 @@ async def devis_public(numero: str, token: str, request: Request):
         _html_file = _item.get("html_file")
         if _html_file and os.path.exists(_html_file):
             _pdf_url = f"/devis-public/{numero}/{token}/pdf"
-            return HTMLResponse(_inject_devis_bar(_read_text(_html_file), _devis_bar_html(_pdf_url)))
+            return HTMLResponse(_inject_devis_bar(_read_text(_html_file), _devis_bar_html(_pdf_url, pre_devis=(_item.get("variante") == "pre_devis"))))
         _pdf_file = _item.get("file")
         if _pdf_file and os.path.exists(_pdf_file):
             return FileResponse(_pdf_file, media_type="application/pdf", headers={"Content-Disposition": "inline"})
-    html_devis = _render_devis_html(request, numero)
+    _pre_devis = bool(_items and _items[0].get("variante") == "pre_devis")
+    html_devis = _render_devis_html(request, numero, avec_sous_traitant=not _pre_devis)
     barre = (
         '<div style="position:fixed;top:0;left:0;right:0;z-index:9999;'
         'background:#F4F6F9;border-bottom:1px solid #E1E5EB;'
@@ -3302,7 +3312,7 @@ async def devis_public(numero: str, token: str, request: Request):
         'padding:12px 24px;font-family:Arial,Helvetica,sans-serif;">'
         '<div>'
         '<img src="/static/Logo.svg" alt="Hexa Rénov\'" style="height:32px;width:auto;vertical-align:middle;">'
-        '<span style="color:#002E5A;font-weight:700;font-size:15px;margin-left:14px;vertical-align:middle;">Votre devis</span>'
+        '<span style="color:#002E5A;font-weight:700;font-size:15px;margin-left:14px;vertical-align:middle;">Votre ' + ('pré-devis' if _pre_devis else 'devis') + '</span>'
         '</div>'
         '<a href="/devis-public/' + numero + '/' + token + '/pdf" '
         'style="background:#E2214B;color:#ffffff;padding:10px 20px;border-radius:6px;'
@@ -3335,7 +3345,7 @@ async def devis_public_pdf(numero: str, token: str, request: Request):
     )
 
 
-def _devis_bar_html(pdf_url: str) -> str:
+def _devis_bar_html(pdf_url: str, pre_devis: bool = False) -> str:
     return (
         '<div style="position:fixed;top:0;left:0;right:0;z-index:9999;'
         'background:#F4F6F9;border-bottom:1px solid #E1E5EB;'
@@ -3343,7 +3353,7 @@ def _devis_bar_html(pdf_url: str) -> str:
         'padding:12px 24px;font-family:Arial,Helvetica,sans-serif;">'
         '<div>'
         '<img src="/static/Logo.svg" alt="Hexa Renov" style="height:32px;width:auto;vertical-align:middle;">'
-        '<span style="color:#002E5A;font-weight:700;font-size:15px;margin-left:14px;vertical-align:middle;">Votre devis</span>'
+        '<span style="color:#002E5A;font-weight:700;font-size:15px;margin-left:14px;vertical-align:middle;">Votre ' + ('pré-devis' if pre_devis else 'devis') + '</span>'
         '</div>'
         '<a href="' + pdf_url + '" '
         'style="background:#E2214B;color:#ffffff;padding:10px 20px;border-radius:6px;'
@@ -3371,7 +3381,7 @@ async def devis_public_versionne(numero: str, version: int, token: str, request:
     html_file = item.get("html_file")
     if html_file and os.path.exists(html_file):
         pdf_url = f"/devis-public/{numero}/{version}/{token}/pdf"
-        return HTMLResponse(_inject_devis_bar(_read_text(html_file), _devis_bar_html(pdf_url)))
+        return HTMLResponse(_inject_devis_bar(_read_text(html_file), _devis_bar_html(pdf_url, pre_devis=(item.get("variante") == "pre_devis"))))
     pdf_file = item.get("file")
     if pdf_file and os.path.exists(pdf_file):
         return FileResponse(pdf_file, media_type="application/pdf", headers={"Content-Disposition": "inline"})
@@ -3458,7 +3468,7 @@ def _email_footer_html():
 </td></tr>"""
 
 
-def _email_devis_html(prenom, apercu, pct_eco, lien_devis):
+def _email_devis_html(prenom, apercu, pct_eco, lien_devis, pre_devis=False):
     bandeau = ""
     if apercu:
         bandeau = f"""<tr><td style="padding:20px 32px 8px 32px;">
@@ -3481,13 +3491,13 @@ def _email_devis_html(prenom, apercu, pct_eco, lien_devis):
 <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="width:600px;max-width:600px;background:#ffffff;border-radius:12px;overflow:hidden;font-family:Arial,Helvetica,sans-serif;">
 {_email_header_html()}
 <tr><td style="padding:32px 32px 0 32px;">
-<div style="color:#E2214B;font-size:13px;font-weight:bold;text-transform:uppercase;letter-spacing:0.04em;">Votre devis personnalisé est prêt</div>
+<div style="color:#E2214B;font-size:13px;font-weight:bold;text-transform:uppercase;letter-spacing:0.04em;">Votre {'pré-devis' if pre_devis else 'devis'} personnalisé est prêt</div>
 <div style="color:#0a2540;font-size:23px;font-weight:bold;margin-top:10px;line-height:1.3;">Bonjour {prenom},<br>votre projet de pompe à chaleur prend forme.</div>
-<div style="color:#4A5567;font-size:15px;line-height:1.6;margin-top:16px;">Nous avons préparé votre devis sur mesure. Bonne nouvelle : dès le premier mois, vous payez <strong style="color:#002E5A">moins cher qu'aujourd'hui</strong> — tout en remboursant votre installation.</div>
+<div style="color:#4A5567;font-size:15px;line-height:1.6;margin-top:16px;">Nous avons préparé votre {'pré-devis' if pre_devis else 'devis'} sur mesure. Bonne nouvelle : dès le premier mois, vous payez <strong style="color:#002E5A">moins cher qu'aujourd'hui</strong> — tout en remboursant votre installation.</div>
 </td></tr>
 {bandeau}
 <tr><td style="padding:24px 32px 8px 32px;text-align:center;">
-<a href="{lien_devis}" style="display:inline-block;background:#E2214B;color:#ffffff;font-size:16px;font-weight:bold;padding:16px 44px;border-radius:8px;text-decoration:none;">Découvrir mon devis</a>
+<a href="{lien_devis}" style="display:inline-block;background:#E2214B;color:#ffffff;font-size:16px;font-weight:bold;padding:16px 44px;border-radius:8px;text-decoration:none;">Découvrir mon {'pré-devis' if pre_devis else 'devis'}</a>
 <div style="color:#8A92A0;font-size:12px;margin-top:10px;">Consultable en ligne · Téléchargeable en PDF</div>
 </td></tr>
 <tr><td style="padding:18px 32px 8px 32px;">
@@ -3602,8 +3612,8 @@ async def _send_devis(numero: str, payload: dict, request: Request) -> dict:
         {
             "from": "Hexa Rénov' <a.parisot@hexa-renov.fr>",
             "to": [email_to],
-            "subject": f"Votre devis Hexa Rénov' — {prenom}",
-            "html": _email_devis_html(prenom, apercu, pct_eco, lien_devis),
+            "subject": f"Votre {'pré-devis' if variante == 'pre_devis' else 'devis'} Hexa Rénov' — {prenom}",
+            "html": _email_devis_html(prenom, apercu, pct_eco, lien_devis, pre_devis=(variante == "pre_devis")),
         }
     )
     resend.Emails.send(

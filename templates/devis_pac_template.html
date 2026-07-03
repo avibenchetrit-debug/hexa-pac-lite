@@ -3,7 +3,7 @@
 <html lang="fr">
 <head>
 <meta charset="utf-8"/>
-<title>Devis №{{ numero_devis }} — Pompe à chaleur air/eau · {{ nom }} {{ prenom }} · Hexa Rénov'</title>
+<title>{{ "Pré-devis" if pre_devis else "Devis" }} №{{ ("PD" + numero_devis[2:]) if pre_devis else numero_devis }} — Pompe à chaleur air/eau · {{ nom }} {{ prenom }} · Hexa Rénov'</title>
 <link href="https://fonts.googleapis.com" rel="preconnect"/>
 <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
@@ -3380,8 +3380,8 @@
 <path d="M827.803 156.53V163.583H835.492V165.853H827.803V173.119H836.4V175.389H825.048V154.26H836.4V156.53H827.803Z" fill="#E2214B"></path>
 </svg>
 <div class="doc-type">
-<div class="doc-type-value">Devis</div>
-<div class="doc-type-num"><span class="doc-type-num-label">N° de devis :</span> {{ numero_devis }}</div>
+<div class="doc-type-value">{{ "Pré-devis" if pre_devis else "Devis" }}</div>
+<div class="doc-type-num"><span class="doc-type-num-label">N° de {{ "pré-devis" if pre_devis else "devis" }} :</span> {{ ("PD" + numero_devis[2:]) if pre_devis else numero_devis }}</div>
 </div>
 </header>
 <!-- INFOS -->
@@ -3421,8 +3421,8 @@
 
 <!-- MENTION LÉGALE INTRO -->
 <section class="legal-intro">
-<div class="legal-intro-headline">Devis gratuit et sans engagement.</div>
-<div class="legal-intro-text">Devis à faire valider après visite technique, sous réserve de la conformité électrique de l'installation existante. L'entité s'engage à respecter la réglementation technique ainsi que les règles de l'art applicables aux travaux sur l'existant. La visite technique permettra de confirmer le dimensionnement, le modèle de pompe à chaleur retenu ainsi que le montant final de l'offre.</div>
+<div class="legal-intro-headline">{{ "Pré-devis" if pre_devis else "Devis" }} gratuit et sans engagement.</div>
+<div class="legal-intro-text">{{ "Pré-devis" if pre_devis else "Devis" }} à faire valider après visite technique, sous réserve de la conformité électrique de l'installation existante. L'entité s'engage à respecter la réglementation technique ainsi que les règles de l'art applicables aux travaux sur l'existant. La visite technique permettra de confirmer le dimensionnement, le modèle de pompe à chaleur retenu ainsi que le montant final de l'offre.</div>
 <div class="pac-heating-note">
 <div class="pac-heating-note-label">Solution chauffage</div>
 <div class="pac-heating-note-title">Opération n° BAR-TH-171&nbsp;&nbsp;Pompe à chaleur de type air/eau</div>

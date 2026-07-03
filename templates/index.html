@@ -16219,13 +16219,15 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
     const wrap = document.createElement('div');
     wrap.id = 'devis-modal-overlay';
     wrap.className = 'devis-modal-overlay';
-    const devisUrl = `/api/devis/${encodeURIComponent(numero)}/preview?t=${Date.now()}`;
+    const vtOk = document.body.dataset.vtValidee === '1';
+    const _variante = vtOk ? 'devis' : 'pre_devis';
+    const devisUrl = `/api/devis/${encodeURIComponent(numero)}/preview?variante=${_variante}&t=${Date.now()}`;
     const notedimUrl = `/api/notedim/${encodeURIComponent(numero)}/preview?t=${Date.now()}`;
     wrap.innerHTML = `
       <div class="devis-modal-box" role="dialog" aria-modal="true">
         <div class="devis-modal-head">
-          <div class="devis-modal-title">Devis ${numero}</div>
-          <button type="button" class="adm-btn adm-btn-ghost devis-tab active" data-url="${devisUrl}" data-kind="devis">📄 Devis</button>
+          <div class="devis-modal-title">${vtOk ? 'Devis' : 'Pré-devis'} ${numero}</div>
+          <button type="button" class="adm-btn adm-btn-ghost devis-tab active" data-url="${devisUrl}" data-kind="devis">📄 ${vtOk ? 'Devis' : 'Pré-devis'}</button>
           <button type="button" class="adm-btn adm-btn-ghost devis-tab" data-url="${notedimUrl}" data-kind="notedim">📐 Note de dim</button>
           <button type="button" class="adm-btn adm-btn-primary" id="devis-pdf-btn">📥 Télécharger PDF</button>
           <button type="button" class="devis-send-btn" id="devis-send-btn">📧 Envoyer</button>
@@ -16248,7 +16250,7 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
       });
     });
     document.getElementById('devis-pdf-btn')?.addEventListener('click', ()=>{
-      const url = currentKind === 'notedim' ? `/api/notedim/${encodeURIComponent(numero)}/pdf?t=${Date.now()}` : `/api/devis/${encodeURIComponent(numero)}/pdf?t=${Date.now()}`;
+      const url = currentKind === 'notedim' ? `/api/notedim/${encodeURIComponent(numero)}/pdf?t=${Date.now()}` : `/api/devis/${encodeURIComponent(numero)}/pdf?variante=${_variante}&t=${Date.now()}`;
       window.open(url, '_blank');
     });
     document.getElementById('devis-send-btn')?.addEventListener('click', ()=>openSendDevisMailModal(numero));
