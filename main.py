@@ -3965,6 +3965,15 @@ def _write_fiches_index(index: dict) -> None:
     _atomic_write_json(FICHES_INDEX_PATH, index)
 
 
+def _fiche_slug(gamme: str) -> str:
+    s = re.sub(r"[^A-Za-z0-9_-]+", "_", str(gamme or "").strip()).strip("_")
+    return s or "gamme"
+
+
+def _fiche_pdf_path(gamme: str) -> str:
+    return os.path.join(FICHES_DIR, _fiche_slug(gamme) + ".pdf")
+
+
 def _gamme_of(model, overrides: dict) -> str:
     ref = (model.get("ref") if isinstance(model, dict) else str(model or "")) or ""
     return (overrides or {}).get(str(ref).strip()) or _gamme_auto(model)
@@ -4009,6 +4018,71 @@ async def set_gamme(request: Request, ref: str = Form(...), gamme: str = Form(""
     _write_fiches_index(index)
     return JSONResponse({"status": "ok", "ref": ref, "gamme": g or auto,
                          "gamme_auto": auto, "source": "override" if ref in overrides else "auto"})
+
+
+@app.post("/api/admin/fiches-techniques")
+async def upload_fiche_technique(request: Request, fichier: UploadFile = File(...), gamme: str = Form(...), auteur: str = Form("")) -> JSONResponse:
+    _require_admin(request)
+    gamme = str(gamme or "").strip()
+    if not gamme:
+        raise HTTPException(status_code=400, detail="Gamme manquante")
+    ext = os.path.splitext(fichier.filename or "")[1].lower().lstrip(".")
+    if ext != "pdf":
+        raise HTTPException(status_code=400, detail="Seuls les PDF sont acceptés")
+    data = await fichier.read()
+    if len(data) > 20 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="Fichier trop volumineux (max 20 Mo)")
+    os.makedirs(FICHES_DIR, exist_ok=True)
+    path = _fiche_pdf_path(gamme)
+    with open(path, "wb") as f:
+        f.write(data)
+    index = _read_fiches_index()
+    fiches = index.get("fiches", {})
+    fiches[gamme] = {
+        "filename": os.path.basename(path),
+        "taille_octets": len(data),
+        "date_upload": _now_iso(),
+        "auteur": (auteur or "").strip() or "Admin",
+    }
+    index["fiches"] = fiches
+    _write_fiches_index(index)
+    return JSONResponse({"status": "ok", "gamme": gamme, "fiche": fiches[gamme]})
+
+
+@app.get("/api/admin/fiches-techniques")
+def list_fiches_techniques(request: Request) -> JSONResponse:
+    _require_admin(request)
+    return JSONResponse(_read_fiches_index().get("fiches", {}))
+
+
+@app.get("/api/admin/fiches-techniques/view")
+def view_fiche_technique(request: Request, gamme: str):
+    _require_admin(request)
+    gamme = str(gamme or "").strip()
+    entry = _read_fiches_index().get("fiches", {}).get(gamme)
+    if not entry:
+        raise HTTPException(status_code=404, detail="Fiche introuvable")
+    path = _fiche_pdf_path(gamme)
+    if not os.path.exists(path):
+        raise HTTPException(status_code=404, detail="Fichier introuvable")
+    return FileResponse(path, media_type="application/pdf", headers={"Content-Disposition": "inline"})
+
+
+@app.delete("/api/admin/fiches-techniques")
+def delete_fiche_technique(request: Request, gamme: str) -> JSONResponse:
+    _require_admin(request)
+    gamme = str(gamme or "").strip()
+    index = _read_fiches_index()
+    fiches = index.get("fiches", {})
+    if gamme not in fiches:
+        raise HTTPException(status_code=404, detail="Fiche introuvable")
+    path = _fiche_pdf_path(gamme)
+    if os.path.exists(path):
+        os.remove(path)
+    fiches.pop(gamme, None)
+    index["fiches"] = fiches
+    _write_fiches_index(index)
+    return JSONResponse({"status": "ok", "gamme": gamme})
 
 
 @app.post("/api/modeles-email/{numero}/envoyer")

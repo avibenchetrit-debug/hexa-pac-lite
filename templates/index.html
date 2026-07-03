@@ -7435,6 +7435,9 @@ input:focus{ outline:none; border-color: var(--c-navy,#002E5A); box-shadow:0 0 0
 .adm-models-table .adm-gamme-in:focus { border-color:#002E5A; outline:none; }
 .adm-models-table .adm-gamme-badge { font-size:9px; font-weight:700; padding:1px 6px; border-radius:9999px; background:#F3F4F6; color:#6B7280; }
 .adm-models-table .adm-gamme-badge.is-override { background:#EDE9FE; color:#6D28D9; }
+.adm-models-table .adm-fiche-btn { background: transparent; border: 1px solid #d1d5db; border-radius:4px; padding: 2px 7px; margin-left:4px; font-size:12px; cursor:pointer; color:#4b5563; height:28px; }
+.adm-models-table .adm-fiche-btn:hover { background:#f3f4f6; }
+.adm-models-table .adm-fiche-btn.has-fiche { color:#15803D; border-color:#86EFAC; background:#DCFCE7; }
 .adm-models-table .adm-del { color: #ef4444; border-color: #fca5a5; position: static; opacity: 1; width:auto; height:28px; border-radius:4px; }
 .adm-models-table .adm-pac-desc-btn:hover,
 .adm-models-table .adm-del:hover { background: #f3f4f6; }
@@ -17264,7 +17267,7 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
         const tip2 = `Prix de cession ${eurTip(r.cession)} = Coût ${eurTip(r.cout)} + Visite ${eurTip(p.vt2)} + COFRAC ${eurTip(p.cofrac2)} + Urbanisme ${eurTip(p.urba2)} + Marge cession ${eurTip(r.margeCession)}. Ma marge nette garantie = ${eurTip(r.net2)}. (Frais ECAIR 12% sur MPR déjà déduits.)`;
         const cessTip = r.cessionForced ? 'Prix de cession forcé pour ce produit. Cliquez sur ↺ pour revenir à la marge globale.' : `Calculé : base ${eurTip(r.baseCession)} + marge globale ${eurTip(r.margeCessionDefaut)}. Vous pouvez forcer une autre valeur.`;
         rowsHTML += `<tr data-i="${i}">
-          <td class="adm-ref col-modele">${m.ref} ${phase}${ecs}<small>${m.nom||''}</small><button type="button" class="adm-pac-desc-btn" data-i="${i}" title="Description technique pour le devis">📝</button><button type="button" class="adm-del" data-i="${i}" title="Supprimer">×</button><div class="adm-gamme"><span class="adm-gamme-lbl">Gamme</span><input type="text" class="adm-gamme-in" data-i="${i}" placeholder="—"><span class="adm-gamme-badge">auto</span></div></td>
+          <td class="adm-ref col-modele">${m.ref} ${phase}${ecs}<small>${m.nom||''}</small><button type="button" class="adm-pac-desc-btn" data-i="${i}" title="Description technique pour le devis">📝</button><button type="button" class="adm-del" data-i="${i}" title="Supprimer">×</button><div class="adm-gamme"><span class="adm-gamme-lbl">Gamme</span><input type="text" class="adm-gamme-in" data-i="${i}" placeholder="—"><span class="adm-gamme-badge">auto</span><button type="button" class="adm-fiche-btn" data-i="${i}" title="Fiche technique fabricant (PDF) — par gamme">📎</button></div></td>
           <td><span class="adm-euro"><input type="text" inputmode="numeric" class="adm-in" data-f="ttc" value="${ferow(m.ttc)}"><i>€</i></span></td>
           <td class="adm-num col-calc">${eur(r.ht)}</td>
           <td><span class="adm-euro"><input type="text" inputmode="numeric" class="adm-in" data-f="achat" value="${ferow(m.achat)}"><i>€</i></span></td>
@@ -17776,7 +17779,10 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
     document.querySelectorAll('.adm-gamme-in').forEach(inp=>{
       inp.addEventListener('change', ()=>{ saveGammeOverride(+inp.dataset.i); });
     });
-    refreshGammesState();
+    document.querySelectorAll('.adm-fiche-btn').forEach(btn=>{
+      btn.addEventListener('click', ()=>{ openFichePicker(+btn.dataset.i); });
+    });
+    refreshGammesState().then(refreshFichesState);
     // bouton "Simuler" -> déplie le curseur de surplus pour la ligne
     document.querySelectorAll('.adm-sim-btn').forEach(btn=>{
       btn.addEventListener('click', ()=>{ toggleSim(+btn.dataset.sim, false); });
@@ -17839,6 +17845,45 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
       }
       adminToast('Gamme enregistrée', '#16a34a');
     } catch(e){ adminToast(e?.message || 'Erreur réseau', '#ef4444'); }
+  }
+
+  async function refreshFichesState(){
+    let index = {};
+    try {
+      const r = await fetch('/api/admin/fiches-techniques', { cache:'no-store', headers: { 'X-Admin-Token': window.adminHeaders()['X-Admin-Token'] } });
+      if (r.ok) index = await r.json();
+    } catch(_) { return; }
+    document.querySelectorAll('.adm-fiche-btn').forEach(btn=>{
+      const cell = btn.closest('td');
+      const inp = cell ? cell.querySelector('.adm-gamme-in') : null;
+      const g = inp ? inp.value.trim() : '';
+      const ok = !!(g && Object.prototype.hasOwnProperty.call(index, g));
+      btn.classList.toggle('has-fiche', ok);
+      btn.title = ok ? ('✅ Fiche présente pour « ' + g + ' » (cliquer pour remplacer)') : 'Fiche technique fabricant (PDF) — par gamme';
+    });
+  }
+  function openFichePicker(i){
+    const inp = document.querySelector('.adm-gamme-in[data-i="'+i+'"]');
+    const gamme = inp ? inp.value.trim() : '';
+    if (!gamme){ adminToast('Gamme inconnue pour ce modèle', '#ef4444'); return; }
+    const picker = document.createElement('input');
+    picker.type = 'file';
+    picker.accept = 'application/pdf';
+    picker.addEventListener('change', async ()=>{
+      const file = picker.files && picker.files[0];
+      if (!file) return;
+      const fd = new FormData();
+      fd.append('gamme', gamme);
+      fd.append('fichier', file);
+      try {
+        const r = await fetch('/api/admin/fiches-techniques', { method:'POST', headers: { 'X-Admin-Token': window.adminHeaders()['X-Admin-Token'] }, body: fd });
+        const body = await r.json().catch(()=>({}));
+        if (!r.ok){ adminToast(body.detail || ('Échec upload (HTTP '+r.status+')'), '#ef4444'); return; }
+        adminToast('Fiche « ' + gamme + ' » enregistrée', '#16a34a');
+        refreshFichesState();
+      } catch(e){ adminToast(e?.message || 'Erreur réseau', '#ef4444'); }
+    });
+    picker.click();
   }
 
   function bindAdminM3(){
