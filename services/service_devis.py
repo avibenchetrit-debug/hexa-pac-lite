@@ -168,6 +168,36 @@ def calculer_mpr(prospect, state_simulateur, admin_params):
     return float_value(forfaits.get(categorie), defaults.get(categorie, 4000))
 
 
+def resoudre_ballon(state_simulateur, admin_params):
+    """Résout le ballon choisi (state.ballon_ref) depuis admin_params['ballon_thermo'].
+    Retourne {ref, nom, fourniture_ht, prix_pose_ht, description_specs} ou None si Aucun."""
+    ref = str(value(state_simulateur, "ballon_ref", default="") or "").strip()
+    if not ref:
+        return None
+    bt = (admin_params or {}).get("ballon_thermo") or {}
+    modeles = bt.get("modeles") if isinstance(bt.get("modeles"), list) else []
+    modele = next((m for m in modeles if isinstance(m, dict) and str(m.get("ref", "")).strip() == ref), None)
+    if not modele:
+        return None
+    specs = modele.get("description_specs")
+    return {
+        "ref": ref,
+        "nom": str(modele.get("nom", "") or ""),
+        "fourniture_ht": float_value(modele.get("fourniture_ht"), 0),
+        "prix_pose_ht": float_value(bt.get("prix_pose_ht"), 0),
+        "description_specs": specs if isinstance(specs, list) else [],
+    }
+
+
+def calculer_mpr_ballon(prospect, admin_params):
+    """Forfait MPR ballon par catégorie (indépendant de la MPR PAC)."""
+    categorie = value(prospect, "categorie_revenu", "categorie", default="modeste")
+    bt = (admin_params or {}).get("ballon_thermo") or {}
+    forfaits = bt.get("forfaits_mpr") or {}
+    defaults = {"tres_modeste": 1200, "modeste": 800, "intermediaire": 400, "superieur": 0}
+    return float_value(forfaits.get(categorie), defaults.get(categorie, 0))
+
+
 def calculer_cee_bar_th_171(prospect, state_simulateur, admin_params):
     """Calcule le montant CEE selon la formule officielle BAR-TH-171."""
     formule = (admin_params or {}).get("formule_bar_th_171", {})
@@ -371,6 +401,30 @@ def calculer_devis(prospect, state_simulateur, admin_params, catalogue_pac):
     montant_cee = result_plafonds["cee_final"]
     reste_a_charge = result_plafonds["reste_a_charge"]
 
+    # --- Couche BALLON thermo (optionnelle, APRÈS plafonds -> CEE/écrêtement intacts) ---
+    ballon = resoudre_ballon(state_simulateur, admin_params)
+    ballon_actif = ballon is not None
+    if ballon_actif:
+        b_four_ht = round(ballon["fourniture_ht"], 2)
+        b_pose_ht = round(ballon["prix_pose_ht"], 2)
+        b_four_ttc = round(b_four_ht * (1 + tva_rate), 2)
+        b_pose_ttc = round(b_pose_ht * (1 + tva_rate), 2)
+        b_total_ht = round(b_four_ht + b_pose_ht, 2)
+        b_total_ttc = round(b_four_ttc + b_pose_ttc, 2)
+        montant_mpr_ballon = calculer_mpr_ballon(prospect, admin_params)
+        reste_a_charge = round(max(reste_a_charge + b_total_ttc - montant_mpr_ballon, 0), 2)
+        recap_total_ht = round(total_ht + b_total_ht, 2)
+        recap_total_ttc = round(total_ttc + b_total_ttc, 2)
+        recap_total_tva = round(recap_total_ttc - recap_total_ht, 2)
+        ballon_nom = ballon["nom"]
+        ballon_description_specs = ballon["description_specs"]
+    else:
+        b_four_ht = b_four_ttc = b_pose_ht = b_pose_ttc = b_total_ht = b_total_ttc = 0
+        montant_mpr_ballon = 0
+        recap_total_ht, recap_total_ttc, recap_total_tva = total_ht, total_ttc, total_tva
+        ballon_nom = ""
+        ballon_description_specs = []
+
     categorie_revenu = value(prospect, "categorie_revenu", "categorie", default="")
     return {
         "prix_pac_ttc": total_ttc,
@@ -396,6 +450,23 @@ def calculer_devis(prospect, state_simulateur, admin_params, catalogue_pac):
         "qt_pose": "1 u.",
         "qt_travaux_induits": "1 forfait",
         "lot_titre": generer_lot_titre(find_modele(catalogue_pac, value(state_simulateur, "modele_pac_id", "modele_pac"))),
+        "ballon_actif": ballon_actif,
+        "ballon_titre": "Chauffe-eau thermodynamique — ECS",
+        "ballon_nom": ballon_nom,
+        "ballon_description_specs": ballon_description_specs,
+        "prix_ballon_fourniture_ht": b_four_ht,
+        "prix_ballon_fourniture_ttc": b_four_ttc,
+        "prix_ballon_pose_ht": b_pose_ht,
+        "prix_ballon_pose_ttc": b_pose_ttc,
+        "ballon_total_ht": b_total_ht,
+        "ballon_total_ttc": b_total_ttc,
+        "montant_mpr_ballon": montant_mpr_ballon,
+        "montant_mpr_ballon_label": LABELS_ANAH.get(categorie_revenu, ""),
+        "qt_ballon_fourniture": "1 u.",
+        "qt_ballon_pose": "1 u.",
+        "recap_total_ht": recap_total_ht,
+        "recap_total_ttc": recap_total_ttc,
+        "recap_total_tva": recap_total_tva,
     }
 
 
@@ -465,6 +536,10 @@ def format_devis_amounts(calculs):
         "prix_fourniture_ht", "prix_fourniture_ttc", "prix_pose_ht", "prix_pose_ttc",
         "prix_travaux_induits_ht", "prix_travaux_induits_ttc", "total_ht", "total_tva",
         "total_ttc", "montant_mpr", "montant_cee", "reste_a_charge",
+        "prix_ballon_fourniture_ht", "prix_ballon_fourniture_ttc",
+        "prix_ballon_pose_ht", "prix_ballon_pose_ttc",
+        "ballon_total_ht", "ballon_total_ttc", "montant_mpr_ballon",
+        "recap_total_ht", "recap_total_ttc", "recap_total_tva",
     ):
         out[key] = money(calculs.get(key))
     return out

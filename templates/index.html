@@ -14855,7 +14855,8 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
     modele_force: false,
     user_modified_price: false,
     sous_dimensionnement: false,
-    selection_alerte: null
+    selection_alerte: null,
+    ballon_ref: ''
   };
   const state = { ...DEFAULT_SIM_STATE };
 
@@ -15169,6 +15170,7 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
       surface_chauffee: state.surface_chauffee || '',
       option: state.option || '',
       niveau_actif: state.niveau_actif || 'recommande',
+      ballon_ref: state.ballon_ref || '',
       // Éco 20 ans (roi()) : incluses uniquement si lastRoi existe, sinon clés omises
       // pour ne pas écraser une valeur déjà persistée (merge côté backend).
       ...(lastRoi ? {
@@ -15218,6 +15220,7 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
       if (saved.surface_chauffee) { state.surface_chauffee = Number(saved.surface_chauffee); state.surface_forcee = true; }
       if (saved.option) state.option = saved.option;
       if (saved.niveau_actif) state.niveau_actif = saved.niveau_actif;
+      if (saved.ballon_ref) state.ballon_ref = saved.ballon_ref;
       state.modele_force = !!saved.modele_pac_id;
     } catch(e) {
       console.warn('Aucun state simulateur sauvegardé', e);
@@ -15804,6 +15807,7 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
             </span>
           </div>
           ${state.selection_alerte ? `<div class="sim-note sim-note--warn" id="sim-selection-alerte">${state.selection_alerte}</div>` : ''}
+          <div class="sim-pnl-line sim-pnl-ballon"><span>Ballon thermodynamique (ECS)</span><select id="sim-ballon" class="sim-model-select"><option value="" ${!state.ballon_ref?'selected':''}>Aucun</option>${(((window.HexaConfig&&window.HexaConfig.ballon_thermo&&window.HexaConfig.ballon_thermo.modeles)||[]).map(b=>`<option value="${b.ref}" ${state.ballon_ref===b.ref?'selected':''}>${b.nom||b.ref}</option>`).join(''))}</select></div>
           <div class="sim-pnl-sep"></div>
           <div class="sim-pnl-line sim-pnl-minus"><span>– MaPrimeRénov' (devis)</span><b id="sim-mpr">${eurDash(c.mprDevis, c.contextePret)}</b></div>
           <div class="sim-pnl-line sim-pnl-minus"><span>– Prime CEE (devis)</span><b id="sim-cee">${eurDash(c.ceeDevis, c.contextePret)}</b></div>
@@ -15919,6 +15923,7 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
     const onIn=(id,fn)=>{ const el=document.getElementById(id); if(!el)return;
       const ev=el.tagName==='SELECT'?'change':'input'; el.addEventListener(ev,e=>{fn(e.target.value); scheduleSaveSimulatorState(); refresh();}); };
     onIn('sim-service',v=>{ state.service=v; state.modele_force=false; });
+    onIn('sim-ballon',v=>{ state.ballon_ref=v; });
     onIn('iso-toit',v=>{ state.iso_toit=v; state.modele_force=false; });
     onIn('iso-mur',v=>{ state.iso_mur=v; state.modele_force=false; });
     onIn('iso-menuiserie',v=>{ state.iso_menuiserie=v; state.modele_force=false; });
@@ -16889,7 +16894,8 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
     const forfaits = cfg.forfaits_mpr || { tres_modeste:1200, modeste:800, intermediaire:400, superieur:0 };
     const modelesRows = modeles.slice(0,2).map((m,i)=>`
       <div class="adm-field adm-field-row"><span class="adm-lab">Modèle ${i+1} — libellé</span><input type="text" class="adm-bt-nom" data-idx="${i}" data-ref="${adminEscape(m.ref||('ballon-'+(i+1)))}" value="${adminEscape(m.nom||'')}"></div>
-      <div class="adm-field adm-field-row"><span class="adm-lab">Modèle ${i+1} — fourniture</span><span class="adm-euro"><input type="text" inputmode="numeric" class="adm-bt-fourniture adm-money" data-idx="${i}" value="${adminEscape(m.fourniture_ht != null ? m.fourniture_ht : 0)}"><i>€ HT</i></span></div>`).join('');
+      <div class="adm-field adm-field-row"><span class="adm-lab">Modèle ${i+1} — fourniture</span><span class="adm-euro"><input type="text" inputmode="numeric" class="adm-bt-fourniture adm-money" data-idx="${i}" value="${adminEscape(m.fourniture_ht != null ? m.fourniture_ht : 0)}"><i>€ HT</i></span></div>
+      <div class="adm-field adm-field-row"><span class="adm-lab">Modèle ${i+1} — description</span><button type="button" class="adm-btn adm-btn-ghost adm-bt-desc" data-bt-desc="${i}">✎ Specs fourniture (${(Array.isArray(m.description_specs)?m.description_specs.length:0)})</button></div>`).join('');
     return `<div class="adm-card">
       ${modelesRows}
       <div class="adm-field adm-field-row"><span class="adm-lab">Pose commune</span><span class="adm-euro"><input type="text" inputmode="numeric" class="adm-bt-pose adm-money" value="${adminEscape(pose)}"><i>€ HT</i></span></div>
@@ -17117,8 +17123,8 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
     },
     ballon_thermo: {
       modeles: [
-        { ref:'ballon-1', nom:'Ballon thermodynamique 1', fourniture_ht:0 },
-        { ref:'ballon-2', nom:'Ballon thermodynamique 2', fourniture_ht:0 }
+        { ref:'ballon-1', nom:'Ballon thermodynamique 1', fourniture_ht:0, description_specs:[] },
+        { ref:'ballon-2', nom:'Ballon thermodynamique 2', fourniture_ht:0, description_specs:[] }
       ],
       prix_pose_ht: 0,
       forfaits_mpr: { tres_modeste:1200, modeste:800, intermediaire:400, superieur:0 }
@@ -17591,6 +17597,55 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
     });
   }
 
+  function openDescriptionBallonModal(i){
+    const cfg = window.HexaConfig || loadConfig();
+    if (!cfg.ballon_thermo) cfg.ballon_thermo = { modeles: [], prix_pose_ht: 0, forfaits_mpr: {} };
+    if (!Array.isArray(cfg.ballon_thermo.modeles)) cfg.ballon_thermo.modeles = [];
+    const m = cfg.ballon_thermo.modeles[i];
+    if (!m) return;
+    currentEditedSpecs = Array.isArray(m.description_specs)
+      ? m.description_specs.map(s => ({ champ:String(s.champ || ''), valeur:String(s.valeur || '') }))
+      : [];
+    document.getElementById('modal-description-ballon')?.remove();
+    const wrap = document.createElement('div');
+    wrap.id = 'modal-description-ballon';
+    wrap.className = 'adm-delmodal';
+    wrap.innerHTML = `
+      <div class="adm-delbox modal-large">
+        <div class="adm-del-h">Description technique ballon — <span>${adminEscape(m.nom || m.ref || '')}</span></div>
+        <p class="adm-opt2-note">Saisissez les caractéristiques (champ + valeur), autant de lignes que nécessaire. Chaque ligne apparaîtra sur le devis sous la ligne "Fourniture" du ballon.</p>
+        <div class="specs-editor">
+          <div class="specs-editor-header">
+            <span class="specs-col-champ">Champ</span>
+            <span class="specs-col-valeur">Valeur</span>
+            <span class="specs-col-actions"></span>
+          </div>
+          <div id="specs-rows-container"></div>
+          <button type="button" class="specs-add-row" id="btn-specs-add-row">+ Ajouter une ligne</button>
+        </div>
+        <div class="adm-del-actions">
+          <button type="button" class="adm-btn adm-btn-cancel" id="btn-cancel-specs">Annuler</button>
+          <button type="button" class="adm-btn adm-btn-primary" id="btn-save-specs-ballon">Sauvegarder</button>
+        </div>
+      </div>`;
+    document.body.appendChild(wrap);
+    renderSpecsRows();
+    const close = () => wrap.remove();
+    document.getElementById('btn-cancel-specs')?.addEventListener('click', close);
+    document.getElementById('btn-specs-add-row')?.addEventListener('click', addSpecsRow);
+    wrap.addEventListener('click', e=>{ if(e.target === wrap) close(); });
+    document.getElementById('btn-save-specs-ballon')?.addEventListener('click', async ()=>{
+      m.description_specs = currentEditedSpecs
+        .map(s => ({ champ:String(s.champ || '').trim(), valeur:String(s.valeur || '').trim() }))
+        .filter(s => s.champ || s.valeur);
+      window.HexaConfig = cfg;
+      try { localStorage.setItem(LS_KEY, JSON.stringify(cfg)); } catch(_){}
+      await saveAdminParamsServer();
+      adminToast('Specs ballon sauvegardées ✓', '#0D6B3B');
+      close();
+    });
+  }
+
   function saveAccordionState(){
     const state = {};
     document.querySelectorAll('.adm-bloc').forEach(bloc => {
@@ -17744,6 +17799,7 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
     });
     document.getElementById('btn-save-prix-vente-devis')?.addEventListener('click', savePrixVenteDevis);
     document.getElementById('btn-save-ballon-thermo')?.addEventListener('click', saveBallonThermo);
+    document.querySelectorAll('.adm-bt-desc').forEach(function(b){ b.addEventListener('click', function(){ openDescriptionBallonModal(parseInt(b.dataset.btDesc,10)); }); });
     document.getElementById('btn-add-sous-traitant')?.addEventListener('click', ()=>{
       window.HexaConfig.sous_traitants = collectSousTraitants();
       window.HexaConfig.sous_traitants.push({ id:'st_' + Date.now(), entreprise:'', siret:'', adresse:'', rge:'', rge_validite_du:'', rge_validite_au:'', assurance:'', actif:false });
