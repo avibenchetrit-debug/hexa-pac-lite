@@ -3636,7 +3636,7 @@ async def _send_devis(numero: str, payload: dict, request: Request) -> dict:
     auteur = str(payload.get("auteur") or "Anonyme")
     notes = _read_notes()
     notes.setdefault(numero, []).append(
-        {"texte": f"Devis v{version} envoyé le {now} à {email_to} par {auteur}", "date": _now_paris_iso(), "auteur": auteur}
+        {"texte": f"{'Pré-devis' if variante == 'pre_devis' else 'Devis'} v{version} envoyé le {now} à {email_to} par {auteur}", "date": _now_paris_iso(), "auteur": auteur}
     )
     _atomic_write_json(NOTES_PATH, notes)
 
@@ -3684,6 +3684,7 @@ async def list_devis(numero: str) -> JSONResponse:
             items.append({
                 "version": version,
                 "numero_devis": item.get("numero_devis") or f"v{version}",
+                "variante": item.get("variante", "devis"),
                 "sent_at": item.get("sent_at", ""),
                 "email": item.get("email", ""),
                 "file": path,

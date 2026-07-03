@@ -14344,7 +14344,7 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
       if (title) title.textContent = `📋 Devis envoyés (${items.length})`;
       root.innerHTML = items.map(item => `
         <div class="docs-devis-row">
-          <div><b>${escapeHtml(item.numero_devis || ('v' + item.version))}</b> — Envoyé le ${formatParis(item.sent_at)} à ${escapeHtml(item.email || '')}</div>
+          <div><b>${escapeHtml((item.variante === 'pre_devis' && (item.numero_devis || '').startsWith('DE')) ? ('PD' + item.numero_devis.slice(2)) : (item.numero_devis || ('v' + item.version)))}</b> — Envoyé le ${formatParis(item.sent_at)} à ${escapeHtml(item.email || '')}</div>
           <div class="docs-devis-actions">
             <button type="button" class="hexa-meta-card-action" data-devis-preview="${item.version}">👁 Aperçu</button>
             <button type="button" class="hexa-meta-card-action" data-devis-download="${item.version}">📥 Télécharger</button>
