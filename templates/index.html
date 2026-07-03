@@ -7906,6 +7906,11 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
 .fiche-statut-lbl{ font-size:12px; font-weight:700; color:#4A5568; }
 .fiche-vt-row{ display:flex; align-items:center; gap:10px; margin:2px 0 12px; flex-wrap:wrap; }
 .fiche-vt-lbl{ font-size:12px; font-weight:700; color:#4A5568; }
+/* Compactage du bloc "Programmer un rappel" (Date | Heure | Motif | Assigné | Poser sur 1 ligne) */
+.row-rappel-compact{ display:grid; grid-template-columns:auto auto 1fr auto auto; gap:8px; align-items:end; }
+.row-rappel-compact .field{ margin:0; }
+.row-rappel-compact .btn{ white-space:nowrap; }
+@media (max-width:900px){ .row-rappel-compact{ grid-template-columns:1fr 1fr; } }
 .fiche-vt-badge{ display:inline-flex; align-items:center; gap:6px; border-radius:9999px; padding:5px 11px; font-size:11.5px; font-weight:700; background:#CCFBF1; color:#0F766E; }
 .fiche-vt-btn{ border:none; border-radius:9999px; padding:5px 11px; font-size:11.5px; font-weight:700; cursor:pointer; font-family:inherit; }
 .fiche-vt-valider{ background:#CCFBF1; color:#0F766E; }
@@ -8105,6 +8110,12 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
   </div>
 </div>
 
+<!-- Statut & VT (déplacés depuis "Origine & Statut") — sous l'identité, styles existants, non-sticky -->
+<div class="fiche-statvt-top">
+  <div class="fiche-statut-row"><span class="fiche-statut-lbl">Statut</span><span id="fiche-statut-slot"></span></div>
+  <div class="fiche-vt-row"><span class="fiche-vt-lbl">Visite technique</span><span id="fiche-vt-slot"></span></div>
+</div>
+
   
 
   
@@ -8129,36 +8140,26 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
         <div class="suivi-actions">
           <button type="button" class="btn btn-secondary" id="suivi-appel-repondu">📞 Appel répondu</button>
           <button type="button" class="btn btn-secondary" id="suivi-nrp">📵 NRP</button>
-          <button type="button" class="btn btn-secondary" id="suivi-sms">💬 SMS envoyé</button>
-          <button type="button" class="btn btn-secondary" id="suivi-email">✉️ Email envoyé</button>
         </div>
         <div class="suivi-compteurs">
           <span class="pv-nrp-count pv-nrp-0" id="suivi-cpt-appel">— /8 appels</span>
-          <span class="pv-nrp-count pv-nrp-0" id="suivi-cpt-sms">— /5 sms</span>
-          <span class="pv-nrp-count pv-nrp-0" id="suivi-cpt-email">— /5 emails</span>
         </div>
         <div class="suivi-dernier" id="suivi-dernier-repondu" style="display:none"></div>
 
         <!-- Programmer un rappel -->
         <div class="card-subtitle">Programmer un rappel</div>
-        <div class="row row-3">
+        <div class="row-rappel-compact">
           <div class="field"><label>Date</label><input type="date" id="suivi-rap-date"></div>
-          <div class="field"><label>Heure <span class="hint">(option.)</span></label><input type="time" id="suivi-rap-heure"></div>
-          <div class="field"><label>Motif</label>
-            <input type="text" id="suivi-rap-motif" placeholder="Ex. relancer devis envoyé">
-          </div>
-        </div>
-        <div class="row row-2">
-          <div class="field"><label>Assigné à</label>
+          <div class="field"><label>Heure</label><input type="time" id="suivi-rap-heure"></div>
+          <div class="field"><label>Motif</label><input type="text" id="suivi-rap-motif" placeholder="Ex. relancer devis envoyé"></div>
+          <div class="field"><label>Assigné</label>
             <select id="suivi-rap-assigne">
               <option value="avi">Avi</option>
               <option value="joelle">Joelle</option>
               <option value="maurice">Maurice</option>
             </select>
           </div>
-          <div class="field" style="justify-content:flex-end;">
-            <button type="button" class="btn btn-secondary" id="suivi-rap-poser">Poser le rappel</button>
-          </div>
+          <button type="button" class="btn btn-secondary" id="suivi-rap-poser">Poser</button>
         </div>
       </div>
 
@@ -8166,8 +8167,6 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
       <div class="card">
         <div class="card-title"><span class="num-card">1</span> Origine &amp; Statut</div>
         <input type="hidden" name="statut" id="statut-input" value="">
-        <div class="fiche-statut-row"><span class="fiche-statut-lbl">Statut</span><span id="fiche-statut-slot"></span></div>
-        <div class="fiche-vt-row"><span class="fiche-vt-lbl">Visite technique</span><span id="fiche-vt-slot"></span></div>
         <div class="row row-1">
           <div class="field" data-required="source" data-label="Source du prospect">
             <label>Provenance <span class="req">*</span></label>
@@ -19905,14 +19904,6 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
     document.getElementById('suivi-appel-repondu')?.addEventListener('click', async () => {
       const r = await suiviPost('/contact', { canal:'appel', resultat:'repondu', maj_statut:true });
       if(r) toastMsg('✓ Appel répondu', '#0D6B3B');
-    });
-    document.getElementById('suivi-sms')?.addEventListener('click', async () => {
-      const r = await suiviPost('/contact', { canal:'sms', resultat:'envoye', maj_statut:true });
-      if(r) toastMsg('✓ SMS enregistré', '#0D6B3B');
-    });
-    document.getElementById('suivi-email')?.addEventListener('click', async () => {
-      const r = await suiviPost('/contact', { canal:'email', resultat:'envoye', maj_statut:true });
-      if(r) toastMsg('✓ Email enregistré', '#0D6B3B');
     });
     // 4) NRP (chemin event : pas de nrp_count)
     document.getElementById('suivi-nrp')?.addEventListener('click', async () => {
