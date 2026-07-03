@@ -3238,13 +3238,49 @@ def _write_pdf(path: str, pdf_bytes: bytes) -> str:
     return path
 
 
+def _append_fiche_technique(pdf_bytes: bytes, numero: str) -> bytes:
+    """Concatène la fiche technique de la gamme du modèle retenu, à la fin du PDF.
+
+    Tout problème (fiche absente / illisible / fusion / pypdf) -> devis seul (jamais d'échec d'envoi)."""
+    try:
+        prospect = _find_lead(numero)
+        if not prospect:
+            return pdf_bytes
+        catalogue = _read_catalogue_pac()
+        state = _load_state_simulateur(numero, prospect, catalogue)
+        modele_ref = state.get("modele_pac_id") or state.get("modele_pac")
+        modele_obj = find_modele(catalogue, modele_ref) or select_default_modele(prospect, catalogue)
+        if not modele_obj:
+            return pdf_bytes
+        index = _read_fiches_index()
+        gamme = _gamme_of(modele_obj, index.get("gamme_overrides", {}))
+        entry = index.get("fiches", {}).get(gamme)
+        if not entry:
+            return pdf_bytes
+        path = _fiche_pdf_path(gamme)
+        if not os.path.exists(path):
+            return pdf_bytes
+        from pypdf import PdfReader, PdfWriter
+        writer = PdfWriter()
+        writer.append(PdfReader(io.BytesIO(pdf_bytes)))
+        writer.append(PdfReader(path))
+        out = io.BytesIO()
+        writer.write(out)
+        return out.getvalue()
+    except Exception:
+        return pdf_bytes
+
+
 def _ensure_devis_pdf(numero: str, request: Request, version: int | None = None, avec_sous_traitant: bool = True) -> tuple[str, str, int]:
     version = version or _next_sent_version(numero)
     html = _render_devis_html(request, numero, version, avec_sous_traitant)
     html_path = _devis_html_path(numero, version)
     _write_text(html_path, html)
     pdf_path = _devis_path(numero, version)
-    _write_pdf(pdf_path, _html_to_pdf_playwright(html, request))
+    pdf_bytes = _html_to_pdf_playwright(html, request)
+    if avec_sous_traitant:
+        pdf_bytes = _append_fiche_technique(pdf_bytes, numero)
+    _write_pdf(pdf_path, pdf_bytes)
     return pdf_path, html_path, version
 
 
