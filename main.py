@@ -3936,12 +3936,23 @@ async def comment_document(numero: str, filename: str, request: Request) -> JSON
     return JSONResponse({"status": "ok"})
 
 
-def _gamme_auto(ref: str) -> str:
-    s = str(ref or "").strip()
-    s = re.sub(r"\s+TRI$", "", s, flags=re.IGNORECASE)   # retire " TRI"
-    s = re.sub(r"-DUO(?=-|$)", "", s, flags=re.IGNORECASE)  # retire "-DUO" (DUO ou pas = même gamme, règle absolue)
-    s = re.sub(r"-\d+(?:[.,]\d+)?$", "", s)               # retire "-<nombre>"
-    return s.strip()
+def _gamme_from_specs(model: dict) -> str:
+    for spec in (model.get("description_specs") or []):
+        if isinstance(spec, dict) and str(spec.get("champ", "")).strip().lower() == "gamme":
+            val = str(spec.get("valeur", "")).strip()
+            if val:
+                return val
+    return ""
+
+
+def _gamme_auto(model) -> str:
+    """Gamme d'un modèle : champ 'Gamme' de description_specs, sinon ref brute (jamais vide)."""
+    if isinstance(model, dict):
+        g = _gamme_from_specs(model)
+        if g:
+            return g
+        return str(model.get("ref") or model.get("nom") or "").strip()
+    return str(model or "").strip()
 
 
 def _read_fiches_index() -> dict:
@@ -3954,8 +3965,9 @@ def _write_fiches_index(index: dict) -> None:
     _atomic_write_json(FICHES_INDEX_PATH, index)
 
 
-def _gamme_of(ref: str, overrides: dict) -> str:
-    return (overrides or {}).get(ref) or _gamme_auto(ref)
+def _gamme_of(model, overrides: dict) -> str:
+    ref = (model.get("ref") if isinstance(model, dict) else str(model or "")) or ""
+    return (overrides or {}).get(str(ref).strip()) or _gamme_auto(model)
 
 
 @app.get("/api/admin/gammes")
@@ -3967,7 +3979,7 @@ def list_gammes(request: Request) -> JSONResponse:
         ref = str(m.get("ref") or m.get("nom") or "").strip()
         if not ref:
             continue
-        auto = _gamme_auto(ref)
+        auto = _gamme_auto(m)
         rows.append({
             "ref": ref, "nom": m.get("nom") or "",
             "gamme": overrides.get(ref) or auto,
@@ -3983,7 +3995,9 @@ async def set_gamme(request: Request, ref: str = Form(...), gamme: str = Form(""
     ref = str(ref or "").strip()
     if not ref:
         raise HTTPException(status_code=400, detail="Référence manquante")
-    auto = _gamme_auto(ref)
+    catalogue = _read_catalogue_pac()
+    model = find_modele(catalogue, ref)
+    auto = _gamme_auto(model or ref)
     g = str(gamme or "").strip()
     index = _read_fiches_index()
     overrides = index.get("gamme_overrides", {})
