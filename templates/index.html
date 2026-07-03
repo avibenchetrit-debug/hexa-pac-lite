@@ -7429,6 +7429,12 @@ input:focus{ outline:none; border-color: var(--c-navy,#002E5A); box-shadow:0 0 0
   height: 28px;
 }
 .adm-models-table .adm-pac-desc-btn { color: #002E5A; border-color: #93c5fd; background: #dbeafe; }
+.adm-models-table .adm-gamme { display:flex; align-items:center; gap:6px; margin-top:6px; }
+.adm-models-table .adm-gamme-lbl { font-size:10px; color:#94a3b8; text-transform:uppercase; letter-spacing:.03em; }
+.adm-models-table .adm-gamme-in { flex:1; min-width:0; font-size:11px; padding:2px 6px; border:1px solid #d1d5db; border-radius:4px; color:#1f2937; }
+.adm-models-table .adm-gamme-in:focus { border-color:#002E5A; outline:none; }
+.adm-models-table .adm-gamme-badge { font-size:9px; font-weight:700; padding:1px 6px; border-radius:9999px; background:#F3F4F6; color:#6B7280; }
+.adm-models-table .adm-gamme-badge.is-override { background:#EDE9FE; color:#6D28D9; }
 .adm-models-table .adm-del { color: #ef4444; border-color: #fca5a5; position: static; opacity: 1; width:auto; height:28px; border-radius:4px; }
 .adm-models-table .adm-pac-desc-btn:hover,
 .adm-models-table .adm-del:hover { background: #f3f4f6; }
@@ -17258,7 +17264,7 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
         const tip2 = `Prix de cession ${eurTip(r.cession)} = Coût ${eurTip(r.cout)} + Visite ${eurTip(p.vt2)} + COFRAC ${eurTip(p.cofrac2)} + Urbanisme ${eurTip(p.urba2)} + Marge cession ${eurTip(r.margeCession)}. Ma marge nette garantie = ${eurTip(r.net2)}. (Frais ECAIR 12% sur MPR déjà déduits.)`;
         const cessTip = r.cessionForced ? 'Prix de cession forcé pour ce produit. Cliquez sur ↺ pour revenir à la marge globale.' : `Calculé : base ${eurTip(r.baseCession)} + marge globale ${eurTip(r.margeCessionDefaut)}. Vous pouvez forcer une autre valeur.`;
         rowsHTML += `<tr data-i="${i}">
-          <td class="adm-ref col-modele">${m.ref} ${phase}${ecs}<small>${m.nom||''}</small><button type="button" class="adm-pac-desc-btn" data-i="${i}" title="Description technique pour le devis">📝</button><button type="button" class="adm-del" data-i="${i}" title="Supprimer">×</button></td>
+          <td class="adm-ref col-modele">${m.ref} ${phase}${ecs}<small>${m.nom||''}</small><button type="button" class="adm-pac-desc-btn" data-i="${i}" title="Description technique pour le devis">📝</button><button type="button" class="adm-del" data-i="${i}" title="Supprimer">×</button><div class="adm-gamme"><span class="adm-gamme-lbl">Gamme</span><input type="text" class="adm-gamme-in" data-i="${i}" placeholder="—"><span class="adm-gamme-badge">auto</span></div></td>
           <td><span class="adm-euro"><input type="text" inputmode="numeric" class="adm-in" data-f="ttc" value="${ferow(m.ttc)}"><i>€</i></span></td>
           <td class="adm-num col-calc">${eur(r.ht)}</td>
           <td><span class="adm-euro"><input type="text" inputmode="numeric" class="adm-in" data-f="achat" value="${ferow(m.achat)}"><i>€</i></span></td>
@@ -17767,6 +17773,10 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
     document.querySelectorAll('.adm-pac-desc-btn').forEach(btn=>{
       btn.addEventListener('click', ()=>{ openDescriptionPacModal(+btn.dataset.i); });
     });
+    document.querySelectorAll('.adm-gamme-in').forEach(inp=>{
+      inp.addEventListener('change', ()=>{ saveGammeOverride(+inp.dataset.i); });
+    });
+    refreshGammesState();
     // bouton "Simuler" -> déplie le curseur de surplus pour la ligne
     document.querySelectorAll('.adm-sim-btn').forEach(btn=>{
       btn.addEventListener('click', ()=>{ toggleSim(+btn.dataset.sim, false); });
@@ -17782,6 +17792,53 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
       });
     });
     bindAdminM3();
+  }
+
+  async function refreshGammesState(){
+    let rows = [];
+    try {
+      const r = await fetch('/api/admin/gammes', { cache:'no-store' });
+      if (r.ok) rows = await r.json();
+    } catch(_) { return; }
+    const byRef = {};
+    (Array.isArray(rows)?rows:[]).forEach(x=>{ byRef[x.ref] = x; });
+    const models = (window.HexaConfig && window.HexaConfig.models) || [];
+    document.querySelectorAll('.adm-gamme-in').forEach(inp=>{
+      const m = models[+inp.dataset.i];
+      const info = m ? byRef[m.ref] : null;
+      if (!info) return;
+      inp.value = info.gamme || '';
+      inp.dataset.auto = info.gamme_auto || '';
+      const badge = inp.parentNode.querySelector('.adm-gamme-badge');
+      if (badge){
+        const over = info.source === 'override';
+        badge.textContent = over ? 'corrigé' : 'auto';
+        badge.classList.toggle('is-override', over);
+      }
+    });
+  }
+  async function saveGammeOverride(i){
+    const models = (window.HexaConfig && window.HexaConfig.models) || [];
+    const m = models[i];
+    const inp = document.querySelector('.adm-gamme-in[data-i="'+i+'"]');
+    if (!m || !m.ref || !inp) return;
+    const fd = new FormData();
+    fd.append('ref', m.ref);
+    fd.append('gamme', inp.value.trim());
+    try {
+      const r = await fetch('/api/admin/gammes', { method:'POST', body: fd });
+      const body = await r.json().catch(()=>({}));
+      if (!r.ok){ adminToast(body.detail || ('Échec (HTTP '+r.status+')'), '#ef4444'); return; }
+      inp.value = body.gamme || '';
+      inp.dataset.auto = body.gamme_auto || inp.dataset.auto || '';
+      const badge = inp.parentNode.querySelector('.adm-gamme-badge');
+      if (badge){
+        const over = body.source === 'override';
+        badge.textContent = over ? 'corrigé' : 'auto';
+        badge.classList.toggle('is-override', over);
+      }
+      adminToast('Gamme enregistrée', '#16a34a');
+    } catch(e){ adminToast(e?.message || 'Erreur réseau', '#ef4444'); }
   }
 
   function bindAdminM3(){

@@ -65,6 +65,8 @@ DEVIS_ENVOYES_PATH = os.path.join(DATA_DIR, "devis_envoyes.json")
 STATES_SIMULATEUR_DIR = os.path.join(DATA_DIR, "states_simulateur")
 DEVIS_DIR = os.path.join(DATA_DIR, "devis")
 DEVIS_META_PATH = os.path.join(DEVIS_DIR, "devis_meta.json")
+FICHES_DIR = os.path.join(DATA_DIR, "fiches_techniques")
+FICHES_INDEX_PATH = os.path.join(FICHES_DIR, "index.json")
 REPO_CATALOGUE_PATH = os.path.join(REPO_DATA_DIR, "catalogue_pac.json")
 REPO_BAREMES_PATH = os.path.join(REPO_DATA_DIR, "baremes.json")
 DOCUMENTS_CATEGORIES_PATH = os.path.join(DATA_DIR, "documents_categories.json")
@@ -3932,6 +3934,66 @@ async def comment_document(numero: str, filename: str, request: Request) -> JSON
         return _doc_err("Document introuvable", 404)
     _write_docs_index(numero, docs)
     return JSONResponse({"status": "ok"})
+
+
+def _gamme_auto(ref: str) -> str:
+    s = str(ref or "").strip()
+    s = re.sub(r"\s+TRI$", "", s, flags=re.IGNORECASE)   # retire " TRI"
+    s = re.sub(r"-\d+(?:[.,]\d+)?$", "", s)               # retire "-<nombre>"
+    return s.strip()
+
+
+def _read_fiches_index() -> dict:
+    idx = _read_json(FICHES_INDEX_PATH, {})
+    return idx if isinstance(idx, dict) else {}
+
+
+def _write_fiches_index(index: dict) -> None:
+    os.makedirs(FICHES_DIR, exist_ok=True)
+    _atomic_write_json(FICHES_INDEX_PATH, index)
+
+
+def _gamme_of(ref: str, overrides: dict) -> str:
+    return (overrides or {}).get(ref) or _gamme_auto(ref)
+
+
+@app.get("/api/admin/gammes")
+def list_gammes(request: Request) -> JSONResponse:
+    _require_admin(request)
+    overrides = _read_fiches_index().get("gamme_overrides", {})
+    rows = []
+    for m in _read_catalogue_pac():
+        ref = str(m.get("ref") or m.get("nom") or "").strip()
+        if not ref:
+            continue
+        auto = _gamme_auto(ref)
+        rows.append({
+            "ref": ref, "nom": m.get("nom") or "",
+            "gamme": overrides.get(ref) or auto,
+            "gamme_auto": auto,
+            "source": "override" if ref in overrides else "auto",
+        })
+    return JSONResponse(rows)
+
+
+@app.post("/api/admin/gammes")
+async def set_gamme(request: Request, ref: str = Form(...), gamme: str = Form("")) -> JSONResponse:
+    _require_admin(request)
+    ref = str(ref or "").strip()
+    if not ref:
+        raise HTTPException(status_code=400, detail="Référence manquante")
+    auto = _gamme_auto(ref)
+    g = str(gamme or "").strip()
+    index = _read_fiches_index()
+    overrides = index.get("gamme_overrides", {})
+    if not g or g == auto:
+        overrides.pop(ref, None)          # retour à l'auto = pas d'override stocké
+    else:
+        overrides[ref] = g
+    index["gamme_overrides"] = overrides
+    _write_fiches_index(index)
+    return JSONResponse({"status": "ok", "ref": ref, "gamme": g or auto,
+                         "gamme_auto": auto, "source": "override" if ref in overrides else "auto"})
 
 
 @app.post("/api/modeles-email/{numero}/envoyer")
