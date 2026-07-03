@@ -921,7 +921,7 @@ PROSPECT_FIELDS = [
 
     # Système "À traiter" (rappels / RDV / actions)
     "rdv",                 # objet | None : {date,heure,type,assigne_a,cree_par,cree_at}
-    "rappel",              # objet | None : {date,assigne_a,motif,origine,cree_par,cree_at}
+    "rappel",              # objet | None : {date,heure,assigne_a,motif,origine,cree_par,cree_at}
     "actions_log",         # liste : historique des actions closes
     "statut_updated_at",   # iso Paris : déjà écrit par /status, déclaré pour cohérence
     "injoignable_at",      # iso Paris : posé quand statut -> injoignable
@@ -1974,8 +1974,9 @@ async def set_lead_rdv(numero: str, request: Request) -> JSONResponse:
 async def set_lead_rappel(numero: str, request: Request) -> JSONResponse:
     """Pose/replace le rappel actif d'un prospect (1 actif par lead). Si un
     rappel existe déjà, l'ancien est archivé dans actions_log (reprogramme)
-    avant d'écrire le nouveau. PAS de changement de statut.
-    Payload : {date:'YYYY-MM-DD', assigne_a, motif, par}."""
+    avant d'écrire le nouveau. Statut auto NON-régressif : nouveau/contacte
+    -> rappeler (ne recule jamais un lead plus avancé).
+    Payload : {date:'YYYY-MM-DD', heure?:'HH:MM', assigne_a, motif, par}."""
     payload = await _read_request_payload(request)
     date = str(payload.get("date") or "").strip()
     # Validation stricte : date présente ET re-sérialisable à l'identique
@@ -1986,6 +1987,12 @@ async def set_lead_rappel(numero: str, request: Request) -> JSONResponse:
         raise HTTPException(
             status_code=400,
             detail="Date de rappel invalide (attendu 'YYYY-MM-DD').",
+        )
+    heure = str(payload.get("heure") or "").strip()  # optionnelle : "" = rappel "toute la journée"
+    if heure and _parse_paris_dt(f"{date}T{heure}") is None:
+        raise HTTPException(
+            status_code=400,
+            detail="Heure de rappel invalide (attendu 'HH:MM').",
         )
     motif = str(payload.get("motif") or "").strip()  # libre, peut être vide
     par = _normalize_assigne(payload.get("par"))
@@ -2014,12 +2021,19 @@ async def set_lead_rappel(numero: str, request: Request) -> JSONResponse:
 
     leads[index]["rappel"] = {
         "date": date,
+        "heure": heure,
         "assigne_a": assigne_a,
         "motif": motif,
         "origine": "manuel",
         "cree_par": par,
         "cree_at": now_paris,
     }
+    # Statut auto NON-régressif : un rappel ne fait avancer que les leads encore
+    # en amont (nouveau/contacte -> rappeler). Ne recule jamais un lead déjà plus
+    # avancé (pre_devis, vt_*, devis, signe...).
+    if leads[index].get("statut") in ("nouveau", "contacte"):
+        leads[index]["statut"] = "rappeler"
+        leads[index]["statut_updated_at"] = now_paris
     leads[index]["updated_at"] = _now_iso()
     _atomic_write_json(LEADS_PATH, leads)
     return JSONResponse({"ok": True, "lead": _lead_for_response(leads[index])})
