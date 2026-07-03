@@ -757,6 +757,12 @@ STATUT_ALIASES = {
     "rappeler": "rappeler",
     "rdv": "rdv",
     "rdv pris": "rdv",
+    "pre_devis": "pre_devis",
+    "pre-devis": "pre_devis",
+    "pré-devis": "pre_devis",
+    "pre_devis_envoye": "pre_devis_envoye",
+    "pre-devis envoye": "pre_devis_envoye",
+    "pré-devis envoyé": "pre_devis_envoye",
     "envoye en vt": "vt_envoye",
     "envoyé en vt": "vt_envoye",
     "vt_envoye": "vt_envoye",
@@ -1761,7 +1767,7 @@ async def update_lead_status(numero: str, request: Request) -> JSONResponse:
     """Met à jour le statut d'un prospect depuis l'Accueil."""
     payload = await _read_request_payload(request)
     new_status = _normalize_statut(str(payload.get("statut") or "").strip())
-    allowed = {"nouveau", "contacte", "rappeler", "rdv", "vt_envoye", "vt_valide", "vt_refuse", "devis", "devis_envoye", "signe", "perdu"}
+    allowed = {"nouveau", "contacte", "rappeler", "rdv", "pre_devis", "pre_devis_envoye", "vt_envoye", "vt_valide", "vt_refuse", "devis", "devis_envoye", "signe", "perdu"}
     if new_status not in allowed:
         raise HTTPException(status_code=400, detail=f"Statut invalide : {new_status}")
     leads = _read_leads()
@@ -1924,7 +1930,7 @@ async def update_lead_nrp(numero: str, request: Request) -> JSONResponse:
 async def set_lead_rdv(numero: str, request: Request) -> JSONResponse:
     """Pose/replace le RDV actif d'un prospect (1 actif par lead).
     Payload : {date:'YYYY-MM-DD', heure:'HH:MM', type:'tel'|'visite',
-    assigne_a, par}. Pose aussi le statut 'rdv'. Format technique stocké tel
+    assigne_a, par}. Format technique stocké tel
     quel ; l'affichage FR se fait côté interface."""
     payload = await _read_request_payload(request)
     date = str(payload.get("date") or "").strip()
@@ -1956,8 +1962,7 @@ async def set_lead_rdv(numero: str, request: Request) -> JSONResponse:
         "cree_par": par,
         "cree_at": now_paris,
     }
-    leads[index]["statut"] = "rdv"
-    leads[index]["statut_updated_at"] = now_paris
+    # RDV téléphonique : ne modifie plus le statut (clé "rdv" retirée du tunnel, option 2)
     leads[index]["updated_at"] = _now_iso()
     _atomic_write_json(LEADS_PATH, leads)
     return JSONResponse({"ok": True, "lead": _lead_for_response(leads[index])})
@@ -3629,7 +3634,7 @@ async def _send_devis(numero: str, payload: dict, request: Request) -> dict:
     leads = _read_leads()
     idx = _find_lead_index(leads, numero)
     if idx is not None:
-        leads[idx]["statut"] = "devis_envoye" if variante == "devis" else "vt_envoye"
+        leads[idx]["statut"] = "devis_envoye" if variante == "devis" else "pre_devis_envoye"
         leads[idx]["date_envoi_devis"] = now
         _atomic_write_json(LEADS_PATH, leads)
 
