@@ -3939,6 +3939,7 @@ async def comment_document(numero: str, filename: str, request: Request) -> JSON
 def _gamme_auto(ref: str) -> str:
     s = str(ref or "").strip()
     s = re.sub(r"\s+TRI$", "", s, flags=re.IGNORECASE)   # retire " TRI"
+    s = re.sub(r"-DUO(?=-|$)", "", s, flags=re.IGNORECASE)  # retire "-DUO" (DUO ou pas = même gamme, règle absolue)
     s = re.sub(r"-\d+(?:[.,]\d+)?$", "", s)               # retire "-<nombre>"
     return s.strip()
 
