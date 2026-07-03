@@ -2999,7 +2999,7 @@ def _notedim_path(numero: str, version: int) -> str:
     return os.path.join(DEVIS_DIR, f"{numero}_notedim_v{version}.pdf")
 
 
-def _build_devis_context(request: Request, numero: str, version: int | None = None) -> dict:
+def _build_devis_context(request: Request, numero: str, version: int | None = None, avec_sous_traitant: bool = True) -> dict:
     prospect = _find_lead(numero)
     if not prospect:
         raise HTTPException(status_code=404, detail="Prospect introuvable")
@@ -3063,6 +3063,7 @@ def _build_devis_context(request: Request, numero: str, version: int | None = No
         "modele_pac": modele_obj.get("nom") or modele_obj.get("ref") or "",
         "description_specs": description_specs,
         "sous_traitant": sous_traitant_context,
+        "avec_sous_traitant": avec_sous_traitant,
         "sous_traitant_texte": format_sous_traitant(sous_traitant),
         **formatted_calculs,
     }
@@ -3165,8 +3166,8 @@ def _render_template_response(request: Request, template_name: str, context: dic
     return HTMLResponse(content=html_content)
 
 
-def _render_devis_html(request: Request, numero: str, version: int | None = None) -> str:
-    ctx = _build_devis_context(request, numero, version)
+def _render_devis_html(request: Request, numero: str, version: int | None = None, avec_sous_traitant: bool = True) -> str:
+    ctx = _build_devis_context(request, numero, version, avec_sous_traitant)
     name = ctx.pop("_error_template", "devis_pac.html")
     ctx.setdefault("request", request)
     return templates.env.get_template(name).render(ctx)
@@ -3229,9 +3230,9 @@ def _write_pdf(path: str, pdf_bytes: bytes) -> str:
     return path
 
 
-def _ensure_devis_pdf(numero: str, request: Request, version: int | None = None) -> tuple[str, str, int]:
+def _ensure_devis_pdf(numero: str, request: Request, version: int | None = None, avec_sous_traitant: bool = True) -> tuple[str, str, int]:
     version = version or _next_sent_version(numero)
-    html = _render_devis_html(request, numero, version)
+    html = _render_devis_html(request, numero, version, avec_sous_traitant)
     html_path = _devis_html_path(numero, version)
     _write_text(html_path, html)
     pdf_path = _devis_path(numero, version)
@@ -3561,8 +3562,14 @@ async def _send_devis(numero: str, payload: dict, request: Request) -> dict:
     if not api_key:
         raise HTTPException(status_code=400, detail="RESEND_API_KEY non configurée")
 
+    vt_validee = bool(prospect.get("vt_validee"))
+    variante = str(payload.get("variante") or ("devis" if vt_validee else "pre_devis")).strip()
+    if variante == "devis" and not vt_validee:
+        raise HTTPException(status_code=400, detail="VT non validée : seul le pré-devis est possible")
+    avec_sous_traitant = (variante == "devis")
+
     version = _next_sent_version(numero)
-    devis_path, devis_html, version = _ensure_devis_pdf(numero, request, version)
+    devis_path, devis_html, version = _ensure_devis_pdf(numero, request, version, avec_sous_traitant)
     notedim_path = _ensure_notedim_pdf(numero, request, version)
 
     # Aperçu éco (bandeau email devis) — peut être None
@@ -3612,7 +3619,7 @@ async def _send_devis(numero: str, payload: dict, request: Request) -> dict:
     leads = _read_leads()
     idx = _find_lead_index(leads, numero)
     if idx is not None:
-        leads[idx]["statut"] = "devis_envoye"
+        leads[idx]["statut"] = "devis_envoye" if variante == "devis" else "vt_envoye"
         leads[idx]["date_envoi_devis"] = now
         _atomic_write_json(LEADS_PATH, leads)
 
@@ -3634,6 +3641,7 @@ async def _send_devis(numero: str, payload: dict, request: Request) -> dict:
         "notedim_file": notedim_path,
         "resend_id": result.get("id") if isinstance(result, dict) else "",
         "statut": "envoye",
+        "variante": variante,
     }
     meta.setdefault(numero, []).append(item)
     _atomic_write_json(DEVIS_META_PATH, meta)

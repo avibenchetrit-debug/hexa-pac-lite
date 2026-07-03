@@ -16258,6 +16258,7 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
     document.getElementById('modal-envoi-mail')?.remove();
     const email = document.querySelector('[name="email"]')?.value || '';
     const prenom = document.querySelector('[name="prenom"]')?.value || '';
+    const vtOk = document.body.dataset.vtValidee === '1';
     const modal = document.createElement('div');
     modal.id = 'modal-envoi-mail';
     modal.className = 'devis-modal-overlay';
@@ -16271,9 +16272,11 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
             avec des liens sécurisés pour les consulter en ligne et les télécharger.
           </div>
         </div>
-        <div class="devis-modal-foot">
+        <div class="devis-modal-foot" style="flex-wrap:wrap;gap:8px">
           <button type="button" class="adm-btn adm-btn-cancel" id="btn-cancel-mail">Annuler</button>
-          <button type="button" class="adm-btn adm-btn-primary" id="btn-send-mail">📧 Envoyer maintenant</button>
+          <button type="button" class="adm-btn ${vtOk ? '' : 'adm-btn-primary'}" id="btn-send-predevis">📄 Envoyer le pré-devis</button>
+          <button type="button" class="adm-btn ${vtOk ? 'adm-btn-primary' : ''}" id="btn-send-devis" ${vtOk ? '' : 'disabled'} style="${vtOk ? '' : 'opacity:.45;cursor:not-allowed'}" title="${vtOk ? '' : 'Validez la VT pour débloquer le devis complet'}">📧 Envoyer le devis complet</button>
+          ${vtOk ? '' : '<div style="flex-basis:100%;font-size:12px;color:#B45309;margin-top:4px">⚠️ VT non validée : seul le pré-devis est disponible.</div>'}
         </div>
       </div>`;
     document.body.appendChild(modal);
@@ -16281,8 +16284,7 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
     modal.querySelector('.devis-close-btn')?.addEventListener('click', close);
     modal.querySelector('#btn-cancel-mail')?.addEventListener('click', close);
     modal.addEventListener('click', e=>{ if(e.target===modal) close(); });
-    modal.querySelector('#btn-send-mail')?.addEventListener('click', async ()=>{
-      const btn = modal.querySelector('#btn-send-mail');
+    async function doSend(variante, btn){
       const prev = btn.textContent;
       btn.disabled = true;
       btn.textContent = 'Envoi...';
@@ -16293,12 +16295,13 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
           headers:{'Content-Type':'application/json'},
           body: JSON.stringify({
             auteur,
+            variante,
             destinataire: document.getElementById('mail-destinataire')?.value || ''
           })
         });
         const data = await r.json().catch(()=>({}));
         if(!r.ok || !(data.ok || data.success)) throw new Error(data.detail || data.msg || 'Envoi impossible');
-        alert('Devis envoyé au client.');
+        alert(variante === 'devis' ? 'Devis complet envoyé au client.' : 'Pré-devis envoyé au client.');
         if(typeof window.hexaRefreshProspectsTable === 'function') window.hexaRefreshProspectsTable();
         close();
       }catch(err){
@@ -16307,7 +16310,9 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
         btn.disabled = false;
         btn.textContent = prev;
       }
-    });
+    }
+    modal.querySelector('#btn-send-predevis')?.addEventListener('click', function(){ doSend('pre_devis', this); });
+    modal.querySelector('#btn-send-devis')?.addEventListener('click', function(){ if(this.disabled) return; doSend('devis', this); });
   }
 
   window.ouvrirSimulationsDrawer = ouvrir;
@@ -19676,6 +19681,7 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
     const numero = String((lead && lead.numero) || document.body.dataset.prospectNumero || '').trim();
     if(!numero){ slot.innerHTML = ''; return; }
     const validee = !!(lead && lead.vt_validee);
+    document.body.dataset.vtValidee = validee ? '1' : '';
     const vtDate = (lead && lead.vt_date) ? String(lead.vt_date) : '';
     const esc = function(s){ return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
     let dateLbl = vtDate;
