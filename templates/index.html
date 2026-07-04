@@ -16895,7 +16895,7 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
     const modelesRows = modeles.slice(0,2).map((m,i)=>`
       <div class="adm-field adm-field-row"><span class="adm-lab">Modèle ${i+1} — libellé</span><input type="text" class="adm-bt-nom" data-idx="${i}" data-ref="${adminEscape(m.ref||('ballon-'+(i+1)))}" value="${adminEscape(m.nom||'')}"></div>
       <div class="adm-field adm-field-row"><span class="adm-lab">Modèle ${i+1} — fourniture</span><span class="adm-euro"><input type="text" inputmode="numeric" class="adm-bt-fourniture adm-money" data-idx="${i}" value="${adminEscape(m.fourniture_ht != null ? m.fourniture_ht : 0)}"><i>€ HT</i></span></div>
-      <div class="adm-field adm-field-row"><span class="adm-lab">Modèle ${i+1} — description</span><button type="button" class="adm-btn adm-btn-ghost adm-bt-desc" data-bt-desc="${i}">✎ Specs fourniture (${(Array.isArray(m.description_specs)?m.description_specs.length:0)})</button></div>`).join('');
+      <div class="adm-field adm-field-row"><span class="adm-lab">Modèle ${i+1} — description</span><button type="button" class="adm-btn adm-btn-cancel adm-bt-desc" data-bt-desc="${i}">✎ Specs fourniture (${(Array.isArray(m.description_specs)?m.description_specs.length:0)})</button></div>`).join('');
     return `<div class="adm-card">
       ${modelesRows}
       <div class="adm-field adm-field-row"><span class="adm-lab">Pose commune</span><span class="adm-euro"><input type="text" inputmode="numeric" class="adm-bt-pose adm-money" value="${adminEscape(pose)}"><i>€ HT</i></span></div>
@@ -17164,6 +17164,7 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
     if (cfg.models) cfg.models.forEach(m=>{ if(m.achat!=null) m.achat=Math.round(m.achat); if(m.ttc!=null) m.ttc=Math.round(m.ttc); });
     cfg.prix_vente_devis = Object.assign({}, DEFAULT.prix_vente_devis, cfg.prix_vente_devis || {});
     cfg.params.frais_ecair_pct = Number(cfg.prix_vente_devis.frais_ecair_pct ?? cfg.params.frais_ecair_pct ?? 12);
+    cfg.ballon_thermo = Object.assign({}, DEFAULT.ballon_thermo, cfg.ballon_thermo || {}, ADMIN_PARAMS_CACHE?.ballon_thermo || {});
     return cfg;
   }
   function saveConfig(notify=true){
