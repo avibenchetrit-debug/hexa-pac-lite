@@ -17440,10 +17440,12 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
     const num = (el) => parseFloat(String((el && el.value) || '0').replace(/\s/g,'').replace(',','.')) || 0;
     const noms = Array.from(document.querySelectorAll('.adm-bt-nom'));
     const fournis = Array.from(document.querySelectorAll('.adm-bt-fourniture'));
+    const anciens = (cfg.ballon_thermo && Array.isArray(cfg.ballon_thermo.modeles)) ? cfg.ballon_thermo.modeles : [];
     const modeles = noms.map((el,i)=>({
       ref: el.dataset.ref || ('ballon-'+(i+1)),
       nom: (el.value||'').trim(),
-      fourniture_ht: num(fournis[i])
+      fourniture_ht: num(fournis[i]),
+      description_specs: Array.isArray(anciens[i] && anciens[i].description_specs) ? anciens[i].description_specs : []
     }));
     const forfaits = {};
     document.querySelectorAll('.adm-bt-mpr').forEach(el=>{ forfaits[el.dataset.cat] = num(el); });
