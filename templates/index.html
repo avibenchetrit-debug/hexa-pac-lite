@@ -2862,6 +2862,17 @@ body.panel-is-open {
     #card-suivi .suivi-line { min-width:0; }
     #card-suivi .suivi-done { padding:4px 10px; font-size:11px; flex-shrink:0; }
     /* Liste "À traiter aujourd'hui" (accueil) */
+    .rappels-panel { background:#FFFFFF; border:1px solid #E2E8F0; border-left:4px solid #E2214B; border-radius:12px; padding:14px 16px; margin-bottom:16px; }
+    .rappels-head { display:flex; align-items:center; gap:8px; margin-bottom:10px; }
+    .rappels-title { font-size:16px; font-weight:700; color:#002E5A; }
+    .rappels-count { display:inline-flex; align-items:center; justify-content:center; min-width:22px; height:22px; padding:0 7px; background:#E2214B; color:#fff; border-radius:11px; font-size:12px; font-weight:700; }
+    .rappels-list { display:flex; flex-direction:column; gap:6px; }
+    .rappels-row { display:flex; align-items:center; gap:12px; padding:8px 10px; border:1px solid #EEF2F7; border-radius:8px; cursor:pointer; transition:background .12s; }
+    .rappels-row:hover { background:#F4F8FC; }
+    .rappels-row.is-retard { background:#FDE8EC; border-color:#F4B3BF; }
+    .rappels-badge { font-size:11px; font-weight:700; color:#fff; background:#E2214B; border-radius:6px; padding:2px 8px; text-transform:uppercase; letter-spacing:.03em; }
+    .rappels-nom { font-weight:600; color:#1A202C; }
+    .rappels-when { margin-left:auto; font-size:13px; color:#475569; font-variant-numeric:tabular-nums; }
     .atraiter-panel { background:#FFFFFF; border:1px solid #E2E8F0; border-radius:12px; padding:14px 16px; margin-bottom:16px; }
     .atraiter-head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:10px; }
     .atraiter-title { font-size:16px; font-weight:700; color:#002E5A; margin:0; display:flex; align-items:center; gap:8px; }
@@ -19012,6 +19023,7 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
     leadsLoading = false;
     renderRows();
     refreshMasterStats(true);
+    renderRappelsAccueil();
   }
   async function refreshAfterImport(){
     return refreshProspectsTable();
@@ -19034,6 +19046,10 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
         </div>
       </div>
       <div class="pv-wrap">
+        <section id="rappels-panel" class="rappels-panel" style="display:none">
+          <div class="rappels-head"><span class="rappels-title">🔔 Rappels à traiter</span><span id="rappels-count" class="rappels-count">0</span></div>
+          <div id="rappels-list" class="rappels-list"></div>
+        </section>
         <section id="atraiter-panel" class="atraiter-panel">
           <div class="atraiter-head">
             <button type="button" id="atraiter-toggle" class="atraiter-toggle" aria-expanded="false"><span class="atraiter-chevron">▸</span><span class="atraiter-title">À traiter aujourd'hui <span id="atraiter-total" class="atraiter-total">0</span></span></button>
@@ -19406,6 +19422,63 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
     if(u) u.textContent = '👤 ' + (name || '—');
   }
   let atraiterScope = 'tous';
+  // Format heure FR : "14:30" -> "14h30", "14:00" -> "14h", "09:30" -> "9h30". Global (partagé fiche + accueil).
+  window.hexaHeureFr = function(h){
+    h = String(h == null ? '' : h).trim();
+    var m = h.match(/(\d{1,2}):(\d{2})/);
+    if(!m) return '';
+    var hh = String(parseInt(m[1], 10));
+    return m[2] === '00' ? (hh + 'h') : (hh + 'h' + m[2]);
+  };
+  // Extracteur défensif : {date,heure} (R1), ISO combiné "YYYY-MM-DDTHH:MM", ou date seule.
+  function rappelDH(rap){
+    if(!rap || typeof rap !== 'object') return null;
+    var d = String(rap.date || '').trim();
+    var h = String(rap.heure || '').trim();
+    if(d.indexOf('T') >= 0){ var p = d.split('T'); d = p[0]; if(!h) h = String(p[1] || '').slice(0,5); }
+    if(!d) return null;
+    return { date: d, heure: h };
+  }
+  // Échéance ms : heure connue -> à l'heure ; sans heure -> fin de journée (23:59).
+  function rappelEcheanceTs(dh){
+    var hm = (dh.heure && /^\d{1,2}:\d{2}/.test(dh.heure)) ? dh.heure.slice(0,5) : '23:59';
+    if(hm.length === 4) hm = '0' + hm;
+    var t = new Date(dh.date + 'T' + hm + ':00').getTime();
+    return isNaN(t) ? Infinity : t;
+  }
+  function renderRappelsAccueil(){
+    var panel = document.getElementById('rappels-panel');
+    var list = document.getElementById('rappels-list');
+    var countEl = document.getElementById('rappels-count');
+    if(!panel || !list) return;
+    if(!list.dataset.bound){
+      list.dataset.bound = '1';
+      list.addEventListener('click', function(e){
+        var row = e.target.closest('.rappels-row');
+        if(row && row.dataset.numero) window.openFicheByNumero(row.dataset.numero);
+      });
+    }
+    var now = Date.now();
+    var items = (Array.isArray(data) ? data : [])
+      .filter(function(d){ return d && d.statut === 'rappeler' && d.rappel && typeof d.rappel === 'object'; })
+      .map(function(d){ var dh = rappelDH(d.rappel); return dh ? { lead: d, dh: dh, ts: rappelEcheanceTs(dh) } : null; })
+      .filter(Boolean)
+      .sort(function(a, b){ return a.ts - b.ts; });
+    if(!items.length){ panel.style.display = 'none'; list.innerHTML = ''; if(countEl) countEl.textContent = '0'; return; }
+    panel.style.display = '';
+    if(countEl) countEl.textContent = String(items.length);
+    list.innerHTML = items.map(function(it){
+      var retard = it.ts < now;
+      var nom = escapeHtml(((it.lead.prenom || '') + ' ' + (it.lead.nom || '')).trim() || it.lead.numero || '');
+      var hFr = window.hexaHeureFr(it.dh.heure);
+      var quand = escapeHtml(fmtDate(it.dh.date) + (hFr ? ' à ' + hFr : ''));
+      return '<div class="rappels-row' + (retard ? ' is-retard' : '') + '" data-numero="' + escapeHtml(it.lead.numero || '') + '">'
+        + (retard ? '<span class="rappels-badge">En retard</span>' : '')
+        + '<span class="rappels-nom">' + nom + '</span>'
+        + '<span class="rappels-when">' + quand + '</span></div>';
+    }).join('');
+  }
+
   async function loadATraiter(){
     const list = document.getElementById('atraiter-list');
     const totalEl = document.getElementById('atraiter-total');
@@ -19797,7 +19870,7 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
         const motif = String(rap.motif||'').trim();
         parts.push('<div class="suivi-item"><span class="suivi-line">🔁 <strong>Rappel</strong> '
           + escapeHtml(rap.date||'')
-          + (rap.heure ? ' ' + escapeHtml(rap.heure) : '')
+          + (rap.heure ? ' ' + escapeHtml(window.hexaHeureFr(rap.heure)) : '')
           + (motif ? ' · ' + escapeHtml(motif) : '')
           + ' · ' + escapeHtml(suiviAssigneLabel(rap.assigne_a)) + '</span>'
           + '<button type="button" class="btn btn-secondary suivi-done" data-kind="rappel">Marquer fait</button></div>');
