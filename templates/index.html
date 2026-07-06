@@ -7522,6 +7522,13 @@ input:focus{ outline:none; border-color: var(--c-navy,#002E5A); box-shadow:0 0 0
 
 /* Bouton + Ajouter une PAC */
 .adm-add-row{ margin-top:12px; }
+.adm-ballon-card{ border:1px solid var(--c-line,#E2E8F0); border-radius:10px; padding:12px 14px; margin-bottom:12px; background:#fff; }
+.adm-ballon-card-head{ display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; border-bottom:1px solid #EEF1F5; padding-bottom:6px; }
+.adm-ballon-card-title{ font-weight:700; color:var(--c-navy,#002E5A); font-size:14px; }
+.adm-ballon-btns{ display:flex; gap:8px; flex-wrap:wrap; }
+.adm-ballon-commun{ margin-top:14px; padding-top:12px; border-top:2px solid #EEF1F5; }
+.adm-ballon-commun-title{ font-weight:700; color:var(--c-navy,#002E5A); font-size:13px; text-transform:uppercase; letter-spacing:0.04em; margin-bottom:8px; }
+.adm-bt-del{ color:#B91C1C; }
 .adm-btn-add{ background:#fff; color:var(--c-navy,#002E5A); border:1.5px dashed var(--c-navy-clair,#1A4A7A); width:100%; padding:11px; font-weight:600; }
 .adm-btn-add:hover{ background:#F4F8FC; border-style:solid; }
 
@@ -16914,23 +16921,29 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
     const coutPoseBallon = (window.HexaConfig && window.HexaConfig.params && window.HexaConfig.params.cout_pose_ballon != null) ? Number(window.HexaConfig.params.cout_pose_ballon) : 600;
     const forfaits = cfg.forfaits_mpr || { tres_modeste:1200, modeste:800, intermediaire:400, superieur:0 };
     const margeBallon = (m) => (Number(m.fourniture_ht)||0) - (Number(m.cout_fourniture_ht)||0) + ((Number(pose)||0) - (Number(coutPoseBallon)||0));
-    const modelesRows = modeles.slice(0,2).map((m,i)=>`
-      <div class="adm-field adm-field-row"><span class="adm-lab">Modèle ${i+1} — libellé</span><input type="text" class="adm-bt-nom" data-idx="${i}" data-ref="${adminEscape(m.ref||('ballon-'+(i+1)))}" value="${adminEscape(m.nom||'')}"></div>
-      <div class="adm-field adm-field-row"><span class="adm-lab">Modèle ${i+1} — fourniture</span><span class="adm-euro"><input type="text" inputmode="numeric" class="adm-bt-fourniture adm-money" data-idx="${i}" value="${adminEscape(m.fourniture_ht != null ? m.fourniture_ht : 0)}"><i>€ HT</i></span></div>
-      <div class="adm-field adm-field-row"><span class="adm-lab">Modèle ${i+1} — coût fourniture</span><span class="adm-euro"><input type="text" inputmode="numeric" class="adm-bt-cout adm-money" data-idx="${i}" value="${adminEscape(m.cout_fourniture_ht != null ? m.cout_fourniture_ht : 0)}"><i>€ HT</i></span></div>
-      <div class="adm-field adm-field-row"><span class="adm-lab">Modèle ${i+1} — description</span><button type="button" class="adm-btn adm-btn-cancel adm-bt-desc" data-bt-desc="${i}">✎ Specs fourniture (${(Array.isArray(m.description_specs)?m.description_specs.length:0)})</button></div>
-      <div class="adm-field adm-field-row"><span class="adm-lab">Modèle ${i+1} — fiche technique</span><button type="button" class="adm-btn adm-btn-cancel adm-fiche-ballon-btn" data-ref="${adminEscape(m.ref||('ballon-'+(i+1)))}">📎 Fiche PDF</button></div>
-      <div class="adm-field adm-field-row adm-bt-marge-row"><span class="adm-lab">Modèle ${i+1} — Marge (admin)</span><span class="adm-bt-marge" data-idx="${i}"><b>${eur(margeBallon(m))}</b> HT</span></div>`).join('');
+    const modelesRows = modeles.map((m,i)=>`
+      <div class="adm-ballon-card" data-ref="${adminEscape(m.ref||('ballon-'+(i+1)))}">
+        <div class="adm-ballon-card-head"><span class="adm-ballon-card-title">Modèle ${i+1}${m.nom ? ' — ' + adminEscape(m.nom) : ''}</span><button type="button" class="adm-btn adm-btn-cancel adm-bt-del" data-ref="${adminEscape(m.ref||('ballon-'+(i+1)))}">🗑 Supprimer</button></div>
+        <div class="adm-field adm-field-row"><span class="adm-lab">Libellé</span><input type="text" class="adm-bt-nom" data-idx="${i}" data-ref="${adminEscape(m.ref||('ballon-'+(i+1)))}" value="${adminEscape(m.nom||'')}"></div>
+        <div class="adm-field adm-field-row"><span class="adm-lab">Prix fourniture</span><span class="adm-euro"><input type="text" inputmode="numeric" class="adm-bt-fourniture adm-money" data-idx="${i}" value="${adminEscape(m.fourniture_ht != null ? m.fourniture_ht : 0)}"><i>€ HT</i></span></div>
+        <div class="adm-field adm-field-row"><span class="adm-lab">Coût fourniture</span><span class="adm-euro"><input type="text" inputmode="numeric" class="adm-bt-cout adm-money" data-idx="${i}" value="${adminEscape(m.cout_fourniture_ht != null ? m.cout_fourniture_ht : 0)}"><i>€ HT</i></span></div>
+        <div class="adm-field adm-field-row adm-bt-marge-row"><span class="adm-lab">Marge (admin)</span><span class="adm-bt-marge" data-idx="${i}"><b>${eur(margeBallon(m))}</b> HT</span></div>
+        <div class="adm-field adm-field-row"><span class="adm-lab">Fiche &amp; specs</span><span class="adm-ballon-btns"><button type="button" class="adm-btn adm-btn-cancel adm-bt-desc" data-bt-desc="${i}">✎ Specs (${(Array.isArray(m.description_specs)?m.description_specs.length:0)})</button><button type="button" class="adm-btn adm-btn-cancel adm-fiche-ballon-btn" data-ref="${adminEscape(m.ref||('ballon-'+(i+1)))}">📎 Fiche PDF</button></span></div>
+      </div>`).join('');
     return `<div class="adm-card">
-      ${modelesRows}
-      <div class="adm-field adm-field-row"><span class="adm-lab">Pose commune</span><span class="adm-euro"><input type="text" inputmode="numeric" class="adm-bt-pose adm-money" value="${adminEscape(pose)}"><i>€ HT</i></span></div>
-      ${[
-        ['tres_modeste','TMO (Très modeste)'],
-        ['modeste','MO (Modeste)'],
-        ['intermediaire','INT (Intermédiaire)'],
-        ['superieur','SUP (Supérieur)']
-      ].map(([k,l])=>`<div class="adm-field adm-field-row"><span class="adm-lab">MPR ${l}</span><span class="adm-euro"><input type="text" inputmode="numeric" class="adm-bt-mpr adm-money" data-cat="${k}" value="${adminEscape(forfaits[k] != null ? forfaits[k] : 0)}"><i>€</i></span></div>`).join('')}
-      <p class="adm-section-help">2 modèles (libellé + fourniture), pose commune, et forfaits MaPrimeRénov' par catégorie. Servent quand un ballon est ajouté au devis.</p>
+      <div class="adm-ballon-models">${modelesRows}</div>
+      <div class="adm-add-row"><button type="button" class="adm-btn adm-btn-add" id="adm-bt-add">+ Ajouter un modèle de ballon</button></div>
+      <div class="adm-ballon-commun">
+        <div class="adm-ballon-commun-title">Réglages communs à tous les modèles</div>
+        <div class="adm-field adm-field-row"><span class="adm-lab">Pose commune</span><span class="adm-euro"><input type="text" inputmode="numeric" class="adm-bt-pose adm-money" value="${adminEscape(pose)}"><i>€ HT</i></span></div>
+        ${[
+          ['tres_modeste','TMO (Très modeste)'],
+          ['modeste','MO (Modeste)'],
+          ['intermediaire','INT (Intermédiaire)'],
+          ['superieur','SUP (Supérieur)']
+        ].map(([k,l])=>`<div class="adm-field adm-field-row"><span class="adm-lab">MPR ${l}</span><span class="adm-euro"><input type="text" inputmode="numeric" class="adm-bt-mpr adm-money" data-cat="${k}" value="${adminEscape(forfaits[k] != null ? forfaits[k] : 0)}"><i>€</i></span></div>`).join('')}
+        <p class="adm-section-help">Coût de pose (calcul marge) réglé dans « Réglages généraux → Coût Hexa ». Chaque modèle a sa fourniture, son coût, ses specs et sa fiche PDF.</p>
+      </div>
       <div class="adm-actions"><button type="button" class="adm-btn-save" id="btn-save-ballon-thermo">Enregistrer</button></div>
     </div>`;
   }
@@ -17462,27 +17475,32 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
     adminToast('✓ Prix de vente sauvegardés', '#0D6B3B');
   }
 
-  async function saveBallonThermo(){
+  function collectBallonThermoAll(){
     const cfg = window.HexaConfig || loadConfig();
     const num = (el) => parseFloat(String((el && el.value) || '0').replace(/\s/g,'').replace(',','.')) || 0;
     const noms = Array.from(document.querySelectorAll('.adm-bt-nom'));
     const fournis = Array.from(document.querySelectorAll('.adm-bt-fourniture'));
     const couts = Array.from(document.querySelectorAll('.adm-bt-cout'));
     const anciens = (cfg.ballon_thermo && Array.isArray(cfg.ballon_thermo.modeles)) ? cfg.ballon_thermo.modeles : [];
-    const modeles = noms.map((el,i)=>({
-      ref: el.dataset.ref || ('ballon-'+(i+1)),
-      nom: (el.value||'').trim(),
-      fourniture_ht: num(fournis[i]),
-      cout_fourniture_ht: num(couts[i]),
-      description_specs: Array.isArray(anciens[i] && anciens[i].description_specs) ? anciens[i].description_specs : []
-    }));
+    const specsByRef = {};
+    anciens.forEach(function(m){ if (m && m.ref) specsByRef[m.ref] = Array.isArray(m.description_specs) ? m.description_specs : []; });
+    const modeles = noms.map((el,i)=>{
+      const ref = el.dataset.ref || ('ballon-'+(i+1));
+      return {
+        ref: ref,
+        nom: (el.value||'').trim(),
+        fourniture_ht: num(fournis[i]),
+        cout_fourniture_ht: num(couts[i]),
+        description_specs: Array.isArray(specsByRef[ref]) ? specsByRef[ref] : []
+      };
+    });
     const forfaits = {};
     document.querySelectorAll('.adm-bt-mpr').forEach(el=>{ forfaits[el.dataset.cat] = num(el); });
-    cfg.ballon_thermo = {
-      modeles: modeles,
-      prix_pose_ht: num(document.querySelector('.adm-bt-pose')),
-      forfaits_mpr: forfaits
-    };
+    return { modeles: modeles, prix_pose_ht: num(document.querySelector('.adm-bt-pose')), forfaits_mpr: forfaits };
+  }
+  async function saveBallonThermo(){
+    const cfg = window.HexaConfig || loadConfig();
+    cfg.ballon_thermo = collectBallonThermoAll();
     window.HexaConfig = cfg;
     try { localStorage.setItem(LS_KEY, JSON.stringify(cfg)); } catch(_){}
     await saveAdminParamsServer();
@@ -17833,6 +17851,26 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
     document.getElementById('btn-save-ballon-thermo')?.addEventListener('click', saveBallonThermo);
     document.querySelectorAll('.adm-bt-desc').forEach(function(b){ b.addEventListener('click', function(){ openDescriptionBallonModal(parseInt(b.dataset.btDesc,10)); }); });
     document.querySelectorAll('.adm-fiche-ballon-btn').forEach(function(b){ b.addEventListener('click', function(){ openFicheBallonPicker(b.dataset.ref); }); });
+    document.getElementById('adm-bt-add')?.addEventListener('click', async function(){
+      const bt = collectBallonThermoAll();
+      bt.modeles.push({ ref:'ballon-'+Date.now(), nom:'Nouveau ballon', fourniture_ht:0, cout_fourniture_ht:0, description_specs:[] });
+      window.HexaConfig.ballon_thermo = bt;
+      try { localStorage.setItem(LS_KEY, JSON.stringify(window.HexaConfig)); } catch(_){}
+      await saveAdminParamsServer();
+      rerenderBody();
+    });
+    document.querySelectorAll('.adm-bt-del').forEach(function(btn){
+      btn.addEventListener('click', async function(){
+        if(!confirm('Supprimer ce modèle de ballon ?')) return;
+        const ref = btn.dataset.ref;
+        const bt = collectBallonThermoAll();
+        bt.modeles = bt.modeles.filter(function(m){ return m.ref !== ref; });
+        window.HexaConfig.ballon_thermo = bt;
+        try { localStorage.setItem(LS_KEY, JSON.stringify(window.HexaConfig)); } catch(_){}
+        await saveAdminParamsServer();
+        rerenderBody();
+      });
+    });
     (function(){
       var pn = function(el){ return el ? (parseFloat(String(el.value||'0').replace(/\s/g,'').replace(',','.'))||0) : 0; };
       var recalcMargeBallon = function(){
