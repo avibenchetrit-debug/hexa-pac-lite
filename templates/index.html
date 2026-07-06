@@ -2871,6 +2871,15 @@ body.panel-is-open {
     .rappels-row:hover { background:#F4F8FC; }
     .rappels-row.is-retard { background:#FDE8EC; border-color:#F4B3BF; }
     .rappels-badge { font-size:11px; font-weight:700; color:#fff; background:#E2214B; border-radius:6px; padding:2px 8px; text-transform:uppercase; letter-spacing:.03em; }
+    .rappels-badge--retard { background:#E2214B; }
+    .rappels-badge--today { background:#F59E0B; }
+    .rappels-badge--avenir { background:#3B82F6; }
+    .rappels-row--retard { background:#FDE8EC; border-color:#F4B3BF; }
+    .rappels-group { margin:10px 0 4px; font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.04em; color:#64748B; display:flex; align-items:center; gap:6px; }
+    .rappels-group::before { content:''; width:8px; height:8px; border-radius:50%; background:currentColor; display:inline-block; }
+    .rappels-group--retard { color:#E2214B; }
+    .rappels-group--today { color:#B45309; }
+    .rappels-group--avenir { color:#2563EB; }
     .rappels-nom { font-weight:600; color:#1A202C; }
     .rappels-when { margin-left:auto; font-size:13px; color:#475569; font-variant-numeric:tabular-nums; }
     .rappels-head { justify-content:space-between; }
@@ -19610,13 +19619,21 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
       .filter(function(d){ return d && d.rappel && typeof d.rappel === 'object' && d.statut !== 'perdu' && d.statut !== 'signe'; })
       .map(function(d){ var dh = rappelDH(d.rappel); return dh ? { lead: d, dh: dh, ts: rappelEcheanceTs(dh) } : null; })
       .filter(Boolean)
-      .filter(function(it){ return it.dh.date <= todayStr; })
       .sort(function(a, b){ return a.ts - b.ts; });
     if(!items.length){ panel.style.display = 'none'; list.innerHTML = ''; if(countEl) countEl.textContent = '0'; return; }
     panel.style.display = '';
     if(countEl) countEl.textContent = String(items.length);
-    list.innerHTML = items.map(function(it){
-      var retard = it.ts < now;
+    var bOrder = { retard: 0, today: 1, avenir: 2 };
+    var bLabel = { retard: 'En retard', today: "Aujourd'hui", avenir: 'À venir' };
+    items.forEach(function(it){ it.bucket = it.dh.date < todayStr ? 'retard' : (it.dh.date === todayStr ? 'today' : 'avenir'); });
+    items.sort(function(a, b){ return (bOrder[a.bucket] - bOrder[b.bucket]) || (a.ts - b.ts); });
+    var html = '';
+    var curBucket = null;
+    items.forEach(function(it){
+      if(it.bucket !== curBucket){
+        curBucket = it.bucket;
+        html += '<div class="rappels-group rappels-group--' + it.bucket + '">' + bLabel[it.bucket] + '</div>';
+      }
       var nom = escapeHtml(((it.lead.prenom || '') + ' ' + (it.lead.nom || '')).trim() || it.lead.numero || '');
       var hFr = window.hexaHeureFr(it.dh.heure);
       var quand = escapeHtml(fmtDate(it.dh.date) + (hFr ? ' à ' + hFr : ''));
@@ -19624,13 +19641,14 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
       var telRaw = tel.replace(/\D/g, '');
       var telFmt = telRaw.replace(/(\d{2})(?=\d)/g, '$1 ').trim();
       var telHtml = tel ? '<a href="tel:' + escapeHtml(telRaw || tel) + '" class="rappels-tel" onclick="event.stopPropagation()">' + escapeHtml(telFmt || tel) + '</a>' : '';
-      return '<div class="rappels-row' + (retard ? ' is-retard' : '') + '" data-numero="' + escapeHtml(it.lead.numero || '') + '">'
-        + (retard ? '<span class="rappels-badge">En retard</span>' : '')
+      html += '<div class="rappels-row rappels-row--' + it.bucket + '" data-numero="' + escapeHtml(it.lead.numero || '') + '">'
+        + '<span class="rappels-badge rappels-badge--' + it.bucket + '">' + bLabel[it.bucket] + '</span>'
         + '<span class="rappels-nom">' + nom + '</span>'
         + (telHtml ? '<span class="rappels-tel-cell">' + telHtml + '</span>' : '')
         + '<span class="rappels-when">' + quand + '</span>'
         + '<button type="button" class="pv-btn pv-btn-ghost rappels-done" data-numero="' + escapeHtml(it.lead.numero || '') + '">Appelé / fait</button></div>';
-    }).join('');
+    });
+    list.innerHTML = html;
   }
 
   async function loadATraiter(){
