@@ -16911,11 +16911,15 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
       { ref:'ballon-2', nom:'Ballon thermodynamique 2', fourniture_ht:0 }
     ];
     const pose = cfg.prix_pose_ht != null ? cfg.prix_pose_ht : 0;
+    const coutPoseBallon = (window.HexaConfig && window.HexaConfig.params && window.HexaConfig.params.cout_pose_ballon != null) ? Number(window.HexaConfig.params.cout_pose_ballon) : 600;
     const forfaits = cfg.forfaits_mpr || { tres_modeste:1200, modeste:800, intermediaire:400, superieur:0 };
+    const margeBallon = (m) => (Number(m.fourniture_ht)||0) - (Number(m.cout_fourniture_ht)||0) + ((Number(pose)||0) - (Number(coutPoseBallon)||0));
     const modelesRows = modeles.slice(0,2).map((m,i)=>`
       <div class="adm-field adm-field-row"><span class="adm-lab">Modèle ${i+1} — libellé</span><input type="text" class="adm-bt-nom" data-idx="${i}" data-ref="${adminEscape(m.ref||('ballon-'+(i+1)))}" value="${adminEscape(m.nom||'')}"></div>
       <div class="adm-field adm-field-row"><span class="adm-lab">Modèle ${i+1} — fourniture</span><span class="adm-euro"><input type="text" inputmode="numeric" class="adm-bt-fourniture adm-money" data-idx="${i}" value="${adminEscape(m.fourniture_ht != null ? m.fourniture_ht : 0)}"><i>€ HT</i></span></div>
-      <div class="adm-field adm-field-row"><span class="adm-lab">Modèle ${i+1} — description</span><button type="button" class="adm-btn adm-btn-cancel adm-bt-desc" data-bt-desc="${i}">✎ Specs fourniture (${(Array.isArray(m.description_specs)?m.description_specs.length:0)})</button></div>`).join('');
+      <div class="adm-field adm-field-row"><span class="adm-lab">Modèle ${i+1} — coût fourniture</span><span class="adm-euro"><input type="text" inputmode="numeric" class="adm-bt-cout adm-money" data-idx="${i}" value="${adminEscape(m.cout_fourniture_ht != null ? m.cout_fourniture_ht : 0)}"><i>€ HT</i></span></div>
+      <div class="adm-field adm-field-row"><span class="adm-lab">Modèle ${i+1} — description</span><button type="button" class="adm-btn adm-btn-cancel adm-bt-desc" data-bt-desc="${i}">✎ Specs fourniture (${(Array.isArray(m.description_specs)?m.description_specs.length:0)})</button></div>
+      <div class="adm-field adm-field-row adm-bt-marge-row"><span class="adm-lab">Modèle ${i+1} — Marge (admin)</span><span class="adm-bt-marge" data-idx="${i}"><b>${eur(margeBallon(m))}</b> HT</span></div>`).join('');
     return `<div class="adm-card">
       ${modelesRows}
       <div class="adm-field adm-field-row"><span class="adm-lab">Pose commune</span><span class="adm-euro"><input type="text" inputmode="numeric" class="adm-bt-pose adm-money" value="${adminEscape(pose)}"><i>€ HT</i></span></div>
@@ -17125,6 +17129,7 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
       marge: 0.455,        // indicatif (le prix TTC est saisi en dur ici)
       pose: 3500,
       acc: 550,
+      cout_pose_ballon: 600,
       tva: 0.055,
       // Option 1
       lead: 30, conv: 0.05, vt1: 200, cofrac1: 226, urba1: 100,
@@ -17143,8 +17148,8 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
     },
     ballon_thermo: {
       modeles: [
-        { ref:'ballon-1', nom:'Ballon thermodynamique 1', fourniture_ht:0, description_specs:[] },
-        { ref:'ballon-2', nom:'Ballon thermodynamique 2', fourniture_ht:0, description_specs:[] }
+        { ref:'ballon-1', nom:'Ballon thermodynamique 1', fourniture_ht:0, cout_fourniture_ht:0, description_specs:[] },
+        { ref:'ballon-2', nom:'Ballon thermodynamique 2', fourniture_ht:0, cout_fourniture_ht:0, description_specs:[] }
       ],
       prix_pose_ht: 0,
       forfaits_mpr: { tres_modeste:1200, modeste:800, intermediaire:400, superieur:0 }
@@ -17337,6 +17342,7 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
       <div class="adm-params">
         <div class="adm-field"><span class="adm-lab">Coût pose HT (calcul marge)</span><span class="adm-euro"><input type="text" inputmode="numeric" class="adm-p adm-money" data-p="pose" value="${fmtE(p.pose)}"><i>€</i></span></div>
         <div class="adm-field"><span class="adm-lab">Coût accessoires HT (calcul marge)</span><span class="adm-euro"><input type="text" inputmode="numeric" class="adm-p adm-money" data-p="acc" value="${fmtE(p.acc)}"><i>€</i></span></div>
+        <div class="adm-field"><span class="adm-lab">Coût pose ballon HT (calcul marge)</span><span class="adm-euro"><input type="text" inputmode="numeric" class="adm-p adm-money" data-p="cout_pose_ballon" value="${fmtE(p.cout_pose_ballon != null ? p.cout_pose_ballon : 600)}"><i>€</i></span></div>
         <div class="adm-field"><span class="adm-lab">Frais ECAIR (% sur MPR)</span><span class="adm-euro"><input type="number" id="adm-frais-ecair-pct" value="${adminEscape(c.prix_vente_devis?.frais_ecair_pct ?? 12)}" step="0.1" min="0" max="100"><i>%</i></span></div>
         <div class="adm-field"><span class="adm-lab">TVA (5,5% par défaut)</span><span class="adm-euro"><input type="text" inputmode="decimal" class="adm-p" data-p="tva" value="${(p.tva*100).toFixed(1)}"><i>%</i></span></div>
       </div>
@@ -17460,11 +17466,13 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
     const num = (el) => parseFloat(String((el && el.value) || '0').replace(/\s/g,'').replace(',','.')) || 0;
     const noms = Array.from(document.querySelectorAll('.adm-bt-nom'));
     const fournis = Array.from(document.querySelectorAll('.adm-bt-fourniture'));
+    const couts = Array.from(document.querySelectorAll('.adm-bt-cout'));
     const anciens = (cfg.ballon_thermo && Array.isArray(cfg.ballon_thermo.modeles)) ? cfg.ballon_thermo.modeles : [];
     const modeles = noms.map((el,i)=>({
       ref: el.dataset.ref || ('ballon-'+(i+1)),
       nom: (el.value||'').trim(),
       fourniture_ht: num(fournis[i]),
+      cout_fourniture_ht: num(couts[i]),
       description_specs: Array.isArray(anciens[i] && anciens[i].description_specs) ? anciens[i].description_specs : []
     }));
     const forfaits = {};
@@ -17823,6 +17831,22 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
     document.getElementById('btn-save-prix-vente-devis')?.addEventListener('click', savePrixVenteDevis);
     document.getElementById('btn-save-ballon-thermo')?.addEventListener('click', saveBallonThermo);
     document.querySelectorAll('.adm-bt-desc').forEach(function(b){ b.addEventListener('click', function(){ openDescriptionBallonModal(parseInt(b.dataset.btDesc,10)); }); });
+    (function(){
+      var pn = function(el){ return el ? (parseFloat(String(el.value||'0').replace(/\s/g,'').replace(',','.'))||0) : 0; };
+      var recalcMargeBallon = function(){
+        var cpEl = document.querySelector('[data-p="cout_pose_ballon"]');
+        var cp = cpEl ? pn(cpEl) : ((window.HexaConfig && window.HexaConfig.params && window.HexaConfig.params.cout_pose_ballon != null) ? Number(window.HexaConfig.params.cout_pose_ballon) : 600);
+        var pv = pn(document.querySelector('.adm-bt-pose'));
+        document.querySelectorAll('.adm-bt-marge').forEach(function(sp){
+          var i = sp.dataset.idx;
+          var fv = pn(document.querySelector('.adm-bt-fourniture[data-idx="'+i+'"]'));
+          var cv = pn(document.querySelector('.adm-bt-cout[data-idx="'+i+'"]'));
+          var marge = (fv - cv) + (pv - cp);
+          sp.innerHTML = '<b>' + new Intl.NumberFormat('fr-FR',{style:'currency',currency:'EUR',maximumFractionDigits:0}).format(Math.round(marge)) + '</b> HT';
+        });
+      };
+      document.querySelectorAll('.adm-bt-fourniture, .adm-bt-cout, .adm-bt-pose, [data-p="cout_pose_ballon"]').forEach(function(el){ el.addEventListener('input', recalcMargeBallon); });
+    })();
     document.getElementById('btn-add-sous-traitant')?.addEventListener('click', ()=>{
       window.HexaConfig.sous_traitants = collectSousTraitants();
       window.HexaConfig.sous_traitants.push({ id:'st_' + Date.now(), entreprise:'', siret:'', adresse:'', rge:'', rge_validite_du:'', rge_validite_au:'', assurance:'', actif:false });
