@@ -19460,7 +19460,7 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
     }
     var now = Date.now();
     var items = (Array.isArray(data) ? data : [])
-      .filter(function(d){ return d && d.statut === 'rappeler' && d.rappel && typeof d.rappel === 'object'; })
+      .filter(function(d){ return d && d.rappel && typeof d.rappel === 'object'; })
       .map(function(d){ var dh = rappelDH(d.rappel); return dh ? { lead: d, dh: dh, ts: rappelEcheanceTs(dh) } : null; })
       .filter(Boolean)
       .sort(function(a, b){ return a.ts - b.ts; });
@@ -19846,7 +19846,7 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
       if (rap && typeof rap === 'object'){
         const motif = String(rap.motif||'').trim();
         parts.push('<div class="suivi-item"><span class="suivi-line">🔁 <strong>Rappel</strong> '
-          + escapeHtml(rap.date||'')
+          + escapeHtml(rap.date ? fmtDate(rap.date) : '')
           + (rap.heure ? ' ' + escapeHtml(window.hexaHeureFr(rap.heure)) : '')
           + (motif ? ' · ' + escapeHtml(motif) : '')
           + ' · ' + escapeHtml(suiviAssigneLabel(rap.assigne_a)) + '</span>'
