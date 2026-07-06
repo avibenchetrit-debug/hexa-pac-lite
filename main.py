@@ -202,8 +202,8 @@ DEFAULT_PARAMETRES_ADMIN = {
     },
     "ballon_thermo": {
         "modeles": [
-            {"ref": "ballon-1", "nom": "Ballon thermodynamique 1", "fourniture_ht": 0, "description_specs": []},
-            {"ref": "ballon-2", "nom": "Ballon thermodynamique 2", "fourniture_ht": 0, "description_specs": []},
+            {"ref": "ballon-1", "nom": "Ballon thermodynamique 1", "fourniture_ht": 0, "economie_ecs_mois": 25, "description_specs": []},
+            {"ref": "ballon-2", "nom": "Ballon thermodynamique 2", "fourniture_ht": 0, "economie_ecs_mois": 25, "description_specs": []},
         ],
         "prix_pose_ht": 0,
         "forfaits_mpr": {"tres_modeste": 1200, "modeste": 800, "intermediaire": 400, "superieur": 0},

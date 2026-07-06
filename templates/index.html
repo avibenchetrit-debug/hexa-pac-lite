@@ -16947,6 +16947,7 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
         <div class="adm-field adm-field-row"><span class="adm-lab">Libellé</span><input type="text" class="adm-bt-nom" data-idx="${i}" data-ref="${adminEscape(m.ref||('ballon-'+(i+1)))}" value="${adminEscape(m.nom||'')}"></div>
         <div class="adm-field adm-field-row"><span class="adm-lab">Prix fourniture</span><span class="adm-euro"><input type="text" inputmode="numeric" class="adm-bt-fourniture adm-money" data-idx="${i}" value="${adminEscape(m.fourniture_ht != null ? m.fourniture_ht : 0)}"><i>€ HT</i></span></div>
         <div class="adm-field adm-field-row"><span class="adm-lab">Coût fourniture</span><span class="adm-euro"><input type="text" inputmode="numeric" class="adm-bt-cout adm-money" data-idx="${i}" value="${adminEscape(m.cout_fourniture_ht != null ? m.cout_fourniture_ht : 0)}"><i>€ HT</i></span></div>
+        <div class="adm-field adm-field-row"><span class="adm-lab">Économie ECS estimée</span><span class="adm-euro"><input type="text" inputmode="numeric" class="adm-bt-ecs adm-money" data-idx="${i}" value="${adminEscape(m.economie_ecs_mois != null ? m.economie_ecs_mois : 25)}"><i>€/mois</i></span></div>
         <div class="adm-field adm-field-row adm-bt-marge-row"><span class="adm-lab">Marge (admin)</span><span class="adm-bt-marge" data-idx="${i}"><b>${eur(margeBallon(m))}</b> HT</span></div>
         <div class="adm-field adm-field-row"><span class="adm-lab">Fiche &amp; specs</span><span class="adm-ballon-btns"><button type="button" class="adm-btn adm-btn-cancel adm-bt-desc" data-bt-desc="${i}">✎ Specs (${(Array.isArray(m.description_specs)?m.description_specs.length:0)})</button><button type="button" class="adm-btn adm-btn-cancel adm-fiche-ballon-btn" data-ref="${adminEscape(m.ref||('ballon-'+(i+1)))}">📎 Fiche PDF</button></span></div>
       </div>`).join('');
@@ -17182,8 +17183,8 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
     },
     ballon_thermo: {
       modeles: [
-        { ref:'ballon-1', nom:'Ballon thermodynamique 1', fourniture_ht:0, cout_fourniture_ht:0, description_specs:[] },
-        { ref:'ballon-2', nom:'Ballon thermodynamique 2', fourniture_ht:0, cout_fourniture_ht:0, description_specs:[] }
+        { ref:'ballon-1', nom:'Ballon thermodynamique 1', fourniture_ht:0, cout_fourniture_ht:0, economie_ecs_mois:25, description_specs:[] },
+        { ref:'ballon-2', nom:'Ballon thermodynamique 2', fourniture_ht:0, cout_fourniture_ht:0, economie_ecs_mois:25, description_specs:[] }
       ],
       prix_pose_ht: 0,
       forfaits_mpr: { tres_modeste:1200, modeste:800, intermediaire:400, superieur:0 }
@@ -17501,6 +17502,7 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
     const noms = Array.from(document.querySelectorAll('.adm-bt-nom'));
     const fournis = Array.from(document.querySelectorAll('.adm-bt-fourniture'));
     const couts = Array.from(document.querySelectorAll('.adm-bt-cout'));
+    const ecs = Array.from(document.querySelectorAll('.adm-bt-ecs'));
     const anciens = (cfg.ballon_thermo && Array.isArray(cfg.ballon_thermo.modeles)) ? cfg.ballon_thermo.modeles : [];
     const specsByRef = {};
     anciens.forEach(function(m){ if (m && m.ref) specsByRef[m.ref] = Array.isArray(m.description_specs) ? m.description_specs : []; });
@@ -17511,6 +17513,7 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
         nom: (el.value||'').trim(),
         fourniture_ht: num(fournis[i]),
         cout_fourniture_ht: num(couts[i]),
+        economie_ecs_mois: num(ecs[i]),
         description_specs: Array.isArray(specsByRef[ref]) ? specsByRef[ref] : []
       };
     });
