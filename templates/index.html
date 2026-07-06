@@ -15827,7 +15827,7 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
             </span>
           </div>
           ${state.selection_alerte ? `<div class="sim-note sim-note--warn" id="sim-selection-alerte">${state.selection_alerte}</div>` : ''}
-          <div class="sim-pnl-line sim-pnl-ballon"><span>Ballon thermodynamique (ECS)</span><select id="sim-ballon" class="sim-model-select"><option value="" ${!state.ballon_ref?'selected':''}>Aucun</option>${(((window.HexaConfig&&window.HexaConfig.ballon_thermo&&window.HexaConfig.ballon_thermo.modeles)||[]).map(b=>`<option value="${b.ref}" ${state.ballon_ref===b.ref?'selected':''}>${b.nom||b.ref}</option>`).join(''))}</select></div>
+          <div class="sim-pnl-line sim-pnl-ballon"><span>Ballon thermodynamique (ECS)</span><select id="sim-ballon" class="sim-model-select"><option value="" ${!state.ballon_ref?'selected':''}>Aucun</option>${((((M3_CONFIG&&M3_CONFIG.ballon_thermo&&M3_CONFIG.ballon_thermo.modeles)||(window.HexaConfig&&window.HexaConfig.ballon_thermo&&window.HexaConfig.ballon_thermo.modeles))||[]).map(b=>`<option value="${b.ref}" ${state.ballon_ref===b.ref?'selected':''}>${b.nom||b.ref}</option>`).join(''))}</select></div>
           <div class="sim-pnl-sep"></div>
           <div class="sim-pnl-line sim-pnl-minus"><span>– MaPrimeRénov' (devis)</span><b id="sim-mpr">${eurDash(c.mprDevis, c.contextePret)}</b></div>
           <div class="sim-pnl-line sim-pnl-minus"><span>– Prime CEE (devis)</span><b id="sim-cee">${eurDash(c.ceeDevis, c.contextePret)}</b></div>

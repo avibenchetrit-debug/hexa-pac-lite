@@ -3543,7 +3543,7 @@
       <table style="width:100%;border-collapse:collapse;background:#FFFFFF;border:1px solid #E1E5EB;border-top:3px solid #002E5A;">
         <tr><td style="padding:8px 12px;">
           <div style="font-size:9px;text-transform:uppercase;letter-spacing:0.1em;color:#8A92A0;margin-bottom:4px;">Rentabilisé en</div>
-          <div style="color:#002E5A;font-weight:800;font-size:30px;line-height:0.9;">{{ projet_apercu.annee_rentable }} ans</div>
+          <div style="color:#002E5A;font-weight:800;font-size:30px;line-height:0.9;">{{ projet_apercu.annee_rentable or '—' }} ans</div>
           <div style="font-size:10px;color:#4A5567;margin-top:4px;line-height:1.3;">Une fois rentabilisée, votre installation génère des économies nettes.</div>
         </td></tr>
       </table>
@@ -3552,7 +3552,7 @@
       <table style="width:100%;border-collapse:collapse;background:#FFFFFF;border:1px solid #E1E5EB;border-top:3px solid #002E5A;">
         <tr><td style="padding:8px 12px;">
           <div style="font-size:9px;text-transform:uppercase;letter-spacing:0.1em;color:#8A92A0;margin-bottom:4px;">Vous gagnez</div>
-          <div style="color:#002E5A;font-weight:800;font-size:30px;line-height:0.9;">{{ projet_apercu.eco_20_ans_fmt }} €</div>
+          <div style="color:#002E5A;font-weight:800;font-size:30px;line-height:0.9;">{{ projet_apercu.eco_20_ans_fmt or '—' }} €</div>
           <div style="font-size:10px;color:#4A5567;margin-top:4px;line-height:1.3;">Économies cumulées sur les {{ projet_apercu.duree_vie_pac_ans }} ans de durée de vie de votre pompe à chaleur.</div>
         </td></tr>
       </table>
@@ -3573,7 +3573,7 @@
       <div style="font-size:9px;color:#8A92A0;">vous démarrez sans avance</div>
     </td>
     <td style="text-align:center;vertical-align:top;width:40%;">
-      <div style="font-size:10px;font-weight:700;color:#002E5A;">{{ projet_apercu.annee_rentable }}ᵉ année · remboursé</div>
+      <div style="font-size:10px;font-weight:700;color:#002E5A;">{{ projet_apercu.annee_rentable or '—' }}ᵉ année · remboursé</div>
       <div style="font-size:9px;color:#8A92A0;">l'installation est à vous</div>
     </td>
     <td style="text-align:right;vertical-align:top;width:30%;">

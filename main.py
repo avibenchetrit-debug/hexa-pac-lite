@@ -2751,6 +2751,7 @@ def get_admin_m3() -> JSONResponse:
             "params_eco_energie": load_parametres_admin().get("params_eco_energie", DEFAULT_PARAMS_ECO_ENERGIE),
             "params_financement": load_parametres_admin().get("params_financement", DEFAULT_PARAMS_FINANCEMENT),
             "marques": load_parametres_admin().get("marques", DEFAULT_MARQUES),
+            "ballon_thermo": load_parametres_admin().get("ballon_thermo", {}),
         }
     )
 
