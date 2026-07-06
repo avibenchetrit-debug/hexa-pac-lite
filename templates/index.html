@@ -15454,6 +15454,18 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
     return factureApresMensuelle > 0 ? factureApresMensuelle : null;
   }
 
+  function ballonSim(state){
+    const ref = state && state.ballon_ref;
+    if (!ref) return { actif:false, totalTTC:0, mpr:0 };
+    const bt = (M3_CONFIG && M3_CONFIG.ballon_thermo) || (window.HexaConfig && window.HexaConfig.ballon_thermo) || {};
+    const modeles = Array.isArray(bt.modeles) ? bt.modeles : [];
+    const m = modeles.find(function(x){ return x && x.ref === ref; });
+    if (!m) return { actif:false, totalTTC:0, mpr:0 };
+    const totalTTC = Math.round(((Number(m.fourniture_ht)||0) + (Number(bt.prix_pose_ht)||0)) * 1.055);
+    const mpr = Number((bt.forfaits_mpr||{})[state.categorie]) || 0;
+    return { actif:true, totalTTC: totalTTC, mpr: mpr };
+  }
+
   async function calcul(){
     if (Object.keys(GRILLE).length === 0 || !CATALOGUE_PAC.length) { await chargerBaremes(); }
     const dim = syncDimensionnement();
@@ -15734,6 +15746,7 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
     const c = await calcul();
     const r = roi(c);
     lastRoi = r;
+    const bs = ballonSim(state);
     const sel=(a,b)=>a===b?'selected':'';
     const anahLabel = LABELS_ANAH[state.categorie] || '—';
     const ceeLabel = LABELS_CEE[state.categorie] || '—';
@@ -15835,12 +15848,15 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
           </div>
           ${state.selection_alerte ? `<div class="sim-note sim-note--warn" id="sim-selection-alerte">${state.selection_alerte}</div>` : ''}
           <div class="sim-pnl-line sim-pnl-ballon"><span>Ballon thermodynamique (ECS)</span><select id="sim-ballon" class="sim-model-select"><option value="" ${!state.ballon_ref?'selected':''}>Aucun</option>${((((M3_CONFIG&&M3_CONFIG.ballon_thermo&&M3_CONFIG.ballon_thermo.modeles)||(window.HexaConfig&&window.HexaConfig.ballon_thermo&&window.HexaConfig.ballon_thermo.modeles))||[]).map(b=>`<option value="${b.ref}" ${state.ballon_ref===b.ref?'selected':''}>${b.nom||b.ref}</option>`).join(''))}</select></div>
+          ${bs.actif ? `<div class="sim-pnl-line"><span>+ Chauffe-eau thermodynamique (fourni posé)</span><b id="sim-ballon-montant">${eur(bs.totalTTC)}</b></div>
+          <div class="sim-pnl-line sim-pnl-sub"><span>= Sous-total PAC + ballon</span><b id="sim-soustotal">${eur((state.prix_pac||0) + bs.totalTTC)}</b></div>` : ''}
           <div class="sim-pnl-sep"></div>
-          <div class="sim-pnl-line sim-pnl-minus"><span>– MaPrimeRénov' (devis)</span><b id="sim-mpr">${eurDash(c.mprDevis, c.contextePret)}</b></div>
+          <div class="sim-pnl-line sim-pnl-minus"><span>– MaPrimeRénov'${bs.actif ? ' — PAC' : ' (devis)'}</span><b id="sim-mpr">${eurDash(c.mprDevis, c.contextePret)}</b></div>
+          ${bs.actif ? `<div class="sim-pnl-line sim-pnl-minus"><span>– MaPrimeRénov' — Ballon thermo</span><b id="sim-mpr-ballon">${eurDash(bs.mpr, c.contextePret)}</b></div>` : ''}
           <div class="sim-pnl-line sim-pnl-minus"><span>– Prime CEE (devis)</span><b id="sim-cee">${eurDash(c.ceeDevis, c.contextePret)}</b></div>
-          <div class="sim-pnl-line sim-pnl-sub"><span>= Aides déduites</span><b id="sim-aides">${eurDash(c.aidesDevis, c.contextePret)}</b></div>
+          <div class="sim-pnl-line sim-pnl-sub"><span>= Aides déduites</span><b id="sim-aides">${eurDash(c.aidesDevis + (bs.actif ? bs.mpr : 0), c.contextePret)}</b></div>
           <div class="sim-pnl-sep sim-pnl-sep--strong"></div>
-          <div class="sim-pnl-line sim-pnl-reste"><span>Reste à charge</span><strong id="sim-reste">${eurDash(c.g29, c.contextePret)}</strong></div>
+          <div class="sim-pnl-line sim-pnl-reste"><span>Reste à charge</span><strong id="sim-reste">${eurDash(bs.actif ? Math.max(0, (state.prix_pac||0) + bs.totalTTC - c.aidesDevis - bs.mpr) : c.g29, c.contextePret)}</strong></div>
         </div>
         <div class="sim-marge">
           <span>CEE conservé installateur <i>(écrêtement, hors devis)</i></span><b id="sim-conserve">${eurDash(c.ceeConserve, c.contextePret)}</b>
@@ -15913,6 +15929,7 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
     const c = await calcul();
     const r = roi(c);
     lastRoi = r;
+    const bs = ballonSim(state);
     const energieLbl = ENERGIE_LABEL[state.energie_avant] || '—';
     const creditLine = state.option==='opt3' ? ''
       : `<div class="sa-line"><span>${state.option==='opt1'?(c.finView.libelles.option1||'Crédit Travaux'):(c.finView.libelles.option2||'Éco-PTZ')} <i>${(c.nMois/12)}&nbsp;ans</i></span><b>${eur(state.option==='opt1'?c.mensO1:c.mensO2)}/mois</b></div>`;
@@ -15925,9 +15942,12 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
     // cellules compte de résultat
     const set=(id,val)=>{ const el=document.getElementById(id); if(el) el.textContent=val; };
     set('sim-mpr', eurDash(c.mprDevis, c.contextePret));
+    set('sim-mpr-ballon', eurDash(bs.mpr, c.contextePret));
     set('sim-cee', eurDash(c.ceeDevis, c.contextePret));
-    set('sim-aides', eurDash(c.aidesDevis, c.contextePret));
-    set('sim-reste', eurDash(c.g29, c.contextePret));
+    set('sim-aides', eurDash(c.aidesDevis + (bs.actif ? bs.mpr : 0), c.contextePret));
+    set('sim-reste', eurDash(bs.actif ? Math.max(0, (state.prix_pac||0) + bs.totalTTC - c.aidesDevis - bs.mpr) : c.g29, c.contextePret));
+    set('sim-ballon-montant', eur(bs.totalTTC));
+    set('sim-soustotal', eur((state.prix_pac||0) + bs.totalTTC));
     set('sim-conserve', eurDash(c.ceeConserve, c.contextePret));
     const prixInput = document.getElementById('sim-prix');
     if (prixInput && document.activeElement !== prixInput) {
