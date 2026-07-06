@@ -19504,8 +19504,8 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
       const kind = it.kind==='rdv' ? 'RDV' : (it.kind==='rappel' ? 'Rappel' : 'Détection');
       const b = etatBadge[it.etat] || [it.etat,'atb-jour'];
       let when;
-      if(it.kind==='rdv') when = escapeHtml(((it.source&&it.source.date)||'')+' '+((it.source&&it.source.heure)||''));
-      else if(it.kind==='rappel') when = escapeHtml((it.source&&it.source.date)||'');
+      if(it.kind==='rdv') when = escapeHtml((((it.source&&it.source.date) ? fmtDate(it.source.date) : '')+' '+((it.source&&it.source.heure)||'')).trim());
+      else if(it.kind==='rappel') when = escapeHtml((it.source&&it.source.date) ? fmtDate(it.source.date) : '');
       else when = escapeHtml((it.label||'Détection') + (it.since_days!=null ? ' · '+it.since_days+' j' : ''));
       const who = it.kind==='detection' ? '—' : escapeHtml(suiviAssigneLabel(it.assigne_a));
       let doneBtn = '';
