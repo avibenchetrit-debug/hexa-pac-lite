@@ -3150,6 +3150,21 @@ def _build_devis_context(request: Request, numero: str, version: int | None = No
                 "duree_vie_pac_ans": _duree_vie,
             }
     context["projet_apercu"] = projet_apercu
+    # --- DEBUG TEMPORAIRE (à retirer) : valeurs éco/ROI pour diagnostic devis ---
+    try:
+        _dbg_fa = _eco.get("facture_apres_mois")
+        _dbg_fv = _eco.get("facture_avant_mois")
+        _dbg_mn = float_value((_fin or {}).get("mensualite"))
+        _dbg_ok = (_dbg_fa not in (None, "") and _dbg_fv not in (None, ""))
+        _dbg_apres = (float_value(_dbg_fv) - float_value(_dbg_fa)) if _dbg_ok else None
+        _dbg_pendant = (float_value(_dbg_fv) - float_value(_dbg_fa) - _dbg_mn) if _dbg_ok else None
+        print(("[DEVIS-DEBUG] numero=%s surface=%r cout_mensuel(facture_avant)=%r reste_a_charge=%r "
+               "mensualite=%r facture_apres=%r facture_avant=%r eco_apres=%r eco_pendant=%r projet_apercu=%s")
+              % (numero, _surface_eco, facture_avant, calculs.get("reste_a_charge"), _dbg_mn,
+                 _dbg_fa, _dbg_fv, _dbg_apres, _dbg_pendant, "SET" if projet_apercu else "None"),
+              flush=True)
+    except Exception as _dbg_e:
+        print("[DEVIS-DEBUG] erreur:", _dbg_e, flush=True)
     return context
 
 
