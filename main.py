@@ -833,13 +833,10 @@ FIELD_ALIASES = {
 # --- Système "À traiter" (rappels / RDV / multicanal) ---------------------
 # Identités déclaratives (non authentifiées) : indicatif, PAS un filtre dur.
 ASSIGNES_VALIDES = {"avi", "joelle", "maurice"}
-RDV_TYPES = {"tel", "visite"}
 CANAUX_VALIDES = {"appel", "sms", "email"}  # whatsapp plus tard
 # Plafonds de tentatives SANS réponse par canal avant "injoignable"
 # (les 3 doivent être atteints). À terme : configurables côté admin.
 PLAFONDS_CANAL = {"appel": 8, "sms": 5, "email": 5}
-# Fenêtre "imminent" d'un RDV (minutes avant l'échéance). À terme : admin.
-RDV_IMMINENT_MIN = 30
 # Seuils des détections automatiques (jours). À terme : configurables admin.
 DETECT_DEVIS_J = 3
 DETECT_JAMAIS_CONTACTE_J = 2
@@ -1942,48 +1939,6 @@ async def update_lead_nrp(numero: str, request: Request) -> JSONResponse:
     return JSONResponse({"success": True, "nrp_count": raw_count})
 
 
-@app.post("/api/leads/{numero}/rdv")
-async def set_lead_rdv(numero: str, request: Request) -> JSONResponse:
-    """Pose/replace le RDV actif d'un prospect (1 actif par lead).
-    Payload : {date:'YYYY-MM-DD', heure:'HH:MM', type:'tel'|'visite',
-    assigne_a, par}. Format technique stocké tel
-    quel ; l'affichage FR se fait côté interface."""
-    payload = await _read_request_payload(request)
-    date = str(payload.get("date") or "").strip()
-    heure = str(payload.get("heure") or "").strip()
-    # Validation stricte du format via le parseur Paris (YYYY-MM-DD + HH:MM
-    # zero-paddés). _parse_paris_dt renvoie None si l'un est absent/mal formé.
-    if not date or not heure or _parse_paris_dt(f"{date}T{heure}") is None:
-        raise HTTPException(
-            status_code=400,
-            detail="Date/heure RDV invalides (attendu date 'YYYY-MM-DD' et heure 'HH:MM').",
-        )
-    rdv_type = str(payload.get("type") or "").strip().lower()
-    if rdv_type not in RDV_TYPES:
-        rdv_type = "tel"
-    par = _normalize_assigne(payload.get("par"))
-    assigne_a = _normalize_assigne(payload.get("assigne_a")) or par
-
-    leads = _read_leads()
-    index = _find_lead_index(leads, numero)
-    if index is None:
-        raise HTTPException(status_code=404, detail="Prospect non trouvé")
-
-    now_paris = _now_paris_iso()
-    leads[index]["rdv"] = {
-        "date": date,
-        "heure": heure,
-        "type": rdv_type,
-        "assigne_a": assigne_a,
-        "cree_par": par,
-        "cree_at": now_paris,
-    }
-    # RDV téléphonique : ne modifie plus le statut (clé "rdv" retirée du tunnel, option 2)
-    leads[index]["updated_at"] = _now_iso()
-    _atomic_write_json(LEADS_PATH, leads)
-    return JSONResponse({"ok": True, "lead": _lead_for_response(leads[index])})
-
-
 @app.post("/api/leads/{numero}/rappel")
 async def set_lead_rappel(numero: str, request: Request) -> JSONResponse:
     """Pose/replace le rappel actif d'un prospect (1 actif par lead). Si un
@@ -2212,75 +2167,6 @@ async def lead_contact(numero: str, request: Request) -> JSONResponse:
 
 
 # --- GET /api/a-traiter : agrégation + tri de la liste "À traiter" ----------
-# Buckets de tri (cf. CONCEPTION_RAPPELS.md §6) :
-#   1 = retards (RDV passés + rappels date<today), échéance croissante
-#   2 = RDV du jour (dont imminents), par heure
-#   3 = rappels du jour, par ancienneté (cree_at asc)
-#   4 = détections (STUB étape 1, rempli à l'étape 5)
-def _atraiter_item(lead, kind, source, etat, echeance_dt):
-    """Construit un item de la liste 'À traiter' (champs d'affichage + source)."""
-    ident = f"{lead.get('numero')}:{kind}:{source.get('date', '')}"
-    if kind == "rdv":
-        ident += f":{source.get('heure', '')}"
-    return {
-        "id": ident,
-        "numero": lead.get("numero"),
-        "nom": lead.get("nom"),
-        "prenom": lead.get("prenom"),
-        "telephone": lead.get("telephone"),
-        "statut": lead.get("statut"),
-        "kind": kind,
-        "etat": etat,
-        "assigne_a": _normalize_assigne(source.get("assigne_a")),
-        "echeance": echeance_dt.isoformat(timespec="seconds"),
-        "source": source,
-    }
-
-
-def _atraiter_rdv_item(lead, rdv, now, today, imminent_delta):
-    """Dérive l'item RDV (ou None si illisible / a_venir exclu). États scope
-    jour : retard (dt<now), imminent (0..30 min), aujourdhui (date=today)."""
-    date = str(rdv.get("date") or "").strip()
-    heure = str(rdv.get("heure") or "").strip()
-    dt = _parse_paris_dt(f"{date}T{heure}") if (date and heure) else _parse_paris_dt(date)
-    if dt is None:
-        return None
-    if dt < now:
-        etat, bucket = "retard", 1
-    elif dt - now <= imminent_delta:
-        etat, bucket = "imminent", 2
-    elif dt.date() == today:
-        etat, bucket = "aujourdhui", 2
-    else:
-        return None  # a_venir : exclu du scope jour
-    item = _atraiter_item(lead, "rdv", rdv, etat, dt)
-    item["_bucket"] = bucket
-    item["_sort"] = dt  # tri par heure (buckets 1 et 2)
-    return item
-
-
-def _atraiter_rappel_item(lead, rappel, today):
-    """Dérive l'item rappel (ou None si illisible / futur exclu). États scope
-    jour : retard (date<today), aujourdhui (date=today)."""
-    date = str(rappel.get("date") or "").strip()
-    dt = _parse_paris_dt(date)
-    if dt is None:
-        return None
-    jour = dt.date()
-    if jour < today:
-        etat, bucket, sort = "retard", 1, dt  # échéance (minuit du jour)
-    elif jour == today:
-        # ancienneté = cree_at asc ; fallback échéance si absent.
-        etat, bucket = "aujourdhui", 3
-        sort = str(rappel.get("cree_at") or "") or dt.isoformat()
-    else:
-        return None  # futur : exclu du scope jour
-    item = _atraiter_item(lead, "rappel", rappel, etat, dt)
-    item["_bucket"] = bucket
-    item["_sort"] = sort
-    return item
-
-
 def _atraiter_detection_item(lead, subtype, label, since_days, trigger_dt):
     """Construit un item de détection (kind=detection, visible par tous)."""
     iso = trigger_dt.isoformat(timespec="seconds")
@@ -2394,7 +2280,6 @@ def get_a_traiter(assigne: str = "tous") -> JSONResponse:
     détections visibles par tous)."""
     now = datetime.now(PARIS_TZ)
     today = now.date()
-    imminent_delta = timedelta(minutes=RDV_IMMINENT_MIN)
 
     filtre = _normalize_assigne(assigne)
     if filtre in ("", "tous"):
