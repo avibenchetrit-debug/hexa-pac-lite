@@ -14816,7 +14816,10 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
     return getCatalogueCompatibles(simState).sort((a,b)=>puissanceModele(a)-puissanceModele(b));
   }
 
-  async function chargerBaremes() {
+  var _baremesPromise = null;
+  function chargerBaremes(force) {
+    if (!force && _baremesPromise) return _baremesPromise;
+    _baremesPromise = (async function() {
     try {
       const [rBaremes, rCatalogue] = await Promise.all([
         fetch('/api/baremes'),
@@ -14852,6 +14855,8 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
       CATALOGUE_PAC = nettoyerCatalogue(chargerCatalogueDepuisStorage());
       window.__hexaCataloguePacCache = CATALOGUE_PAC.map(m => m.raw || m);
     }
+    })();
+    return _baremesPromise;
   }
   chargerBaremes();
 
@@ -16424,6 +16429,7 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
   }
 
   window.addEventListener('hexa-config-changed', ()=>{
+    _baremesPromise = null;
     const fromStorage = chargerCatalogueDepuisStorage();
     if (fromStorage.length) {
       CATALOGUE_PAC = nettoyerCatalogue(fromStorage);
@@ -17169,6 +17175,7 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
     } catch(e) {
       console.warn('Sauvegarde serveur échouée, données en localStorage', e);
     }
+    try { window.dispatchEvent(new CustomEvent('hexa-config-changed')); } catch(_){}
   }
 
   // ---- Config par défaut (issue du catalogue rempli) ----
