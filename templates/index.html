@@ -19459,10 +19459,12 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
       });
     }
     var now = Date.now();
+    var todayStr = new Date().toLocaleDateString('en-CA');
     var items = (Array.isArray(data) ? data : [])
-      .filter(function(d){ return d && d.rappel && typeof d.rappel === 'object'; })
+      .filter(function(d){ return d && d.rappel && typeof d.rappel === 'object' && d.statut !== 'perdu' && d.statut !== 'signe'; })
       .map(function(d){ var dh = rappelDH(d.rappel); return dh ? { lead: d, dh: dh, ts: rappelEcheanceTs(dh) } : null; })
       .filter(Boolean)
+      .filter(function(it){ return it.dh.date <= todayStr; })
       .sort(function(a, b){ return a.ts - b.ts; });
     if(!items.length){ panel.style.display = 'none'; list.innerHTML = ''; if(countEl) countEl.textContent = '0'; return; }
     panel.style.display = '';

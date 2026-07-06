@@ -2336,6 +2336,9 @@ def _detection_items(lead, ctx):
     statut = _normalize_statut(lead.get("statut", ""))
     today = ctx["today"]
     out = []
+    # Leads terminés (perdu/signé) : aucune relance (ni devis, ni simu, ni jamais contacté).
+    if statut in ("perdu", "signe"):
+        return out
 
     rejets = {}
     for e in (lead.get("actions_log") or []):
