@@ -15561,7 +15561,6 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
     const seuilRentabilite = estCredit ? 0 : c.g29;
     const bsEcs = ballonSim(state);
     const ecsAn0 = bsEcs.actif ? bsEcs.economieEcs*12 : 0;
-    console.log('[ROI-DEBUG] ballon_ref=', state.ballon_ref, '| bsEcs=', JSON.stringify(bsEcs), '| ecsAn0=', ecsAn0, '| modeles=', JSON.stringify((M3_CONFIG&&M3_CONFIG.ballon_thermo&&M3_CONFIG.ballon_thermo.modeles)||null));
     let cumul = 0; let anneeRentable = null;
     for (let an=1; an<=dureeVie; an++){
       const factAvant = annAvant0*Math.pow(1+infAvant, an-1);

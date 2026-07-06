@@ -393,6 +393,11 @@ def load_parametres_admin():
     if not isinstance(data, dict):
         data = {}
     merged = _deep_merge_defaults(data, DEFAULT_PARAMETRES_ADMIN)
+    _bt = merged.get("ballon_thermo")
+    if isinstance(_bt, dict):
+        for _m in (_bt.get("modeles") or []):
+            if isinstance(_m, dict) and _m.get("economie_ecs_mois") is None:
+                _m["economie_ecs_mois"] = 25
     sous_traitants = merged.get("sous_traitants")
     if not isinstance(sous_traitants, list) or not sous_traitants:
         merged["sous_traitants"] = [dict(DEFAULT_SOUS_TRAITANTS[0])]
