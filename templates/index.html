@@ -16919,6 +16919,7 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
       <div class="adm-field adm-field-row"><span class="adm-lab">Modèle ${i+1} — fourniture</span><span class="adm-euro"><input type="text" inputmode="numeric" class="adm-bt-fourniture adm-money" data-idx="${i}" value="${adminEscape(m.fourniture_ht != null ? m.fourniture_ht : 0)}"><i>€ HT</i></span></div>
       <div class="adm-field adm-field-row"><span class="adm-lab">Modèle ${i+1} — coût fourniture</span><span class="adm-euro"><input type="text" inputmode="numeric" class="adm-bt-cout adm-money" data-idx="${i}" value="${adminEscape(m.cout_fourniture_ht != null ? m.cout_fourniture_ht : 0)}"><i>€ HT</i></span></div>
       <div class="adm-field adm-field-row"><span class="adm-lab">Modèle ${i+1} — description</span><button type="button" class="adm-btn adm-btn-cancel adm-bt-desc" data-bt-desc="${i}">✎ Specs fourniture (${(Array.isArray(m.description_specs)?m.description_specs.length:0)})</button></div>
+      <div class="adm-field adm-field-row"><span class="adm-lab">Modèle ${i+1} — fiche technique</span><button type="button" class="adm-btn adm-btn-cancel adm-fiche-ballon-btn" data-ref="${adminEscape(m.ref||('ballon-'+(i+1)))}">📎 Fiche PDF</button></div>
       <div class="adm-field adm-field-row adm-bt-marge-row"><span class="adm-lab">Modèle ${i+1} — Marge (admin)</span><span class="adm-bt-marge" data-idx="${i}"><b>${eur(margeBallon(m))}</b> HT</span></div>`).join('');
     return `<div class="adm-card">
       ${modelesRows}
@@ -17831,6 +17832,7 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
     document.getElementById('btn-save-prix-vente-devis')?.addEventListener('click', savePrixVenteDevis);
     document.getElementById('btn-save-ballon-thermo')?.addEventListener('click', saveBallonThermo);
     document.querySelectorAll('.adm-bt-desc').forEach(function(b){ b.addEventListener('click', function(){ openDescriptionBallonModal(parseInt(b.dataset.btDesc,10)); }); });
+    document.querySelectorAll('.adm-fiche-ballon-btn').forEach(function(b){ b.addEventListener('click', function(){ openFicheBallonPicker(b.dataset.ref); }); });
     (function(){
       var pn = function(el){ return el ? (parseFloat(String(el.value||'0').replace(/\s/g,'').replace(',','.'))||0) : 0; };
       var recalcMargeBallon = function(){
@@ -18017,6 +18019,27 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
         if (!r.ok){ adminToast(body.detail || ('Échec upload (HTTP '+r.status+')'), '#ef4444'); return; }
         adminToast('Fiche « ' + gamme + ' » enregistrée', '#16a34a');
         refreshFichesState();
+      } catch(e){ adminToast(e?.message || 'Erreur réseau', '#ef4444'); }
+    });
+    picker.click();
+  }
+
+  function openFicheBallonPicker(ref){
+    if (!ref){ adminToast('Référence ballon inconnue', '#ef4444'); return; }
+    const picker = document.createElement('input');
+    picker.type = 'file';
+    picker.accept = 'application/pdf';
+    picker.addEventListener('change', async ()=>{
+      const file = picker.files && picker.files[0];
+      if (!file) return;
+      const fd = new FormData();
+      fd.append('ref', ref);
+      fd.append('fichier', file);
+      try {
+        const r = await fetch('/api/admin/fiches-ballon', { method:'POST', headers: { 'X-Admin-Token': window.adminHeaders()['X-Admin-Token'] }, body: fd });
+        const body = await r.json().catch(()=>({}));
+        if (!r.ok){ adminToast(body.detail || ('Échec upload (HTTP '+r.status+')'), '#ef4444'); return; }
+        adminToast('Fiche ballon « ' + ref + ' » enregistrée', '#16a34a');
       } catch(e){ adminToast(e?.message || 'Erreur réseau', '#ef4444'); }
     });
     picker.click();

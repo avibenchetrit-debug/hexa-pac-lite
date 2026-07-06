@@ -3289,6 +3289,37 @@ def _append_fiche_technique(pdf_bytes: bytes, numero: str) -> bytes:
         return pdf_bytes
 
 
+def _append_fiche_ballon(pdf_bytes: bytes, numero: str) -> bytes:
+    """Concatène la fiche technique du ballon choisi (state.ballon_ref), à la fin du PDF.
+
+    Mêmes garanties que la fiche PAC : tout problème (fiche absente / illisible / fusion / pypdf) -> PDF inchangé."""
+    try:
+        prospect = _find_lead(numero)
+        if not prospect:
+            return pdf_bytes
+        catalogue = _read_catalogue_pac()
+        state = _load_state_simulateur(numero, prospect, catalogue)
+        ballon_ref = str(state.get("ballon_ref") or "").strip()
+        if not ballon_ref:
+            return pdf_bytes
+        index = _read_fiches_index()
+        entry = index.get("fiches_ballon", {}).get(ballon_ref)
+        if not entry:
+            return pdf_bytes
+        path = _fiche_ballon_pdf_path(ballon_ref)
+        if not os.path.exists(path):
+            return pdf_bytes
+        from pypdf import PdfReader, PdfWriter
+        writer = PdfWriter()
+        writer.append(PdfReader(io.BytesIO(pdf_bytes)))
+        writer.append(PdfReader(path))
+        out = io.BytesIO()
+        writer.write(out)
+        return out.getvalue()
+    except Exception:
+        return pdf_bytes
+
+
 def _ensure_devis_pdf(numero: str, request: Request, version: int | None = None, avec_sous_traitant: bool = True) -> tuple[str, str, int]:
     version = version or _next_sent_version(numero)
     html = _render_devis_html(request, numero, version, avec_sous_traitant)
@@ -3298,6 +3329,7 @@ def _ensure_devis_pdf(numero: str, request: Request, version: int | None = None,
     pdf_bytes = _html_to_pdf_playwright(html, request)
     if avec_sous_traitant:
         pdf_bytes = _append_fiche_technique(pdf_bytes, numero)
+        pdf_bytes = _append_fiche_ballon(pdf_bytes, numero)
     _write_pdf(pdf_path, pdf_bytes)
     return pdf_path, html_path, version
 
@@ -4028,6 +4060,10 @@ def _fiche_pdf_path(gamme: str) -> str:
     return os.path.join(FICHES_DIR, _fiche_slug(gamme) + ".pdf")
 
 
+def _fiche_ballon_pdf_path(ref: str) -> str:
+    return os.path.join(FICHES_DIR, "ballon_" + _fiche_slug(ref) + ".pdf")
+
+
 def _gamme_of(model, overrides: dict) -> str:
     ref = (model.get("ref") if isinstance(model, dict) else str(model or "")) or ""
     return (overrides or {}).get(str(ref).strip()) or _gamme_auto(model)
@@ -4101,6 +4137,71 @@ async def upload_fiche_technique(request: Request, fichier: UploadFile = File(..
     index["fiches"] = fiches
     _write_fiches_index(index)
     return JSONResponse({"status": "ok", "gamme": gamme, "fiche": fiches[gamme]})
+
+
+@app.post("/api/admin/fiches-ballon")
+async def upload_fiche_ballon(request: Request, fichier: UploadFile = File(...), ref: str = Form(...), auteur: str = Form("")) -> JSONResponse:
+    _require_admin(request)
+    ref = str(ref or "").strip()
+    if not ref:
+        raise HTTPException(status_code=400, detail="Référence ballon manquante")
+    ext = os.path.splitext(fichier.filename or "")[1].lower().lstrip(".")
+    if ext != "pdf":
+        raise HTTPException(status_code=400, detail="Seuls les PDF sont acceptés")
+    data = await fichier.read()
+    if len(data) > 20 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="Fichier trop volumineux (max 20 Mo)")
+    os.makedirs(FICHES_DIR, exist_ok=True)
+    path = _fiche_ballon_pdf_path(ref)
+    with open(path, "wb") as f:
+        f.write(data)
+    index = _read_fiches_index()
+    fiches = index.get("fiches_ballon", {})
+    fiches[ref] = {
+        "filename": os.path.basename(path),
+        "taille_octets": len(data),
+        "date_upload": _now_iso(),
+        "auteur": (auteur or "").strip() or "Admin",
+    }
+    index["fiches_ballon"] = fiches
+    _write_fiches_index(index)
+    return JSONResponse({"status": "ok", "ref": ref, "fiche": fiches[ref]})
+
+
+@app.get("/api/admin/fiches-ballon")
+def list_fiches_ballon(request: Request) -> JSONResponse:
+    _require_admin(request)
+    return JSONResponse(_read_fiches_index().get("fiches_ballon", {}))
+
+
+@app.get("/api/admin/fiches-ballon/view")
+def view_fiche_ballon(request: Request, ref: str):
+    _require_admin(request)
+    ref = str(ref or "").strip()
+    entry = _read_fiches_index().get("fiches_ballon", {}).get(ref)
+    if not entry:
+        raise HTTPException(status_code=404, detail="Fiche introuvable")
+    path = _fiche_ballon_pdf_path(ref)
+    if not os.path.exists(path):
+        raise HTTPException(status_code=404, detail="Fichier introuvable")
+    return FileResponse(path, media_type="application/pdf", headers={"Content-Disposition": "inline"})
+
+
+@app.delete("/api/admin/fiches-ballon")
+def delete_fiche_ballon(request: Request, ref: str) -> JSONResponse:
+    _require_admin(request)
+    ref = str(ref or "").strip()
+    index = _read_fiches_index()
+    fiches = index.get("fiches_ballon", {})
+    if ref not in fiches:
+        raise HTTPException(status_code=404, detail="Fiche introuvable")
+    path = _fiche_ballon_pdf_path(ref)
+    if os.path.exists(path):
+        os.remove(path)
+    fiches.pop(ref, None)
+    index["fiches_ballon"] = fiches
+    _write_fiches_index(index)
+    return JSONResponse({"status": "ok", "ref": ref})
 
 
 @app.get("/api/admin/fiches-techniques")
