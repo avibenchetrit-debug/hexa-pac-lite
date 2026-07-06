@@ -26,6 +26,7 @@ from services.service_devis import (
     DEPT_ZONE,
     calculer_devis,
     calculer_economie_devis,
+    resoudre_ballon,
     calculer_financement_devis,
     calculer_notedim,
     calculer_zone_climatique,
@@ -3114,10 +3115,12 @@ def _build_devis_context(request: Request, numero: str, version: int | None = No
     )
     _eco = context.get("economie_devis") or {}
     _fin = context.get("financement_devis") or {}
+    _ballon_ctx = resoudre_ballon(state, admin)
+    _ecs_mois = float_value((_ballon_ctx or {}).get("economie_ecs_mois")) if _ballon_ctx else 0
     projet_apercu = None
     if _eco.get("facture_apres_mois") and _eco.get("facture_avant_mois"):
         _fav = float_value(_eco.get("facture_avant_mois"))
-        _fap = float_value(_eco.get("facture_apres_mois"))
+        _fap = max(0.0, float_value(_eco.get("facture_apres_mois")) - _ecs_mois)
         _mens = float_value(_fin.get("mensualite"))
         _total_credit = round(_fap + _mens)
         _eco_pendant = round(_fav - _total_credit)

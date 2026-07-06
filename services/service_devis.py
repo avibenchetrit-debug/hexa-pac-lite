@@ -185,6 +185,7 @@ def resoudre_ballon(state_simulateur, admin_params):
         "nom": str(modele.get("nom", "") or ""),
         "fourniture_ht": float_value(modele.get("fourniture_ht"), 0),
         "prix_pose_ht": float_value(bt.get("prix_pose_ht"), 0),
+        "economie_ecs_mois": float_value(modele.get("economie_ecs_mois"), 0),
         "description_specs": specs if isinstance(specs, list) else [],
     }
 

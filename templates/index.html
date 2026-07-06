@@ -15456,14 +15456,15 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
 
   function ballonSim(state){
     const ref = state && state.ballon_ref;
-    if (!ref) return { actif:false, totalTTC:0, mpr:0 };
+    if (!ref) return { actif:false, totalTTC:0, mpr:0, economieEcs:0 };
     const bt = (M3_CONFIG && M3_CONFIG.ballon_thermo) || (window.HexaConfig && window.HexaConfig.ballon_thermo) || {};
     const modeles = Array.isArray(bt.modeles) ? bt.modeles : [];
     const m = modeles.find(function(x){ return x && x.ref === ref; });
-    if (!m) return { actif:false, totalTTC:0, mpr:0 };
+    if (!m) return { actif:false, totalTTC:0, mpr:0, economieEcs:0 };
     const totalTTC = Math.round(((Number(m.fourniture_ht)||0) + (Number(bt.prix_pose_ht)||0)) * 1.055);
     const mpr = Number((bt.forfaits_mpr||{})[state.categorie]) || 0;
-    return { actif:true, totalTTC: totalTTC, mpr: mpr };
+    const economieEcs = Number(m.economie_ecs_mois) || 0;
+    return { actif:true, totalTTC: totalTTC, mpr: mpr, economieEcs: economieEcs };
   }
 
   async function calcul(){
@@ -15558,12 +15559,15 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
     const estCredit = (mensAnnee > 0 && dureeCreditAns > 0);
     // Au comptant, le client débourse g29 ; à crédit, rien au départ (tout financé) => seuil 0
     const seuilRentabilite = estCredit ? 0 : c.g29;
+    const bsEcs = ballonSim(state);
+    const ecsAn0 = bsEcs.actif ? bsEcs.economieEcs*12 : 0;
     let cumul = 0; let anneeRentable = null;
     for (let an=1; an<=dureeVie; an++){
       const factAvant = annAvant0*Math.pow(1+infAvant, an-1);
       const factApres = annApres0*Math.pow(1+inflElec, an-1);
       const credit = (an <= dureeCreditAns) ? mensAnnee : 0;
-      const econoAnnee = factAvant - factApres - credit;
+      const ecsAnnee = ecsAn0*Math.pow(1+inflElec, an-1);
+      const econoAnnee = factAvant - factApres + ecsAnnee - credit;
       cumul += econoAnnee;
       if (anneeRentable===null && cumul >= seuilRentabilite) anneeRentable = an;
     }
