@@ -3482,6 +3482,9 @@
 <div class="sub-line">
 <div class="sub-line-header"><span class="sub-line-name">Pose</span><span class="sub-line-qt">{{ qt_ballon_pose }}</span><span class="sub-line-pu">{{ prix_ballon_pose_ht }}</span><span class="sub-line-tva">{{ tva_taux }}</span><span class="sub-line-total">{{ prix_ballon_pose_ttc }}</span></div>
 <div class="specs"><div class="specs-block"><div class="specs-block-title">Système mis en œuvre</div><ul class="specs-list"><li>Installation et mise en service d'un chauffe-eau thermodynamique</li></ul></div><div class="specs-block"><div class="specs-block-title">Aménagements et sujétions</div><ul class="specs-list"><li>Dépose et évacuation du chauffe-eau existant</li><li>Mise en place du chauffe-eau thermodynamique</li><li>Raccordement hydraulique aux réseaux d'eau froide et d'eau chaude</li><li>Raccordement électrique et protection adaptée</li><li>Raccordement aéraulique selon configuration de l'installation</li><li>Contrôle de l'étanchéité du circuit hydraulique</li><li>Groupe de sécurité et évacuation des condensats</li><li>Mise en service et essais de fonctionnement</li><li>Évacuation des déchets en filière agréée</li></ul></div><div class="specs-block"><div class="specs-block-title">Système de finition</div><ul class="specs-list"><li>Vanne d'arrêt et organes d'isolement</li><li>Calorifugeage des réseaux hydrauliques accessibles</li><li>Disconnecteur si nécessaire</li><li>Réglage et programmation de l'installation</li><li>Contrôle du bon fonctionnement</li></ul></div></div>
+{% if avec_sous_traitant %}
+<div class="subcontractor"><div class="subcontractor-title">Travaux sous-traités</div><div class="subcontractor-grid"><div class="sc-row"><span class="key">Entreprise</span><span class="val">{{ sous_traitant.entreprise }}</span></div><div class="sc-row"><span class="key">SIRET</span><span class="val">{{ sous_traitant.siret }}</span></div><div class="sc-row"><span class="key">Adresse</span><span class="val">{{ sous_traitant.adresse }}</span></div><div class="sc-row"><span class="key">Certificat RGE</span><span class="val">{{ sous_traitant.rge }}</span></div><div class="sc-row"><span class="key">Validité RGE</span><span class="val">{{ sous_traitant.rge_validite }}</span></div><div class="sc-row"><span class="key">Assurance</span><span class="val">{{ sous_traitant.assurance }}</span></div></div></div>
+{% endif %}
 </div>
 <div class="lot-subtotal"><span class="lot-subtotal-label">Sous-total lot</span><div class="lot-subtotal-amounts"><span class="ht"><span class="label">HT</span>{{ ballon_total_ht }}</span><span class="ttc"><span class="label">TTC</span>{{ ballon_total_ttc }}</span></div></div>
 </div>
@@ -3494,11 +3497,9 @@
 <div class="recap-grid">
 <div>
 <div class="recap-block-title">Totaux du projet</div>
-<div class="recap-line"><span class="label">Fourniture HT</span><span class="amount">{{ prix_fourniture_ht }}</span></div>
-<div class="recap-line"><span class="label">Pose HT</span><span class="amount">{{ prix_pose_ht }}</span></div>
+<div class="recap-line"><span class="label">Fourniture HT</span><span class="amount">{{ recap_fourniture_ht }}</span></div>
+<div class="recap-line"><span class="label">Pose HT</span><span class="amount">{{ recap_pose_ht }}</span></div>
 <div class="recap-line"><span class="label">Travaux induits HT</span><span class="amount">{{ prix_travaux_induits_ht }}</span></div>
-{% if ballon_actif %}<div class="recap-line"><span class="label">Ballon thermo — Fourniture HT</span><span class="amount">{{ prix_ballon_fourniture_ht }}</span></div>
-<div class="recap-line"><span class="label">Ballon thermo — Pose HT</span><span class="amount">{{ prix_ballon_pose_ht }}</span></div>{% endif %}
 <div class="recap-line subtotal"><span class="label">Total HT</span><span class="amount">{{ recap_total_ht }}</span></div>
 <div class="recap-line"><span class="label">TVA {{ tva_taux }}</span><span class="amount">{{ recap_total_tva }}</span></div>
 <div class="recap-line total"><span class="label">Total TTC</span><span class="amount">{{ recap_total_ttc }}</span></div>

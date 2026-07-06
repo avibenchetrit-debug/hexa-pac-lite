@@ -425,6 +425,8 @@ def calculer_devis(prospect, state_simulateur, admin_params, catalogue_pac):
         ballon_nom = ""
         ballon_description_specs = []
 
+    recap_fourniture_ht = round(prix_fourniture_ht + b_four_ht, 2)
+    recap_pose_ht = round(prix_pose_ht + b_pose_ht, 2)
     categorie_revenu = value(prospect, "categorie_revenu", "categorie", default="")
     return {
         "prix_pac_ttc": total_ttc,
@@ -464,6 +466,8 @@ def calculer_devis(prospect, state_simulateur, admin_params, catalogue_pac):
         "montant_mpr_ballon_label": LABELS_ANAH.get(categorie_revenu, ""),
         "qt_ballon_fourniture": "1 u.",
         "qt_ballon_pose": "1 u.",
+        "recap_fourniture_ht": recap_fourniture_ht,
+        "recap_pose_ht": recap_pose_ht,
         "recap_total_ht": recap_total_ht,
         "recap_total_ttc": recap_total_ttc,
         "recap_total_tva": recap_total_tva,
@@ -539,6 +543,7 @@ def format_devis_amounts(calculs):
         "prix_ballon_fourniture_ht", "prix_ballon_fourniture_ttc",
         "prix_ballon_pose_ht", "prix_ballon_pose_ttc",
         "ballon_total_ht", "ballon_total_ttc", "montant_mpr_ballon",
+        "recap_fourniture_ht", "recap_pose_ht",
         "recap_total_ht", "recap_total_ttc", "recap_total_tva",
     ):
         out[key] = money(calculs.get(key))
