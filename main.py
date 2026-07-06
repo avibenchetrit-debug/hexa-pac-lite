@@ -2396,16 +2396,8 @@ def get_a_traiter(assigne: str = "tous") -> JSONResponse:
     for lead in _read_leads():
         if _is_deleted(lead):
             continue
-        rdv = lead.get("rdv")
-        if isinstance(rdv, dict):
-            item = _atraiter_rdv_item(lead, rdv, now, today, imminent_delta)
-            if item is not None:
-                items.append(item)
-        rappel = lead.get("rappel")
-        if isinstance(rappel, dict):
-            item = _atraiter_rappel_item(lead, rappel, today)
-            if item is not None:
-                items.append(item)
+        # "À relancer" = détections uniquement. Rappels -> bloc "Mes rappels" ;
+        # RDV legacy (non créables) -> retirés de l'agrégation.
         items.extend(_detection_items(lead, detect_ctx))
 
     # Filtre par personne : RDV/rappel par assigne_a ; détections par tous.
