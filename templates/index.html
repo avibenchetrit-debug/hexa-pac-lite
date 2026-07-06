@@ -2873,6 +2873,15 @@ body.panel-is-open {
     .rappels-badge { font-size:11px; font-weight:700; color:#fff; background:#E2214B; border-radius:6px; padding:2px 8px; text-transform:uppercase; letter-spacing:.03em; }
     .rappels-nom { font-weight:600; color:#1A202C; }
     .rappels-when { margin-left:auto; font-size:13px; color:#475569; font-variant-numeric:tabular-nums; }
+    .rappels-head { justify-content:space-between; }
+    .rappels-toggle { display:inline-flex; align-items:center; gap:8px; background:none; border:none; padding:0; cursor:pointer; font-family:inherit; }
+    .rappels-chevron { color:#002E5A; font-size:13px; transition:transform .15s; display:inline-block; }
+    .rappels-panel.is-open .rappels-chevron { transform:rotate(90deg); }
+    .rappels-body { display:none; }
+    .rappels-panel.is-open .rappels-body { display:block; max-height:300px; overflow-y:auto; margin-top:10px; }
+    .rappels-tel { color:#002E5A; text-decoration:none; font-variant-numeric:tabular-nums; }
+    .rappels-tel:hover { color:#E2214B; }
+    .rappels-done { flex-shrink:0; padding:4px 10px; font-size:11px; }
     .atraiter-panel { background:#FFFFFF; border:1px solid #E2E8F0; border-radius:12px; padding:14px 16px; margin-bottom:16px; }
     .atraiter-head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:10px; }
     .atraiter-title { font-size:16px; font-weight:700; color:#002E5A; margin:0; display:flex; align-items:center; gap:8px; }
@@ -19047,8 +19056,8 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
       </div>
       <div class="pv-wrap">
         <section id="rappels-panel" class="rappels-panel" style="display:none">
-          <div class="rappels-head"><span class="rappels-title">🔔 Mes rappels</span><span id="rappels-count" class="rappels-count">0</span></div>
-          <div id="rappels-list" class="rappels-list"></div>
+          <div class="rappels-head"><button type="button" id="rappels-toggle" class="rappels-toggle" aria-expanded="true"><span class="rappels-chevron">▸</span><span class="rappels-title">🔔 Mes rappels</span></button><span id="rappels-count" class="rappels-count">0</span></div>
+          <div id="rappels-body" class="rappels-body"><div id="rappels-list" class="rappels-list"></div></div>
         </section>
         <section id="atraiter-panel" class="atraiter-panel">
           <div class="atraiter-head">
@@ -19451,9 +19460,34 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
     var list = document.getElementById('rappels-list');
     var countEl = document.getElementById('rappels-count');
     if(!panel || !list) return;
-    if(!list.dataset.bound){
-      list.dataset.bound = '1';
-      list.addEventListener('click', function(e){
+    if(!panel.dataset.bound){
+      panel.dataset.bound = '1';
+      if(localStorage.getItem('hexa_rappels_open') !== '0') panel.classList.add('is-open');
+      var tg = document.getElementById('rappels-toggle');
+      if(tg){
+        tg.setAttribute('aria-expanded', panel.classList.contains('is-open') ? 'true' : 'false');
+        tg.addEventListener('click', function(){
+          var open = panel.classList.toggle('is-open');
+          tg.setAttribute('aria-expanded', open ? 'true' : 'false');
+          try{ localStorage.setItem('hexa_rappels_open', open ? '1' : '0'); }catch(_){}
+        });
+      }
+      list.addEventListener('click', async function(e){
+        var done = e.target.closest('.rappels-done');
+        if(done){
+          e.stopPropagation();
+          var numero = done.dataset.numero;
+          try {
+            var r = await fetch('/api/leads/' + encodeURIComponent(numero) + '/action-done', {
+              method:'POST', headers:{'Content-Type':'application/json'},
+              body: JSON.stringify({ kind:'rappel', resultat:'fait', par: currentHexaUser() })
+            });
+            if(!r.ok){ var bb = await r.json().catch(function(){ return {}; }); toastMsg('Erreur : ' + (bb.detail || ('HTTP ' + r.status)), '#B91C1C'); return; }
+            toastMsg('✓ Rappel marqué fait', '#0D6B3B');
+            if(typeof refreshProspectsTable === 'function') refreshProspectsTable();
+          } catch(_){ toastMsg('Erreur réseau', '#B91C1C'); }
+          return;
+        }
         var row = e.target.closest('.rappels-row');
         if(row && row.dataset.numero) window.openFicheByNumero(row.dataset.numero);
       });
@@ -19474,10 +19508,16 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
       var nom = escapeHtml(((it.lead.prenom || '') + ' ' + (it.lead.nom || '')).trim() || it.lead.numero || '');
       var hFr = window.hexaHeureFr(it.dh.heure);
       var quand = escapeHtml(fmtDate(it.dh.date) + (hFr ? ' à ' + hFr : ''));
+      var tel = String(it.lead.telephone || '').trim();
+      var telRaw = tel.replace(/\D/g, '');
+      var telFmt = telRaw.replace(/(\d{2})(?=\d)/g, '$1 ').trim();
+      var telHtml = tel ? '<a href="tel:' + escapeHtml(telRaw || tel) + '" class="rappels-tel" onclick="event.stopPropagation()">' + escapeHtml(telFmt || tel) + '</a>' : '';
       return '<div class="rappels-row' + (retard ? ' is-retard' : '') + '" data-numero="' + escapeHtml(it.lead.numero || '') + '">'
         + (retard ? '<span class="rappels-badge">En retard</span>' : '')
         + '<span class="rappels-nom">' + nom + '</span>'
-        + '<span class="rappels-when">' + quand + '</span></div>';
+        + (telHtml ? '<span class="rappels-tel-cell">' + telHtml + '</span>' : '')
+        + '<span class="rappels-when">' + quand + '</span>'
+        + '<button type="button" class="pv-btn pv-btn-ghost rappels-done" data-numero="' + escapeHtml(it.lead.numero || '') + '">Appelé / fait</button></div>';
     }).join('');
   }
 
