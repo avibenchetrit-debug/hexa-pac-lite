@@ -17,7 +17,7 @@ from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response, StreamingResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.background import BackgroundTask
@@ -237,6 +237,59 @@ PARIS_TZ = ZoneInfo("Europe/Paris")
 # Serve static assets (CSS/JS/images) under /static.
 os.makedirs(STATIC_DIR, exist_ok=True)
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
+
+# ============ ENFORCEMENT AUTH (Lot 2) — middleware global ============
+# Kill-switch anti-verrouillage : AUTH_ENFORCE=0 désactive tout l'enforcement (retour au comportement pré-Lot 2).
+_AUTH_PUBLIC_EXACT = {"/login", "/health", "/api/auth/login", "/api/auth/logout", "/api/auth/me", "/api/admin/auth"}
+_AUTH_PUBLIC_PREFIX = ("/static/", "/devis-public/", "/notedim-public/")
+# GET /api/admin/* lues par le simulateur/accueil (commerciaux) -> connecté, PAS admin-only.
+_AUTH_ADMIN_GET_OK = {"/api/admin/m3", "/api/admin/marques", "/api/admin/config"}
+
+
+def _auth_is_public(path: str) -> bool:
+    if path in _AUTH_PUBLIC_EXACT:
+        return True
+    return any(path.startswith(p) for p in _AUTH_PUBLIC_PREFIX)
+
+
+def _auth_is_admin_only(method: str, path: str) -> bool:
+    if method == "POST" and path == "/api/catalogue-pac":
+        return True
+    if path.startswith("/api/admin/"):
+        if method == "GET" and path in _AUTH_ADMIN_GET_OK:
+            return False
+        return True
+    return False
+
+
+def _auth_is_html_page(method: str, path: str) -> bool:
+    if method not in ("GET", "HEAD"):
+        return False
+    if path in ("/", "/nouveau"):
+        return True
+    if path.startswith("/prospect/"):
+        rest = path[len("/prospect/"):]
+        return rest != "" and "/" not in rest
+    return False
+
+
+@app.middleware("http")
+async def _auth_enforcement(request: Request, call_next):
+    if os.environ.get("AUTH_ENFORCE", "1") == "0":
+        return await call_next(request)
+    path = request.url.path
+    method = request.method
+    if _auth_is_public(path):
+        return await call_next(request)
+    user = current_user(request)
+    if not user:
+        if _auth_is_html_page(method, path):
+            return RedirectResponse(url="/login", status_code=302)
+        return JSONResponse({"detail": "Non authentifié"}, status_code=401)
+    if _auth_is_admin_only(method, path) and user.get("role") != "admin":
+        return JSONResponse({"detail": "Accès administrateur requis"}, status_code=403)
+    return await call_next(request)
 
 
 def _admin_password() -> str:
