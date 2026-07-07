@@ -84,6 +84,75 @@ def calculer_zone_climatique(cp, zone=""):
     return normalize_zone(zone, cp)
 
 
+# Température extérieure de base par SOUS-ZONE — répliquée à l'identique du front
+# (temperatureExterieureBase) pour que la note (document) == l'aperçu (modal).
+TEMP_BASE_SOUS_ZONE = {"H1A": -9, "H1B": -8, "H1C": -7, "H2A": -4, "H2B": -5, "H2C": -3, "H2D": -2, "H3": 0}
+TEMP_BASE_CP = {}  # override par code postal — vide (identique au front)
+DEPT_SOUS_ZONE = {
+    "01": "H1A", "03": "H1A", "05": "H1A", "07": "H1A", "10": "H1A", "21": "H1A", "25": "H1A", "39": "H1A", "42": "H1A", "43": "H1A", "45": "H1A", "51": "H1A", "52": "H1A", "54": "H1A", "55": "H1A", "57": "H1A", "58": "H1A", "67": "H1A", "68": "H1A", "69": "H1A", "70": "H1A", "71": "H1A", "73": "H1A", "74": "H1A", "88": "H1A", "89": "H1A", "90": "H1A",
+    "02": "H1B", "08": "H1B", "14": "H1B", "18": "H1B", "27": "H1B", "28": "H1B", "36": "H1B", "41": "H1B", "50": "H1B", "53": "H1B", "59": "H1B", "60": "H1B", "61": "H1B", "62": "H1B", "75": "H1B", "76": "H1B", "77": "H1B", "78": "H1B", "80": "H1B", "91": "H1B", "92": "H1B", "93": "H1B", "94": "H1B", "95": "H1B",
+    "22": "H1C", "29": "H1C", "35": "H1C", "44": "H1C", "49": "H1C", "56": "H1C", "72": "H1C", "85": "H1C",
+    "17": "H2A", "24": "H2A", "33": "H2A", "37": "H2A", "79": "H2A", "86": "H2A",
+    "16": "H2B", "19": "H2B", "23": "H2B", "26": "H2B", "38": "H2B", "46": "H2B", "47": "H2B", "48": "H2B", "63": "H2B", "81": "H2B", "82": "H2B", "87": "H2B",
+    "09": "H2C", "11": "H2C", "12": "H2C", "15": "H2C", "31": "H2C", "32": "H2C", "40": "H2C", "64": "H2C", "65": "H2C",
+    "04": "H2D", "06": "H2D", "13": "H2D", "30": "H2D", "34": "H2D", "66": "H2D", "83": "H2D", "84": "H2D",
+    "2A": "H3", "2B": "H3", "971": "H3", "972": "H3", "973": "H3", "974": "H3", "976": "H3",
+}
+
+
+def _fmt_fr_num(x):
+    """Affichage identique au modal : entier -> groupé espace (fr-FR) ; sinon virgule décimale."""
+    try:
+        f = float(x)
+    except (TypeError, ValueError):
+        return "0"
+    if f == int(f):
+        return f"{int(f):,}".replace(",", " ")
+    return f"{f:g}".replace(".", ",")
+
+
+def _normaliser_sous_zone(z):
+    raw = str(z or "").strip().upper().replace(" ", "")
+    if not raw:
+        return ""
+    for sz in ("H1A", "H1B", "H1C", "H2A", "H2B", "H2C", "H2D"):
+        if raw.startswith(sz):
+            return sz
+    if raw.startswith("H1"):
+        return "H1"
+    if raw.startswith("H2"):
+        return "H2"
+    if raw.startswith("H3"):
+        return "H3"
+    return ""
+
+
+def _temperature_base_notedim(prospect):
+    cp = "".join(c for c in str(value(prospect, "cp_chantier", "code_postal_chantier", "cp", default="") or "") if c.isdigit())[:5]
+    info = None
+    if cp and cp in TEMP_BASE_CP:
+        info = {"temperature": TEMP_BASE_CP[cp], "zone": _normaliser_sous_zone(value(prospect, "zone_climatique_chantier", "zone_climatique", default="")) or "H1"}
+    else:
+        dept = cp[:3] if cp.startswith("97") else cp[:2]
+        if dept and dept in DEPT_SOUS_ZONE:
+            z = DEPT_SOUS_ZONE[dept]
+            info = {"temperature": TEMP_BASE_SOUS_ZONE[z], "zone": z}
+    if info is None:
+        z_detail = _normaliser_sous_zone(value(prospect, "zone_climatique_chantier", "zone_climatique", default=""))
+        if z_detail and z_detail in TEMP_BASE_SOUS_ZONE:
+            info = {"temperature": TEMP_BASE_SOUS_ZONE[z_detail], "zone": z_detail}
+    if info is None:
+        z = normalize_zone("", cp)
+        if z in TEMP_BASE_ZONE:
+            info = {"temperature": TEMP_BASE_ZONE[z], "zone": z}
+    if info is None:
+        info = {"temperature": -7, "zone": "H1"}
+    altitude = float_value(value(prospect, "altitude", default=0), 0)
+    correction = ((altitude - 200) / 100) * 0.5 if altitude > 200 else 0
+    correction_label = f"correction altitude -{number_fr(correction)} °C" if correction > 0 else "sans correction"
+    return {"temperature": info["temperature"] - correction, "zone": info["zone"], "altitude": altitude, "correction_label": correction_label}
+
+
 def get_prix_pac_for_devis(prospect, state_simulateur, catalogue):
     state_price = value(state_simulateur, "prix_pac", default=None)
     if state_price not in (None, ""):
@@ -662,21 +731,18 @@ def calculer_notedim(prospect, state_simulateur, catalogue_pac):
     surface_habitable = float_value(value(prospect, "surface_habitable", "surface_logement_m2", default=100), 100)
     surface_chauffee = float_value(value(state_simulateur, "surface_chauffee", default=0), 0)
     if surface_chauffee <= 0:
-        surface_chauffee = round(surface_habitable * 0.9, 1)
+        surface_chauffee = surface_habitable * 0.9
     hsp = float_value(value(prospect, "hsp", default=2.5), 2.5)
-    volume = round(surface_chauffee * hsp, 1)
-    zone = calculer_zone_climatique(
-        value(prospect, "cp_chantier", "code_postal_chantier", "cp"),
-        value(prospect, "zone_climatique", "zone_climatique_chantier"),
-    )
-    temperature_base = TEMP_BASE_ZONE.get(zone, -7)
-    altitude = float_value(value(prospect, "altitude", default=0), 0)
-    correction_label = "sans correction"
-    if altitude > 200:
-        correction = ((altitude - 200) / 100) * 0.5
-        temperature_base = round(temperature_base - correction, 1)
-        correction_label = f"correction altitude -{number_fr(correction)} °C"
-    delta_t = round(20 - temperature_base, 1)
+    if hsp <= 0:
+        hsp = 2.5
+    volume = surface_chauffee * hsp
+    # Température de base : logique fine par sous-zone, identique à l'aperçu simulateur.
+    _temp = _temperature_base_notedim(prospect)
+    zone = _temp["zone"]
+    temperature_base = _temp["temperature"]
+    altitude = _temp["altitude"]
+    correction_label = _temp["correction_label"]
+    delta_t = 20 - temperature_base
 
     iso_toit = value(state_simulateur, "iso_toit", default="isole")
     iso_mur = value(state_simulateur, "iso_mur", default="isole")
@@ -695,21 +761,25 @@ def calculer_notedim(prospect, state_simulateur, catalogue_pac):
     g_mur = coeffs["mur"].get(iso_mur, 0.30)
     g_menuiserie = coeffs["menuiserie"].get(iso_menuiserie, 0.05)
     g_retenu = min(max(0.75 + g_toit + g_mur + g_menuiserie, 0.75), 2.50)
-    p_chauffage = round(g_retenu * volume * delta_t)
+    # Puissances : répliquées à l'identique du front (aucun arrondi intermédiaire ;
+    # facteur de sécurité appliqué au chauffage puis ajout de l'ECS).
+    p_chauffage = g_retenu * volume * delta_t
     service = value(state_simulateur, "service", default="chauffage_ecs")
     service_ecs = service in ("chauffage_ecs", "chauffage+ecs")
-    p_ecs = round(min(max(p_chauffage * 0.06, 500), 1000)) if service_ecs else 0
+    p_ecs = min(max(p_chauffage * 0.06, 500), 1000) if service_ecs else 0
     p_totale = p_chauffage + p_ecs
-    p_pac_reco_w = round(p_totale * 1.10)
-    p_pac_reco_kw = round(p_pac_reco_w / 1000, 1)
+    p_chauffage_secu = p_chauffage * 1.10
+    p_pac_w = p_chauffage_secu + p_ecs
+    p_pac_reco_w = int(p_pac_w + 0.5)
+    p_pac_reco_kw = int(p_pac_w / 1000 * 10 + 0.5) / 10
     modele = find_modele(catalogue_pac, value(state_simulateur, "modele_pac_id", "modele_pac")) or select_default_modele(prospect, catalogue_pac)
     modele_kw = float_value(value(modele, "puiss_chauf", "puiss35", "puissance_kw", default=p_pac_reco_kw), p_pac_reco_kw)
     return {
         "surface_habitable": number_fr(surface_habitable, 0),
         "surface_chauffee": number_fr(surface_chauffee, 1),
-        "hsp": number_fr(hsp, 2),
+        "hsp": _fmt_fr_num(hsp),
         "zone_climatique": zone,
-        "temperature_base": number_fr(temperature_base, 1),
+        "temperature_base": _fmt_fr_num(temperature_base),
         "iso_toit_label": labels.get(iso_toit, iso_toit),
         "iso_toit_coeff": number_fr(g_toit, 2),
         "iso_mur_label": labels.get(iso_mur, iso_mur),
@@ -719,24 +789,24 @@ def calculer_notedim(prospect, state_simulateur, catalogue_pac):
         "methode_calcul": "NF EN 12831 simplifiée — G × V × ΔT",
         "g_base": number_fr(0.75, 2),
         "g_retenu": number_fr(g_retenu, 2),
-        "volume_chauffe": number_fr(volume, 1),
+        "volume_chauffe": _fmt_fr_num(int(volume + 0.5)),
         "altitude": number_fr(altitude, 0),
         "correction_altitude_label": correction_label,
         "temperature_consigne": "20",
-        "delta_t": number_fr(delta_t, 1),
+        "delta_t": _fmt_fr_num(delta_t),
         "service": "Chauffage + ECS" if service_ecs else "Chauffage seul",
-        "p_ecs": str(p_ecs),
+        "p_ecs": _fmt_fr_num(int(p_ecs + 0.5)),
         "type_emetteurs_label": TYPE_EMETTEURS_LABELS.get(value(prospect, "type_emetteurs"), value(prospect, "type_emetteurs", default="—")),
-        "p_chauffage": str(p_chauffage),
-        "p_totale": str(p_totale),
-        "p_pac_reco_w": str(p_pac_reco_w),
+        "p_chauffage": _fmt_fr_num(int(p_chauffage + 0.5)),
+        "p_totale": _fmt_fr_num(int(p_totale + 0.5)),
+        "p_chauffage_secu": _fmt_fr_num(int(p_chauffage_secu + 0.5)),
+        "p_pac_reco_w": _fmt_fr_num(p_pac_reco_w),
         "p_pac_reco_kw": number_fr(p_pac_reco_kw, 1),
         "gamme_min": number_fr(max(p_pac_reco_kw * 0.8, 0), 1),
         "gamme_max": number_fr(p_pac_reco_kw * 1.2, 1),
         "modele_pac": value(modele, "nom", "ref", default="—"),
         "modele_pac_specs": f"{number_fr(modele_kw, 1)} kW · {value(modele, 'alim', default='')} · COP {value(modele, 'cop', 'scop35', default='—')}",
     }
-
 
 def nombre_en_lettres_euros(amount):
     euros = int(round(float_value(amount)))
