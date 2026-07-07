@@ -16309,7 +16309,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
         <div class="devis-modal-head">
           <div class="devis-modal-title">${vtOk ? 'Devis' : 'Pré-devis'} ${numero}</div>
           <button type="button" class="adm-btn adm-btn-ghost devis-tab active" data-url="${devisUrl}" data-kind="devis">📄 ${vtOk ? 'Devis' : 'Pré-devis'}</button>
-          <button type="button" class="adm-btn adm-btn-ghost devis-tab" data-url="${notedimUrl}" data-kind="notedim">📐 Note de dim</button>
+          ${vtOk ? `<button type="button" class="adm-btn adm-btn-ghost devis-tab" data-url="${notedimUrl}" data-kind="notedim">📐 Note de dim</button>` : ''}
           <button type="button" class="adm-btn adm-btn-primary" id="devis-pdf-btn">📥 Télécharger PDF</button>
           <button type="button" class="devis-send-btn" id="devis-send-btn">📧 Envoyer</button>
           <button type="button" class="devis-close-btn" id="devis-close-btn" aria-label="Fermer">×</button>

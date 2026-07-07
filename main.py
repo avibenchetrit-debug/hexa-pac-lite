@@ -3566,6 +3566,15 @@ def _ensure_notedim_pdf(numero: str, request: Request, version: int) -> str:
     return path
 
 
+def _require_vt_validee(numero: str) -> None:
+    """Bloque la génération d'une note de dim tant que la VT n'est pas validée sur le lead."""
+    prospect = _find_lead(numero)
+    if not prospect:
+        raise HTTPException(status_code=404, detail="Prospect introuvable")
+    if not bool(prospect.get("vt_validee")):
+        raise HTTPException(status_code=403, detail="VT non validée : la note de dimensionnement sera générée après la visite technique.")
+
+
 @app.get("/api/devis/{numero}/validate")
 async def validate_devis(numero: str) -> JSONResponse:
     prospect = _find_lead(numero)
@@ -3588,6 +3597,7 @@ async def devis_preview(numero: str, request: Request, variante: str | None = No
 
 @app.get("/api/notedim/{numero}/preview", response_class=HTMLResponse)
 async def notedim_preview(numero: str, request: Request) -> HTMLResponse:
+    _require_vt_validee(numero)
     return _render_template_response(request, "notedim_pac.html", _build_notedim_context(request, numero))
 
 
@@ -3762,6 +3772,7 @@ async def notedim_public_pdf(numero: str, token: str, request: Request):
 
 @app.get("/api/notedim/{numero}/pdf")
 async def notedim_pdf(numero: str, request: Request):
+    _require_vt_validee(numero)
     version = _next_devis_version(numero)
     pdf_bytes = _html_to_pdf_playwright(_render_notedim_html(request, numero), request)
     _write_pdf(_notedim_path(numero, version), pdf_bytes)
@@ -3898,7 +3909,7 @@ async def _send_devis(numero: str, payload: dict, request: Request) -> dict:
 
     version = _next_sent_version(numero)
     devis_path, devis_html, version = _ensure_devis_pdf(numero, request, version, avec_sous_traitant)
-    notedim_path = _ensure_notedim_pdf(numero, request, version)
+    notedim_path = _ensure_notedim_pdf(numero, request, version) if variante == "devis" else None
 
     # Aperçu éco (bandeau email devis) — peut être None
     ctx = _build_devis_context(request, numero)
@@ -3934,14 +3945,15 @@ async def _send_devis(numero: str, payload: dict, request: Request) -> dict:
             "html": _email_devis_html(prenom, apercu, pct_eco, lien_devis, pre_devis=(variante == "pre_devis")),
         }
     )
-    resend.Emails.send(
-        {
-            "from": "Hexa Rénov' <a.parisot@hexa-renov.fr>",
-            "to": [email_to],
-            "subject": "Votre note de dimensionnement Hexa Rénov'",
-            "html": _email_notedim_html(prenom, specs, lien_notedim),
-        }
-    )
+    if variante == "devis":
+        resend.Emails.send(
+            {
+                "from": "Hexa Rénov' <a.parisot@hexa-renov.fr>",
+                "to": [email_to],
+                "subject": "Votre note de dimensionnement Hexa Rénov'",
+                "html": _email_notedim_html(prenom, specs, lien_notedim),
+            }
+        )
 
     now = _now_iso()
     leads = _read_leads()
