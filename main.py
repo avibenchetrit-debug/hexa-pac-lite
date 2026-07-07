@@ -61,8 +61,8 @@ ECHANGES_PATH = os.path.join(DATA_DIR, "echanges.json")
 DELEGATAIRES_PATH = os.path.join(DATA_DIR, "delegataires.json")
 MODELES_EMAIL_PATH = os.path.join(DATA_DIR, "modeles_email.json")
 PARAMETRES_ADMIN_PATH = os.path.join(DATA_DIR, "parametres_admin.json")
-# users.json HORS de DATA_DIR -> exclu du backup GitHub (qui archive DATA_DIR). Chemin configurable.
-USERS_PATH = os.environ.get("USERS_PATH", os.path.join(BASE_DIR, "auth", "users.json"))
+# users.json dans DATA_DIR (volume persistant) mais EXCLU du backup GitHub (cf. backup_github._collect_json_files). Chemin configurable.
+USERS_PATH = os.environ.get("USERS_PATH", os.path.join(DATA_DIR, "users.json"))
 COUNTERS_PATH = os.path.join(DATA_DIR, "counters.json")
 DEVIS_ENVOYES_PATH = os.path.join(DATA_DIR, "devis_envoyes.json")
 STATES_SIMULATEUR_DIR = os.path.join(DATA_DIR, "states_simulateur")

@@ -43,6 +43,8 @@ def _collect_json_files(data_dir):
         for name in names:
             if not name.endswith(".json"):
                 continue
+            if name == "users.json":  # jamais les hachages de mots de passe sur GitHub
+                continue
             full = os.path.join(root, name)
             rel = os.path.relpath(full, data_dir).replace(os.sep, "/")
             try:
