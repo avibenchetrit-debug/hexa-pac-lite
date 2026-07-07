@@ -1782,49 +1782,25 @@ def get_documents_categories() -> JSONResponse:
     return JSONResponse(cats if isinstance(cats, list) else [])
 
 
-@app.post("/api/catalogue-pac")
-async def post_catalogue_pac(request: Request) -> JSONResponse:
-    try:
-        payload = await request.json()
-    except ValueError as exc:
-        raise HTTPException(
-            status_code=400, detail=f"Payload JSON invalide: {exc}"
-        ) from exc
-
+def _normalize_catalogue_list(payload) -> list:
+    """Valide + normalise une liste de modèles catalogue (réutilisé par POST et import xlsx)."""
     if not isinstance(payload, list):
         raise HTTPException(status_code=400, detail="Le payload doit être un tableau JSON.")
-
     validated = []
     for idx, entry in enumerate(payload):
         if not isinstance(entry, dict):
-            raise HTTPException(
-                status_code=400,
-                detail=f"Entrée #{idx + 1}: un objet JSON est attendu.",
-            )
-
+            raise HTTPException(status_code=400, detail=f"Entrée #{idx + 1}: un objet JSON est attendu.")
         ref = str(entry.get("ref", "")).strip()
         nom = str(entry.get("nom", "")).strip()
         if not ref and not nom:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Entrée #{idx + 1}: 'ref' ou 'nom' est obligatoire.",
-            )
-
+            raise HTTPException(status_code=400, detail=f"Entrée #{idx + 1}: 'ref' ou 'nom' est obligatoire.")
         raw_ttc = entry.get("ttc", entry.get("prix_ttc"))
         try:
             ttc = float(str(raw_ttc).replace(" ", "").replace(",", "."))
         except (TypeError, ValueError):
-            raise HTTPException(
-                status_code=400,
-                detail=f"Entrée #{idx + 1}: 'ttc' doit être numérique.",
-            ) from None
-
+            raise HTTPException(status_code=400, detail=f"Entrée #{idx + 1}: 'ttc' doit être numérique.") from None
         if ttc < 0:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Entrée #{idx + 1}: 'ttc' doit être positif.",
-            )
-
+            raise HTTPException(status_code=400, detail=f"Entrée #{idx + 1}: 'ttc' doit être positif.")
         item = dict(entry)
         if ref:
             item["ref"] = ref
@@ -1842,9 +1818,60 @@ async def post_catalogue_pac(request: Request) -> JSONResponse:
         else:
             item["description_specs"] = parse_legacy_description(item.get("description_technique", ""))
         validated.append(item)
+    return validated
+
+
+@app.post("/api/catalogue-pac")
+async def post_catalogue_pac(request: Request) -> JSONResponse:
+    try:
+        payload = await request.json()
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=400, detail=f"Payload JSON invalide: {exc}"
+        ) from exc
+
+    validated = _normalize_catalogue_list(payload)
 
     _atomic_write_json(CATALOGUE_PAC_PATH, validated)
     return JSONResponse({"ok": True, "count": len(validated)})
+
+
+def _backup_catalogue() -> str | None:
+    """Copie horodatée du catalogue courant avant remplacement (None si aucun fichier)."""
+    if not os.path.exists(CATALOGUE_PAC_PATH):
+        return None
+    ts = datetime.now(PARIS_TZ).strftime("%Y%m%d-%H%M%S")
+    dest = os.path.join(DATA_DIR, f"catalogue_pac.backup-{ts}.json")
+    shutil.copyfile(CATALOGUE_PAC_PATH, dest)
+    return dest
+
+
+@app.post("/api/catalogue-pac/import-xlsx")
+async def import_catalogue_xlsx(request: Request, file: UploadFile = File(...), confirm: str = Form("")) -> JSONResponse:
+    _require_admin(request)
+    raw = await file.read()
+    try:
+        from services.import_catalogue_pac import parse_catalogue_xlsx_report
+        models, warnings = parse_catalogue_xlsx_report(io.BytesIO(raw))
+    except Exception as exc:  # noqa: BLE001
+        return JSONResponse({"ok": False, "error": f"Lecture Excel impossible : {exc}"}, status_code=400)
+
+    apercu = [
+        {"ref": m.get("ref", ""), "nom": m.get("nom", ""), "usage": m.get("usage", ""),
+         "alim": m.get("alim", ""), "specs": len(m.get("description_specs") or [])}
+        for m in models
+    ]
+    if str(confirm).strip().lower() not in ("1", "true", "oui", "yes"):
+        return JSONResponse({"ok": True, "confirmed": False, "count": len(models), "modeles": apercu, "warnings": warnings})
+
+    if not models:
+        return JSONResponse({"ok": False, "error": "Aucun modèle valide — remplacement annulé.", "warnings": warnings}, status_code=400)
+
+    validated = _normalize_catalogue_list(models)
+    backup = _backup_catalogue()
+    _atomic_write_json(CATALOGUE_PAC_PATH, validated)
+    return JSONResponse({"ok": True, "confirmed": True, "count": len(validated),
+                         "backup": os.path.basename(backup) if backup else None, "warnings": warnings})
 
 
 @app.post("/api/leads")

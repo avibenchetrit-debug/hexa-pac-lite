@@ -17309,6 +17309,55 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     let t=''; try{ t = JSON.parse(localStorage.getItem('hexa_admin_unlocked')||'{}').token||''; }catch(_){}
     return {'Content-Type':'application/json','X-Admin-Token':t};
   };
+  async function previewImportCatalogue(file){
+    const fd=new FormData(); fd.append('file', file);
+    let data;
+    try{
+      const r=await fetch('/api/catalogue-pac/import-xlsx', { method:'POST', headers:{ 'X-Admin-Token': window.adminHeaders()['X-Admin-Token'] }, body: fd });
+      data=await r.json();
+      if(!r.ok || !data.ok) throw new Error(data.error || 'Lecture impossible');
+    }catch(e){ alert('Import : ' + e.message); return; }
+    showImportPreviewModal(file, data);
+  }
+  function showImportPreviewModal(file, data){
+    document.getElementById('modal-import-xlsx')?.remove();
+    const wrap=document.createElement('div'); wrap.id='modal-import-xlsx'; wrap.className='devis-modal-overlay';
+    const warns=(data.warnings||[]);
+    const warnHtml = warns.length ? `<div style="margin:10px 0;padding:10px;background:#FEF2F2;border:1px solid #FCA5A5;border-radius:8px;color:#B91C1C;font-size:13px"><b>${warns.length} avertissement(s) :</b><ul style="margin:6px 0 0;padding-left:18px">${warns.map(w=>'<li>'+adminEscape(w)+'</li>').join('')}</ul></div>` : '';
+    const rows=(data.modeles||[]).map(m=>`<tr><td>${adminEscape(m.ref)}</td><td>${adminEscape(m.nom)}</td><td>${adminEscape(m.usage)}</td><td>${adminEscape(m.alim)}</td><td style="text-align:right">${m.specs}</td></tr>`).join('');
+    wrap.innerHTML=`
+      <div class="devis-modal-box" style="max-width:760px;height:auto">
+        <div class="devis-modal-head"><div class="devis-modal-title">Import catalogue — prévisualisation</div><button type="button" class="devis-close-btn" aria-label="Fermer">×</button></div>
+        <div class="devis-modal-body" style="padding:18px;display:block;overflow:auto">
+          <p style="font-size:14px;color:#002E5A"><b>${data.count}</b> modèle(s) importés — <b>remplaceront TOUT le catalogue actuel</b>.</p>
+          ${warnHtml}
+          <table style="width:100%;border-collapse:collapse;font-size:13px;margin-top:8px">
+            <thead><tr style="text-align:left;color:#64748B;border-bottom:1px solid #E2E8F0"><th>Réf</th><th>Nom</th><th>Usage</th><th>Alim</th><th style="text-align:right">Specs</th></tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
+        <div class="devis-modal-foot" style="gap:8px">
+          <button type="button" class="adm-btn adm-btn-cancel" id="imp-cancel">Annuler</button>
+          <button type="button" class="adm-btn adm-btn-primary" id="imp-confirm" ${data.count?'':'disabled'}>Confirmer le remplacement</button>
+        </div>
+      </div>`;
+    document.body.appendChild(wrap);
+    const close=()=>wrap.remove();
+    wrap.querySelector('.devis-close-btn').addEventListener('click', close);
+    document.getElementById('imp-cancel').addEventListener('click', close);
+    wrap.addEventListener('click', e=>{ if(e.target===wrap) close(); });
+    document.getElementById('imp-confirm').addEventListener('click', async ()=>{
+      const btn=document.getElementById('imp-confirm'); btn.disabled=true; btn.textContent='Remplacement…';
+      const fd=new FormData(); fd.append('file', file); fd.append('confirm','true');
+      try{
+        const r=await fetch('/api/catalogue-pac/import-xlsx', { method:'POST', headers:{ 'X-Admin-Token': window.adminHeaders()['X-Admin-Token'] }, body: fd });
+        const d=await r.json();
+        if(!r.ok || !d.ok) throw new Error(d.error || 'Échec du remplacement');
+        alert('Catalogue remplacé : ' + d.count + ' modèle(s).' + (d.backup ? '\nSauvegarde : ' + d.backup : ''));
+        close(); location.reload();
+      }catch(e){ alert('Erreur : ' + e.message); btn.disabled=false; btn.textContent='Confirmer le remplacement'; }
+    });
+  }
   async function saveAdminParamsServer(){
     try {
       await fetch('/api/admin/params', {
@@ -17593,7 +17642,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
       <div class="adm-actions"><button type="button" class="adm-btn-save" data-save-sous-bloc="5-1">Enregistrer</button></div>`;
     const modelesMarges = `
       <div class="adm-table-wrap adm-models-table-wrapper"><table class="adm-table adm-models-table"><thead><tr class="adm-head-group"><th rowspan="2">Modèle</th><th rowspan="2">Prix vente TTC</th><th rowspan="2">Prix vente HT</th><th rowspan="2">Achat HT</th><th rowspan="2">Pose + access.</th><th rowspan="2">Coût de revient</th><th rowspan="2" class="header-option1">Marge brute</th><th rowspan="2" class="adm-th1 header-option1">Marge nette Hexa<br>Option 1</th><th colspan="3" class="adm-grp-regie header-option2">RÉGIE — Option 2</th></tr><tr><th class="adm-th2 sub-header-option2">Prix de cession</th><th class="adm-th2 sub-header-option2">Marge nette Hexa</th><th class="adm-th2b sub-header-option2">Commission régie</th></tr></thead><tbody id="adm-tbody">${rowsHTML}</tbody></table></div>
-      <div class="adm-add-row"><button type="button" class="adm-btn adm-btn-add" id="adm-add">+ Ajouter une pompe à chaleur</button></div>
+      <div class="adm-add-row"><button type="button" class="adm-btn adm-btn-add" id="adm-add">+ Ajouter une pompe à chaleur</button><button type="button" class="adm-btn adm-btn-add" id="adm-import-xlsx">📥 Importer catalogue Excel</button><input type="file" id="adm-import-xlsx-file" accept=".xlsx" style="display:none"></div>
       <div class="adm-legend"><div class="adm-legend-row"><span class="adm-dot adm-dot1"></span><span>Option 1 — vente directe : marge brute − CAC − visite − COFRAC − urbanisme.</span></div><div class="adm-legend-row"><span class="adm-dot adm-dot2"></span><span>Option 2 — prix de cession : marge garantie au-dessus de (coût + visite + COFRAC + urbanisme). La régie revend au-dessus et garde le surplus ; la colonne « Commission régie » montre ce qu'elle gagne si elle revend à ton prix catalogue.</span></div><div class="adm-legend-row"><span>Marges théoriques — calculées sur un MPR forfaitaire de 5 000 € (estimation commune à tous les modèles), pas un calcul réel par prospect.</span></div></div>
       <div class="adm-actions"><button type="button" class="adm-btn-save" id="adm-save-catalogue">Enregistrer</button></div>`;
     const adminBody = `${admBloc('1','1. Réglages généraux',admSousBloc('1-1','1.1 Coût Hexa',coutHexa)+admSousBloc('1-2','1.2 Vente Hexa',venteHexa))}${admBloc('2','2. MPR',admSousBloc('2-1','2.1 Forfait MPR',renderMprFields())+admSousBloc('2-2','2.2 Plafonds réglementaires',renderPlafondsSection())+admSousBloc('2-3','2.3 Barèmes ANAH (plafonds RFR)',renderBaremesAnahSection()))}${admBloc('3','3. CEE',admSousBloc('3-1','3.1 Formule BAR-TH-171 (PAC Air-Eau)',renderFormuleBarSection())+admSousBloc('3-2','3.2 Bonification CEE',renderBonificationFields())+admSousBloc('3-3','3.3 Délégataires CEE',renderDelegatairesFields()))}${admBloc('4','4. Sous-traitants',renderSousTraitantsSection())}${admBloc('5','5. Commercial',admSousBloc('5-1','5.1 Options commerciales',optionsCommerciales)+admSousBloc('5-2','5.2 Modèles et marges nettes',modelesMarges)+admSousBloc('5-3','5.3 Ballon thermodynamique',renderBallonThermoFields()))}${admBloc('6','6. Modèles email',renderEmailsFields())}${admBloc('7','7. Corbeille des leads','<div id="adm-trash" class="adm-trash-empty">Chargement...</div>')}${admBloc('8','8. Paramètres économiques',admSousBloc('8-1',"8.1 Hypothèses économie d'énergie",renderParamsEcoEnergie())+admSousBloc('8-2','8.2 Hypothèses financement',renderParamsFinancement()))}${admBloc('9','9. Gammes & Marques', renderMarquesSection())}${admBloc('10','10. Utilisateurs', renderUtilisateursSection())}`;
@@ -18120,6 +18169,12 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     bindAccordions();
     const addBtn=document.getElementById('adm-add');
     if(addBtn) addBtn.addEventListener('click', openAddForm);
+    const impBtn=document.getElementById('adm-import-xlsx');
+    const impFile=document.getElementById('adm-import-xlsx-file');
+    if(impBtn && impFile){
+      impBtn.addEventListener('click', ()=> impFile.click());
+      impFile.addEventListener('change', ()=>{ const f=impFile.files[0]; impFile.value=''; if(f) previewImportCatalogue(f); });
+    }
     // segmented control marge de cession € / %
     document.querySelectorAll('.adm-seg-btn').forEach(btn=>{
       btn.addEventListener('click', ()=>{
