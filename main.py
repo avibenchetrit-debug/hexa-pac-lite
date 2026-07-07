@@ -2921,6 +2921,143 @@ async def auth_me(request: Request):
     return {"authenticated": True, "user": u["username"], "role": u["role"]}
 
 
+# ============ GESTION DES COMPTES (Lot 3a) — protégée par la SESSION (role==admin) ============
+def _require_admin_session(request: Request) -> dict:
+    u = current_user(request)
+    if not u:
+        raise HTTPException(status_code=401, detail="Non authentifié")
+    if u.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Accès administrateur requis")
+    return u
+
+
+def _valid_username(s: str) -> bool:
+    return bool(re.match(r"^[a-z0-9_.-]{2,32}$", str(s or "").strip().lower()))
+
+
+def _count_active_admins(users: list, exclude: str = None) -> int:
+    ex = str(exclude or "").strip().lower()
+    n = 0
+    for u in users:
+        if not isinstance(u, dict):
+            continue
+        if str(u.get("username", "")).strip().lower() == ex:
+            continue
+        if u.get("role") == "admin" and u.get("actif", True):
+            n += 1
+    return n
+
+
+def _public_user(u: dict) -> dict:
+    return {
+        "username": u.get("username"),
+        "role": u.get("role", "commercial"),
+        "actif": bool(u.get("actif", True)),
+        "cree_at": u.get("cree_at", ""),
+    }
+
+
+def _find_user_record(users: list, username: str):
+    uname = str(username or "").strip().lower()
+    return next((u for u in users if isinstance(u, dict) and str(u.get("username", "")).strip().lower() == uname), None)
+
+
+@app.get("/api/admin/users")
+async def admin_users_list(request: Request):
+    _require_admin_session(request)
+    return {"users": [_public_user(u) for u in _read_users() if isinstance(u, dict)]}
+
+
+@app.post("/api/admin/users")
+async def admin_users_create(request: Request):
+    _require_admin_session(request)
+    payload = await _read_request_payload(request)
+    username = str(payload.get("username") or "").strip().lower()
+    password = str(payload.get("password") or "")
+    role = str(payload.get("role") or "commercial").strip().lower()
+    if not _valid_username(username):
+        raise HTTPException(status_code=400, detail="Identifiant invalide (a-z, 0-9, . _ - ; 2 à 32 caractères)")
+    if role not in ("admin", "commercial"):
+        raise HTTPException(status_code=400, detail="Rôle invalide")
+    if len(password) < 6:
+        raise HTTPException(status_code=400, detail="Mot de passe trop court (6 caractères minimum)")
+    users = _read_users()
+    if _find_user_record(users, username):
+        raise HTTPException(status_code=409, detail="Identifiant déjà utilisé")
+    users.append({
+        "id": username, "username": username, "password_hash": _hash_password(password),
+        "role": role, "actif": True, "cree_at": _now_iso(), "visibilite": "tous",
+    })
+    _write_users(users)
+    return {"ok": True, "user": _public_user(users[-1])}
+
+
+@app.post("/api/admin/users/{username}/active")
+async def admin_users_set_active(username: str, request: Request):
+    _require_admin_session(request)
+    payload = await _read_request_payload(request)
+    actif = bool(payload.get("actif"))
+    users = _read_users()
+    target = _find_user_record(users, username)
+    if not target:
+        raise HTTPException(status_code=404, detail="Compte introuvable")
+    if not actif and target.get("role") == "admin" and _count_active_admins(users, exclude=str(username).strip().lower()) < 1:
+        raise HTTPException(status_code=409, detail="Impossible : c'est le dernier administrateur actif")
+    target["actif"] = actif
+    _write_users(users)
+    return {"ok": True, "user": _public_user(target)}
+
+
+@app.post("/api/admin/users/{username}/reset-password")
+async def admin_users_reset_password(username: str, request: Request):
+    _require_admin_session(request)
+    payload = await _read_request_payload(request)
+    password = str(payload.get("password") or "")
+    if len(password) < 6:
+        raise HTTPException(status_code=400, detail="Mot de passe trop court (6 caractères minimum)")
+    users = _read_users()
+    target = _find_user_record(users, username)
+    if not target:
+        raise HTTPException(status_code=404, detail="Compte introuvable")
+    target["password_hash"] = _hash_password(password)
+    _write_users(users)
+    return {"ok": True}
+
+
+@app.delete("/api/admin/users/{username}")
+async def admin_users_delete(username: str, request: Request):
+    _require_admin_session(request)
+    users = _read_users()
+    target = _find_user_record(users, username)
+    if not target:
+        raise HTTPException(status_code=404, detail="Compte introuvable")
+    if target.get("role") == "admin" and _count_active_admins(users, exclude=str(username).strip().lower()) < 1:
+        raise HTTPException(status_code=409, detail="Impossible : c'est le dernier administrateur actif")
+    uname = str(username).strip().lower()
+    users = [u for u in users if not (isinstance(u, dict) and str(u.get("username", "")).strip().lower() == uname)]
+    _write_users(users)
+    return {"ok": True}
+
+
+@app.post("/api/auth/change-password")
+async def auth_change_password(request: Request):
+    u = current_user(request)
+    if not u:
+        raise HTTPException(status_code=401, detail="Non authentifié")
+    payload = await _read_request_payload(request)
+    current_pw = str(payload.get("current_password") or "")
+    new_pw = str(payload.get("new_password") or "")
+    if len(new_pw) < 6:
+        raise HTTPException(status_code=400, detail="Nouveau mot de passe trop court (6 caractères minimum)")
+    users = _read_users()
+    target = _find_user_record(users, u["username"])
+    if not target or not _verify_password(current_pw, str(target.get("password_hash", ""))):
+        raise HTTPException(status_code=401, detail="Mot de passe actuel incorrect")
+    target["password_hash"] = _hash_password(new_pw)
+    _write_users(users)
+    return {"ok": True}
+
+
 @app.post("/api/admin/auth")
 async def admin_auth(request: Request) -> JSONResponse:
     payload = await _read_request_payload(request)
