@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Connexion — Hexa-Rénov'</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: radial-gradient(1200px 600px at 80% -10%, #F3F7FC 0%, #EEF2F7 55%); color:#1A2233; }
+  .login-card { background:#fff; border:1px solid #E2E8F0; border-radius:14px; padding:28px 26px;
+    width:340px; max-width:92vw; box-shadow:0 10px 40px rgba(16,32,64,.10); }
+  .login-brand { font-weight:800; color:#002E5A; font-size:22px; text-align:center; margin-bottom:4px; }
+  .login-sub { text-align:center; color:#64748B; font-size:13px; margin-bottom:18px; }
+  .login-card label { display:block; font-size:12px; font-weight:600; color:#334155; margin:10px 0 4px; }
+  .login-card input { width:100%; border:1px solid #CBD5E1; border-radius:8px; padding:10px 12px; font-size:15px; font-family:inherit; }
+  .login-card input:focus { border-color:#002E5A; outline:none; }
+  .login-btn { width:100%; margin-top:18px; background:#002E5A; color:#fff; border:0; border-radius:8px;
+    padding:11px; font-size:15px; font-weight:700; cursor:pointer; }
+  .login-btn:disabled { opacity:.6; cursor:default; }
+  .login-err { margin-top:12px; background:#FDE8EC; color:#B91C1C; border:1px solid #F4B3BF;
+    border-radius:8px; padding:8px 10px; font-size:13px; text-align:center; }
+</style>
+</head>
+<body>
+<form class="login-card" id="login-form" autocomplete="on">
+  <div class="login-brand">Hexa-Rénov'</div>
+  <div class="login-sub">Connexion au CRM</div>
+  <label for="username">Identifiant</label>
+  <input id="username" name="username" autocomplete="username" autocapitalize="none" spellcheck="false" autofocus required>
+  <label for="password">Mot de passe</label>
+  <input id="password" name="password" type="password" autocomplete="current-password" required>
+  <button type="submit" class="login-btn" id="login-btn">Se connecter</button>
+  <div class="login-err" id="login-error" hidden></div>
+</form>
+<script>
+  (function(){
+    var form = document.getElementById('login-form');
+    var err = document.getElementById('login-error');
+    var btn = document.getElementById('login-btn');
+    form.addEventListener('submit', async function(e){
+      e.preventDefault();
+      err.hidden = true; btn.disabled = true;
+      try {
+        var r = await fetch('/api/auth/login', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            username: document.getElementById('username').value,
+            password: document.getElementById('password').value
+          })
+        });
+        if (r.ok) { window.location.replace('/'); return; }
+        var b = await r.json().catch(function(){ return {}; });
+        err.textContent = b.detail || 'Identifiant ou mot de passe incorrect';
+        err.hidden = false;
+      } catch(_) {
+        err.textContent = 'Erreur réseau, réessayez.';
+        err.hidden = false;
+      }
+      btn.disabled = false;
+    });
+  })();
+</script>
+</body>
+</html>

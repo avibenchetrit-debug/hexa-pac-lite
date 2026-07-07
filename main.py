@@ -1508,6 +1508,17 @@ async def index_prospect(numero: str) -> HTMLResponse:
     return _serve_index_html()
 
 
+def _serve_login_html() -> HTMLResponse:
+    login_path = os.path.join(TEMPLATES_DIR, "login.html")
+    with open(login_path, encoding="utf-8") as f:
+        return HTMLResponse(content=f.read())
+
+
+@app.get("/login", response_class=HTMLResponse)
+async def login_page() -> HTMLResponse:
+    return _serve_login_html()
+
+
 @app.get("/health")
 async def health() -> JSONResponse:
     return JSONResponse({"status": "ok"})

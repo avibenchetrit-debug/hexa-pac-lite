@@ -7818,6 +7818,10 @@ body.hexa-view-prospects #hexa-prospects-view{
 body.hexa-view-prospects #hexa-admin-btn{ display:none; }
 /* sur l'accueil, le selecteur d'identite est la puce du panneau "A traiter" */
 body.hexa-view-prospects #hexa-user-menu{ display:none; }
+/* Auth Lot 1 : plus de selecteur d'utilisateur (identite = session) */
+#atraiter-user{ display:none !important; }
+/* Auth Lot 1 : masquer l'admin aux commerciaux (UX ; enforcement backend = Lot 2) */
+body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ display:none !important; }
 
 .pv-top{ background:rgba(255,255,255,.9); backdrop-filter:blur(12px); box-shadow:0 1px 0 rgba(16,32,64,.06);
   padding:12px 28px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:5; }
@@ -8092,7 +8096,7 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
   <div class="hexa-user-menu" id="hexa-user-menu">
     <button type="button" class="hexa-user-btn" id="hexa-user-btn">👤 — ▾</button>
     <div class="hexa-user-dropdown" id="hexa-user-dropdown">
-      <button type="button" id="hexa-change-user">Changer d'utilisateur</button>
+      <button type="button" id="hexa-change-user">Déconnexion</button>
     </div>
   </div>
   <button type="button" id="btn-script-appel" class="hexa-header-btn" title="Configurer dans Admin" disabled>📞 Script d'appel</button>
@@ -18939,6 +18943,7 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
     maurice: 'Maurice',
   };
   function currentHexaUser() {
+    try { if (window.HEXA_SESSION && window.HEXA_SESSION.user) return String(window.HEXA_SESSION.user); } catch(_) {}
     try { return (localStorage.getItem('hexa_user') || '').trim(); } catch(_) { return ''; }
   }
   function setHexaUser(key) {
@@ -18989,7 +18994,7 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
     });
     change.addEventListener('click', () => {
       menu.classList.remove('open');
-      showUserModal();
+      hexaLogout();
     });
     document.addEventListener('click', e => {
       if (!e.target.closest('#hexa-user-menu')) menu.classList.remove('open');
@@ -19177,7 +19182,8 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
           <span class="hexa-paris-clock-time" style="color:#ffffff;font-size:14px;font-weight:bold;font-variant-numeric:tabular-nums;letter-spacing:0.04em;">--:--:--</span>
         </div>
         <div class="pv-actions">
-          <button class="pv-btn pv-btn-ghost" id="pv-admin">⚙ Admin</button>
+          <button class="pv-btn pv-btn-ghost" id="pv-logout" title="Déconnexion">⎋ Déconnexion</button>
+      <button class="pv-btn pv-btn-ghost" id="pv-admin">⚙ Admin</button>
           <button class="pv-btn pv-btn-ghost" id="pv-regie">📊 Simulateur régie</button>
           <button class="pv-btn pv-btn-primary" id="pv-new">+ Nouveau</button>
         </div>
@@ -19422,6 +19428,8 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
     if(newBtn) newBtn.addEventListener('click', openNewProspect);
     const brand=document.getElementById('pv-brand-home');
     if(brand) brand.addEventListener('click', ()=>showProspects());
+    const logoutBtn=document.getElementById('pv-logout');
+    if(logoutBtn) logoutBtn.addEventListener('click', ()=>{ hexaLogout(); });
     const admBtn=document.getElementById('pv-admin');
     if(admBtn) admBtn.addEventListener('click', ()=>{ if(window.HexaAdmin) window.HexaAdmin.open(); });
     const regieBtn=document.getElementById('pv-regie');
@@ -20309,7 +20317,22 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
     if (!opts.skipHistory && location.pathname !== '/nouveau') history.pushState({view:'nouveau'}, '', '/nouveau');
   }
 
-  function init(){
+  async function hexaCheckSession(){
+    try { const r = await fetch('/api/auth/me', { cache:'no-store' }); if(!r.ok) return { authenticated:false }; return await r.json(); }
+    catch(_){ return { authenticated:false }; }
+  }
+  async function hexaLogout(){
+    try { await fetch('/api/auth/logout', { method:'POST' }); } catch(_){}
+    try { localStorage.removeItem('hexa_admin_unlocked'); } catch(_){}
+    window.location.replace('/login');
+  }
+  window.hexaLogout = hexaLogout;
+  async function init(){
+    const _s = await hexaCheckSession();
+    if (!_s || !_s.authenticated) { window.location.replace('/login'); return; }
+    window.HEXA_SESSION = { user: _s.user, role: _s.role };
+    try { localStorage.setItem('hexa_user', _s.user || ''); } catch(_){}
+    document.body.classList.toggle('hexa-role-commercial', _s.role !== 'admin');
     const view=buildView();
     if(view) document.body.appendChild(view);
     bindView(); renderRows();
@@ -20324,7 +20347,6 @@ body.hexa-view-prospects #hexa-user-menu{ display:none; }
     if(neu) neu.addEventListener('click', e=>{ e.preventDefault(); openNewProspect(); });
     bindIdentityBannerLive();
     updateIdentityBanner();
-    ensureUserSelected();
     bindSuiviCard();
     document.getElementById('hexa-atraiter-badge')?.addEventListener('click', function(){ showProspects(); const el=document.getElementById('atraiter-panel'); if(el) el.scrollIntoView({behavior:'smooth', block:'start'}); });
     pollATraiterBadge();
