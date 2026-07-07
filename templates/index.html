@@ -16923,6 +16923,111 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
       + '</div>'
       + '<div class="adm-actions"><button type="button" class="adm-btn-save" id="btn-save-marques">Enregistrer</button></div>';
   }
+  function renderUtilisateursSection(){
+    return `<div class="adm-card">
+      <div class="adm-cols">
+        <div class="adm-field"><span class="adm-lab">Identifiant</span><input type="text" class="adm-in" id="adm-user-username" placeholder="ex: joelle" autocomplete="off" autocapitalize="none"></div>
+        <div class="adm-field"><span class="adm-lab">Mot de passe initial</span><input type="password" class="adm-in" id="adm-user-password" autocomplete="new-password"></div>
+        <div class="adm-field"><span class="adm-lab">Rôle</span><select class="adm-in" id="adm-user-role"><option value="commercial">Commercial</option><option value="admin">Admin</option></select></div>
+      </div>
+      <div class="adm-actions"><button type="button" class="adm-btn-save" id="adm-user-create">Créer le compte</button></div>
+      <div class="adm-table-wrap" style="margin-top:14px;"><table class="adm-table"><thead><tr><th>Identifiant</th><th>Rôle</th><th>Statut</th><th>Créé le</th><th>Actions</th></tr></thead><tbody id="adm-users-list"><tr><td colspan="5">Chargement…</td></tr></tbody></table></div>
+      <p class="adm-section-help">Le dernier administrateur actif ne peut être ni désactivé ni supprimé. Les mots de passe ne sont jamais affichés.</p>
+    </div>`;
+  }
+  async function loadAdminUsers(){
+    const tb = document.getElementById('adm-users-list');
+    if(!tb) return;
+    try {
+      const r = await fetch('/api/admin/users', { cache:'no-store' });
+      if(!r.ok){ tb.innerHTML = '<tr><td colspan="5">Erreur de chargement ('+r.status+')</td></tr>'; return; }
+      const data = await r.json();
+      const users = (data && data.users) || [];
+      if(!users.length){ tb.innerHTML = '<tr><td colspan="5">Aucun compte.</td></tr>'; return; }
+      tb.innerHTML = users.map(function(u){
+        const actif = u.actif !== false;
+        const uname = adminEscape(u.username || '');
+        const roleLbl = u.role === 'admin' ? 'Admin' : 'Commercial';
+        const statut = actif ? '<b style="color:#0D6B3B;">Actif</b>' : '<b style="color:#B91C1C;">Inactif</b>';
+        const cree = u.cree_at ? adminEscape(String(u.cree_at).slice(0,10)) : '—';
+        return '<tr data-username="'+uname+'">'
+          + '<td>'+uname+'</td><td>'+roleLbl+'</td><td>'+statut+'</td><td>'+cree+'</td>'
+          + '<td><div class="adm-actions">'
+          + '<button type="button" class="adm-btn adm-btn-cancel adm-user-toggle" data-actif="'+(actif?'1':'0')+'">'+(actif?'Désactiver':'Réactiver')+'</button>'
+          + '<button type="button" class="adm-btn adm-btn-cancel adm-user-reset">Réinit. mdp</button>'
+          + '<button type="button" class="adm-btn adm-btn-danger adm-user-del">Supprimer</button>'
+          + '</div></td></tr>';
+      }).join('');
+    } catch(e){ tb.innerHTML = '<tr><td colspan="5">Erreur réseau.</td></tr>'; }
+  }
+  async function adminUserPost(url, body, okMsg){
+    try {
+      const r = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+      const b = await r.json().catch(function(){ return {}; });
+      if(!r.ok){ adminToast(b.detail || ('Erreur ('+r.status+')'), '#B91C1C', 6000); return; }
+      adminToast(okMsg, '#0D6B3B'); loadAdminUsers();
+    } catch(_){ adminToast('Erreur réseau', '#B91C1C'); }
+  }
+  function openResetPasswordModal(username){
+    document.getElementById('adm-reset-modal')?.remove();
+    const wrap = document.createElement('div');
+    wrap.id = 'adm-reset-modal';
+    wrap.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(16,32,64,.45);display:flex;align-items:center;justify-content:center;';
+    wrap.innerHTML = '<div style="background:#fff;border-radius:12px;padding:20px 22px;width:340px;max-width:92vw;box-shadow:0 10px 40px rgba(16,32,64,.18);">'
+      + '<div style="font-weight:700;color:#002E5A;margin-bottom:4px;">Réinitialiser le mot de passe</div>'
+      + '<div style="color:#64748B;font-size:13px;margin-bottom:12px;">Compte « ' + adminEscape(username) + ' »</div>'
+      + '<input type="password" id="adm-reset-pw" class="adm-in" placeholder="Nouveau mot de passe (6 min)" autocomplete="new-password" style="width:100%;">'
+      + '<div class="adm-actions" style="margin-top:16px;justify-content:flex-end;">'
+      + '<button type="button" class="adm-btn adm-btn-cancel" id="adm-reset-cancel">Annuler</button>'
+      + '<button type="button" class="adm-btn adm-btn-save" id="adm-reset-ok">Valider</button>'
+      + '</div></div>';
+    document.body.appendChild(wrap);
+    const input = document.getElementById('adm-reset-pw');
+    if(input) input.focus();
+    const close = function(){ wrap.remove(); };
+    document.getElementById('adm-reset-cancel')?.addEventListener('click', close);
+    wrap.addEventListener('click', function(e){ if(e.target === wrap) close(); });
+    document.getElementById('adm-reset-ok')?.addEventListener('click', async function(){
+      const pw = input ? input.value : '';
+      if(String(pw).length < 6){ adminToast('Mot de passe trop court (min 6)', '#B91C1C'); return; }
+      close();
+      await adminUserPost('/api/admin/users/'+encodeURIComponent(username)+'/reset-password', { password: pw }, 'Mot de passe réinitialisé ✓');
+    });
+  }
+  async function createAdminUser(){
+    const un = (document.getElementById('adm-user-username')?.value || '').trim();
+    const pw = document.getElementById('adm-user-password')?.value || '';
+    const role = document.getElementById('adm-user-role')?.value || 'commercial';
+    if(!un || !pw){ adminToast('Identifiant et mot de passe requis', '#B91C1C'); return; }
+    try {
+      const r = await fetch('/api/admin/users', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ username:un, password:pw, role:role }) });
+      const b = await r.json().catch(function(){ return {}; });
+      if(!r.ok){ adminToast(b.detail || ('Erreur ('+r.status+')'), '#B91C1C', 6000); return; }
+      adminToast('Compte « '+un+' » créé ✓', '#0D6B3B');
+      const uEl=document.getElementById('adm-user-username'); if(uEl) uEl.value='';
+      const pEl=document.getElementById('adm-user-password'); if(pEl) pEl.value='';
+      loadAdminUsers();
+    } catch(e){ adminToast('Erreur réseau', '#B91C1C'); }
+  }
+  async function onAdminUserAction(e){
+    const row = e.target.closest('tr[data-username]');
+    if(!row) return;
+    const uname = row.dataset.username;
+    if(e.target.closest('.adm-user-toggle')){
+      const actif = e.target.closest('.adm-user-toggle').dataset.actif === '1';
+      await adminUserPost('/api/admin/users/'+encodeURIComponent(uname)+'/active', { actif: !actif }, actif ? 'Compte désactivé' : 'Compte réactivé');
+    } else if(e.target.closest('.adm-user-reset')){
+      openResetPasswordModal(uname);
+    } else if(e.target.closest('.adm-user-del')){
+      if(!confirm('Supprimer définitivement le compte « '+uname+' » ?')) return;
+      try {
+        const r = await fetch('/api/admin/users/'+encodeURIComponent(uname), { method:'DELETE' });
+        const b = await r.json().catch(function(){ return {}; });
+        if(!r.ok){ adminToast(b.detail || ('Erreur ('+r.status+')'), '#B91C1C', 6000); return; }
+        adminToast('Compte supprimé ✓', '#0D6B3B'); loadAdminUsers();
+      } catch(_){ adminToast('Erreur réseau', '#B91C1C'); }
+    }
+  }
   function admBloc(id, title, content){
     return `<div class="adm-bloc" data-bloc-id="${id}" data-open="false">
       <div class="adm-bloc-header" data-toggle-bloc="${id}">
@@ -17456,7 +17561,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
       <div class="adm-add-row"><button type="button" class="adm-btn adm-btn-add" id="adm-add">+ Ajouter une pompe à chaleur</button></div>
       <div class="adm-legend"><div class="adm-legend-row"><span class="adm-dot adm-dot1"></span><span>Option 1 — vente directe : marge brute − CAC − visite − COFRAC − urbanisme.</span></div><div class="adm-legend-row"><span class="adm-dot adm-dot2"></span><span>Option 2 — prix de cession : marge garantie au-dessus de (coût + visite + COFRAC + urbanisme). La régie revend au-dessus et garde le surplus ; la colonne « Commission régie » montre ce qu'elle gagne si elle revend à ton prix catalogue.</span></div><div class="adm-legend-row"><span>Marges théoriques — calculées sur un MPR forfaitaire de 5 000 € (estimation commune à tous les modèles), pas un calcul réel par prospect.</span></div></div>
       <div class="adm-actions"><button type="button" class="adm-btn-save" id="adm-save-catalogue">Enregistrer</button></div>`;
-    const adminBody = `${admBloc('1','1. Réglages généraux',admSousBloc('1-1','1.1 Coût Hexa',coutHexa)+admSousBloc('1-2','1.2 Vente Hexa',venteHexa))}${admBloc('2','2. MPR',admSousBloc('2-1','2.1 Forfait MPR',renderMprFields())+admSousBloc('2-2','2.2 Plafonds réglementaires',renderPlafondsSection())+admSousBloc('2-3','2.3 Barèmes ANAH (plafonds RFR)',renderBaremesAnahSection()))}${admBloc('3','3. CEE',admSousBloc('3-1','3.1 Formule BAR-TH-171 (PAC Air-Eau)',renderFormuleBarSection())+admSousBloc('3-2','3.2 Bonification CEE',renderBonificationFields())+admSousBloc('3-3','3.3 Délégataires CEE',renderDelegatairesFields()))}${admBloc('4','4. Sous-traitants',renderSousTraitantsSection())}${admBloc('5','5. Commercial',admSousBloc('5-1','5.1 Options commerciales',optionsCommerciales)+admSousBloc('5-2','5.2 Modèles et marges nettes',modelesMarges)+admSousBloc('5-3','5.3 Ballon thermodynamique',renderBallonThermoFields()))}${admBloc('6','6. Modèles email',renderEmailsFields())}${admBloc('7','7. Corbeille des leads','<div id="adm-trash" class="adm-trash-empty">Chargement...</div>')}${admBloc('8','8. Paramètres économiques',admSousBloc('8-1',"8.1 Hypothèses économie d'énergie",renderParamsEcoEnergie())+admSousBloc('8-2','8.2 Hypothèses financement',renderParamsFinancement()))}${admBloc('9','9. Gammes & Marques', renderMarquesSection())}`;
+    const adminBody = `${admBloc('1','1. Réglages généraux',admSousBloc('1-1','1.1 Coût Hexa',coutHexa)+admSousBloc('1-2','1.2 Vente Hexa',venteHexa))}${admBloc('2','2. MPR',admSousBloc('2-1','2.1 Forfait MPR',renderMprFields())+admSousBloc('2-2','2.2 Plafonds réglementaires',renderPlafondsSection())+admSousBloc('2-3','2.3 Barèmes ANAH (plafonds RFR)',renderBaremesAnahSection()))}${admBloc('3','3. CEE',admSousBloc('3-1','3.1 Formule BAR-TH-171 (PAC Air-Eau)',renderFormuleBarSection())+admSousBloc('3-2','3.2 Bonification CEE',renderBonificationFields())+admSousBloc('3-3','3.3 Délégataires CEE',renderDelegatairesFields()))}${admBloc('4','4. Sous-traitants',renderSousTraitantsSection())}${admBloc('5','5. Commercial',admSousBloc('5-1','5.1 Options commerciales',optionsCommerciales)+admSousBloc('5-2','5.2 Modèles et marges nettes',modelesMarges)+admSousBloc('5-3','5.3 Ballon thermodynamique',renderBallonThermoFields()))}${admBloc('6','6. Modèles email',renderEmailsFields())}${admBloc('7','7. Corbeille des leads','<div id="adm-trash" class="adm-trash-empty">Chargement...</div>')}${admBloc('8','8. Paramètres économiques',admSousBloc('8-1',"8.1 Hypothèses économie d'énergie",renderParamsEcoEnergie())+admSousBloc('8-2','8.2 Hypothèses financement',renderParamsFinancement()))}${admBloc('9','9. Gammes & Marques', renderMarquesSection())}${admBloc('10','10. Utilisateurs', renderUtilisateursSection())}`;
     return `
       <div class="adm-overlay" id="adm-overlay">
         <div class="adm-modal">
@@ -18006,6 +18111,9 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
       btn.addEventListener('click', ()=>{ openFichePicker(+btn.dataset.i); });
     });
     refreshGammesState().then(refreshFichesState);
+    loadAdminUsers();
+    document.getElementById('adm-user-create')?.addEventListener('click', createAdminUser);
+    document.getElementById('adm-users-list')?.addEventListener('click', onAdminUserAction);
     // bouton "Simuler" -> déplie le curseur de surplus pour la ligne
     document.querySelectorAll('.adm-sim-btn').forEach(btn=>{
       btn.addEventListener('click', ()=>{ toggleSim(+btn.dataset.sim, false); });
