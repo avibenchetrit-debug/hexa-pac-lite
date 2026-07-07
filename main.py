@@ -3370,6 +3370,10 @@ def _build_devis_context(request: Request, numero: str, version: int | None = No
                 "mode": _mode,
                 "duree_vie_pac_ans": _duree_vie,
             }
+    # Interrupteur par lead : décocher masque le bloc éco/ROI (devis + pré-devis + e-mail).
+    # Absent ou True → affiché (rétrocompat) ; seul False explicite masque.
+    if state.get("afficher_apercu") is False:
+        projet_apercu = None
     context["projet_apercu"] = projet_apercu
     return context
 

@@ -15223,6 +15223,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
       surface_chauffee: state.surface_chauffee || '',
       option: state.option || '',
       niveau_actif: state.niveau_actif || 'recommande',
+      afficher_apercu: state.afficher_apercu !== false,
       ballon_ref: state.ballon_ref || '',
       // Éco 20 ans (roi()) : incluses uniquement si lastRoi existe, sinon clés omises
       // pour ne pas écraser une valeur déjà persistée (merge côté backend).
@@ -15273,6 +15274,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
       if (saved.surface_chauffee) { state.surface_chauffee = Number(saved.surface_chauffee); state.surface_forcee = true; }
       if (saved.option) state.option = saved.option;
       if (saved.niveau_actif) state.niveau_actif = saved.niveau_actif;
+      state.afficher_apercu = (saved.afficher_apercu !== false);
       if (saved.ballon_ref) state.ballon_ref = saved.ballon_ref;
       state.modele_force = !!saved.modele_pac_id;
     } catch(e) {
@@ -15949,6 +15951,10 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
             ${explicationCalcul(c, r, energieLbl)}
           </div>
         </div>
+        <label class="sim-apercu-toggle" style="display:flex;align-items:center;gap:8px;margin:10px 0 6px;font-size:13px;cursor:pointer;user-select:none;">
+          <input type="checkbox" id="sim-afficher-apercu" ${state.afficher_apercu !== false ? 'checked' : ''} style="width:16px;height:16px;flex:0 0 auto;cursor:pointer;">
+          <span>Afficher les économies et le ROI sur le devis/pré-devis</span>
+        </label>
         <button type="button" id="btn-voir-devis" class="cta-primary-large">📄 Voir le devis</button>`;
   }
 
@@ -16050,6 +16056,15 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
       btn.addEventListener('click',()=>{ state.option=btn.dataset.opt; scheduleSaveSimulatorState(); refresh(); });
     });
     document.getElementById('btn-voir-devis')?.addEventListener('click', ouvrirModalDevis);
+    if (!window.__apercuToggleDelegated){
+      window.__apercuToggleDelegated = true;
+      document.addEventListener('change', (e)=>{
+        if (e.target && e.target.id === 'sim-afficher-apercu'){
+          state.afficher_apercu = e.target.checked;
+          scheduleSaveSimulatorState();
+        }
+      });
+    }
     // bulles info : délégation (survit aux patch de #sim-dynamic)
     bindInfoDelegation();
   }
