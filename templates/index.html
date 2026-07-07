@@ -7354,6 +7354,14 @@ input:focus{ outline:none; border-color: var(--c-navy,#002E5A); box-shadow:0 0 0
 .adm-ref{ text-align:left !important; font-weight:700; color: var(--c-navy,#002E5A); }
 .adm-ref small{ display:block; font-weight:400; color: var(--c-subtle,#9CA3AF); font-size:10px; }
 .adm-in{ width:84px; border:1px solid var(--c-line,#E2E8F0); border-radius:6px; padding:6px 7px; font-size:13px; font-weight:700; text-align:right; color: var(--c-navy,#002E5A); font-family:inherit; }
+.adm-user-in{ border:1px solid var(--c-line,#E2E8F0); border-radius:7px; padding:8px 10px; font-size:14px; font-family:inherit; color:#1A2233; }
+.adm-user-in:focus{ border-color:#002E5A; outline:none; }
+.adm-user-form{ display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap; margin-bottom:6px; }
+.adm-user-field{ display:flex; flex-direction:column; gap:4px; }
+.adm-user-field .adm-user-in{ min-width:160px; }
+.adm-pw-wrap{ display:flex; align-items:stretch; }
+.adm-pw-wrap .adm-user-in{ border-top-right-radius:0; border-bottom-right-radius:0; }
+.adm-pw-eye{ border:1px solid var(--c-line,#E2E8F0); border-left:0; border-radius:0 7px 7px 0; background:#F4F8FC; cursor:pointer; padding:0 10px; font-size:14px; }
 .adm-calc{ color: var(--c-muted,#4A5568); }
 .adm-strong{ font-weight:700; color: var(--c-ink,#1A2233); }
 .adm-calc small, .adm-net small{ display:block; font-weight:400; color: var(--c-subtle,#9CA3AF); font-size:10px; }
@@ -16923,14 +16931,25 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
       + '</div>'
       + '<div class="adm-actions"><button type="button" class="adm-btn-save" id="btn-save-marques">Enregistrer</button></div>';
   }
+  function bindPwEyes(root){
+    (root || document).querySelectorAll('.adm-pw-eye').forEach(function(btn){
+      if(btn.dataset.bound) return; btn.dataset.bound = '1';
+      btn.addEventListener('click', function(){
+        const inp = document.getElementById(btn.dataset.target);
+        if(!inp) return;
+        inp.type = inp.type === 'password' ? 'text' : 'password';
+        btn.textContent = inp.type === 'password' ? '👁' : '🙈';
+      });
+    });
+  }
   function renderUtilisateursSection(){
     return `<div class="adm-card">
-      <div class="adm-cols">
-        <div class="adm-field"><span class="adm-lab">Identifiant</span><input type="text" class="adm-in" id="adm-user-username" placeholder="ex: joelle" autocomplete="off" autocapitalize="none"></div>
-        <div class="adm-field"><span class="adm-lab">Mot de passe initial</span><input type="password" class="adm-in" id="adm-user-password" autocomplete="new-password"></div>
-        <div class="adm-field"><span class="adm-lab">Rôle</span><select class="adm-in" id="adm-user-role"><option value="commercial">Commercial</option><option value="admin">Admin</option></select></div>
+      <div class="adm-user-form">
+        <div class="adm-user-field"><span class="adm-lab">Identifiant</span><input type="text" class="adm-user-in" id="adm-user-username" placeholder="ex: joelle" autocomplete="off" autocapitalize="none" spellcheck="false"></div>
+        <div class="adm-user-field"><span class="adm-lab">Mot de passe initial</span><span class="adm-pw-wrap"><input type="password" class="adm-user-in" id="adm-user-password" autocomplete="new-password"><button type="button" class="adm-pw-eye" data-target="adm-user-password" title="Afficher / masquer">👁</button></span></div>
+        <div class="adm-user-field"><span class="adm-lab">Rôle</span><select class="adm-user-in" id="adm-user-role"><option value="commercial">Commercial</option><option value="admin">Admin</option></select></div>
+        <button type="button" class="adm-btn-save" id="adm-user-create">Créer</button>
       </div>
-      <div class="adm-actions"><button type="button" class="adm-btn-save" id="adm-user-create">Créer le compte</button></div>
       <div class="adm-table-wrap" style="margin-top:14px;"><table class="adm-table"><thead><tr><th>Identifiant</th><th>Rôle</th><th>Statut</th><th>Créé le</th><th>Actions</th></tr></thead><tbody id="adm-users-list"><tr><td colspan="5">Chargement…</td></tr></tbody></table></div>
       <p class="adm-section-help">Le dernier administrateur actif ne peut être ni désactivé ni supprimé. Les mots de passe ne sont jamais affichés.</p>
     </div>`;
@@ -16976,7 +16995,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     wrap.innerHTML = '<div style="background:#fff;border-radius:12px;padding:20px 22px;width:340px;max-width:92vw;box-shadow:0 10px 40px rgba(16,32,64,.18);">'
       + '<div style="font-weight:700;color:#002E5A;margin-bottom:4px;">Réinitialiser le mot de passe</div>'
       + '<div style="color:#64748B;font-size:13px;margin-bottom:12px;">Compte « ' + adminEscape(username) + ' »</div>'
-      + '<input type="password" id="adm-reset-pw" class="adm-in" placeholder="Nouveau mot de passe (6 min)" autocomplete="new-password" style="width:100%;">'
+      + '<span class="adm-pw-wrap"><input type="password" id="adm-reset-pw" class="adm-user-in" placeholder="Nouveau mot de passe (6 min)" autocomplete="new-password" style="flex:1;"><button type="button" class="adm-pw-eye" data-target="adm-reset-pw" title="Afficher / masquer">👁</button></span>'
       + '<div class="adm-actions" style="margin-top:16px;justify-content:flex-end;">'
       + '<button type="button" class="adm-btn adm-btn-cancel" id="adm-reset-cancel">Annuler</button>'
       + '<button type="button" class="adm-btn adm-btn-save" id="adm-reset-ok">Valider</button>'
@@ -16984,6 +17003,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     document.body.appendChild(wrap);
     const input = document.getElementById('adm-reset-pw');
     if(input) input.focus();
+    bindPwEyes(wrap);
     const close = function(){ wrap.remove(); };
     document.getElementById('adm-reset-cancel')?.addEventListener('click', close);
     wrap.addEventListener('click', function(e){ if(e.target === wrap) close(); });
@@ -18114,6 +18134,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     loadAdminUsers();
     document.getElementById('adm-user-create')?.addEventListener('click', createAdminUser);
     document.getElementById('adm-users-list')?.addEventListener('click', onAdminUserAction);
+    bindPwEyes(document);
     // bouton "Simuler" -> déplie le curseur de surplus pour la ligne
     document.querySelectorAll('.adm-sim-btn').forEach(btn=>{
       btn.addEventListener('click', ()=>{ toggleSim(+btn.dataset.sim, false); });
