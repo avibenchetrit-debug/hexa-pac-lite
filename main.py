@@ -61,6 +61,8 @@ ECHANGES_PATH = os.path.join(DATA_DIR, "echanges.json")
 DELEGATAIRES_PATH = os.path.join(DATA_DIR, "delegataires.json")
 MODELES_EMAIL_PATH = os.path.join(DATA_DIR, "modeles_email.json")
 PARAMETRES_ADMIN_PATH = os.path.join(DATA_DIR, "parametres_admin.json")
+# users.json HORS de DATA_DIR -> exclu du backup GitHub (qui archive DATA_DIR). Chemin configurable.
+USERS_PATH = os.environ.get("USERS_PATH", os.path.join(BASE_DIR, "auth", "users.json"))
 COUNTERS_PATH = os.path.join(DATA_DIR, "counters.json")
 DEVIS_ENVOYES_PATH = os.path.join(DATA_DIR, "devis_envoyes.json")
 STATES_SIMULATEUR_DIR = os.path.join(DATA_DIR, "states_simulateur")
@@ -288,6 +290,102 @@ def _sign_devis_token(numero: str) -> str:
 def _verify_devis_token(numero: str, token: str) -> bool:
     import hmac as _hmac
     return _hmac.compare_digest(token, _sign_devis_token(numero))
+
+
+# ============ AUTHENTIFICATION (Lot 0 : fondations, SANS enforcement) ============
+SESSION_COOKIE = "hexa_session"
+SESSION_TTL_SECONDS = int(os.environ.get("SESSION_TTL_SECONDS", str(12 * 3600)))
+
+
+def _session_secret() -> bytes:
+    # Lot 4 rendra SESSION_SECRET obligatoire ; fallback provisoire sur le secret admin.
+    return (os.environ.get("SESSION_SECRET") or "").encode("utf-8") or _admin_secret()
+
+
+def _hash_password(password: str, salt: bytes = None) -> str:
+    if salt is None:
+        salt = os.urandom(16)
+    dk = hashlib.scrypt(password.encode("utf-8"), salt=salt, n=2 ** 14, r=8, p=1, dklen=32)
+    return "scrypt$" + base64.b64encode(salt).decode("ascii") + "$" + base64.b64encode(dk).decode("ascii")
+
+
+def _verify_password(password: str, stored: str) -> bool:
+    try:
+        algo, salt_b64, dk_b64 = str(stored or "").split("$", 2)
+        if algo != "scrypt":
+            return False
+        salt = base64.b64decode(salt_b64)
+        expected = base64.b64decode(dk_b64)
+        dk = hashlib.scrypt(password.encode("utf-8"), salt=salt, n=2 ** 14, r=8, p=1, dklen=len(expected))
+        return hmac.compare_digest(dk, expected)
+    except Exception:
+        return False
+
+
+def _read_users() -> list:
+    data = _read_json(USERS_PATH, [])
+    return data if isinstance(data, list) else []
+
+
+def _write_users(users: list) -> None:
+    os.makedirs(os.path.dirname(USERS_PATH) or ".", exist_ok=True)
+    _atomic_write_json(USERS_PATH, users)
+
+
+def _find_user(username: str):
+    u = str(username or "").strip().lower()
+    for user in _read_users():
+        if str(user.get("username", "")).strip().lower() == u and user.get("actif", True):
+            return user
+    return None
+
+
+def _ensure_bootstrap_admin() -> None:
+    """Seed un admin depuis l'env si users.json est vide (break-glass : jamais verrouille dehors)."""
+    if _read_users():
+        return
+    bu = str(os.environ.get("ADMIN_BOOTSTRAP_USER") or "").strip().lower()
+    bp = os.environ.get("ADMIN_BOOTSTRAP_PASSWORD") or ""
+    if not bu or not bp:
+        return
+    _write_users([{
+        "id": bu, "username": bu, "password_hash": _hash_password(bp),
+        "role": "admin", "actif": True, "cree_at": _now_iso(), "visibilite": "tous",
+    }])
+
+
+def _sign_session(user_id: str, role: str, issued_at: int) -> str:
+    payload = f"{user_id}:{role}:{issued_at}"
+    sig = hmac.new(_session_secret(), payload.encode("utf-8"), hashlib.sha256).hexdigest()
+    return f"{payload}:{sig}"
+
+
+def _verify_session(token: str):
+    try:
+        parts = str(token or "").split(":")
+        if len(parts) != 4:
+            return None
+        user_id, role, issued_at, sig = parts
+        payload = f"{user_id}:{role}:{issued_at}"
+        expected = hmac.new(_session_secret(), payload.encode("utf-8"), hashlib.sha256).hexdigest()
+        if not hmac.compare_digest(sig, expected):
+            return None
+        if (time.time() - int(issued_at)) > SESSION_TTL_SECONDS:
+            return None
+        return {"user_id": user_id, "role": role}
+    except Exception:
+        return None
+
+
+def current_user(request: Request):
+    """Renvoie {username, role} si session valide, sinon None. NON bloquant (Lot 0)."""
+    sess = _verify_session(request.cookies.get(SESSION_COOKIE) or "")
+    if not sess:
+        return None
+    user = _find_user(sess["user_id"])
+    if not user:
+        return None
+    return {"username": user.get("username"), "role": user.get("role", "commercial")}
 
 
 def _public_devis_url(request: Request, numero: str) -> str:
@@ -2781,6 +2879,35 @@ async def purge_echanges_orphelins(request: Request) -> JSONResponse:
         "nb_supprimes": len(orphelins) if confirm else 0,
         "nb_restants": len(echanges),
     })
+
+
+@app.post("/api/auth/login")
+async def auth_login(request: Request, response: Response):
+    _ensure_bootstrap_admin()
+    payload = await _read_request_payload(request)
+    username = str(payload.get("username") or "").strip().lower()
+    password = str(payload.get("password") or "")
+    user = _find_user(username)
+    if not user or not _verify_password(password, str(user.get("password_hash", ""))):
+        raise HTTPException(status_code=401, detail="Identifiant ou mot de passe incorrect")
+    token = _sign_session(user.get("username"), user.get("role", "commercial"), int(time.time()))
+    _secure = os.environ.get("COOKIE_SECURE", "1") != "0"
+    response.set_cookie(SESSION_COOKIE, token, httponly=True, secure=_secure, samesite="lax", max_age=SESSION_TTL_SECONDS, path="/")
+    return {"ok": True, "user": user.get("username"), "role": user.get("role", "commercial")}
+
+
+@app.post("/api/auth/logout")
+async def auth_logout(response: Response):
+    response.delete_cookie(SESSION_COOKIE, path="/")
+    return {"ok": True}
+
+
+@app.get("/api/auth/me")
+async def auth_me(request: Request):
+    u = current_user(request)
+    if not u:
+        return {"authenticated": False}
+    return {"authenticated": True, "user": u["username"], "role": u["role"]}
 
 
 @app.post("/api/admin/auth")
