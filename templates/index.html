@@ -17324,17 +17324,19 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     const wrap=document.createElement('div'); wrap.id='modal-import-xlsx'; wrap.className='devis-modal-overlay';
     const warns=(data.warnings||[]);
     const warnHtml = warns.length ? `<div style="margin:10px 0;padding:10px;background:#FEF2F2;border:1px solid #FCA5A5;border-radius:8px;color:#B91C1C;font-size:13px"><b>${warns.length} avertissement(s) :</b><ul style="margin:6px 0 0;padding-left:18px">${warns.map(w=>'<li>'+adminEscape(w)+'</li>').join('')}</ul></div>` : '';
-    const rows=(data.modeles||[]).map(m=>`<tr><td>${adminEscape(m.ref)}</td><td>${adminEscape(m.nom)}</td><td>${adminEscape(m.usage)}</td><td>${adminEscape(m.alim)}</td><td style="text-align:right">${m.specs}</td></tr>`).join('');
+    const rows=(data.modeles||[]).map(m=>`<tr><td style="padding:6px 10px;border-bottom:1px solid #F1F5F9">${adminEscape(m.ref)}</td><td style="padding:6px 10px;border-bottom:1px solid #F1F5F9">${adminEscape(m.nom)}</td><td style="padding:6px 10px;border-bottom:1px solid #F1F5F9">${adminEscape(m.usage)}</td><td style="padding:6px 10px;border-bottom:1px solid #F1F5F9">${adminEscape(m.alim)}</td><td style="padding:6px 10px;border-bottom:1px solid #F1F5F9;text-align:right">${m.specs}</td></tr>`).join('');
     wrap.innerHTML=`
-      <div class="devis-modal-box" style="max-width:760px;height:auto">
+      <div class="devis-modal-box" style="max-width:900px;width:90vw;height:auto;max-height:88vh">
         <div class="devis-modal-head"><div class="devis-modal-title">Import catalogue — prévisualisation</div><button type="button" class="devis-close-btn" aria-label="Fermer">×</button></div>
-        <div class="devis-modal-body" style="padding:18px;display:block;overflow:auto">
-          <p style="font-size:14px;color:#002E5A"><b>${data.count}</b> modèle(s) importés — <b>remplaceront TOUT le catalogue actuel</b>.</p>
-          ${warnHtml}
-          <table style="width:100%;border-collapse:collapse;font-size:13px;margin-top:8px">
-            <thead><tr style="text-align:left;color:#64748B;border-bottom:1px solid #E2E8F0"><th>Réf</th><th>Nom</th><th>Usage</th><th>Alim</th><th style="text-align:right">Specs</th></tr></thead>
-            <tbody>${rows}</tbody>
-          </table>
+        <div class="devis-modal-body" style="padding:18px;display:flex;flex-direction:column;min-height:0;overflow:hidden">
+          <p style="font-size:14px;color:#002E5A;flex:0 0 auto;margin:0 0 8px"><b>${data.count}</b> modèle(s) importés — <b>remplaceront TOUT le catalogue actuel</b>.</p>
+          <div style="flex:0 0 auto">${warnHtml}</div>
+          <div style="flex:1 1 auto;min-height:0;overflow:auto;border:1px solid #E2E8F0;border-radius:8px;background:#fff">
+            <table style="width:100%;border-collapse:collapse;font-size:13px">
+              <thead><tr style="text-align:left;color:#64748B;position:sticky;top:0;background:#fff;box-shadow:inset 0 -1px 0 #E2E8F0"><th style="padding:8px 10px">Réf</th><th style="padding:8px 10px">Nom</th><th style="padding:8px 10px">Usage</th><th style="padding:8px 10px">Alim</th><th style="padding:8px 10px;text-align:right">Specs</th></tr></thead>
+              <tbody>${rows}</tbody>
+            </table>
+          </div>
         </div>
         <div class="devis-modal-foot" style="gap:8px">
           <button type="button" class="adm-btn adm-btn-cancel" id="imp-cancel">Annuler</button>
