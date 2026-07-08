@@ -202,7 +202,7 @@ DEFAULT_PARAMS_FINANCEMENT = {
 
 DEFAULT_PARAMETRES_ADMIN = {
     "relances": {"max": 6, "niveaux_jours": [3, 7, 14, 30, 60, 90]},
-    "relances_nrp": {"max": 3, "niveaux_jours": [1, 3, 7]},
+    "relances_nrp": {"max": 4, "niveaux_jours": [2, 6, 12, 21]},
     "params": {
         "pose": 3500,
         "acc": 550,
@@ -2125,6 +2125,13 @@ async def update_lead_vt(numero: str, request: Request) -> JSONResponse:
     })
 
 
+def _promote_statut_rappeler(lead, now):
+    """NRP : Nouveau -> "À rappeler" (statut ELIGIBLE aux relances). Ne régresse pas les leads avancés."""
+    if _normalize_statut(lead.get("statut", "")) == "nouveau":
+        lead["statut"] = "rappeler"
+        lead["statut_updated_at"] = now
+
+
 def _nrp_event(numero, payload):
     """NRP-EVENT : NRP manuel => echange appel/nrp + compteur + auto-rappel
     lendemain + bascule 'injoignable' si les 3 plafonds canal sont atteints.
@@ -2153,10 +2160,7 @@ def _nrp_event(numero, payload):
     lead["nrp_log"] = nrp_log
     lead["nrp_count"] = len(nrp_log)
     lead["nrp_updated_at"] = now
-    # NRP : Nouveau -> "À rappeler" (statut ELIGIBLE aux relances ; seuls signe/perdu arretent).
-    if _normalize_statut(lead.get("statut", "")) == "nouveau":
-        lead["statut"] = "rappeler"
-        lead["statut_updated_at"] = now
+    _promote_statut_rappeler(lead, now)
 
     # c. auto-rappel lendemain (archive l'ancien rappel s'il existe).
     ancien = lead.get("rappel")
@@ -2229,6 +2233,7 @@ async def update_lead_nrp(numero: str, request: Request) -> JSONResponse:
     leads[index]["nrp_log"] = nrp_log
     leads[index]["nrp_count"] = raw_count
     leads[index]["nrp_updated_at"] = _now_paris_iso()
+    _promote_statut_rappeler(leads[index], leads[index]["nrp_updated_at"])
     leads[index]["updated_at"] = _now_iso()
     _atomic_write_json(LEADS_PATH, leads)
     return JSONResponse({"success": True, "nrp_count": raw_count})
