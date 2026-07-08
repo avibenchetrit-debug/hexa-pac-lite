@@ -2153,6 +2153,10 @@ def _nrp_event(numero, payload):
     lead["nrp_log"] = nrp_log
     lead["nrp_count"] = len(nrp_log)
     lead["nrp_updated_at"] = now
+    # NRP : Nouveau -> "À rappeler" (statut ELIGIBLE aux relances ; seuls signe/perdu arretent).
+    if _normalize_statut(lead.get("statut", "")) == "nouveau":
+        lead["statut"] = "rappeler"
+        lead["statut_updated_at"] = now
 
     # c. auto-rappel lendemain (archive l'ancien rappel s'il existe).
     ancien = lead.get("rappel")
