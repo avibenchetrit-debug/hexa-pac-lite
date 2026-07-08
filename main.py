@@ -116,6 +116,12 @@ DEFAULT_RELANCE_MESSAGES = {
 }
 
 
+DEFAULT_RELANCE_NRP = {
+    "sujet": "Votre projet de pompe à chaleur — Hexa Rénov'",
+    "contenu": "Bonjour {prenom},\n\nNous avons essayé de vous joindre au sujet de votre projet de pompe à chaleur, sans succès pour le moment.\n\nRien d'urgent : nous restons à votre disposition pour en discuter quand vous le souhaitez. Un simple retour à cet email suffit, ou rappelez-nous directement — nous serons ravis d'échanger avec vous.\n\nÀ très vite,\nL'équipe Hexa-Rénov'",
+}
+
+
 DEFAULT_SOUS_TRAITANTS = [
     {
         "id": "italisol",
@@ -195,6 +201,7 @@ DEFAULT_PARAMS_FINANCEMENT = {
 
 DEFAULT_PARAMETRES_ADMIN = {
     "relances": {"max": 6, "niveaux_jours": [3, 7, 14, 30, 60, 90]},
+    "relances_nrp": {"max": 3, "niveaux_jours": [1, 3, 7]},
     "params": {
         "pose": 3500,
         "acc": 550,
@@ -4034,6 +4041,46 @@ def _email_relance_html(prenom, message_html, lien_devis, pre_devis=False):
 </body></html>"""
 
 
+def _email_relance_nrp_html(message_html, telephone):
+    tel_raw = str(telephone).replace(" ", "")
+    return f"""<!DOCTYPE html><html><head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background:#eef1f5;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#eef1f5;padding:24px 0;"><tr><td align="center">
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="width:600px;max-width:600px;background:#ffffff;border-radius:12px;overflow:hidden;font-family:Arial,Helvetica,sans-serif;">
+{_email_header_html()}
+<tr><td style="padding:32px 32px 0 32px;">
+<div style="color:#E2214B;font-size:13px;font-weight:bold;text-transform:uppercase;letter-spacing:0.04em;">Votre projet Hexa Rénov'</div>
+<div style="color:#4A5567;font-size:15px;line-height:1.7;margin-top:14px;">{message_html}</div>
+</td></tr>
+<tr><td style="padding:24px 32px 8px 32px;text-align:center;">
+<a href="tel:{tel_raw}" style="display:inline-block;color:#002E5A;font-size:28px;font-weight:bold;text-decoration:none;letter-spacing:0.02em;">{telephone}</a>
+<div style="color:#8A92A0;font-size:12px;margin-top:8px;">Appelez-nous ou répondez simplement à cet email</div>
+</td></tr>
+<tr><td style="padding:18px 32px 8px 32px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+<td style="text-align:center;padding:0 6px;"><div style="font-size:22px;">🛡️</div><div style="color:#4A5567;font-size:11px;font-weight:bold;margin-top:4px;">Certifié RGE</div></td>
+<td style="text-align:center;padding:0 6px;"><div style="font-size:22px;">🤝</div><div style="color:#4A5567;font-size:11px;font-weight:bold;margin-top:4px;">Aides incluses</div></td>
+<td style="text-align:center;padding:0 6px;"><div style="font-size:22px;">⚡</div><div style="color:#4A5567;font-size:11px;font-weight:bold;margin-top:4px;">Réponse 24h</div></td>
+<td style="text-align:center;padding:0 6px;"><div style="font-size:22px;">📍</div><div style="color:#4A5567;font-size:11px;font-weight:bold;margin-top:4px;">France Rénov'</div></td>
+</tr></table>
+</td></tr>
+<tr><td style="padding:24px 32px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#002E5A;border-radius:10px;"><tr><td style="padding:28px 24px;text-align:center;">
+<div style="color:#ffffff;font-size:18px;font-weight:bold;">Une maison à rénover entièrement ?</div>
+<div style="color:#9fb8d4;font-size:13px;margin-top:6px;">Un seul interlocuteur. Des aides cumulées. Plus d'économies.</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:18px;"><tr>
+<td style="width:33%;padding:4px;vertical-align:top;"><div style="background:#ffffff;border-radius:10px;height:96px;text-align:center;"><div style="padding-top:18px;font-size:30px;">🧱</div><div style="color:#002E5A;font-size:13px;font-weight:bold;margin-top:6px;">Isolation</div></div></td>
+<td style="width:33%;padding:4px;vertical-align:top;"><div style="background:#ffffff;border-radius:10px;height:96px;text-align:center;"><div style="padding-top:18px;font-size:30px;">❄️</div><div style="color:#002E5A;font-size:13px;font-weight:bold;margin-top:6px;">Climatisation</div></div></td>
+<td style="width:33%;padding:4px;vertical-align:top;"><div style="background:#ffffff;border-radius:10px;height:96px;text-align:center;"><div style="padding-top:18px;font-size:30px;">🏠</div><div style="color:#002E5A;font-size:13px;font-weight:bold;margin-top:6px;">Rénovation globale</div></div></td>
+</tr></table>
+</td></tr></table>
+</td></tr>
+{_email_footer_html()}
+</table>
+</td></tr></table>
+</body></html>"""
+
+
 def _email_notedim_html(prenom, specs, lien_notedim):
     def _v(x):
         return x if x not in (None, "") else "—"
@@ -4315,6 +4362,137 @@ def _send_relance(numero: str, version: int, request: Request) -> dict:
     )
     _atomic_write_json(NOTES_PATH, notes)
     return {"ok": True, "niveau": niveau, "resend_id": result.get("id") if isinstance(result, dict) else ""}
+
+
+_nrp_relance_lock = threading.Lock()
+
+
+def _relance_nrp_config():
+    p = load_parametres_admin()
+    cfg = p.get("relances_nrp") if isinstance(p.get("relances_nrp"), dict) else {}
+    niveaux = cfg.get("niveaux_jours")
+    if not isinstance(niveaux, list) or not niveaux:
+        niveaux = DEFAULT_PARAMETRES_ADMIN["relances_nrp"]["niveaux_jours"]
+    maxr = int(float_value(cfg.get("max"), DEFAULT_PARAMETRES_ADMIN["relances_nrp"]["max"]))
+    return {"max": maxr, "niveaux_jours": [int(float_value(x, 0)) for x in niveaux]}
+
+
+def _relances_nrp_a_faire(today):
+    cfg = _relance_nrp_config()
+    niveaux = cfg["niveaux_jours"]
+    maxr = cfg["max"]
+    meta = _read_devis_meta()
+    out = []
+    for lead in _read_leads():
+        if _is_deleted(lead):
+            continue
+        numero = str(lead.get("numero") or "").strip()
+        if not numero:
+            continue
+        statut = _normalize_statut(lead.get("statut", ""))
+        if statut in ("signe", "perdu"):
+            continue
+        nrp_count = int(lead.get("nrp_count") or 0)
+        if nrp_count < 1 and statut not in ("rappeler", "injoignable"):
+            continue
+        email_to = str(lead.get("email") or "").strip()
+        if not email_to:
+            continue
+        if meta.get(numero) or str(lead.get("date_envoi_devis") or "").strip():
+            continue
+        base_dt = _parse_paris_dt(lead.get("nrp_updated_at"))
+        if base_dt is None:
+            continue
+        rep = _dernier_repondu(numero)
+        rep_dt = _parse_paris_dt(rep) if rep else None
+        if rep_dt is not None and rep_dt > base_dt:
+            continue
+        rc = int(lead.get("nrp_relance_count") or 0)
+        if rc >= maxr or rc >= len(niveaux):
+            continue
+        jours = (today - base_dt.date()).days
+        if jours < int(niveaux[rc]):
+            continue
+        out.append({
+            "numero": numero,
+            "prenom": lead.get("prenom", ""),
+            "nom": lead.get("nom", ""),
+            "telephone": lead.get("telephone", ""),
+            "niveau": rc + 1,
+            "jours": jours,
+            "nrp_count": nrp_count,
+        })
+    return out
+
+
+def _send_nrp_relance(numero: str, request: Request) -> dict:
+    prospect = _find_lead(numero)
+    if not prospect:
+        raise HTTPException(status_code=404, detail="Prospect introuvable")
+    email_to = str(prospect.get("email") or "").strip()
+    if not email_to:
+        raise HTTPException(status_code=400, detail="Email prospect manquant")
+    api_key = os.environ.get("RESEND_API_KEY", "")
+    if not api_key:
+        raise HTTPException(status_code=400, detail="RESEND_API_KEY non configurée")
+    maxr = _relance_nrp_config()["max"]
+    now = _now_paris_iso()
+
+    # --- CLAIM sous lock dedie (mark-then-send) : un niveau NRP ne repart JAMAIS deux fois ---
+    with _nrp_relance_lock:
+        leads = _read_leads()
+        idx = _find_lead_index(leads, numero)
+        if idx is None:
+            raise HTTPException(status_code=404, detail="Prospect introuvable")
+        lead = leads[idx]
+        if _normalize_statut(lead.get("statut", "")) in ("signe", "perdu"):
+            return {"ok": False, "skip": "lead signé/perdu"}
+        rc = int(lead.get("nrp_relance_count") or 0)
+        if rc >= maxr:
+            return {"ok": False, "skip": "max atteint"}
+        niveau = rc + 1
+        rels = lead.get("nrp_relances") if isinstance(lead.get("nrp_relances"), list) else []
+        if any(int(r.get("niveau") or 0) == niveau for r in rels):
+            return {"ok": False, "skip": "niveau déjà envoyé"}
+        lead["nrp_relance_count"] = niveau
+        lead["nrp_last_relance_at"] = now
+        rels.append({"niveau": niveau, "sent_at": now})
+        lead["nrp_relances"] = rels
+        lead["updated_at"] = _now_iso()
+        prenom_raw = str(lead.get("prenom") or "")
+        _atomic_write_json(LEADS_PATH, leads)
+
+    # --- ENVOI hors lock (niveau claime) ---
+    contenu = DEFAULT_RELANCE_NRP["contenu"].replace("{prenom}", prenom_raw)
+    sujet = DEFAULT_RELANCE_NRP["sujet"].replace("{prenom}", prenom_raw)
+    message_html = html.escape(contenu).replace("\n", "<br>")
+    html_nrp = _email_relance_nrp_html(message_html, "09 70 70 25 11")
+    import resend
+
+    resend.api_key = api_key
+    result = resend.Emails.send({
+        "from": "Hexa Rénov' <a.parisot@hexa-renov.fr>",
+        "to": [email_to],
+        "subject": sujet,
+        "html": html_nrp,
+    })
+    notes = _read_notes()
+    notes.setdefault(numero, []).append(
+        {"texte": f"Relance NRP niveau {niveau} envoyée à {email_to}", "date": now, "auteur": "Relance NRP"}
+    )
+    _atomic_write_json(NOTES_PATH, notes)
+    return {"ok": True, "niveau": niveau, "resend_id": result.get("id") if isinstance(result, dict) else ""}
+
+
+@app.get("/api/relances-nrp/a-faire")
+def get_relances_nrp_a_faire() -> JSONResponse:
+    today = datetime.now(PARIS_TZ).date()
+    return JSONResponse({"items": _relances_nrp_a_faire(today)})
+
+
+@app.post("/api/relances-nrp/{numero}/send")
+async def post_relance_nrp_send(numero: str, request: Request) -> JSONResponse:
+    return JSONResponse(_send_nrp_relance(numero, request))
 
 
 @app.get("/api/relances/a-faire")
