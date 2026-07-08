@@ -4092,6 +4092,9 @@ def _email_devis_html(prenom, apercu, pct_eco, lien_devis, pre_devis=False):
 
 def _email_relance_html(prenom, message_html, lien_devis, pre_devis=False):
     label = "pré-devis" if pre_devis else "devis"
+    _parts = message_html.split("<br>", 1)
+    _greeting = _parts[0]
+    _corps = _parts[1][4:] if len(_parts) > 1 and _parts[1].startswith("<br>") else (_parts[1] if len(_parts) > 1 else "")
     return f"""<!DOCTYPE html><html><head><meta charset="utf-8"></head>
 <body style="margin:0;padding:0;background:#eef1f5;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#eef1f5;padding:24px 0;"><tr><td align="center">
@@ -4099,7 +4102,8 @@ def _email_relance_html(prenom, message_html, lien_devis, pre_devis=False):
 {_email_header_html()}
 <tr><td style="padding:32px 32px 0 32px;">
 <div style="color:#E2214B;font-size:13px;font-weight:bold;text-transform:uppercase;letter-spacing:0.04em;">Votre {label} Hexa Rénov'</div>
-<div style="color:#4A5567;font-size:15px;line-height:1.7;margin-top:14px;">{message_html}</div>
+<div style="color:#0a2540;font-size:23px;font-weight:bold;margin-top:10px;line-height:1.3;">{_greeting}</div>
+<div style="color:#4A5567;font-size:15px;line-height:1.6;margin-top:16px;">{_corps}</div>
 </td></tr>
 <tr><td style="padding:24px 32px 8px 32px;text-align:center;">
 <a href="{lien_devis}" style="display:inline-block;background:#E2214B;color:#ffffff;font-size:16px;font-weight:bold;padding:16px 44px;border-radius:8px;text-decoration:none;">Consulter mon {label}</a>
@@ -4132,6 +4136,9 @@ def _email_relance_html(prenom, message_html, lien_devis, pre_devis=False):
 
 def _email_relance_nrp_html(message_html, telephone):
     tel_raw = str(telephone).replace(" ", "")
+    _parts = message_html.split("<br>", 1)
+    _greeting = _parts[0]
+    _corps = _parts[1][4:] if len(_parts) > 1 and _parts[1].startswith("<br>") else (_parts[1] if len(_parts) > 1 else "")
     return f"""<!DOCTYPE html><html><head><meta charset="utf-8"></head>
 <body style="margin:0;padding:0;background:#eef1f5;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#eef1f5;padding:24px 0;"><tr><td align="center">
@@ -4139,7 +4146,8 @@ def _email_relance_nrp_html(message_html, telephone):
 {_email_header_html()}
 <tr><td style="padding:32px 32px 0 32px;">
 <div style="color:#E2214B;font-size:13px;font-weight:bold;text-transform:uppercase;letter-spacing:0.04em;">Votre projet Hexa Rénov'</div>
-<div style="color:#4A5567;font-size:15px;line-height:1.7;margin-top:14px;">{message_html}</div>
+<div style="color:#0a2540;font-size:23px;font-weight:bold;margin-top:10px;line-height:1.3;">{_greeting}</div>
+<div style="color:#4A5567;font-size:15px;line-height:1.6;margin-top:16px;">{_corps}</div>
 </td></tr>
 <tr><td style="padding:24px 32px 8px 32px;text-align:center;">
 <a href="tel:{tel_raw}" style="display:inline-block;color:#002E5A;font-size:28px;font-weight:bold;text-decoration:none;letter-spacing:0.02em;">{telephone}</a>
