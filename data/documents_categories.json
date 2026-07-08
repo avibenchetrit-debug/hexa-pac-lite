@@ -24,6 +24,14 @@
     ]
   },
   {
+    "id": "vt",
+    "label": "VT",
+    "icon": "🔍",
+    "sous_categories": [
+      {"id": "rapport_vt", "label": "Rapport de visite technique", "icon": "📄", "statut": null, "max_docs": 3, "types_acceptes": ["PDF"]}
+    ]
+  },
+  {
     "id": "divers",
     "label": "Divers",
     "icon": "📎",

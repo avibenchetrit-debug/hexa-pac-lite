@@ -626,6 +626,26 @@ def _seed_json_file(path, default, repo_source=None):
     _atomic_write_json(path, default)
 
 
+def _ensure_vt_category():
+    """Idempotent : garantit la catégorie 'vt' juste après 'urbanisme' dans le fichier
+    runtime (volume). N'écrit qu'une fois, ne modifie pas les autres catégories."""
+    cats = _read_json(DOCUMENTS_CATEGORIES_PATH, [])
+    if not isinstance(cats, list) or any(isinstance(c, dict) and c.get("id") == "vt" for c in cats):
+        return
+    vt = {
+        "id": "vt",
+        "label": "VT",
+        "icon": "🔍",
+        "sous_categories": [
+            {"id": "rapport_vt", "label": "Rapport de visite technique", "icon": "📄",
+             "statut": None, "max_docs": 3, "types_acceptes": ["PDF"]}
+        ],
+    }
+    idx = next((i for i, c in enumerate(cats) if isinstance(c, dict) and c.get("id") == "urbanisme"), None)
+    cats.insert(idx + 1 if idx is not None else len(cats), vt)
+    _atomic_write_json(DOCUMENTS_CATEGORIES_PATH, cats)
+
+
 def _init_storage():
     os.makedirs(DATA_DIR, exist_ok=True)
     _seed_json_file(LEADS_PATH, [])
@@ -645,6 +665,7 @@ def _init_storage():
     _seed_json_file(DEVIS_META_PATH, {})
     save_parametres_admin_atomic(load_parametres_admin())
     _migrate_catalogue_pac_schema()
+    _ensure_vt_category()
 
 
 def _read_leads():
