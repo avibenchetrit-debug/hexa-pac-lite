@@ -2127,7 +2127,7 @@ async def update_lead_vt(numero: str, request: Request) -> JSONResponse:
 
 def _promote_statut_rappeler(lead, now):
     """NRP : Nouveau -> "À rappeler" (statut ELIGIBLE aux relances). Ne régresse pas les leads avancés."""
-    if _normalize_statut(lead.get("statut", "")) == "nouveau":
+    if _normalize_statut(lead.get("statut", "")) in ("", "nouveau"):
         lead["statut"] = "rappeler"
         lead["statut_updated_at"] = now
 
