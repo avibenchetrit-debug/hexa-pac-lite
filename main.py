@@ -4476,6 +4476,11 @@ def _send_relance(numero: str, version: int, request: Request) -> dict:
         {"texte": f"Relance niveau {niveau} envoyée à {email_to}", "date": now, "auteur": "Relance"}
     )
     _atomic_write_json(NOTES_PATH, notes)
+    _append_echange(
+        numero, canal="email",
+        contenu=f"Relance {'pré-devis' if variante == 'pre_devis' else 'devis'} niveau {niveau} envoyée à {email_to}",
+        objet=sujet, resultat="", origine="auto", auteur="Relance",
+    )
     return {"ok": True, "niveau": niveau, "resend_id": result.get("id") if isinstance(result, dict) else ""}
 
 
@@ -4602,6 +4607,11 @@ def _send_nrp_relance(numero: str, request: Request) -> dict:
         {"texte": f"Relance NRP niveau {niveau} envoyée à {email_to}", "date": now, "auteur": "Relance NRP"}
     )
     _atomic_write_json(NOTES_PATH, notes)
+    _append_echange(
+        numero, canal="email",
+        contenu=f"Relance NRP niveau {niveau} envoyée à {email_to}",
+        objet=sujet, resultat="", origine="auto", auteur="Relance",
+    )
     return {"ok": True, "niveau": niveau, "resend_id": result.get("id") if isinstance(result, dict) else ""}
 
 
