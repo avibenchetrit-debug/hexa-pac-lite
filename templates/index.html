@@ -5740,6 +5740,10 @@ body.comments-panel-open {
 .docs-devis-title{ font-size:12px; font-weight:800; color:#002E5A; text-transform:uppercase; letter-spacing:.06em; margin-bottom:8px; }
 .docs-devis-row{ display:flex; flex-direction:column; align-items:stretch; gap:10px; padding:12px; border-radius:8px; background:#fff; border:1px solid #E2E8F0; margin-top:6px; }
 .docs-devis-row > div:first-child{ font-size:13px; color:#2D3748; }
+.docs-devis-title{ cursor:pointer; user-select:none; }
+.docs-devis-title::before{ content:'▾'; display:inline-block; width:14px; color:#64748B; font-size:11px; }
+.docs-devis-block.is-collapsed .docs-devis-title::before{ content:'▸'; }
+.docs-devis-block.is-collapsed #docs-devis-list{ display:none; }
 .docs-devis-actions{ display:flex; gap:6px; flex-wrap:wrap; }
 .docs-notedim-row{ display:flex; flex-wrap:wrap; align-items:center; gap:6px; padding-top:8px; border-top:1px solid #EDF2F7; margin-top:2px; }
 .docs-notedim-label{ font-size:11px; color:#888; width:100%; margin-bottom:2px; }
@@ -13889,8 +13893,8 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
         <button class="comments-panel-close" onclick="fermerDocuments()" aria-label="Fermer">×</button>
       </div>
       <div class="comments-panel-list documents-panel-body">
-        <div class="docs-devis-block" id="docs-devis-block">
-          <div class="docs-devis-title" id="docs-devis-title">📋 Devis envoyés</div>
+        <div class="docs-devis-block is-collapsed" id="docs-devis-block">
+          <div class="docs-devis-title" id="docs-devis-title" onclick="toggleDevisEnvoyes()">📋 Devis envoyés</div>
           <div id="docs-devis-list">Chargement…</div>
         </div>
         <button type="button" class="docs-nav-back" id="docs-nav-back" style="display:none;">‹ Retour</button>
@@ -14359,6 +14363,12 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
       });
     });
   }
+
+  function toggleDevisEnvoyes(){
+    const b = document.getElementById('docs-devis-block');
+    if (b) b.classList.toggle('is-collapsed');
+  }
+  window.toggleDevisEnvoyes = toggleDevisEnvoyes;
 
   async function refreshDevisList() {
     const root = document.getElementById('docs-devis-list');
