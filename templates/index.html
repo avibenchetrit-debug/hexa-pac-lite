@@ -9398,7 +9398,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     if (window.majRequisSimu) window.majRequisSimu();
   }
 
-  window.REQUIS_SIMU_FIELDS = ['surface_logement_m2','code_postal_chantier','type_logement','hsp','altitude','type_emetteurs','mode_chauffage','alimentation_electrique','rfr','nombre_personnes'];
+  window.REQUIS_SIMU_FIELDS = ['surface_logement_m2','code_postal_chantier','type_logement','hsp','altitude','type_emetteurs','mode_chauffage','alimentation_electrique','rfr','nombre_personnes','cout_energetique_mensuel_eur'];
   window.majRequisSimu = function () {
     (window.REQUIS_SIMU_FIELDS || []).forEach(function (nm) {
       const el = document.querySelector('[name="' + nm + '"]');
@@ -14903,6 +14903,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     service: 'chauffage_seul',
     prix_pac: null,
     facture_avant: 200,            // €/mois
+    facture_avant_defaut: true,    // true tant que le coût réel n'est pas saisi (=> warning ROI)
     facture_apres: 100,            // €/mois
     option: 'opt1',                // opt1 | opt2 | opt3 (financement propre)
     iso_toit: 'isole',
@@ -15356,6 +15357,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     state.surface_habitable = null;
     if (!state.surface_forcee) state.surface_chauffee = null;
     state.facture_avant = 200;
+    state.facture_avant_defaut = true;
     const categorieInput = document.getElementById('categorie-input')?.value || '';
     if (['tres_modeste', 'modeste', 'intermediaire', 'superieur'].includes(categorieInput)) {
       state.categorie = categorieInput;
@@ -15408,9 +15410,10 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
       || document.querySelector('[name="cout_chauffage"]')?.value);
     if (coutMensuel!=null && coutMensuel>0) {
       state.facture_avant = coutMensuel;
+      state.facture_avant_defaut = false;
     } else {
       const coutAnnuel = num(document.getElementById('cout-annuel-input')?.value || document.querySelector('[name="cout_energetique_annuel_eur"]')?.value);
-      if (coutAnnuel!=null && coutAnnuel>0) state.facture_avant=Math.round(coutAnnuel/12);
+      if (coutAnnuel!=null && coutAnnuel>0) { state.facture_avant=Math.round(coutAnnuel/12); state.facture_avant_defaut = false; }
     }
   }
 
@@ -15937,6 +15940,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
         </div>
         ${state.option==='opt1' && c.finView.mention ? `<div class="sim-note">${c.finView.mention}</div>` : ''}
 
+        ${state.facture_avant_defaut ? `<div style="margin:0 0 10px;padding:9px 11px;border:1px solid #F59E0B;border-radius:8px;background:#FEF3C7;color:#8A4B00;font-size:12px;line-height:1.45;">⚠️ Facture actuelle non renseignée — les économies et le ROI affichés sont <b>indicatifs</b> (estimation par défaut ${eur(state.facture_avant)}/mois). Renseignez le coût de chauffage actuel pour un calcul fiable.</div>` : ''}
         <!-- AVANT / APRÈS PAC (live) -->
         <div class="sim-section-label">Avant / Après PAC</div>
         <div class="sim-aa">
