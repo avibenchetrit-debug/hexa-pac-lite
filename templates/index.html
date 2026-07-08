@@ -19923,7 +19923,29 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
         + '<span class="atraiter-who">—</span>'
         + doneBtn + '</div>';
     }
-    let html = '';
+    // --- Relances à faire (Étape 1 : semi-auto) ---
+    let relHtml = '';
+    try {
+      const rr = await fetch('/api/relances/a-faire', { cache:'no-store' });
+      const rd = rr.ok ? await rr.json() : { items: [] };
+      const rel = rd.items || [];
+      if (rel.length) {
+        relHtml = rel.map(function(r){
+          const nm = escapeHtml(((r.prenom||'')+' '+(r.nom||'')).trim() || r.numero || '');
+          const typ = r.variante === 'pre_devis' ? 'Pré-devis' : 'Devis';
+          const ouv = r.ouvert ? '✅ ouvert' : '⏳ non ouvert';
+          return '<div class="atraiter-row" data-numero="'+escapeHtml(r.numero)+'">'
+            + '<span class="atraiter-badge atb-detec">Relance '+r.niveau+'</span>'
+            + '<span class="atraiter-kind">Relance</span>'
+            + '<span class="atraiter-nom">'+nm+'</span>'
+            + '<span class="atraiter-when">'+escapeHtml(typ+' v'+r.version+' · envoyé il y a '+r.jours+' j · '+ouv)+'</span>'
+            + '<span class="atraiter-tel-cell">—</span><span class="atraiter-who">—</span>'
+            + '<button type="button" class="pv-btn pv-btn-ghost relance-send" data-relance-numero="'+escapeHtml(r.numero)+'" data-relance-version="'+r.version+'">Relancer</button>'
+            + '</div>';
+        }).join('');
+      }
+    } catch(_) {}
+    let html = relHtml;
     if(items.length) html += items.map(rowHtml).join('');
     else html += '<div class="atraiter-empty">Aucune relance ' + (atraiterScope==='moi'?'pour vous ':'') + "à traiter.</div>";
     list.innerHTML = html;
@@ -19949,6 +19971,25 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
       });
     });
     document.getElementById('atraiter-list').addEventListener('click', async function(e){
+      const relBtn = e.target.closest('.relance-send');
+      if (relBtn) {
+        e.preventDefault();
+        const numero = relBtn.dataset.relanceNumero;
+        const version = Number(relBtn.dataset.relanceVersion);
+        relBtn.disabled = true; relBtn.textContent = 'Envoi…';
+        try {
+          const r = await fetch('/api/relances/'+encodeURIComponent(numero)+'/send', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ version: version }) });
+          const d = await r.json();
+          if (!r.ok || !d.ok) throw new Error(d.skip || d.detail || 'Échec');
+          toastMsg('✓ Relance niveau '+d.niveau+' envoyée', '#0D6B3B');
+        } catch(err) {
+          toastMsg('Relance : '+err.message, '#B45309');
+          relBtn.disabled = false; relBtn.textContent = 'Relancer';
+          return;
+        }
+        loadATraiter();
+        return;
+      }
       const grp = e.target.closest('.atraiter-detgroup-toggle');
       if(grp){
         const rows = document.getElementById('atraiter-detrows');
