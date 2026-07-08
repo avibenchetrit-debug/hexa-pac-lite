@@ -14387,6 +14387,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
       root.innerHTML = items.map(item => `
         <div class="docs-devis-row">
           <div><b>${escapeHtml((item.variante === 'pre_devis' && (item.numero_devis || '').startsWith('DE')) ? ('PD' + item.numero_devis.slice(2)) : (item.numero_devis || ('v' + item.version)))}</b> — Envoyé le ${formatParis(item.sent_at)} à ${escapeHtml(item.email || '')}</div>
+          <div style="font-size:12px;font-weight:600;margin-top:2px;${item.first_opened_at ? 'color:#15803D' : 'color:#94A3B8'}">${item.first_opened_at ? `✅ Ouvert le ${formatParis(item.first_opened_at)}${(item.open_count||0) > 1 ? ` · ${item.open_count} ouvertures` : ''}` : '⏳ Pas encore ouvert'}</div>
           <div class="docs-devis-actions">
             <button type="button" class="hexa-meta-card-action" data-devis-preview="${item.version}">👁 Aperçu</button>
             <button type="button" class="hexa-meta-card-action" data-devis-download="${item.version}">📥 Télécharger</button>

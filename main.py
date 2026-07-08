@@ -8,6 +8,7 @@ import os
 import re
 import shutil
 import tempfile
+import threading
 # import smtplib  # legacy SMTP disabled: devis are sent with Resend.
 import time
 import urllib.parse
@@ -3778,6 +3779,62 @@ async def devis_public_versionne_pdf(numero: str, version: int, token: str, requ
     return FileResponse(pdf_file, media_type="application/pdf", filename=f"Devis_{numero}.pdf")
 
 
+# ---- Tracking d'ouverture email devis (pixel 1x1) ----
+_devis_open_lock = threading.Lock()
+_TRANSPARENT_GIF = base64.b64decode("R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7")
+
+
+def _pixel_devis_url(request: Request, numero: str, version) -> str:
+    base = str(request.base_url).rstrip("/")
+    if base.startswith("http://"):
+        base = "https://" + base[len("http://"):]
+    return f"{base}/devis-public/{numero}/{version}/{_sign_devis_token_v(numero, version)}/o.gif"
+
+
+def _inject_pixel(html_str: str, pixel_url: str) -> str:
+    img = f'<img src="{pixel_url}" width="1" height="1" alt="" style="display:none;width:1px;height:1px;border:0;">'
+    if "</body>" in html_str:
+        return html_str.replace("</body>", img + "</body>", 1)
+    return html_str + img
+
+
+def _record_devis_open(numero: str, version: int, request: Request) -> None:
+    """Best-effort : enregistre l'ouverture sur l'item devis_meta (first_opened_at conservé, open_count incrémenté)."""
+    now = _now_paris_iso()
+    ua = request.headers.get("user-agent", "")[:200]
+    ip = (request.client.host if request.client else "") or ""
+    with _devis_open_lock:
+        meta = _read_devis_meta()
+        arr = meta.get(numero)
+        if not isinstance(arr, list):
+            return
+        target = next((it for it in arr if int(it.get("version") or 0) == int(version)), None)
+        if target is None:
+            return
+        if not target.get("first_opened_at"):
+            target["first_opened_at"] = now
+        target["open_count"] = int(target.get("open_count") or 0) + 1
+        opens = target.get("opens") if isinstance(target.get("opens"), list) else []
+        opens.append({"date": now, "ip": ip, "ua": ua})
+        target["opens"] = opens[-50:]
+        meta[numero] = arr
+        _atomic_write_json(DEVIS_META_PATH, meta)
+
+
+@app.get("/devis-public/{numero}/{version}/{token}/o.gif")
+async def devis_open_pixel(numero: str, version: int, token: str, request: Request):
+    if _verify_devis_token_v(numero, version, token):
+        try:
+            _record_devis_open(numero, version, request)
+        except Exception:  # noqa: BLE001 — le pixel ne doit JAMAIS casser l'affichage de l'email
+            pass
+    return Response(
+        content=_TRANSPARENT_GIF,
+        media_type="image/gif",
+        headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0", "Pragma": "no-cache", "Expires": "0"},
+    )
+
+
 @app.get("/notedim-public/{numero}/{token}", response_class=HTMLResponse)
 async def notedim_public(numero: str, token: str, request: Request):
     if not _verify_notedim_token(numero, token):
@@ -3990,7 +4047,7 @@ async def _send_devis(numero: str, payload: dict, request: Request) -> dict:
             "from": "Hexa Rénov' <a.parisot@hexa-renov.fr>",
             "to": [email_to],
             "subject": f"Votre {'pré-devis' if variante == 'pre_devis' else 'devis'} Hexa Rénov' — {prenom}",
-            "html": _email_devis_html(prenom, apercu, pct_eco, lien_devis, pre_devis=(variante == "pre_devis")),
+            "html": _inject_pixel(_email_devis_html(prenom, apercu, pct_eco, lien_devis, pre_devis=(variante == "pre_devis")), _pixel_devis_url(request, numero, version)),
         }
     )
     if variante == "devis":
@@ -4067,6 +4124,8 @@ async def list_devis(numero: str) -> JSONResponse:
                 "email": item.get("email", ""),
                 "file": path,
                 "has_notedim": bool(item.get("notedim_file") and os.path.exists(item.get("notedim_file"))),
+                "first_opened_at": item.get("first_opened_at") or "",
+                "open_count": int(item.get("open_count") or 0),
             })
     items.sort(key=lambda x: x.get("version", 0), reverse=True)
     return JSONResponse(items)
