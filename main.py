@@ -1,3 +1,4 @@
+import asyncio
 import io
 import base64
 import hashlib
@@ -1277,12 +1278,71 @@ def _migrate_leads_schema():
     print(f"Migration leads.json : {normalized_count} entrées normalisées")
 
 
+_PUBLIC_BASE_URL = os.environ.get("PUBLIC_BASE_URL", "https://hexa-pac-lite-production.up.railway.app").rstrip("/")
+
+
+class _SchedulerRequest:
+    """Requête minimale pour le scheduler (pas de contexte HTTP) : fournit base_url."""
+    def __init__(self, base_url):
+        self.base_url = base_url + "/"
+        self.headers = {}
+        self.client = None
+
+
+def _relances_hour():
+    cfg = load_parametres_admin().get("relances") or {}
+    return int(float_value(cfg.get("hour"), int(os.environ.get("RELANCES_HOUR_PARIS", "10") or "10")))
+
+
+def _run_relances_once():
+    now = datetime.now(PARIS_TZ)
+    if now.weekday() >= 5:
+        print("[relances] week-end -> skip")
+        return
+    today = now.date()
+    req = _SchedulerRequest(_PUBLIC_BASE_URL)
+    n_dev = 0
+    n_nrp = 0
+    for it in _relances_a_faire(today):
+        try:
+            if _send_relance(it["numero"], it["version"], req).get("ok"):
+                n_dev += 1
+        except Exception as exc:  # noqa: BLE001
+            print(f"[relances] devis {it.get('numero')} echec : {type(exc).__name__}: {exc}")
+    for it in _relances_nrp_a_faire(today):
+        try:
+            if _send_nrp_relance(it["numero"], req).get("ok"):
+                n_nrp += 1
+        except Exception as exc:  # noqa: BLE001
+            print(f"[relances] nrp {it.get('numero')} echec : {type(exc).__name__}: {exc}")
+    print(f"[relances] termine : {n_dev} devis + {n_nrp} NRP envoyes")
+
+
+async def _relances_loop():
+    while True:
+        now = datetime.now(PARIS_TZ)
+        target = now.replace(hour=_relances_hour() % 24, minute=0, second=0, microsecond=0)
+        if target <= now:
+            target += timedelta(days=1)
+        await asyncio.sleep(max(60, (target - now).total_seconds()))
+        try:
+            await asyncio.to_thread(_run_relances_once)
+        except Exception as exc:  # noqa: BLE001 - ne jamais tuer la boucle
+            print(f"[relances] echec boucle : {type(exc).__name__}: {exc}")
+
+
+def start_relances_scheduler():
+    asyncio.create_task(_relances_loop())
+    print(f"[relances] planifie a {_relances_hour()}h Paris (hors week-end)")
+
+
 @app.on_event("startup")
 async def startup_event():
     _init_storage()
     _migrate_leads_schema()
     _admin_password()
     start_backup_scheduler(DATA_DIR)
+    start_relances_scheduler()
 
 
 def _extract_texte(payload_form, payload_json):
@@ -2991,9 +3051,7 @@ async def save_params_financement(request: Request):
 
 @app.get("/api/admin/relances")
 async def get_relances_config():
-    p = load_parametres_admin()
-    cfg = p.get("relances") if isinstance(p.get("relances"), dict) else {}
-    return cfg or DEFAULT_PARAMETRES_ADMIN["relances"]
+    return _relance_config()
 
 
 @app.post("/api/admin/relances")
@@ -3004,9 +3062,40 @@ async def save_relances_config(request: Request):
     cfg = dict(params.get("relances") or DEFAULT_PARAMETRES_ADMIN["relances"])
     if "max" in payload:
         cfg["max"] = int(float_value(payload.get("max"), cfg.get("max", 6)))
+    if "hour" in payload:
+        cfg["hour"] = int(float_value(payload.get("hour"), cfg.get("hour", 10)))
     if isinstance(payload.get("niveaux_jours"), list):
         cfg["niveaux_jours"] = [int(float_value(x, 0)) for x in payload["niveaux_jours"] if str(x).strip()]
+    if isinstance(payload.get("messages"), dict):
+        msgs = dict(cfg.get("messages") or {})
+        for k in ("non_ouvert", "ouvert"):
+            mk = payload["messages"].get(k)
+            if isinstance(mk, dict):
+                msgs[k] = {"sujet": str(mk.get("sujet", "")), "contenu": str(mk.get("contenu", ""))}
+        cfg["messages"] = msgs
     params["relances"] = cfg
+    save_parametres_admin_atomic(params)
+    return {"success": True}
+
+
+@app.get("/api/admin/relances-nrp")
+async def get_relances_nrp_config():
+    return _relance_nrp_config()
+
+
+@app.post("/api/admin/relances-nrp")
+async def save_relances_nrp_config(request: Request):
+    _require_admin(request)
+    payload = await _read_request_payload(request)
+    params = load_parametres_admin()
+    cfg = dict(params.get("relances_nrp") or DEFAULT_PARAMETRES_ADMIN["relances_nrp"])
+    if "max" in payload:
+        cfg["max"] = int(float_value(payload.get("max"), cfg.get("max", 3)))
+    if isinstance(payload.get("niveaux_jours"), list):
+        cfg["niveaux_jours"] = [int(float_value(x, 0)) for x in payload["niveaux_jours"] if str(x).strip()]
+    if isinstance(payload.get("message"), dict):
+        cfg["message"] = {"sujet": str(payload["message"].get("sujet", "")), "contenu": str(payload["message"].get("contenu", ""))}
+    params["relances_nrp"] = cfg
     save_parametres_admin_atomic(params)
     return {"success": True}
 
@@ -4237,7 +4326,16 @@ def _relance_config():
     if not isinstance(niveaux, list) or not niveaux:
         niveaux = DEFAULT_PARAMETRES_ADMIN["relances"]["niveaux_jours"]
     maxr = int(float_value(cfg.get("max"), DEFAULT_PARAMETRES_ADMIN["relances"]["max"]))
-    return {"max": maxr, "niveaux_jours": [int(float_value(x, 0)) for x in niveaux]}
+    msgs = cfg.get("messages") if isinstance(cfg.get("messages"), dict) else {}
+    messages = {}
+    for k in ("non_ouvert", "ouvert"):
+        m = msgs.get(k) if isinstance(msgs.get(k), dict) else {}
+        messages[k] = {
+            "sujet": str(m.get("sujet") or DEFAULT_RELANCE_MESSAGES[k]["sujet"]),
+            "contenu": str(m.get("contenu") or DEFAULT_RELANCE_MESSAGES[k]["contenu"]),
+        }
+    hour = int(float_value(cfg.get("hour"), int(os.environ.get("RELANCES_HOUR_PARIS", "10") or "10")))
+    return {"max": maxr, "niveaux_jours": [int(float_value(x, 0)) for x in niveaux], "messages": messages, "hour": hour}
 
 
 def _relances_a_faire(today):
@@ -4326,7 +4424,7 @@ def _send_relance(numero: str, version: int, request: Request) -> dict:
     # --- ENVOI hors lock (niveau deja claime) ---
     ctx = _build_devis_context(request, numero)
     prenom = html.escape(str(prospect.get("prenom") or ""))
-    tpl = DEFAULT_RELANCE_MESSAGES["ouvert" if ouvert else "non_ouvert"]
+    tpl = _relance_config()["messages"]["ouvert" if ouvert else "non_ouvert"]
     subst = {
         "prenom": prenom,
         "numero": numero_devis,
@@ -4374,7 +4472,12 @@ def _relance_nrp_config():
     if not isinstance(niveaux, list) or not niveaux:
         niveaux = DEFAULT_PARAMETRES_ADMIN["relances_nrp"]["niveaux_jours"]
     maxr = int(float_value(cfg.get("max"), DEFAULT_PARAMETRES_ADMIN["relances_nrp"]["max"]))
-    return {"max": maxr, "niveaux_jours": [int(float_value(x, 0)) for x in niveaux]}
+    m = cfg.get("message") if isinstance(cfg.get("message"), dict) else {}
+    message = {
+        "sujet": str(m.get("sujet") or DEFAULT_RELANCE_NRP["sujet"]),
+        "contenu": str(m.get("contenu") or DEFAULT_RELANCE_NRP["contenu"]),
+    }
+    return {"max": maxr, "niveaux_jours": [int(float_value(x, 0)) for x in niveaux], "message": message}
 
 
 def _relances_nrp_a_faire(today):
@@ -4463,8 +4566,9 @@ def _send_nrp_relance(numero: str, request: Request) -> dict:
         _atomic_write_json(LEADS_PATH, leads)
 
     # --- ENVOI hors lock (niveau claime) ---
-    contenu = DEFAULT_RELANCE_NRP["contenu"].replace("{prenom}", prenom_raw)
-    sujet = DEFAULT_RELANCE_NRP["sujet"].replace("{prenom}", prenom_raw)
+    _tpl_nrp = _relance_nrp_config()["message"]
+    contenu = _tpl_nrp["contenu"].replace("{prenom}", prenom_raw)
+    sujet = _tpl_nrp["sujet"].replace("{prenom}", prenom_raw)
     message_html = html.escape(contenu).replace("\n", "<br>")
     html_nrp = _email_relance_nrp_html(message_html, "09 70 70 25 11")
     import resend

@@ -16849,6 +16849,68 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
         <div class="adm-actions"><button type="button" class="adm-btn-save" id="btn-save-plafonds">Sauvegarder</button></div>
       </div>`;
   }
+  function renderRelancesSection(){
+    return `
+      <div class="adm-field adm-field-row"><span class="adm-lab">Heure d'envoi quotidien (Paris)</span><span><input type="number" id="rel-hour" min="0" max="23" style="width:70px"> h <span style="color:#94A3B8;font-size:12px">— automatique, hors week-end</span></span></div>
+      <h4 style="margin:16px 0 6px;color:#002E5A;font-size:14px">Relances DEVIS / pré-devis</h4>
+      <div class="adm-field adm-field-row"><span class="adm-lab">Nombre max de relances</span><input type="number" id="rel-dev-max" min="1" max="12" style="width:70px"></div>
+      <div class="adm-field adm-field-row"><span class="adm-lab">Délais (jours depuis l'envoi, séparés par virgule)</span><input type="text" id="rel-dev-niveaux" placeholder="3,7,14,30,60,90" style="width:240px"></div>
+      <div style="margin:10px 0"><b style="font-size:13px">Message — devis NON ouvert</b><input type="text" id="rel-dev-no-sujet" placeholder="Sujet" style="width:100%;margin:4px 0;box-sizing:border-box"><textarea id="rel-dev-no-contenu" rows="6" style="width:100%;box-sizing:border-box"></textarea></div>
+      <div style="margin:10px 0"><b style="font-size:13px">Message — devis OUVERT</b><input type="text" id="rel-dev-ou-sujet" placeholder="Sujet" style="width:100%;margin:4px 0;box-sizing:border-box"><textarea id="rel-dev-ou-contenu" rows="6" style="width:100%;box-sizing:border-box"></textarea></div>
+      <div style="font-size:11px;color:#64748B;background:#F8FAFC;border-radius:6px;padding:6px 10px">Placeholders : <code>{prenom}</code> <code>{numero}</code> <code>{modele_pac}</code> <code>{reste_a_charge}</code> <code>{type_document}</code></div>
+      <h4 style="margin:18px 0 6px;color:#002E5A;font-size:14px">Relances NRP (prospect pas joignable)</h4>
+      <div class="adm-field adm-field-row"><span class="adm-lab">Nombre max de relances</span><input type="number" id="rel-nrp-max" min="1" max="12" style="width:70px"></div>
+      <div class="adm-field adm-field-row"><span class="adm-lab">Délais (jours depuis le dernier appel)</span><input type="text" id="rel-nrp-niveaux" placeholder="1,3,7" style="width:240px"></div>
+      <div style="margin:10px 0"><b style="font-size:13px">Message NRP</b><input type="text" id="rel-nrp-sujet" placeholder="Sujet" style="width:100%;margin:4px 0;box-sizing:border-box"><textarea id="rel-nrp-contenu" rows="6" style="width:100%;box-sizing:border-box"></textarea></div>
+      <div style="font-size:11px;color:#64748B;background:#F8FAFC;border-radius:6px;padding:6px 10px">Placeholders : <code>{prenom}</code></div>
+      <div class="adm-actions"><button type="button" class="adm-btn-save" id="rel-save">Enregistrer les relances</button></div>`;
+  }
+  async function loadRelancesSection(){
+    try {
+      const [dev, nrp] = await Promise.all([
+        fetch('/api/admin/relances', { headers: window.adminHeaders() }).then(r=>r.json()).catch(()=>({})),
+        fetch('/api/admin/relances-nrp', { headers: window.adminHeaders() }).then(r=>r.json()).catch(()=>({})),
+      ]);
+      const g = id => document.getElementById(id);
+      const set = (id, v) => { const el=g(id); if(el) el.value = (v==null?'':v); };
+      set('rel-hour', dev.hour ?? 10);
+      set('rel-dev-max', dev.max ?? 6);
+      set('rel-dev-niveaux', (dev.niveaux_jours||[]).join(','));
+      const dm = dev.messages||{}, no = dm.non_ouvert||{}, ou = dm.ouvert||{};
+      set('rel-dev-no-sujet', no.sujet); set('rel-dev-no-contenu', no.contenu);
+      set('rel-dev-ou-sujet', ou.sujet); set('rel-dev-ou-contenu', ou.contenu);
+      set('rel-nrp-max', nrp.max ?? 3);
+      set('rel-nrp-niveaux', (nrp.niveaux_jours||[]).join(','));
+      const nm = nrp.message||{};
+      set('rel-nrp-sujet', nm.sujet); set('rel-nrp-contenu', nm.contenu);
+    } catch(_){}
+  }
+  async function saveRelancesSection(){
+    const g = id => document.getElementById(id);
+    const parseNiv = s => String(s||'').split(',').map(x=>parseInt(String(x).trim(),10)).filter(n=>Number.isFinite(n));
+    const btn = g('rel-save'); if(btn){ btn.disabled=true; btn.textContent='Enregistrement…'; }
+    try {
+      const devPayload = {
+        hour: parseInt(g('rel-hour').value,10)||10,
+        max: parseInt(g('rel-dev-max').value,10)||6,
+        niveaux_jours: parseNiv(g('rel-dev-niveaux').value),
+        messages: {
+          non_ouvert: { sujet: g('rel-dev-no-sujet').value, contenu: g('rel-dev-no-contenu').value },
+          ouvert: { sujet: g('rel-dev-ou-sujet').value, contenu: g('rel-dev-ou-contenu').value },
+        },
+      };
+      const nrpPayload = {
+        max: parseInt(g('rel-nrp-max').value,10)||3,
+        niveaux_jours: parseNiv(g('rel-nrp-niveaux').value),
+        message: { sujet: g('rel-nrp-sujet').value, contenu: g('rel-nrp-contenu').value },
+      };
+      const r1 = await fetch('/api/admin/relances', { method:'POST', headers: window.adminHeaders(), body: JSON.stringify(devPayload) });
+      const r2 = await fetch('/api/admin/relances-nrp', { method:'POST', headers: window.adminHeaders(), body: JSON.stringify(nrpPayload) });
+      if(!r1.ok || !r2.ok) throw new Error('Échec sauvegarde');
+      adminToast('Relances enregistrées ✓', '#0D6B3B');
+    } catch(e){ adminToast('Erreur : '+(e.message||e), '#B91C1C'); }
+    finally { if(btn){ btn.disabled=false; btn.textContent='Enregistrer les relances'; } }
+  }
   function renderParamsEcoEnergie(){
     const d = defaultParamsEcoEnergie();
     const eco = Object.assign(defaultParamsEcoEnergie(), M3_ADMIN?.params_eco_energie || {});
@@ -17662,7 +17724,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
       <div class="adm-add-row"><button type="button" class="adm-btn adm-btn-add" id="adm-add">+ Ajouter une pompe à chaleur</button><button type="button" class="adm-btn adm-btn-add" id="adm-import-xlsx">📥 Importer catalogue Excel</button><input type="file" id="adm-import-xlsx-file" accept=".xlsx" style="display:none"></div>
       <div class="adm-legend"><div class="adm-legend-row"><span class="adm-dot adm-dot1"></span><span>Option 1 — vente directe : marge brute − CAC − visite − COFRAC − urbanisme.</span></div><div class="adm-legend-row"><span class="adm-dot adm-dot2"></span><span>Option 2 — prix de cession : marge garantie au-dessus de (coût + visite + COFRAC + urbanisme). La régie revend au-dessus et garde le surplus ; la colonne « Commission régie » montre ce qu'elle gagne si elle revend à ton prix catalogue.</span></div><div class="adm-legend-row"><span>Marges théoriques — calculées sur un MPR forfaitaire de 5 000 € (estimation commune à tous les modèles), pas un calcul réel par prospect.</span></div></div>
       <div class="adm-actions"><button type="button" class="adm-btn-save" id="adm-save-catalogue">Enregistrer</button></div>`;
-    const adminBody = `${admBloc('1','1. Réglages généraux',admSousBloc('1-1','1.1 Coût Hexa',coutHexa)+admSousBloc('1-2','1.2 Vente Hexa',venteHexa))}${admBloc('2','2. MPR',admSousBloc('2-1','2.1 Forfait MPR',renderMprFields())+admSousBloc('2-2','2.2 Plafonds réglementaires',renderPlafondsSection())+admSousBloc('2-3','2.3 Barèmes ANAH (plafonds RFR)',renderBaremesAnahSection()))}${admBloc('3','3. CEE',admSousBloc('3-1','3.1 Formule BAR-TH-171 (PAC Air-Eau)',renderFormuleBarSection())+admSousBloc('3-2','3.2 Bonification CEE',renderBonificationFields())+admSousBloc('3-3','3.3 Délégataires CEE',renderDelegatairesFields()))}${admBloc('4','4. Sous-traitants',renderSousTraitantsSection())}${admBloc('5','5. Commercial',admSousBloc('5-1','5.1 Options commerciales',optionsCommerciales)+admSousBloc('5-2','5.2 Modèles et marges nettes',modelesMarges)+admSousBloc('5-3','5.3 Ballon thermodynamique',renderBallonThermoFields()))}${admBloc('6','6. Modèles email',renderEmailsFields())}${admBloc('7','7. Corbeille des leads','<div id="adm-trash" class="adm-trash-empty">Chargement...</div>')}${admBloc('8','8. Paramètres économiques',admSousBloc('8-1',"8.1 Hypothèses économie d'énergie",renderParamsEcoEnergie())+admSousBloc('8-2','8.2 Hypothèses financement',renderParamsFinancement()))}${admBloc('9','9. Gammes & Marques', renderMarquesSection())}${admBloc('10','10. Utilisateurs', renderUtilisateursSection())}`;
+    const adminBody = `${admBloc('1','1. Réglages généraux',admSousBloc('1-1','1.1 Coût Hexa',coutHexa)+admSousBloc('1-2','1.2 Vente Hexa',venteHexa))}${admBloc('2','2. MPR',admSousBloc('2-1','2.1 Forfait MPR',renderMprFields())+admSousBloc('2-2','2.2 Plafonds réglementaires',renderPlafondsSection())+admSousBloc('2-3','2.3 Barèmes ANAH (plafonds RFR)',renderBaremesAnahSection()))}${admBloc('3','3. CEE',admSousBloc('3-1','3.1 Formule BAR-TH-171 (PAC Air-Eau)',renderFormuleBarSection())+admSousBloc('3-2','3.2 Bonification CEE',renderBonificationFields())+admSousBloc('3-3','3.3 Délégataires CEE',renderDelegatairesFields()))}${admBloc('4','4. Sous-traitants',renderSousTraitantsSection())}${admBloc('5','5. Commercial',admSousBloc('5-1','5.1 Options commerciales',optionsCommerciales)+admSousBloc('5-2','5.2 Modèles et marges nettes',modelesMarges)+admSousBloc('5-3','5.3 Ballon thermodynamique',renderBallonThermoFields()))}${admBloc('6','6. Modèles email',renderEmailsFields())}${admBloc('7','7. Corbeille des leads','<div id="adm-trash" class="adm-trash-empty">Chargement...</div>')}${admBloc('8','8. Paramètres économiques',admSousBloc('8-1',"8.1 Hypothèses économie d'énergie",renderParamsEcoEnergie())+admSousBloc('8-2','8.2 Hypothèses financement',renderParamsFinancement()))}${admBloc('9','9. Gammes & Marques', renderMarquesSection())}${admBloc('10','10. Utilisateurs', renderUtilisateursSection())}${admBloc('11','11. Relances (emails automatiques)', renderRelancesSection())}`;
     return `
       <div class="adm-overlay" id="adm-overlay">
         <div class="adm-modal">
@@ -18219,6 +18281,8 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     });
     refreshGammesState().then(refreshFichesState);
     loadAdminUsers();
+    document.getElementById('rel-save')?.addEventListener('click', saveRelancesSection);
+    loadRelancesSection();
     document.getElementById('adm-user-create')?.addEventListener('click', createAdminUser);
     document.getElementById('adm-users-list')?.addEventListener('click', onAdminUserAction);
     bindPwEyes(document);
