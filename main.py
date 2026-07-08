@@ -106,12 +106,12 @@ DEFAULT_MODELES_EMAIL = [
 
 DEFAULT_RELANCE_MESSAGES = {
     "non_ouvert": {
-        "sujet": "Votre devis Hexa Rénov' — {numero}",
-        "contenu": "Bonjour {prenom},\n\nJe me permets de revenir vers vous : avez-vous bien reçu votre devis {numero} pour {modele_pac} (reste à charge estimé {reste_a_charge}) ?\nJe reste à votre disposition pour toute question.\n\nCordialement,\nL'équipe Hexa-Rénov'",
+        "sujet": "Votre {type_document} Hexa Rénov' — {numero}",
+        "contenu": "Bonjour {prenom},\n\nVotre {type_document} {numero} se sentirait presque seul... l'auriez-vous manqué ?\n\nNous l'avons préparé pour votre projet {modele_pac} (reste à charge estimé {reste_a_charge}), et il n'attend plus que vous. Une question, un doute, une envie d'en parler ? Nous sommes là.\n\nÀ très vite,\nL'équipe Hexa-Rénov'",
     },
     "ouvert": {
-        "sujet": "Votre devis Hexa Rénov' — {numero}",
-        "contenu": "Bonjour {prenom},\n\nVous avez consulté votre devis {numero} — avez-vous des questions ? Je reste disponible pour en discuter quand vous voulez.\n\nCordialement,\nL'équipe Hexa-Rénov'",
+        "sujet": "Votre {type_document} Hexa Rénov' — {numero}",
+        "contenu": "Bonjour {prenom},\n\nVous avez ouvert votre {type_document} {numero} — c'est déjà un bon début ! 😊\n\nAlors, qu'en avez-vous pensé ? S'il reste une question, un doute ou un détail à ajuster, nous sommes là pour en parler. Votre future pompe à chaleur, elle, n'attend qu'un feu vert.\n\nÀ très vite,\nL'équipe Hexa-Rénov'",
     },
 }
 
@@ -4285,6 +4285,7 @@ def _send_relance(numero: str, version: int, request: Request) -> dict:
         "numero": numero_devis,
         "modele_pac": str(ctx.get("modele_pac", "")),
         "reste_a_charge": str(ctx.get("reste_a_charge", "")),
+        "type_document": "pré-devis" if variante == "pre_devis" else "devis",
     }
 
     def _fmt(s):
