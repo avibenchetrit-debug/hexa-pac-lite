@@ -2864,7 +2864,7 @@ body.panel-is-open {
     /* Liste "À traiter aujourd'hui" (accueil) */
     .rappels-panel { background:#FFFFFF; border:1px solid #E2E8F0; border-left:4px solid #E2214B; border-radius:12px; padding:14px 16px; margin-bottom:16px; }
     .rappels-head { display:flex; align-items:center; gap:8px; margin-bottom:10px; }
-    .rappels-title { font-size:16px; font-weight:700; color:#002E5A; }
+    .rappels-title { font-size:16px; font-weight:700; color:#002E5A; display:inline-flex; align-items:center; gap:8px; }
     .rappels-count { display:inline-flex; align-items:center; justify-content:center; min-width:22px; height:22px; padding:0 7px; background:#E2214B; color:#fff; border-radius:11px; font-size:12px; font-weight:700; }
     .rappels-list { display:flex; flex-direction:column; gap:6px; }
     .rappels-row { display:flex; align-items:center; gap:12px; padding:8px 10px; border:1px solid #EEF2F7; border-radius:8px; cursor:pointer; transition:background .12s; }
@@ -19470,7 +19470,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
       </div>
       <div class="pv-wrap">
         <section id="rappels-panel" class="rappels-panel" style="display:none">
-          <div class="rappels-head"><button type="button" id="rappels-toggle" class="rappels-toggle" aria-expanded="true"><span class="rappels-chevron">▸</span><span class="rappels-title">🔔 Mes rappels</span></button><span id="rappels-count" class="rappels-count">0</span></div>
+          <div class="rappels-head"><button type="button" id="rappels-toggle" class="rappels-toggle" aria-expanded="true"><span class="rappels-chevron">▸</span><span class="rappels-title">🔔 Mes rappels <span id="rappels-count" class="rappels-count">0</span></span></button></div>
           <div id="rappels-body" class="rappels-body"><div id="rappels-list" class="rappels-list"></div></div>
         </section>
         <section id="atraiter-panel" class="atraiter-panel">
