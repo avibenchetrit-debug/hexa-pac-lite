@@ -3508,9 +3508,13 @@
 <div class="recap-line aide"><span class="label">Estimation aide Prime CEE</span><span class="amount">- {{ montant_cee }}</span></div>
 <div style="font-size: 9.5px; color: var(--gris-mute); padding: 2px 0 4px; margin-top: 0; line-height: 1.4;">Le reste à payer correspond au total TTC diminué des estimations d'aides MaPrimeRénov' et Prime CEE.</div>
 <div class="recap-rac"><span class="recap-rac-label">Montant total à régler</span><span class="recap-rac-amount">{{ reste_a_charge }}</span></div>
+{% if montant_mpr_affiche and montant_mpr_affiche != '0' %}
+<div style="background:#F4F5F7;border-radius:0 0 6px 6px;padding:8px 24px 9px;font-size:8px;line-height:1.5;color:#4A5567;">
 {% if mode_mpr == 'sans_attente' %}
-<div style="margin-top:8px;padding:10px 12px;border:1px solid #002E5A;border-left:3px solid #E2214B;border-radius:6px;background:#F4F8FC;font-size:9.5px;line-height:1.5;color:#1A2233;">
-<strong style="color:#002E5A;">Mode sans attente MPR</strong> : le montant de la prime MaPrimeRénov' ({{ montant_mpr_affiche }} €) reste à votre charge lors du règlement. <strong style="color:#002E5A;">Cette prime vous sera versée directement par l'Anah</strong> après réalisation des travaux. Ce mode permet un démarrage immédiat du chantier (délai : 0 mois au lieu de 5 mois).
+<strong style="color:#002E5A;font-size:8.5px;">Option retenue : démarrage sans attente</strong> — Ce montant n'intègre pas MaPrimeRénov' (<strong>{{ montant_mpr_affiche }} €</strong>), qui vous sera versée directement par l'Anah après travaux. Cette option, retenue à votre demande, permet un démarrage immédiat du chantier.
+{% else %}
+<strong style="color:#002E5A;font-size:8.5px;">Option retenue : démarrage après notification</strong> — Ce montant intègre MaPrimeRénov' (<strong>{{ montant_mpr_affiche }} €</strong>), avancée par Hexa-Rénov'. Les travaux débuteront après réception de la notification d'octroi de l'Anah (délai moyen : 5 mois).
+{% endif %}
 </div>
 {% endif %}
 
