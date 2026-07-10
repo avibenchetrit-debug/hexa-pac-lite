@@ -15235,6 +15235,8 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
       surface_chauffee: state.surface_chauffee || '',
       option: state.option || '',
       niveau_actif: state.niveau_actif || 'recommande',
+      mode_mpr: state.mode_mpr || 'attente',
+      financement_mpr: state.financement_mpr || 'cash',
       afficher_apercu: state.afficher_apercu !== false,
       ballon_ref: state.ballon_ref || '',
       // Éco 20 ans (roi()) : incluses uniquement si lastRoi existe, sinon clés omises
@@ -15285,6 +15287,8 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
       if (saved.type_logement) state.type_logement = saved.type_logement;
       if (saved.surface_chauffee) { state.surface_chauffee = Number(saved.surface_chauffee); state.surface_forcee = true; }
       if (saved.option) state.option = saved.option;
+      state.mode_mpr = saved.mode_mpr || 'attente';
+      state.financement_mpr = saved.financement_mpr || 'cash';
       if (saved.niveau_actif) state.niveau_actif = saved.niveau_actif;
       state.afficher_apercu = (saved.afficher_apercu !== false);
       if (saved.ballon_ref) state.ballon_ref = saved.ballon_ref;
@@ -15550,18 +15554,41 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     const aidesDevis  = ceeDevis + mprDevis;
     const g29 = Math.max(0, (state.prix_pac || 0) - aidesDevis);
 
+    // --- Ballon inclus dans le crédit (aligné sur le back). resteAttente = reste_a_charge back ---
+    const bs = ballonSim(state);
+    const ballonTTC = bs.actif ? bs.totalTTC : 0;
+    const mprBallon = bs.actif ? bs.mpr : 0;
+    const resteAttente = Math.max(0, g29 + ballonTTC - mprBallon);   // NET RÉEL, base du ROI, indépendant des toggles
+    const mprTotal = mprDevis + mprBallon;
+    // Toggles par lead (défauts rétrocompat). superieur/MPR=0 => sansAttente neutralisé.
+    const modeMpr = state.mode_mpr || 'attente';
+    const finMpr  = state.financement_mpr || 'cash';
+    const sansAttente = (modeMpr === 'sans_attente') && (mprTotal > 0);
+    const reste_affiche = sansAttente ? resteAttente + mprTotal : resteAttente;
+    const base_credit   = (sansAttente && finMpr === 'credit') ? reste_affiche : resteAttente;
+
     const fin = M3_CONFIG?.params_financement || defaultParamsFinancement();
-    // Option 1 — Crédit Travaux : taux/durée conditionnels au seuil de reste à charge
+    // --- SET NET (ROI) : sur resteAttente, JAMAIS influencé par les toggles ---
+    const seuilNet = Number(fin.seuil_rac_eur) || 0;
+    const ctNet = (resteAttente < seuilNet) ? (fin.credit_travaux?.sous_seuil || {}) : (fin.credit_travaux?.sur_seuil || {});
+    const dureeO1Net = Number(ctNet.duree_mois) || 0;
+    const mensO1Net = pmt((Number(ctNet.taux_pct) || 0) / 100, dureeO1Net, resteAttente);
+    const dureeO2Net = Number(fin.eco_ptz?.duree_mois) || 0;
+    const mensO2Net = pmt((Number(fin.eco_ptz?.taux_pct) || 0) / 100, dureeO2Net, resteAttente);
+    const nMoisNet = ({ opt1:dureeO1Net, opt2:dureeO2Net, opt3:0 })[state.option];
+    const mensOptNet = state.option==='opt1' ? mensO1Net : state.option==='opt2' ? mensO2Net : 0;
+
+    // --- SET AFFICHÉ (UI + devis) : sur base_credit, suit les toggles ---
     const seuil = Number(fin.seuil_rac_eur) || 0;
-    const sousLeSeuil = g29 < seuil;
+    const sousLeSeuil = base_credit < seuil;
     const ct = sousLeSeuil ? (fin.credit_travaux?.sous_seuil || {}) : (fin.credit_travaux?.sur_seuil || {});
     const tauxO1 = (Number(ct.taux_pct) || 0) / 100;
     const dureeO1 = Number(ct.duree_mois) || 0;
-    const mensO1 = pmt(tauxO1, dureeO1, g29);
+    const mensO1 = pmt(tauxO1, dureeO1, base_credit);
     // Option 2 — Éco-PTZ
     const tauxO2 = (Number(fin.eco_ptz?.taux_pct) || 0) / 100;
     const dureeO2 = Number(fin.eco_ptz?.duree_mois) || 0;
-    const mensO2 = pmt(tauxO2, dureeO2, g29);
+    const mensO2 = pmt(tauxO2, dureeO2, base_credit);
     const fraisO2 = 0;
 
     // mensualité selon option choisie (opt3 = pas de crédit)
@@ -15578,6 +15605,8 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     };
 
     return { sKey, ceeDevis, ceeConserve, mprDevis, aidesDevis, g29,
+             resteAttente, mprTotal, reste_affiche, base_credit,
+             mensOptNet, nMoisNet, modeMpr, finMpr, sansAttente,
              contextePret,
              mensO1, mensO2, fraisO2, mensOpt, nMois, dim, finView };
   }
@@ -15596,11 +15625,11 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     const dureeVie = Number(pe.duree_vie_pac_ans) || DUREE_VIE_PAC;
     const annAvant0 = state.facture_avant*12;
     const annApres0 = state.facture_apres*12;
-    const mensAnnee = c.mensOpt*12;                 // coût crédit annuel
-    const dureeCreditAns = c.nMois/12;
+    const mensAnnee = c.mensOptNet*12;                 // coût crédit annuel
+    const dureeCreditAns = c.nMoisNet/12;
     const estCredit = (mensAnnee > 0 && dureeCreditAns > 0);
     // Au comptant, le client débourse g29 ; à crédit, rien au départ (tout financé) => seuil 0
-    const seuilRentabilite = estCredit ? 0 : c.g29;
+    const seuilRentabilite = estCredit ? 0 : c.resteAttente;
     const bsEcs = ballonSim(state);
     const ecsAn0 = bsEcs.actif ? bsEcs.economieEcs*12 : 0;
     let cumul = 0; let anneeRentable = null;
@@ -15614,7 +15643,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
       if (anneeRentable===null && cumul >= seuilRentabilite) anneeRentable = an;
     }
     // total20 = cumul des gains nets sur dureeVie, moins ce qui a été déboursé au départ (g29 au comptant, 0 à crédit)
-    const total20 = cumul - (estCredit ? 0 : c.g29);
+    const total20 = cumul - (estCredit ? 0 : c.resteAttente);
     return { anneeRentable, total20, infAvant, inflElec, dureeCreditAns, cumulNet: cumul, estCredit };
   }
 
@@ -15642,7 +15671,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
 </ul>`;
     }
     return `<ul>
-<li>Vous avancez <b>${eur(c.g29)}</b>, une seule fois.</li>
+<li>Vous avancez <b>${eur(c.reste_affiche)}</b>, une seule fois.</li>
 <li>Vos économies de chauffage (${av} → ${eur(state.facture_apres)}/mois) vous remboursent en <b>${r.anneeRentable} ans</b>.</li>
 <li>Ensuite, <b>tout ce que vous économisez est pour vous.</b></li>
 </ul>`;
@@ -15662,7 +15691,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     }
     return `<b>En clair :</b>
 <ul>
-<li>Vous avancez ${eur(c.g29)} une seule fois.</li>
+<li>Vous avancez ${eur(c.reste_affiche)} une seule fois.</li>
 <li>Vos économies de chauffage vous remboursent cette somme en ${r.anneeRentable} ans.</li>
 <li>Ensuite, tout est pour vous : sur 20 ans, ça fait ${eur(r.total20)} dans votre poche.</li>
 <li>Le prix du ${energieLbl} augmente d'environ ${Math.round(r.infAvant*100)}%/an → l'écart se creuse en votre faveur chaque année.</li>
@@ -15902,7 +15931,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
           <div class="sim-pnl-line sim-pnl-minus"><span>– Prime CEE (devis)</span><b id="sim-cee">${eurDash(c.ceeDevis, c.contextePret)}</b></div>
           <div class="sim-pnl-line sim-pnl-sub"><span>= Aides déduites</span><b id="sim-aides">${eurDash(c.aidesDevis + (bs.actif ? bs.mpr : 0), c.contextePret)}</b></div>
           <div class="sim-pnl-sep sim-pnl-sep--strong"></div>
-          <div class="sim-pnl-line sim-pnl-reste"><span>Reste à charge</span><strong id="sim-reste">${eurDash(bs.actif ? Math.max(0, (state.prix_pac||0) + bs.totalTTC - c.aidesDevis - bs.mpr) : c.g29, c.contextePret)}</strong></div>
+          <div class="sim-pnl-line sim-pnl-reste"><span>Reste à charge</span><strong id="sim-reste">${eurDash(c.reste_affiche, c.contextePret)}</strong></div>
         </div>
         <div class="sim-marge">
           <span>CEE conservé installateur <i>(écrêtement, hors devis)</i></span><b id="sim-conserve">${eurDash(c.ceeConserve, c.contextePret)}</b>
@@ -15918,6 +15947,25 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
   function renderDynamic(c, r, energieLbl, creditLine, totalApres, delta, phraseRoi){
     return `
         <!-- FINANCEMENT : 3 options sur une ligne -->
+        ${c.mprTotal > 0 ? `
+        <div class="sim-section-label">Mode MaPrimeRénov'</div>
+        <div class="sim-opts">
+          <button type="button" class="sim-opt ${c.modeMpr==='sans_attente'?'':'active'}" data-mode-mpr="attente">
+            <span class="sim-opt-tag">Mode</span><span class="sim-opt-name">Attente MPR</span><span class="sim-opt-sub">délai 5 mois · Hexa avance</span>
+          </button>
+          <button type="button" class="sim-opt ${c.modeMpr==='sans_attente'?'active':''}" data-mode-mpr="sans_attente">
+            <span class="sim-opt-tag">Mode</span><span class="sim-opt-name">Sans attente MPR</span><span class="sim-opt-sub">délai 0 mois · démarrage immédiat</span>
+          </button>
+        </div>` : ''}
+        ${c.sansAttente ? `
+        <div class="sim-opts">
+          <button type="button" class="sim-opt ${c.finMpr==='credit'?'':'active'}" data-fin-mpr="cash">
+            <span class="sim-opt-tag">Avance MPR</span><span class="sim-opt-name">MPR payée cash</span><span class="sim-opt-sub">mensualité inchangée</span>
+          </button>
+          <button type="button" class="sim-opt ${c.finMpr==='credit'?'active':''}" data-fin-mpr="credit">
+            <span class="sim-opt-tag">Avance MPR</span><span class="sim-opt-name">MPR financée à crédit</span><span class="sim-opt-sub">mensualité plus élevée</span>
+          </button>
+        </div>` : ''}
         <div class="sim-section-label">Financement du reste à charge</div>
         <div class="sim-opts">
           <button type="button" class="sim-opt ${state.option==='opt1'?'active':''}" data-opt="opt1">
@@ -15936,7 +15984,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
             <span class="sim-opt-tag">Option 3</span>
             <span class="sim-opt-name">${c.finView.libelles.option3 || 'Fonds propres'}</span>
             <span class="sim-opt-sub">comptant</span>
-            <span class="sim-opt-amt">${eur(c.g29)}<small> 1 fois</small></span>
+            <span class="sim-opt-amt">${eur(c.reste_affiche)}<small> 1 fois</small></span>
           </button>
         </div>
         ${state.option==='opt1' && c.finView.mention ? `<div class="sim-note">${c.finView.mention}</div>` : ''}
@@ -15996,7 +16044,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     set('sim-mpr-ballon', eurDash(bs.mpr, c.contextePret));
     set('sim-cee', eurDash(c.ceeDevis, c.contextePret));
     set('sim-aides', eurDash(c.aidesDevis + (bs.actif ? bs.mpr : 0), c.contextePret));
-    set('sim-reste', eurDash(bs.actif ? Math.max(0, (state.prix_pac||0) + bs.totalTTC - c.aidesDevis - bs.mpr) : c.g29, c.contextePret));
+    set('sim-reste', eurDash(c.reste_affiche, c.contextePret));
     set('sim-ballon-montant', eur(bs.totalTTC));
     set('sim-soustotal', eur((state.prix_pac||0) + bs.totalTTC));
     set('sim-conserve', eurDash(c.ceeConserve, c.contextePret));
@@ -16067,8 +16115,14 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
       patch();
     }));
     // options de financement : refresh complet (pas d'input -> ok), scroll préservé
-    document.querySelectorAll('.sim-opt').forEach(btn=>{
+    document.querySelectorAll('.sim-opt[data-opt]').forEach(btn=>{
       btn.addEventListener('click',()=>{ state.option=btn.dataset.opt; scheduleSaveSimulatorState(); refresh(); });
+    });
+    document.querySelectorAll('.sim-opt[data-mode-mpr]').forEach(btn=>{
+      btn.addEventListener('click',()=>{ state.mode_mpr=btn.dataset.modeMpr; scheduleSaveSimulatorState(); refresh(); });
+    });
+    document.querySelectorAll('.sim-opt[data-fin-mpr]').forEach(btn=>{
+      btn.addEventListener('click',()=>{ state.financement_mpr=btn.dataset.finMpr; scheduleSaveSimulatorState(); refresh(); });
     });
     document.getElementById('btn-voir-devis')?.addEventListener('click', ouvrirModalDevis);
     if (!window.__apercuToggleDelegated){

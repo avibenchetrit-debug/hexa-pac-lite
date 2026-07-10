@@ -3512,7 +3512,18 @@ def _build_devis_context(request: Request, numero: str, version: int | None = No
             facture_avant = round(float_value(_cout_annuel) / 12) if (str(_cout_annuel).strip() and float_value(_cout_annuel) > 0) else None
     _surface_eco = devis_value(state, "surface_chauffee", default="") or devis_value(prospect, "surface_habitable", "surface_logement_m2", default="")
     _zone_eco = devis_value(state, "zone", default=context["zone_climatique"])
-    context["financement_devis"] = calculer_financement_devis(calculs["reste_a_charge"], admin)
+    # Toggle MPR (par lead) : reste affiche + base de credit selon mode/financement (ROI intact via eco_20_ans du state)
+    _mode_mpr = (state.get("mode_mpr") or "attente")
+    _fin_mpr = (state.get("financement_mpr") or "cash")
+    _mpr_total = float_value(calculs.get("montant_mpr")) + float_value(calculs.get("montant_mpr_ballon"))
+    _reste_net = float_value(calculs["reste_a_charge"])  # = resteAttente (ballon deja inclus cote back)
+    _sans_attente = (_mode_mpr == "sans_attente") and (_mpr_total > 0)
+    _reste_affiche = _reste_net + _mpr_total if _sans_attente else _reste_net
+    _base_credit = _reste_affiche if (_sans_attente and _fin_mpr == "credit") else _reste_net
+    context["reste_a_charge"] = money(_reste_affiche)
+    context["mode_mpr"] = "sans_attente" if _sans_attente else "attente"
+    context["montant_mpr_affiche"] = f"{round(_mpr_total):,}".replace(",", " ")
+    context["financement_devis"] = calculer_financement_devis(_base_credit, admin)
     context["economie_devis"] = calculer_economie_devis(
         _surface_eco, _zone_eco,
         devis_value(modele_obj, "etas35", default=0), devis_value(modele_obj, "etas55", default=0),
