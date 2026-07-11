@@ -648,24 +648,17 @@ def _seed_json_file(path, default, repo_source=None):
     _atomic_write_json(path, default)
 
 
-def _ensure_vt_category():
-    """Idempotent : garantit la catégorie 'vt' juste après 'urbanisme' dans le fichier
-    runtime (volume). N'écrit qu'une fois, ne modifie pas les autres catégories."""
-    cats = _read_json(DOCUMENTS_CATEGORIES_PATH, [])
-    if not isinstance(cats, list) or any(isinstance(c, dict) and c.get("id") == "vt" for c in cats):
+def _sync_documents_categories():
+    """Idempotent : aligne le fichier runtime (volume) sur la structure canonique du repo.
+    Les catégories de documents sont une config en lecture seule (aucune édition runtime) :
+    on force la synchro volume <- repo dès qu'elles diffèrent. Remplace _ensure_vt_category
+    (catégorie VT retirée + réorganisation complète des documents prospect)."""
+    canonical = _read_json(REPO_DOCUMENTS_CATEGORIES_PATH, None)
+    if not isinstance(canonical, list) or not canonical:
         return
-    vt = {
-        "id": "vt",
-        "label": "VT",
-        "icon": "🔍",
-        "sous_categories": [
-            {"id": "rapport_vt", "label": "Rapport de visite technique", "icon": "📄",
-             "statut": None, "max_docs": 3, "types_acceptes": ["PDF"]}
-        ],
-    }
-    idx = next((i for i, c in enumerate(cats) if isinstance(c, dict) and c.get("id") == "urbanisme"), None)
-    cats.insert(idx + 1 if idx is not None else len(cats), vt)
-    _atomic_write_json(DOCUMENTS_CATEGORIES_PATH, cats)
+    if _read_json(DOCUMENTS_CATEGORIES_PATH, None) == canonical:
+        return
+    _atomic_write_json(DOCUMENTS_CATEGORIES_PATH, canonical)
 
 
 def _init_storage():
@@ -687,7 +680,7 @@ def _init_storage():
     _seed_json_file(DEVIS_META_PATH, {})
     save_parametres_admin_atomic(load_parametres_admin())
     _migrate_catalogue_pac_schema()
-    _ensure_vt_category()
+    _sync_documents_categories()
 
 
 def _read_leads():
