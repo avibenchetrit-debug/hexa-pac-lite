@@ -17783,7 +17783,17 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
       <div class="adm-add-row"><button type="button" class="adm-btn adm-btn-add" id="adm-add">+ Ajouter une pompe à chaleur</button><button type="button" class="adm-btn adm-btn-add" id="adm-import-xlsx">📥 Importer catalogue Excel</button><input type="file" id="adm-import-xlsx-file" accept=".xlsx" style="display:none"></div>
       <div class="adm-legend"><div class="adm-legend-row"><span class="adm-dot adm-dot1"></span><span>Option 1 — vente directe : marge brute − CAC − visite − COFRAC − urbanisme.</span></div><div class="adm-legend-row"><span class="adm-dot adm-dot2"></span><span>Option 2 — prix de cession : marge garantie au-dessus de (coût + visite + COFRAC + urbanisme). La régie revend au-dessus et garde le surplus ; la colonne « Commission régie » montre ce qu'elle gagne si elle revend à ton prix catalogue.</span></div><div class="adm-legend-row"><span>Marges théoriques — calculées sur un MPR forfaitaire de 5 000 € (estimation commune à tous les modèles), pas un calcul réel par prospect.</span></div></div>
       <div class="adm-actions"><button type="button" class="adm-btn-save" id="adm-save-catalogue">Enregistrer</button></div>`;
-    const adminBody = `${admBloc('1','1. Réglages généraux',admSousBloc('1-1','1.1 Coût Hexa',coutHexa)+admSousBloc('1-2','1.2 Vente Hexa',venteHexa))}${admBloc('2','2. MPR',admSousBloc('2-1','2.1 Forfait MPR',renderMprFields())+admSousBloc('2-2','2.2 Plafonds réglementaires',renderPlafondsSection())+admSousBloc('2-3','2.3 Barèmes ANAH (plafonds RFR)',renderBaremesAnahSection()))}${admBloc('3','3. CEE',admSousBloc('3-1','3.1 Formule BAR-TH-171 (PAC Air-Eau)',renderFormuleBarSection())+admSousBloc('3-2','3.2 Bonification CEE',renderBonificationFields())+admSousBloc('3-3','3.3 Délégataires CEE',renderDelegatairesFields()))}${admBloc('4','4. Sous-traitants',renderSousTraitantsSection())}${admBloc('5','5. Commercial',admSousBloc('5-1','5.1 Options commerciales',optionsCommerciales)+admSousBloc('5-2','5.2 Modèles et marges nettes',modelesMarges)+admSousBloc('5-3','5.3 Ballon thermodynamique',renderBallonThermoFields()))}${admBloc('6','6. Modèles email',renderEmailsFields())}${admBloc('7','7. Corbeille des leads','<div id="adm-trash" class="adm-trash-empty">Chargement...</div>')}${admBloc('8','8. Paramètres économiques',admSousBloc('8-1',"8.1 Hypothèses économie d'énergie",renderParamsEcoEnergie())+admSousBloc('8-2','8.2 Hypothèses financement',renderParamsFinancement()))}${admBloc('9','9. Gammes & Marques', renderMarquesSection())}${admBloc('10','10. Utilisateurs', renderUtilisateursSection())}${admBloc('11','11. Relances (emails automatiques)', renderRelancesSection())}`;
+    const admB1 = admBloc('1','1. Réglages généraux',admSousBloc('1-1','1.1 Coût Hexa',coutHexa)+admSousBloc('1-2','1.2 Vente Hexa',venteHexa));
+    const admB2 = admBloc('2','2. MPR',admSousBloc('2-1','2.1 Forfait MPR',renderMprFields())+admSousBloc('2-2','2.2 Plafonds réglementaires',renderPlafondsSection())+admSousBloc('2-3','2.3 Barèmes ANAH (plafonds RFR)',renderBaremesAnahSection()));
+    const admB3 = admBloc('3','3. CEE',admSousBloc('3-1','3.1 Formule BAR-TH-171 (PAC Air-Eau)',renderFormuleBarSection())+admSousBloc('3-2','3.2 Bonification CEE',renderBonificationFields())+admSousBloc('3-3','3.3 Délégataires CEE',renderDelegatairesFields()));
+    const admB4 = admBloc('4','4. Sous-traitants',renderSousTraitantsSection());
+    const admB5 = admBloc('5','5. Commercial',admSousBloc('5-1','5.1 Options commerciales',optionsCommerciales)+admSousBloc('5-2','5.2 Modèles et marges nettes',modelesMarges)+admSousBloc('5-3','5.3 Ballon thermodynamique',renderBallonThermoFields()));
+    const admB6 = admBloc('6','6. Modèles email',renderEmailsFields());
+    const admB7 = admBloc('7','7. Corbeille des leads','<div id="adm-trash" class="adm-trash-empty">Chargement...</div>');
+    const admB8 = admBloc('8','8. Paramètres économiques',admSousBloc('8-1',"8.1 Hypothèses économie d'énergie",renderParamsEcoEnergie())+admSousBloc('8-2','8.2 Hypothèses financement',renderParamsFinancement()));
+    const admB9 = admBloc('9','9. Gammes & Marques', renderMarquesSection());
+    const admB10 = admBloc('10','10. Utilisateurs', renderUtilisateursSection());
+    const admB11 = admBloc('11','11. Relances (emails automatiques)', renderRelancesSection());
     return `
       <div class="adm-overlay" id="adm-overlay">
         <div class="adm-modal">
@@ -17807,14 +17817,14 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
             <button class="adm-roottab" data-roottab="systeme">Système</button>
           </div>
           <div class="adm-body">
-            <div class="adm-rootpanel" data-rootpanel="general">${adminBody}</div>
-            <div class="adm-rootpanel" data-rootpanel="mpr" hidden></div>
-            <div class="adm-rootpanel" data-rootpanel="cee" hidden></div>
-            <div class="adm-rootpanel" data-rootpanel="catalogue" hidden></div>
+            <div class="adm-rootpanel" data-rootpanel="general">${admB1}${admB4}${admB5}</div>
+            <div class="adm-rootpanel" data-rootpanel="mpr" hidden>${admB2}</div>
+            <div class="adm-rootpanel" data-rootpanel="cee" hidden>${admB3}</div>
+            <div class="adm-rootpanel" data-rootpanel="catalogue" hidden>${admB9}</div>
             <div class="adm-rootpanel" data-rootpanel="ballon" hidden></div>
-            <div class="adm-rootpanel" data-rootpanel="eco" hidden></div>
-            <div class="adm-rootpanel" data-rootpanel="emails" hidden></div>
-            <div class="adm-rootpanel" data-rootpanel="systeme" hidden></div>
+            <div class="adm-rootpanel" data-rootpanel="eco" hidden>${admB8}</div>
+            <div class="adm-rootpanel" data-rootpanel="emails" hidden>${admB6}${admB11}</div>
+            <div class="adm-rootpanel" data-rootpanel="systeme" hidden>${admB10}${admB7}</div>
           </div>
         </div>
       </div>`;
