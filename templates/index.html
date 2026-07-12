@@ -17787,7 +17787,9 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     const admB2 = admBloc('2','2. MPR',admSousBloc('2-1','2.1 Forfait MPR',renderMprFields())+admSousBloc('2-2','2.2 Plafonds réglementaires',renderPlafondsSection())+admSousBloc('2-3','2.3 Barèmes ANAH (plafonds RFR)',renderBaremesAnahSection()));
     const admB3 = admBloc('3','3. CEE',admSousBloc('3-1','3.1 Formule BAR-TH-171 (PAC Air-Eau)',renderFormuleBarSection())+admSousBloc('3-2','3.2 Bonification CEE',renderBonificationFields())+admSousBloc('3-3','3.3 Délégataires CEE',renderDelegatairesFields()));
     const admB4 = admBloc('4','4. Sous-traitants',renderSousTraitantsSection());
-    const admB5 = admBloc('5','5. Commercial',admSousBloc('5-1','5.1 Options commerciales',optionsCommerciales)+admSousBloc('5-2','5.2 Modèles et marges nettes',modelesMarges)+admSousBloc('5-3','5.3 Ballon thermodynamique',renderBallonThermoFields()));
+    const admB5_1 = admBloc('5-1','Options commerciales',optionsCommerciales);
+    const admB5_2 = admBloc('5-2','Modèles et marges nettes',modelesMarges);
+    const admB5_3 = admBloc('5-3','Ballon thermodynamique',renderBallonThermoFields());
     const admB6 = admBloc('6','6. Modèles email',renderEmailsFields());
     const admB7 = admBloc('7','7. Corbeille des leads','<div id="adm-trash" class="adm-trash-empty">Chargement...</div>');
     const admB8 = admBloc('8','8. Paramètres économiques',admSousBloc('8-1',"8.1 Hypothèses économie d'énergie",renderParamsEcoEnergie())+admSousBloc('8-2','8.2 Hypothèses financement',renderParamsFinancement()));
@@ -17808,6 +17810,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
           </div>
           <div class="adm-roottabs" id="adm-roottabs">
             <button class="adm-roottab active" data-roottab="general">Général</button>
+            <button class="adm-roottab" data-roottab="marge">Marge</button>
             <button class="adm-roottab" data-roottab="mpr">MPR</button>
             <button class="adm-roottab" data-roottab="cee">CEE</button>
             <button class="adm-roottab" data-roottab="catalogue">Catalogue PAC</button>
@@ -17817,11 +17820,12 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
             <button class="adm-roottab" data-roottab="systeme">Système</button>
           </div>
           <div class="adm-body">
-            <div class="adm-rootpanel" data-rootpanel="general">${admB1}${admB4}${admB5}</div>
+            <div class="adm-rootpanel" data-rootpanel="general">${admB1}${admB4}</div>
+            <div class="adm-rootpanel" data-rootpanel="marge" hidden>${admB5_1}</div>
             <div class="adm-rootpanel" data-rootpanel="mpr" hidden>${admB2}</div>
             <div class="adm-rootpanel" data-rootpanel="cee" hidden>${admB3}</div>
-            <div class="adm-rootpanel" data-rootpanel="catalogue" hidden>${admB9}</div>
-            <div class="adm-rootpanel" data-rootpanel="ballon" hidden></div>
+            <div class="adm-rootpanel" data-rootpanel="catalogue" hidden>${admB5_2}${admB9}</div>
+            <div class="adm-rootpanel" data-rootpanel="ballon" hidden>${admB5_3}</div>
             <div class="adm-rootpanel" data-rootpanel="eco" hidden>${admB8}</div>
             <div class="adm-rootpanel" data-rootpanel="emails" hidden>${admB6}${admB11}</div>
             <div class="adm-rootpanel" data-rootpanel="systeme" hidden>${admB10}${admB7}</div>
