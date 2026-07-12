@@ -7133,6 +7133,11 @@ input:focus{ outline:none; border-color: var(--c-navy,#002E5A); box-shadow:0 0 0
 .adm-tab.active { color:#002E5A; border-bottom-color:#E2214B; }
 .adm-tab-content { display:block; }
 .adm-tab-content[hidden] { display:none; }
+.adm-roottabs{display:flex;flex-wrap:wrap;gap:2px;border-bottom:1px solid var(--gris-ligne,#E2E8F0);margin:0 0 18px;padding:0 4px;}
+.adm-roottab{appearance:none;background:none;border:none;border-bottom:2px solid transparent;padding:10px 16px;font-family:inherit;font-size:12px;font-weight:600;letter-spacing:.04em;color:var(--gris-mute,#6B7280);cursor:pointer;white-space:nowrap;transition:color .15s,border-color .15s;}
+.adm-roottab:hover{color:var(--bleu,#002E5A);}
+.adm-roottab.active{color:var(--bleu,#002E5A);border-bottom-color:var(--rouge,#E2214B);}
+.adm-rootpanel[hidden]{display:none;}
 .adm-bloc {
   background: white;
   border: 1px solid #e5e7eb;
@@ -17791,7 +17796,26 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
               <button type="button" class="adm-close" id="adm-close" aria-label="Fermer">&times;</button>
             </div>
           </div>
-          <div class="adm-body">${adminBody}</div>
+          <div class="adm-roottabs" id="adm-roottabs">
+            <button class="adm-roottab active" data-roottab="general">Général</button>
+            <button class="adm-roottab" data-roottab="mpr">MPR</button>
+            <button class="adm-roottab" data-roottab="cee">CEE</button>
+            <button class="adm-roottab" data-roottab="catalogue">Catalogue PAC</button>
+            <button class="adm-roottab" data-roottab="ballon">Ballon</button>
+            <button class="adm-roottab" data-roottab="eco">Économie & Financement</button>
+            <button class="adm-roottab" data-roottab="emails">Emails & Relances</button>
+            <button class="adm-roottab" data-roottab="systeme">Système</button>
+          </div>
+          <div class="adm-body">
+            <div class="adm-rootpanel" data-rootpanel="general">${adminBody}</div>
+            <div class="adm-rootpanel" data-rootpanel="mpr" hidden></div>
+            <div class="adm-rootpanel" data-rootpanel="cee" hidden></div>
+            <div class="adm-rootpanel" data-rootpanel="catalogue" hidden></div>
+            <div class="adm-rootpanel" data-rootpanel="ballon" hidden></div>
+            <div class="adm-rootpanel" data-rootpanel="eco" hidden></div>
+            <div class="adm-rootpanel" data-rootpanel="emails" hidden></div>
+            <div class="adm-rootpanel" data-rootpanel="systeme" hidden></div>
+          </div>
         </div>
       </div>`;
   }
@@ -18352,6 +18376,16 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     document.querySelectorAll('.adm-cess-reset').forEach(btn=>{
       btn.addEventListener('click', ()=>{
         const i=+btn.dataset.i; delete window.HexaConfig.models[i].cession_forcee; recalc();
+      });
+    });
+    document.querySelectorAll('.adm-roottab').forEach(tab => {
+      tab.addEventListener('click', function () {
+        const target = this.dataset.roottab;
+        document.querySelectorAll('.adm-roottab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.adm-rootpanel').forEach(p => { p.hidden = true; });
+        this.classList.add('active');
+        const panel = document.querySelector(`.adm-rootpanel[data-rootpanel="${target}"]`);
+        if (panel) panel.hidden = false;
       });
     });
     bindAdminM3();
