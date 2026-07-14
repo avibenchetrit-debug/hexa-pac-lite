@@ -13905,6 +13905,9 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
           <div class="docs-devis-title" id="docs-devis-title" onclick="toggleDevisEnvoyes()">📋 Devis envoyés</div>
           <div id="docs-devis-list">Chargement…</div>
         </div>
+        <div class="docs-devis-block" id="docs-nrp-block" style="display:none">
+          <div id="docs-nrp-list"></div>
+        </div>
         <button type="button" class="docs-nav-back" id="docs-nav-back" style="display:none;">‹ Retour</button>
         <nav id="docs-breadcrumb" class="docs-breadcrumb"></nav>
         <div id="docs-view-root"><div id="docs-cat-list" class="docs-folder-list"></div></div>
@@ -14396,6 +14399,10 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
         <div class="docs-devis-row">
           <div><b>${escapeHtml((item.variante === 'pre_devis' && (item.numero_devis || '').startsWith('DE')) ? ('PD' + item.numero_devis.slice(2)) : (item.numero_devis || ('v' + item.version)))}</b> — Envoyé le ${formatParis(item.sent_at)} à ${escapeHtml(item.email || '')}</div>
           <div style="font-size:12px;font-weight:600;margin-top:2px;${item.first_opened_at ? 'color:#15803D' : 'color:#94A3B8'}">${item.first_opened_at ? `✅ Ouvert le ${formatParis(item.first_opened_at)}${(item.open_count||0) > 1 ? ` · ${item.open_count} ouvertures` : ''}` : '⏳ Pas encore ouvert'}</div>
+          ${(Array.isArray(item.relances) && item.relances.length) ? `<details class="docs-relances">
+            <summary>${item.variante === 'pre_devis' ? 'Pré-devis' : 'Devis'} : ${item.relances.length} relance${item.relances.length > 1 ? 's' : ''}</summary>
+            <ul class="docs-relances-list">${item.relances.map(r => `<li>Relance ${escapeHtml(r.niveau)} — ${formatParis(r.sent_at)}</li>`).join('')}</ul>
+          </details>` : ''}
           <div class="docs-devis-actions">
             <button type="button" class="hexa-meta-card-action" data-devis-preview="${item.version}">👁 Aperçu</button>
             <button type="button" class="hexa-meta-card-action" data-devis-download="${item.version}">📥 Télécharger</button>
@@ -14594,6 +14601,20 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     } catch (_) { /* ignore */ }
   }
 
+  function refreshNrpRelances() {
+    const block = document.getElementById('docs-nrp-block');
+    const root = document.getElementById('docs-nrp-list');
+    if (!block || !root) return;
+    const cp = window.HexaCurrentProspect || {};
+    const rels = Array.isArray(cp.nrp_relances) ? cp.nrp_relances : [];
+    if (!rels.length) { block.style.display = 'none'; root.innerHTML = ''; return; }
+    block.style.display = '';
+    root.innerHTML = `<details class="docs-relances">
+        <summary>NRP : ${rels.length} relance${rels.length > 1 ? 's' : ''}</summary>
+        <ul class="docs-relances-list">${rels.map(r => `<li>Relance ${escapeHtml(r.niveau)} — ${formatParis(r.sent_at)}</li>`).join('')}</ul>
+      </details>`;
+  }
+
   window.ouvrirDocuments = async function(numero) {
     injectPanel();
     currentProspect = numero || document.body.dataset.prospectNumero;
@@ -14607,6 +14628,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     }
     await chargerSousTitreProspect();
     await refreshDevisList();
+    refreshNrpRelances();
     await loadCategories();
     await refreshStatus();
     navToRoot();
@@ -19497,6 +19519,8 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     }
     const rows = getStatsFilteredLeads();
     totalEl.textContent = String(rows.length);
+    const nrpRelEl = document.getElementById('pv-stats-relances-nrp');
+    if(nrpRelEl) nrpRelEl.textContent = String(rows.reduce((n,p)=> n + (Array.isArray(p.nrp_relances) ? p.nrp_relances.length : 0), 0));
     const byStatut = new Map();
     rows.forEach(p=>{
       const k = leadField(p,'statut') || 'sans_statut';
@@ -19611,6 +19635,9 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
               </div>
               <div id="pv-stats-detail" style="font-size:12px;max-height:240px;overflow-y:auto"></div>
             </div>
+          </div>
+          <div style="margin-top:12px;padding-top:10px;border-top:0.5px solid #E2E8F0;font-size:12px;color:#475569">
+            <span style="font-weight:600;color:#002E5A">Relances NRP :</span> <b id="pv-stats-relances-nrp">0</b>
           </div>
         </section>
         <h1 class="pv-h1">Prospects</h1>
@@ -20611,7 +20638,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     window.syncAlimentationProspect?.();
     const numero = String(lead.numero || '').trim();
     document.body.dataset.prospectNumero = numero;
-    window.HexaCurrentProspect = { numero, nom_complet:((lead.nom||'')+' '+(lead.prenom||'')).trim() };
+    window.HexaCurrentProspect = { numero, nom_complet:((lead.nom||'')+' '+(lead.prenom||'')).trim(), nrp_relances: Array.isArray(lead.nrp_relances) ? lead.nrp_relances : [] };
     const infoStrong=document.querySelector('#footer-prospect-num') || document.querySelector('#form-actions-info strong');
     if(infoStrong) infoStrong.textContent = numero || '—';
     form.action = numero ? '/api/leads/' + encodeURIComponent(numero) : '';

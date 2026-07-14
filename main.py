@@ -4666,6 +4666,8 @@ async def list_devis(numero: str) -> JSONResponse:
                 "has_notedim": bool(item.get("notedim_file") and os.path.exists(item.get("notedim_file"))),
                 "first_opened_at": item.get("first_opened_at") or "",
                 "open_count": int(item.get("open_count") or 0),
+                "relance_count": int(item.get("relance_count") or 0),
+                "relances": item.get("relances") if isinstance(item.get("relances"), list) else [],
             })
     items.sort(key=lambda x: x.get("version", 0), reverse=True)
     return JSONResponse(items)
