@@ -4785,6 +4785,38 @@ async def download_devis(numero: str, version: int):
     return FileResponse(path, media_type="application/pdf", filename=os.path.basename(path))
 
 
+@app.get("/api/factures/{numero}/list")
+async def list_factures(numero: str) -> JSONResponse:
+    meta = _read_factures_meta().get(numero, [])
+    items = []
+    for rec in meta:
+        if not isinstance(rec, dict):
+            continue
+        path = rec.get("file") or ""
+        items.append({
+            "numero_facture": rec.get("numero_facture", ""),
+            "numero_devis_ref": rec.get("numero_devis_ref", ""),
+            "date_emission": rec.get("date_emission", ""),
+            "date_fin_travaux": _format_date_fr(rec.get("date_fin_travaux", "")) or rec.get("date_fin_travaux", ""),
+            "montant_ttc": rec.get("montant_ttc"),
+            "created_at": rec.get("created_at", ""),
+            "available": bool(path and os.path.exists(path)),
+        })
+    return JSONResponse(items)
+
+
+@app.get("/api/factures/{numero}/download")
+async def download_facture(numero: str, numero_facture: str):
+    meta = _read_factures_meta().get(numero, [])
+    rec = next((r for r in meta if isinstance(r, dict) and r.get("numero_facture") == numero_facture), None)
+    if not rec:
+        raise HTTPException(status_code=404, detail="Facture introuvable")
+    path = rec.get("file") or _facture_pdf_path(numero, numero_facture)
+    if not os.path.exists(path):
+        raise HTTPException(status_code=404, detail="PDF facture introuvable")
+    return FileResponse(path, media_type="application/pdf", filename=os.path.basename(path))
+
+
 @app.get("/api/devis/{numero}/view")
 async def view_devis(numero: str, version: int):
     path = _devis_path(numero, version)

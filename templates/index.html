@@ -13933,6 +13933,10 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
         <div class="docs-devis-block" id="docs-nrp-block" style="display:none">
           <div id="docs-nrp-list"></div>
         </div>
+        <div class="docs-devis-block" id="docs-factures-block" style="display:none">
+          <div class="docs-devis-title">🧾 Factures</div>
+          <div id="docs-factures-list"></div>
+        </div>
         <button type="button" class="docs-nav-back" id="docs-nav-back" style="display:none;">‹ Retour</button>
         <nav id="docs-breadcrumb" class="docs-breadcrumb"></nav>
         <div id="docs-view-root"><div id="docs-cat-list" class="docs-folder-list"></div></div>
@@ -14449,7 +14453,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
         try {
           const r = await fetch(`/api/facture/${encodeURIComponent(currentProspect)}`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ date_fin_travaux: dateFin }) });
           const body = await r.json().catch(() => ({}));
-          if (r.ok && body.success) { if (st) { st.textContent = '\u2705 Facture ' + (body.numero_facture || '') + ' générée'; st.style.color = '#15803D'; } }
+          if (r.ok && body.success) { if (st) { st.textContent = '\u2705 Facture ' + (body.numero_facture || '') + ' générée'; st.style.color = '#15803D'; } refreshFacturesList(); }
           else { if (st) { st.textContent = '\u274C ' + (body.detail || 'Erreur'); st.style.color = '#B91C1C'; } }
         } catch (e) { if (st) { st.textContent = '\u274C Erreur réseau'; st.style.color = '#B91C1C'; } }
       });
@@ -14472,6 +14476,31 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
       root.innerHTML = '<div class="pv-muted">Aucun devis envoyé pour ce prospect</div>';
     }
   }
+
+  async function refreshFacturesList() {
+    const block = document.getElementById('docs-factures-block');
+    const root = document.getElementById('docs-factures-list');
+    if (!block || !root || !currentProspect) return;
+    let items = [];
+    try {
+      const r = await fetch(`/api/factures/${encodeURIComponent(currentProspect)}/list`, { cache:'no-store' });
+      items = r.ok ? await r.json() : [];
+    } catch (_) { items = []; }
+    if (!Array.isArray(items) || !items.length) { block.style.display = 'none'; root.innerHTML = ''; return; }
+    block.style.display = '';
+    root.innerHTML = items.map(f => `
+      <div class="docs-devis-row">
+        <div><b>${escapeHtml(f.numero_facture || '')}</b>${f.numero_devis_ref ? ` — réf. devis ${escapeHtml(f.numero_devis_ref)}` : ''}</div>
+        <div style="font-size:12px;color:#475569;margin-top:2px;">Émise le ${escapeHtml(f.date_emission || '—')} · Fin travaux ${escapeHtml(f.date_fin_travaux || '—')}${(f.montant_ttc !== null && f.montant_ttc !== undefined && f.montant_ttc !== '') ? ` · ${escapeHtml(String(f.montant_ttc))} € TTC` : ''}</div>
+        <div class="docs-devis-actions">
+          ${f.available ? `<button type="button" class="hexa-meta-card-action" data-facture-download="${escapeHtml(f.numero_facture || '')}">📥 Télécharger</button>` : '<span class="pv-muted" style="font-size:12px;">PDF indisponible</span>'}
+        </div>
+      </div>`).join('');
+    root.querySelectorAll('[data-facture-download]').forEach(btn => {
+      btn.addEventListener('click', () => window.open(`/api/factures/${encodeURIComponent(currentProspect)}/download?numero_facture=${encodeURIComponent(btn.dataset.factureDownload)}`, '_blank'));
+    });
+  }
+  window.refreshFacturesList = refreshFacturesList;
 
   function openDevisPdfViewer(version) {
     ensureViewer();
@@ -14672,6 +14701,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     await chargerSousTitreProspect();
     await refreshDevisList();
     refreshNrpRelances();
+    refreshFacturesList();
     await loadCategories();
     await refreshStatus();
     navToRoot();
