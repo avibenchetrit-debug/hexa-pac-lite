@@ -17100,12 +17100,61 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     const rows = marques.length
       ? marques.map(function(mq){ return marqueCardHtml(mq, cfg[mq] || {}); }).join('')
       : '<p class="adm-section-help">Aucune marque au catalogue.</p>';
+    const addNiveauOpts = '<option value="">— choisir le niveau —</option>' + (window.HEXA_NIVEAUX || []).map(function(n){ return '<option value="' + n.key + '">' + n.icone + ' ' + n.label + '</option>'; }).join('');
     return rows
-      + '<div class="adm-add-row" style="display:flex;gap:8px;align-items:center;margin:10px 0">'
-      +   '<input type="text" id="adm-new-marque-nom" placeholder="Nom de la nouvelle marque (ex. FRISQUET)">'
+      + '<div class="adm-add-row" style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;margin:10px 0 4px">'
+      +   '<label style="display:flex;flex-direction:column;gap:2px;font-size:11px;font-weight:600">Nom<input type="text" id="adm-new-marque-nom" placeholder="ex. ARISTON"></label>'
+      +   '<label style="display:flex;flex-direction:column;gap:2px;font-size:11px;font-weight:600">Préfixe de réf.<input type="text" id="adm-new-marque-prefixe" placeholder="ex. ARI"></label>'
+      +   '<label style="display:flex;flex-direction:column;gap:2px;font-size:11px;font-weight:600">Niveau<select id="adm-new-marque-niveau">' + addNiveauOpts + '</select></label>'
       +   '<button type="button" class="adm-btn" id="btn-add-marque">+ Ajouter une marque</button>'
       + '</div>'
+      + '<p class="adm-section-help" style="margin:0 0 10px;color:#92400E">⚠️ La référence des modèles doit commencer <b>exactement</b> par ce préfixe (ex. <code>ARI-NIMBUS-9</code>). Le niveau est obligatoire : sans lui, les modèles de la marque n\'apparaissent pas au devis.</p>'
       + '<div class="adm-actions"><button type="button" class="adm-btn-save" id="btn-save-marques">Enregistrer</button></div>';
+  }
+  function collectMarquesPayload(){
+    const payload = {};
+    document.querySelectorAll('#adm-bloc-content-9 .adm-card[data-marque]').forEach(function(card){
+      const mq = card.getAttribute('data-marque');
+      const niveau = card.querySelector('.adm-marque-niveau') ? card.querySelector('.adm-marque-niveau').value : '';
+      const positionnement = card.querySelector('.adm-marque-pos') ? card.querySelector('.adm-marque-pos').value : '';
+      const prefixes = card.querySelector('.adm-marque-prefixes')
+        ? card.querySelector('.adm-marque-prefixes').value.split(',').map(function(s){ return String(s).trim().toUpperCase(); }).filter(function(s){ return s; })
+        : [];
+      const avantages = Array.from(card.querySelectorAll('.adm-marque-av')).sort(function(a,b){return Number(a.dataset.idx)-Number(b.dataset.idx);}).map(function(el){return el.value || '';});
+      payload[mq] = { prefixes: prefixes, niveau: niveau, positionnement: positionnement, avantages: avantages };
+    });
+    return payload;
+  }
+  async function postMarques(payload){
+    const r = await fetch('/api/admin/marques', { method:'POST', headers: window.adminHeaders(), body: JSON.stringify(payload) });
+    return r.ok;
+  }
+  function refreshMarquesSection(){
+    const cont = document.getElementById('adm-bloc-content-9');
+    if (!cont) return;
+    cont.innerHTML = renderMarquesSection();
+    bindMarquesSection();
+  }
+  function bindMarquesSection(){
+    document.getElementById('btn-save-marques')?.addEventListener('click', async ()=>{
+      const payload = collectMarquesPayload();
+      if (await postMarques(payload)) { M3_ADMIN.marques = payload; adminToast('Gammes & marques sauvegardées ✓', '#0D6B3B'); window.dispatchEvent(new CustomEvent('hexa-config-changed')); refreshMarquesSection(); }
+      else adminToast('Erreur sauvegarde marques', '#B91C1C');
+    });
+    document.getElementById('btn-add-marque')?.addEventListener('click', async ()=>{
+      const nom = (document.getElementById('adm-new-marque-nom')?.value || '').trim().toUpperCase();
+      const prefixe = (document.getElementById('adm-new-marque-prefixe')?.value || '').trim().toUpperCase();
+      const niveau = document.getElementById('adm-new-marque-niveau')?.value || '';
+      if (!nom) { adminToast('Nom de marque requis', '#B91C1C'); return; }
+      if (!prefixe) { adminToast('Préfixe requis (ex. ARI)', '#B91C1C'); return; }
+      if (!niveau) { adminToast('Niveau obligatoire — sinon les modèles n\'apparaissent pas au devis', '#B91C1C'); return; }
+      const cfg = (M3_ADMIN && M3_ADMIN.marques) || {};
+      if (Object.prototype.hasOwnProperty.call(cfg, nom)) { adminToast('Marque « ' + nom + ' » déjà présente', '#B45309'); return; }
+      const payload = collectMarquesPayload();
+      payload[nom] = { prefixes: [prefixe], niveau: niveau, positionnement: '', avantages: ['','',''] };
+      if (await postMarques(payload)) { M3_ADMIN.marques = payload; adminToast('Marque « ' + nom + ' » ajoutée ✓', '#0D6B3B'); window.dispatchEvent(new CustomEvent('hexa-config-changed')); refreshMarquesSection(); }
+      else adminToast('Erreur ajout marque', '#B91C1C');
+    });
   }
   function bindPwEyes(root){
     (root || document).querySelectorAll('.adm-pw-eye').forEach(function(btn){
@@ -18622,36 +18671,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
       if (r.ok) { M3_ADMIN.baremes_anah = payload; window.HEXA_BAREMES_ANAH = payload; adminToast('Barèmes ANAH sauvegardés ✓', '#0D6B3B'); window.dispatchEvent(new CustomEvent('hexa-config-changed')); }
       else adminToast('Erreur sauvegarde barèmes ANAH', '#B91C1C');
     });
-    document.getElementById('btn-save-marques')?.addEventListener('click', async ()=>{
-      const payload = {};
-      document.querySelectorAll('#adm-bloc-content-9 .adm-card[data-marque]').forEach(function(card){
-        const mq = card.getAttribute('data-marque');
-        const niveau = card.querySelector('.adm-marque-niveau') ? card.querySelector('.adm-marque-niveau').value : '';
-        const positionnement = card.querySelector('.adm-marque-pos') ? card.querySelector('.adm-marque-pos').value : '';
-        const prefixes = card.querySelector('.adm-marque-prefixes')
-          ? card.querySelector('.adm-marque-prefixes').value.split(',').map(function(s){ return String(s).trim().toUpperCase(); }).filter(function(s){ return s; })
-          : [];
-        const avantages = Array.from(card.querySelectorAll('.adm-marque-av')).sort(function(a,b){return Number(a.dataset.idx)-Number(b.dataset.idx);}).map(function(el){return el.value || '';});
-        payload[mq] = { prefixes: prefixes, niveau: niveau, positionnement: positionnement, avantages: avantages };
-      });
-      const r = await fetch('/api/admin/marques', { method:'POST', headers: window.adminHeaders(), body: JSON.stringify(payload) });
-      if (r.ok) { M3_ADMIN.marques = payload; adminToast('Gammes & marques sauvegardées ✓', '#0D6B3B'); window.dispatchEvent(new CustomEvent('hexa-config-changed')); }
-      else adminToast('Erreur sauvegarde marques', '#B91C1C');
-    });
-    document.getElementById('btn-add-marque')?.addEventListener('click', function(){
-      const inp = document.getElementById('adm-new-marque-nom');
-      const nom = (inp && inp.value ? inp.value : '').trim().toUpperCase();
-      if (!nom) { adminToast('Nom de marque requis', '#B91C1C'); return; }
-      const cont = document.getElementById('adm-bloc-content-9');
-      if (!cont) return;
-      if (cont.querySelector('.adm-card[data-marque="' + nom + '"]')) { adminToast('Marque déjà présente', '#B45309'); return; }
-      const addRow = cont.querySelector('.adm-add-row');
-      const tmp = document.createElement('div');
-      tmp.innerHTML = marqueCardHtml(nom, {});
-      const card = tmp.firstChild;
-      if (addRow && addRow.parentNode) addRow.parentNode.insertBefore(card, addRow);
-      if (inp) inp.value = '';
-    });
+    bindMarquesSection();
     document.getElementById('btn-save-params-eco-energie')?.addEventListener('click', async ()=>{
       const n = id => Number(String(document.getElementById(id)?.value ?? '').replace(',','.')) || 0;
       const payload = {
@@ -18757,7 +18777,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
       };
       const r = await fetch('/api/admin/m3', { method:'POST', headers: window.adminHeaders(), body: JSON.stringify(payload) });
       if (r.ok) {
-        M3_ADMIN = payload;
+        M3_ADMIN = Object.assign(M3_ADMIN||{}, payload);
         adminToast('Configuration MPR/CEE/Emails sauvegardée ✓', '#0D6B3B');
         window.dispatchEvent(new CustomEvent('hexa-config-changed'));
       } else {
