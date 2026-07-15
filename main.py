@@ -37,6 +37,7 @@ from services.service_devis import (
     format_sous_traitant,
     generer_lot_titre,
     generer_numero_devis,
+    generer_numero_facture,
     generer_numero_dossier,
     generer_numero_notedim,
     money,
@@ -70,6 +71,8 @@ DEVIS_ENVOYES_PATH = os.path.join(DATA_DIR, "devis_envoyes.json")
 STATES_SIMULATEUR_DIR = os.path.join(DATA_DIR, "states_simulateur")
 DEVIS_DIR = os.path.join(DATA_DIR, "devis")
 DEVIS_META_PATH = os.path.join(DEVIS_DIR, "devis_meta.json")
+FACTURES_DIR = os.path.join(DATA_DIR, "factures")
+FACTURES_META_PATH = os.path.join(FACTURES_DIR, "factures_meta.json")
 FICHES_DIR = os.path.join(DATA_DIR, "fiches_techniques")
 FICHES_INDEX_PATH = os.path.join(FICHES_DIR, "index.json")
 REPO_CATALOGUE_PATH = os.path.join(REPO_DATA_DIR, "catalogue_pac.json")
@@ -678,6 +681,8 @@ def _init_storage():
     os.makedirs(DOCUMENTS_DIR, exist_ok=True)
     os.makedirs(STATES_SIMULATEUR_DIR, exist_ok=True)
     _seed_json_file(DEVIS_META_PATH, {})
+    os.makedirs(FACTURES_DIR, exist_ok=True)
+    _seed_json_file(FACTURES_META_PATH, {})
     save_parametres_admin_atomic(load_parametres_admin())
     _migrate_catalogue_pac_schema()
     _sync_documents_categories()
@@ -982,6 +987,10 @@ STATUT_ALIASES = {
     "signe": "signe",
     "signé": "signe",
     "perdu": "perdu",
+    "installation finie": "installation_finie",
+    "installation_finie": "installation_finie",
+    "installation terminee": "installation_finie",
+    "installation terminée": "installation_finie",
 }
 
 CATEGORIE_ALIASES = {
@@ -2064,7 +2073,7 @@ async def update_lead_status(numero: str, request: Request) -> JSONResponse:
     """Met à jour le statut d'un prospect depuis l'Accueil."""
     payload = await _read_request_payload(request)
     new_status = _normalize_statut(str(payload.get("statut") or "").strip())
-    allowed = {"nouveau", "contacte", "rappeler", "rdv", "pre_devis", "pre_devis_envoye", "vt_envoye", "vt_valide", "vt_refuse", "devis", "devis_envoye", "signe", "perdu"}
+    allowed = {"nouveau", "contacte", "rappeler", "rdv", "pre_devis", "pre_devis_envoye", "vt_envoye", "vt_valide", "vt_refuse", "devis", "devis_envoye", "signe", "perdu", "installation_finie"}
     if new_status not in allowed:
         raise HTTPException(status_code=400, detail=f"Statut invalide : {new_status}")
     leads = _read_leads()
@@ -3921,6 +3930,101 @@ async def devis_public_versionne_pdf(numero: str, version: int, token: str, requ
     if not pdf_file or not os.path.exists(pdf_file):
         raise HTTPException(status_code=404, detail="Devis introuvable")
     return FileResponse(pdf_file, media_type="application/pdf", filename=f"Devis_{numero}.pdf")
+
+
+_facture_lock = threading.Lock()
+
+
+def _read_factures_meta() -> dict:
+    m = _read_json(FACTURES_META_PATH, {})
+    return m if isinstance(m, dict) else {}
+
+
+def _facture_pdf_path(numero: str, numero_facture: str) -> str:
+    safe = re.sub(r"[^A-Za-z0-9_-]+", "-", str(numero_facture or "").strip()) or "FA"
+    return os.path.join(FACTURES_DIR, f"{numero}_{safe}.pdf")
+
+
+def _render_facture_html(request: Request, numero: str, numero_facture: str, numero_devis_ref: str, date_fin_travaux: str) -> str:
+    ctx = _build_devis_context(request, numero, avec_sous_traitant=True)
+    if ctx.get("_error_template"):
+        raise HTTPException(status_code=400, detail="Champs manquants : facture impossible")
+    ctx["mode"] = "facture"
+    ctx["numero_facture"] = numero_facture
+    ctx["numero_devis_ref"] = numero_devis_ref
+    ctx["date_fin_travaux"] = _format_date_fr(date_fin_travaux) or date_fin_travaux
+    ctx["projet_apercu"] = None
+    ctx.setdefault("request", request)
+    return templates.env.get_template("devis_pac.html").render(ctx)
+
+
+def _facture_montant_ttc(numero: str):
+    try:
+        prospect = _lead_for_response(_find_lead(numero))
+        catalogue = _read_catalogue_pac()
+        state = _load_state_simulateur(numero, prospect, catalogue)
+        calc = calculer_devis(prospect, state, _admin_payload_with_m3(), catalogue)
+        return calc.get("total_ttc")
+    except Exception:
+        return None
+
+
+@app.post("/api/facture/{numero}")
+async def emettre_facture(numero: str, request: Request) -> JSONResponse:
+    payload = await _read_request_payload(request)
+    date_fin_travaux = str(payload.get("date_fin_travaux") or "").strip()
+    if not date_fin_travaux:
+        raise HTTPException(status_code=400, detail="Date de fin de travaux requise")
+    prospect = _find_lead(numero)
+    if not prospect:
+        raise HTTPException(status_code=404, detail="Prospect introuvable")
+    items = _sent_devis_items(numero)
+    if items:
+        numero_devis_ref = items[-1].get("numero_devis") or ""
+        version_devis = items[-1].get("version")
+    else:
+        version_devis = _next_sent_version(numero)
+        numero_devis_ref = generer_numero_devis(prospect, version_devis)
+    annee = datetime.now(PARIS_TZ).strftime("%Y")
+    # GAPLESS : le numero n'est persiste qu'APRES un PDF reussi, dans le meme geste que la meta.
+    with _facture_lock:
+        counters = _read_json(COUNTERS_PATH, {"dossier": 0})
+        if not isinstance(counters, dict):
+            counters = {"dossier": 0}
+        seq = int(counters.get(f"facture_{annee}") or 0) + 1
+        numero_facture = f"FA-{annee}-{seq:04d}"
+        # Rendu + PDF AVANT tout commit : un echec ne consomme aucun numero.
+        html_facture = _render_facture_html(request, numero, numero_facture, numero_devis_ref, date_fin_travaux)
+        pdf_bytes = _html_to_pdf_playwright(html_facture, request)
+        pdf_bytes = _append_fiche_technique(pdf_bytes, numero)
+        pdf_bytes = _append_fiche_ballon(pdf_bytes, numero)
+        pdf_path = _facture_pdf_path(numero, numero_facture)
+        _write_pdf(pdf_path, pdf_bytes)
+        # COMMIT : compteur puis meta (PDF deja ecrit). Le numero est definitivement consomme ici.
+        counters[f"facture_{annee}"] = seq
+        _atomic_write_json(COUNTERS_PATH, counters)
+        now = _now_iso()
+        meta = _read_factures_meta()
+        record = {
+            "numero_facture": numero_facture,
+            "numero_devis_ref": numero_devis_ref,
+            "version_devis": version_devis,
+            "date_emission": datetime.now(PARIS_TZ).strftime("%d/%m/%Y"),
+            "date_fin_travaux": date_fin_travaux,
+            "montant_ttc": _facture_montant_ttc(numero),
+            "file": pdf_path,
+            "created_at": now,
+        }
+        meta.setdefault(numero, []).append(record)
+        _atomic_write_json(FACTURES_META_PATH, meta)
+    leads = _read_leads()
+    idx = _find_lead_index(leads, numero)
+    if idx is not None:
+        leads[idx]["statut"] = "installation_finie"
+        leads[idx]["statut_updated_at"] = _now_paris_iso()
+        leads[idx]["updated_at"] = _now_iso()
+        _atomic_write_json(LEADS_PATH, leads)
+    return JSONResponse({"success": True, "numero_facture": numero_facture})
 
 
 # ---- Tracking d'ouverture email devis (pixel 1x1) ----

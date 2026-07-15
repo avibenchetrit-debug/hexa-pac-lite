@@ -3,7 +3,7 @@
 <html lang="fr">
 <head>
 <meta charset="utf-8"/>
-<title>{{ "Pré-devis" if pre_devis else "Devis" }} №{{ ("PD" + numero_devis[2:]) if pre_devis else numero_devis }} — Pompe à chaleur air/eau · {{ nom }} {{ prenom }} · Hexa Rénov'</title>
+<title>{{ "Facture" if mode == 'facture' else ("Pré-devis" if pre_devis else "Devis") }} №{{ numero_facture if mode == 'facture' else (("PD" + numero_devis[2:]) if pre_devis else numero_devis) }} — Pompe à chaleur air/eau · {{ nom }} {{ prenom }} · Hexa Rénov'</title>
 <link href="https://fonts.googleapis.com" rel="preconnect"/>
 <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
@@ -3380,8 +3380,9 @@
 <path d="M827.803 156.53V163.583H835.492V165.853H827.803V173.119H836.4V175.389H825.048V154.26H836.4V156.53H827.803Z" fill="#E2214B"></path>
 </svg>
 <div class="doc-type">
-<div class="doc-type-value">{{ "Pré-devis" if pre_devis else "Devis" }}</div>
-<div class="doc-type-num"><span class="doc-type-num-label">N° de {{ "pré-devis" if pre_devis else "devis" }} :</span> {{ ("PD" + numero_devis[2:]) if pre_devis else numero_devis }}</div>
+<div class="doc-type-value">{{ "Facture" if mode == 'facture' else ("Pré-devis" if pre_devis else "Devis") }}</div>
+<div class="doc-type-num"><span class="doc-type-num-label">N° de {{ "facture" if mode == 'facture' else ("pré-devis" if pre_devis else "devis") }} :</span> {{ numero_facture if mode == 'facture' else (("PD" + numero_devis[2:]) if pre_devis else numero_devis) }}</div>
+{% if mode == 'facture' %}<div class="doc-type-num"><span class="doc-type-num-label">Réf. devis :</span> {{ numero_devis_ref }}</div>{% endif %}
 </div>
 </header>
 <!-- INFOS -->
@@ -3408,6 +3409,7 @@
 <div class="infos-row"><span class="infos-label">Durée de validité</span><span class="infos-value">{{ date_validite }}</span></div>
 <div class="infos-row"><span class="infos-label">Visite technique</span><span class="infos-value">{{ date_visite_technique }}</span></div>
 <div class="infos-row"><span class="infos-label">Début travaux</span><span class="infos-value">{{ date_debut_travaux }}</span></div>
+{% if mode == 'facture' %}<div class="infos-row"><span class="infos-label">Fin travaux</span><span class="infos-value">{{ date_fin_travaux }}</span></div>{% endif %}
 <div class="infos-row"><span class="infos-label">Adresse chantier</span><span class="infos-value">{{ adresse_chantier }}</span></div>
 <div class="infos-row"><span class="infos-label">CP chantier</span><span class="infos-value">{{ cp_chantier }}</span></div>
 <div class="infos-row"><span class="infos-label">Ville chantier</span><span class="infos-value">{{ ville_chantier }}</span></div>
@@ -3421,8 +3423,10 @@
 
 <!-- MENTION LÉGALE INTRO -->
 <section class="legal-intro">
+{% if mode != 'facture' %}
 <div class="legal-intro-headline">{{ "Pré-devis" if pre_devis else "Devis" }} gratuit et sans engagement.</div>
 <div class="legal-intro-text">{{ "Pré-devis" if pre_devis else "Devis" }} à faire valider après visite technique, sous réserve de la conformité électrique de l'installation existante. L'entité s'engage à respecter la réglementation technique ainsi que les règles de l'art applicables aux travaux sur l'existant. La visite technique permettra de confirmer le dimensionnement, le modèle de pompe à chaleur retenu ainsi que le montant final de l'offre.</div>
+{% endif %}
 <div class="pac-heating-note">
 <div class="pac-heating-note-label">Solution chauffage</div>
 <div class="pac-heating-note-title">Opération n° BAR-TH-171&nbsp;&nbsp;Pompe à chaleur de type air/eau</div>
@@ -3648,6 +3652,13 @@ Dans le cas où l'aide notifiée au client est inférieure au montant de l'aide 
 <!-- CONDITIONS DE PAIEMENT -->
 <section class="payment-terms">
 <div class="section-title">Conditions de paiement</div>
+{% if mode == 'facture' %}
+<div class="payment-grid">
+<div class="payment-card"><div class="payment-card-content"><div class="payment-card-title">Échéance de paiement</div><div class="payment-card-text"><strong>Solde intégral exigible à réception de la présente facture.</strong> Travaux achevés le {{ date_fin_travaux }}.</div></div></div>
+<div class="payment-card"><div class="payment-card-content"><div class="payment-card-title">Pénalités de retard</div><div class="payment-card-text">Tout retard de paiement entraîne de plein droit des pénalités égales à trois fois le taux d'intérêt légal, exigibles sans rappel préalable (art. L441-10 du Code de commerce).</div></div></div>
+<div class="payment-card"><div class="payment-card-content"><div class="payment-card-title">Indemnité forfaitaire</div><div class="payment-card-text">Une indemnité forfaitaire pour frais de recouvrement de <strong>40 €</strong> est due en cas de retard de paiement (art. L441-10 et D441-5 du Code de commerce).</div></div></div>
+</div>
+{% else %}
 <div class="payment-grid">
 <div class="payment-card">
 <div class="payment-card-icon">
@@ -3696,8 +3707,10 @@ Dans le cas où l'aide notifiée au client est inférieure au montant de l'aide 
 </div>
 </div>
 </div>
+{% endif %}
 </section>
 <!-- ZONE SIGNATURE — UN SEUL GROS BLOC POUR LE CLIENT -->
+{% if mode != 'facture' %}
 <section class="signature">
 <div class="signature-title">Acceptation du devis</div>
 <div class="signature-box" style="min-height: 360px;">
@@ -3709,6 +3722,7 @@ Dans le cas où l'aide notifiée au client est inférieure au montant de l'aide 
 <div class="signature-box-date"><strong>Date :</strong> ___ / ___ / ______</div>
 </div>
 </section>
+{% endif %}
 <!-- MENTION aides publiques -->
 
 <!-- CERTIFICATIONS -->

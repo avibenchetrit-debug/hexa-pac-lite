@@ -645,6 +645,13 @@ def generer_numero_dossier(counters):
     return f"HX{annee_court}-{counters['dossier']:04d}", counters
 
 
+def generer_numero_facture(counters, annee):
+    """Numero de facture GAPLESS par annee : FA-AAAA-NNNN. Mute counters (a persister par l'appelant)."""
+    key = f"facture_{annee}"
+    counters[key] = int(counters.get(key) or 0) + 1
+    return f"FA-{annee}-{counters[key]:04d}", counters
+
+
 def generer_numero_notedim(prospect):
     annee = datetime.now().strftime("%Y")
     numero = str(value(prospect, "numero", default="PR-000000")).replace("PR-", "")

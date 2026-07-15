@@ -14435,6 +14435,24 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
           </div>
           ${item.has_notedim ? `<div class="docs-notedim-row"><span class="docs-notedim-label">Note de dimensionnement</span><button type="button" class="hexa-meta-card-action" data-notedim-preview="${item.version}">👁 Aperçu</button><button type="button" class="hexa-meta-card-action" data-notedim-download="${item.version}">📥 Télécharger</button></div>` : ''}
         </div>`).join('');
+      root.insertAdjacentHTML('beforeend', '<div class="docs-facture-row" style="margin-top:12px;padding-top:10px;border-top:1px solid #E2E8F0;display:flex;flex-wrap:wrap;align-items:center;gap:8px;">'
+        + '<span style="font-size:12px;font-weight:700;color:#002E5A;">Installation finie</span>'
+        + '<label style="font-size:12px;color:#475569;">Fin travaux <input type="date" id="facture-date-fin" style="margin-left:4px;"></label>'
+        + '<button type="button" id="facture-generate-btn" class="hexa-meta-card-action">\u{1F9FE} Générer la facture</button>'
+        + '<span id="facture-status" style="font-size:12px;"></span>'
+        + '</div>');
+      document.getElementById('facture-generate-btn')?.addEventListener('click', async () => {
+        const dateFin = document.getElementById('facture-date-fin')?.value || '';
+        const st = document.getElementById('facture-status');
+        if (!dateFin) { if (st) { st.textContent = 'Renseignez la date de fin de travaux.'; st.style.color = '#B91C1C'; } return; }
+        if (st) { st.textContent = 'Génération…'; st.style.color = '#475569'; }
+        try {
+          const r = await fetch(`/api/facture/${encodeURIComponent(currentProspect)}`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ date_fin_travaux: dateFin }) });
+          const body = await r.json().catch(() => ({}));
+          if (r.ok && body.success) { if (st) { st.textContent = '\u2705 Facture ' + (body.numero_facture || '') + ' générée'; st.style.color = '#15803D'; } }
+          else { if (st) { st.textContent = '\u274C ' + (body.detail || 'Erreur'); st.style.color = '#B91C1C'; } }
+        } catch (e) { if (st) { st.textContent = '\u274C Erreur réseau'; st.style.color = '#B91C1C'; } }
+      });
       root.querySelectorAll('[data-devis-preview]').forEach(btn => {
         btn.addEventListener('click', () => openDevisPdfViewer(btn.dataset.devisPreview));
       });
@@ -17160,25 +17178,37 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     cont.innerHTML = renderMarquesSection();
     bindMarquesSection();
   }
-  function bindMarquesSection(){
-    document.getElementById('btn-save-marques')?.addEventListener('click', async ()=>{
-      const payload = collectMarquesPayload();
-      if (await postMarques(payload)) { M3_ADMIN.marques = payload; adminToast('Gammes & marques sauvegardées ✓', '#0D6B3B'); window.dispatchEvent(new CustomEvent('hexa-config-changed')); refreshMarquesSection(); }
-      else adminToast('Erreur sauvegarde marques', '#B91C1C');
-    });
-    document.getElementById('btn-add-marque')?.addEventListener('click', async ()=>{
-      const nom = (document.getElementById('adm-new-marque-nom')?.value || '').trim().toUpperCase();
-      const prefixe = (document.getElementById('adm-new-marque-prefixe')?.value || '').trim().toUpperCase();
-      const niveau = document.getElementById('adm-new-marque-niveau')?.value || '';
-      if (!nom) { adminToast('Nom de marque requis', '#B91C1C'); return; }
-      if (!prefixe) { adminToast('Préfixe requis (ex. ARI)', '#B91C1C'); return; }
-      if (!niveau) { adminToast('Niveau obligatoire — sinon les modèles n\'apparaissent pas au devis', '#B91C1C'); return; }
-      const cfg = (M3_ADMIN && M3_ADMIN.marques) || {};
-      if (Object.prototype.hasOwnProperty.call(cfg, nom)) { adminToast('Marque « ' + nom + ' » déjà présente', '#B45309'); return; }
-      const payload = collectMarquesPayload();
-      payload[nom] = { prefixes: [prefixe], niveau: niveau, positionnement: '', avantages: ['','',''] };
-      if (await postMarques(payload)) { M3_ADMIN.marques = payload; adminToast('Marque « ' + nom + ' » ajoutée ✓', '#0D6B3B'); window.dispatchEvent(new CustomEvent('hexa-config-changed')); refreshMarquesSection(); }
-      else adminToast('Erreur ajout marque', '#B91C1C');
+  async function handleAddMarqueClick(){
+    const nomEl = document.getElementById('adm-new-marque-nom');
+    const prefixeEl = document.getElementById('adm-new-marque-prefixe');
+    const niveauEl = document.getElementById('adm-new-marque-niveau');
+    if (!nomEl || !prefixeEl || !niveauEl) return;
+    const nom = (nomEl.value || '').trim().toUpperCase();
+    const prefixe = (prefixeEl.value || '').trim().toUpperCase();
+    const niveau = niveauEl.value || '';
+    if (!nom) { adminToast('Nom de marque requis', '#B91C1C'); return; }
+    if (!prefixe) { adminToast('Préfixe requis (ex. ARI)', '#B91C1C'); return; }
+    if (!niveau) { adminToast('Niveau obligatoire — sinon les modèles n\'apparaissent pas au devis', '#B91C1C'); return; }
+    const cfg = (M3_ADMIN && M3_ADMIN.marques) || {};
+    if (Object.prototype.hasOwnProperty.call(cfg, nom)) { adminToast('Marque « ' + nom + ' » déjà présente', '#B45309'); return; }
+    const payload = collectMarquesPayload();
+    payload[nom] = { prefixes: [prefixe], niveau: niveau, positionnement: '', avantages: ['','',''] };
+    if (await postMarques(payload)) { M3_ADMIN.marques = payload; adminToast('Marque « ' + nom + ' » ajoutée ✓', '#0D6B3B'); window.dispatchEvent(new CustomEvent('hexa-config-changed')); refreshMarquesSection(); }
+    else adminToast('Erreur ajout marque', '#B91C1C');
+  }
+  async function handleSaveMarquesClick(){
+    const payload = collectMarquesPayload();
+    if (await postMarques(payload)) { M3_ADMIN.marques = payload; adminToast('Gammes & marques sauvegardées ✓', '#0D6B3B'); window.dispatchEvent(new CustomEvent('hexa-config-changed')); refreshMarquesSection(); }
+    else adminToast('Erreur sauvegarde marques', '#B91C1C');
+  }
+  function bindMarquesSection(){ /* no-op : délégation globale posée une seule fois ci-dessous */ }
+  if (!window.__hexaMarquesDelegated) {
+    window.__hexaMarquesDelegated = true;
+    document.addEventListener('click', function(e){
+      const t = e.target;
+      if (!t || !t.closest) return;
+      if (t.closest('#btn-add-marque')) { e.preventDefault(); handleAddMarqueClick(); }
+      else if (t.closest('#btn-save-marques')) { e.preventDefault(); handleSaveMarquesClick(); }
     });
   }
   function bindPwEyes(root){
@@ -19283,6 +19313,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     { k:"devis",    label:"Devis",        bg:"#E0F2FE", fg:"#0369A1" },
     { k:"devis_envoye", label:"Devis envoyé", bg:"#DCFCE7", fg:"#15803D" },
     { k:"signe",    label:"Signé",        bg:"#DCFCE7", fg:"#15803D" },
+    { k:"installation_finie", label:"Installation finie", bg:"#D1FAE5", fg:"#065F46" },
     { k:"perdu",    label:"Perdu",        bg:"#FEE2E2", fg:"#B91C1C" },
   ];
   const STMAP = Object.fromEntries(STATUTS.map((s,i)=>[s.k,Object.assign({i},s)]));
