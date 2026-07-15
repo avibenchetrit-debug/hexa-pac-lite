@@ -7234,7 +7234,7 @@ input:focus{ outline:none; border-color: var(--c-navy,#002E5A); box-shadow:0 0 0
 }
 .specs-editor-header {
   display: grid;
-  grid-template-columns: 1fr 1.5fr 40px;
+  grid-template-columns: 1fr 1.5fr 112px;
   gap: 8px;
   padding: 10px 12px;
   background: #f3f4f6;
@@ -7249,7 +7249,7 @@ input:focus{ outline:none; border-color: var(--c-navy,#002E5A); box-shadow:0 0 0
 }
 .specs-editor .specs-row {
   display: grid;
-  grid-template-columns: 1fr 1.5fr 40px;
+  grid-template-columns: 1fr 1.5fr 112px;
   gap: 8px;
   padding: 6px 12px;
   border-bottom: 1px solid #f3f4f6;
@@ -7285,6 +7285,31 @@ input:focus{ outline:none; border-color: var(--c-navy,#002E5A); box-shadow:0 0 0
   background: #fef2f2;
   border-radius: 4px;
 }
+.specs-editor .specs-row-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+}
+.specs-editor .specs-row-btn {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #fff;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+  color: #4b5563;
+}
+.specs-editor .specs-row-btn:hover:not(:disabled) { background: #f3f4f6; }
+.specs-editor .specs-row-btn:disabled { opacity: 0.35; cursor: default; }
+.specs-editor .specs-row-btn.specs-row-delete { color: #ef4444; border-color: #fecaca; }
+.specs-editor .specs-row-btn.specs-row-delete:hover { background: #fef2f2; }
 .specs-add-row {
   display: block;
   width: 100%;
@@ -18026,13 +18051,19 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     const container = document.getElementById('specs-rows-container');
     if (!container) return;
     container.innerHTML = '';
+    const lastIdx = currentEditedSpecs.length - 1;
     currentEditedSpecs.forEach((spec, idx) => {
       const row = document.createElement('div');
       row.className = 'specs-row';
       row.innerHTML = `
         <input type="text" class="specs-input-champ" data-idx="${idx}" data-field="champ" value="${adminEscape(spec.champ || '')}" placeholder="Ex: Marque">
         <input type="text" class="specs-input-valeur" data-idx="${idx}" data-field="valeur" value="${adminEscape(spec.valeur || '')}" placeholder="Ex: ATLANTIC">
-        <button type="button" class="specs-row-delete" data-idx="${idx}" title="Supprimer cette ligne">🗑</button>
+        <div class="specs-row-actions">
+          <button type="button" class="specs-row-btn specs-row-insert" data-idx="${idx}" title="Insérer une ligne en dessous">+</button>
+          <button type="button" class="specs-row-btn specs-row-up" data-idx="${idx}" title="Monter la ligne"${idx === 0 ? ' disabled' : ''}>↑</button>
+          <button type="button" class="specs-row-btn specs-row-down" data-idx="${idx}" title="Descendre la ligne"${idx === lastIdx ? ' disabled' : ''}>↓</button>
+          <button type="button" class="specs-row-btn specs-row-delete" data-idx="${idx}" title="Supprimer cette ligne">🗑</button>
+        </div>
       `;
       container.appendChild(row);
     });
@@ -18041,6 +18072,34 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
         const idx = parseInt(this.dataset.idx, 10);
         const field = this.dataset.field;
         if (currentEditedSpecs[idx]) currentEditedSpecs[idx][field] = this.value;
+      });
+    });
+    container.querySelectorAll('.specs-row-insert').forEach(btn => {
+      btn.addEventListener('click', function() {
+        const idx = parseInt(this.dataset.idx, 10);
+        currentEditedSpecs.splice(idx + 1, 0, { champ:'', valeur:'' });
+        renderSpecsRows();
+        document.querySelectorAll('#specs-rows-container .specs-input-champ')[idx + 1]?.focus();
+      });
+    });
+    container.querySelectorAll('.specs-row-up').forEach(btn => {
+      btn.addEventListener('click', function() {
+        const idx = parseInt(this.dataset.idx, 10);
+        if (idx <= 0) return;
+        const tmp = currentEditedSpecs[idx];
+        currentEditedSpecs[idx] = currentEditedSpecs[idx - 1];
+        currentEditedSpecs[idx - 1] = tmp;
+        renderSpecsRows();
+      });
+    });
+    container.querySelectorAll('.specs-row-down').forEach(btn => {
+      btn.addEventListener('click', function() {
+        const idx = parseInt(this.dataset.idx, 10);
+        if (idx >= currentEditedSpecs.length - 1) return;
+        const tmp = currentEditedSpecs[idx];
+        currentEditedSpecs[idx] = currentEditedSpecs[idx + 1];
+        currentEditedSpecs[idx + 1] = tmp;
+        renderSpecsRows();
       });
     });
     container.querySelectorAll('.specs-row-delete').forEach(btn => {
