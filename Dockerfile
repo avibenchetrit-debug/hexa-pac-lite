@@ -42,6 +42,7 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 RUN playwright install chromium
 
+ARG CACHEBUST=1
 COPY . .
 
 EXPOSE 8080
