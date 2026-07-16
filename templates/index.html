@@ -5620,6 +5620,7 @@ body.panel-is-open .prospect-shell-sticky {
   padding-left: 20px !important;
   margin: 6px 0;
 }
+.docs-relances-list { list-style-type: disc; padding-left: 20px !important; margin: 6px 0; }
 .comments-panel-editable ol,
 #notes-panel-editable ol {
   list-style-type: decimal !important;
@@ -19341,6 +19342,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
   const nrpLast  = p => { const l=p.nrp_log||[]; return l.length?l[l.length-1]:null; };
 
   let data = [];
+  let RELANCES_BY_LEAD = {};
   let leadsLoading = true;
   let leadsLoadError = '';
   let sortKey='numero', sortDir=-1, query='';
@@ -19622,6 +19624,10 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     totalEl.textContent = String(rows.length);
     const nrpRelEl = document.getElementById('pv-stats-relances-nrp');
     if(nrpRelEl) nrpRelEl.textContent = String(rows.reduce((n,p)=> n + (Array.isArray(p.nrp_relances) ? p.nrp_relances.length : 0), 0));
+    const preRelEl = document.getElementById('pv-stats-relances-predevis');
+    if(preRelEl) preRelEl.textContent = String(rows.reduce((n,p)=> n + ((RELANCES_BY_LEAD[p.numero]||{}).pre_devis||0), 0));
+    const devRelEl = document.getElementById('pv-stats-relances-devis');
+    if(devRelEl) devRelEl.textContent = String(rows.reduce((n,p)=> n + ((RELANCES_BY_LEAD[p.numero]||{}).devis||0), 0));
     const byStatut = new Map();
     rows.forEach(p=>{
       const k = leadField(p,'statut') || 'sans_statut';
@@ -19668,6 +19674,10 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
       const leads = await res.json();
       if(!Array.isArray(leads)) throw new Error('Réponse invalide');
       data = leads.map(normalizeProspect);
+      try {
+        const rs = await fetch('/api/stats/relances', { cache:'no-store' });
+        RELANCES_BY_LEAD = rs.ok ? ((await rs.json()).par_lead || {}) : {};
+      } catch(_) { RELANCES_BY_LEAD = {}; }
     }catch(_){
       data = [];
       leadsLoadError = 'Connexion au serveur impossible. Vérifiez votre connexion.';
@@ -19737,8 +19747,10 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
               <div id="pv-stats-detail" style="font-size:12px;max-height:240px;overflow-y:auto"></div>
             </div>
           </div>
-          <div style="margin-top:12px;padding-top:10px;border-top:0.5px solid #E2E8F0;font-size:12px;color:#475569">
-            <span style="font-weight:600;color:#002E5A">Relances NRP :</span> <b id="pv-stats-relances-nrp">0</b>
+          <div style="margin-top:12px;padding-top:10px;border-top:0.5px solid #E2E8F0;font-size:12px;color:#475569;display:flex;flex-wrap:wrap;gap:16px">
+            <span><span style="font-weight:600;color:#002E5A">Relances NRP :</span> <b id="pv-stats-relances-nrp">0</b></span>
+            <span><span style="font-weight:600;color:#002E5A">Relances pré-devis :</span> <b id="pv-stats-relances-predevis">0</b></span>
+            <span><span style="font-weight:600;color:#002E5A">Relances devis :</span> <b id="pv-stats-relances-devis">0</b></span>
           </div>
         </section>
         <h1 class="pv-h1">Prospects</h1>

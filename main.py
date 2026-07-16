@@ -3422,7 +3422,17 @@ def _load_state_simulateur(numero: str, prospect: dict, catalogue: list[dict]) -
     return state
 
 
-def _next_numero_dossier() -> str:
+def _peek_numero_dossier() -> str:
+    """Prochain numero de dossier SANS persister (previews) : la copie evite d'ecrire counters."""
+    counters = _read_json(COUNTERS_PATH, {"dossier": 0})
+    if not isinstance(counters, dict):
+        counters = {"dossier": 0}
+    numero_dossier, _ = generer_numero_dossier(dict(counters))
+    return numero_dossier
+
+
+def _commit_numero_dossier() -> str:
+    """Alloue DEFINITIVEMENT un numero de dossier (incremente + persiste). A l'envoi uniquement."""
     counters = _read_json(COUNTERS_PATH, {"dossier": 0})
     if not isinstance(counters, dict):
         counters = {"dossier": 0}
@@ -3431,11 +3441,26 @@ def _next_numero_dossier() -> str:
     return numero_dossier
 
 
+def _persisted_numero_dossier(numero: str, version) -> str | None:
+    """Numero de dossier deja fige dans devis_meta pour (numero, version), sinon None (retrocompat)."""
+    if version is None:
+        return None
+    try:
+        v = int(version)
+    except (TypeError, ValueError):
+        return None
+    for it in (_read_devis_meta().get(numero, []) or []):
+        if isinstance(it, dict) and int(it.get("version") or 0) == v:
+            nd = it.get("numero_dossier")
+            return nd if nd else None
+    return None
+
+
 def _notedim_path(numero: str, version: int) -> str:
     return os.path.join(DEVIS_DIR, f"{numero}_notedim_v{version}.pdf")
 
 
-def _build_devis_context(request: Request, numero: str, version: int | None = None, avec_sous_traitant: bool = True) -> dict:
+def _build_devis_context(request: Request, numero: str, version: int | None = None, avec_sous_traitant: bool = True, numero_dossier: str | None = None) -> dict:
     prospect = _find_lead(numero)
     if not prospect:
         raise HTTPException(status_code=404, detail="Prospect introuvable")
@@ -3486,7 +3511,7 @@ def _build_devis_context(request: Request, numero: str, version: int | None = No
         "ville_chantier": ville_chantier,
         "usage_bien": prospect.get("usage_bien", "proprietaire_occupant"),
         "numero_devis": generer_numero_devis(prospect, version if version is not None else _next_sent_version(numero)),
-        "numero_dossier": _next_numero_dossier(),
+        "numero_dossier": numero_dossier or _persisted_numero_dossier(numero, version) or _peek_numero_dossier(),
         "date_emission": today.strftime("%d/%m/%Y"),
         "date_validite": (today + timedelta(days=60)).strftime("%d/%m/%Y"),
         "date_visite_technique": date_visite,
@@ -3620,8 +3645,8 @@ def _render_template_response(request: Request, template_name: str, context: dic
     return HTMLResponse(content=html_content)
 
 
-def _render_devis_html(request: Request, numero: str, version: int | None = None, avec_sous_traitant: bool = True) -> str:
-    ctx = _build_devis_context(request, numero, version, avec_sous_traitant)
+def _render_devis_html(request: Request, numero: str, version: int | None = None, avec_sous_traitant: bool = True, numero_dossier: str | None = None) -> str:
+    ctx = _build_devis_context(request, numero, version, avec_sous_traitant, numero_dossier)
     name = ctx.pop("_error_template", "devis_pac.html")
     ctx.setdefault("request", request)
     return templates.env.get_template(name).render(ctx)
@@ -3748,9 +3773,9 @@ def _append_fiche_ballon(pdf_bytes: bytes, numero: str) -> bytes:
         return pdf_bytes
 
 
-def _ensure_devis_pdf(numero: str, request: Request, version: int | None = None, avec_sous_traitant: bool = True) -> tuple[str, str, int]:
+def _ensure_devis_pdf(numero: str, request: Request, version: int | None = None, avec_sous_traitant: bool = True, numero_dossier: str | None = None) -> tuple[str, str, int]:
     version = version or _next_sent_version(numero)
-    html = _render_devis_html(request, numero, version, avec_sous_traitant)
+    html = _render_devis_html(request, numero, version, avec_sous_traitant, numero_dossier)
     html_path = _devis_html_path(numero, version)
     _write_text(html_path, html)
     pdf_path = _devis_path(numero, version)
@@ -3946,8 +3971,8 @@ def _facture_pdf_path(numero: str, numero_facture: str) -> str:
     return os.path.join(FACTURES_DIR, f"{numero}_{safe}.pdf")
 
 
-def _render_facture_html(request: Request, numero: str, numero_facture: str, numero_devis_ref: str, date_fin_travaux: str) -> str:
-    ctx = _build_devis_context(request, numero, avec_sous_traitant=True)
+def _render_facture_html(request: Request, numero: str, numero_facture: str, numero_devis_ref: str, date_fin_travaux: str, numero_dossier: str | None = None) -> str:
+    ctx = _build_devis_context(request, numero, avec_sous_traitant=True, numero_dossier=numero_dossier)
     if ctx.get("_error_template"):
         raise HTTPException(status_code=400, detail="Champs manquants : facture impossible")
     ctx["mode"] = "facture"
@@ -3995,7 +4020,7 @@ async def emettre_facture(numero: str, request: Request) -> JSONResponse:
         seq = int(counters.get(f"facture_{annee}") or 0) + 1
         numero_facture = f"FA-{annee}-{seq:04d}"
         # Rendu + PDF AVANT tout commit : un echec ne consomme aucun numero.
-        html_facture = _render_facture_html(request, numero, numero_facture, numero_devis_ref, date_fin_travaux)
+        html_facture = _render_facture_html(request, numero, numero_facture, numero_devis_ref, date_fin_travaux, _persisted_numero_dossier(numero, version_devis))
         pdf_bytes = _html_to_pdf_playwright(html_facture, request)
         pdf_bytes = _append_fiche_technique(pdf_bytes, numero)
         pdf_bytes = _append_fiche_ballon(pdf_bytes, numero)
@@ -4350,7 +4375,8 @@ async def _send_devis(numero: str, payload: dict, request: Request) -> dict:
     avec_sous_traitant = (variante == "devis")
 
     version = _next_sent_version(numero)
-    devis_path, devis_html, version = _ensure_devis_pdf(numero, request, version, avec_sous_traitant)
+    numero_dossier = _commit_numero_dossier()
+    devis_path, devis_html, version = _ensure_devis_pdf(numero, request, version, avec_sous_traitant, numero_dossier)
     notedim_path = _ensure_notedim_pdf(numero, request, version) if variante == "devis" else None
 
     # Aperçu éco (bandeau email devis) — peut être None
@@ -4415,6 +4441,7 @@ async def _send_devis(numero: str, payload: dict, request: Request) -> dict:
     meta = _read_devis_meta()
     item = {
         "version": version,
+        "numero_dossier": numero_dossier,
         "numero_devis": generer_numero_devis(prospect, version),
         "sent_at": now,
         "email": email_to,
@@ -4784,6 +4811,29 @@ async def download_devis(numero: str, version: int):
     if not os.path.exists(path):
         raise HTTPException(status_code=404, detail="Devis introuvable")
     return FileResponse(path, media_type="application/pdf", filename=os.path.basename(path))
+
+
+@app.get("/api/stats/relances")
+def stats_relances() -> JSONResponse:
+    """Agrege les relances devis/pre-devis par lead depuis devis_meta.json (encadre stats accueil)."""
+    meta = _read_devis_meta()
+    par_lead = {}
+    for numero, items in (meta or {}).items():
+        if not isinstance(items, list):
+            continue
+        pre = dev = 0
+        for it in items:
+            if not isinstance(it, dict):
+                continue
+            rels = it.get("relances")
+            n = len(rels) if isinstance(rels, list) else 0
+            if it.get("variante") == "pre_devis":
+                pre += n
+            else:
+                dev += n
+        if pre or dev:
+            par_lead[numero] = {"pre_devis": pre, "devis": dev}
+    return JSONResponse({"par_lead": par_lead})
 
 
 @app.get("/api/factures/{numero}/list")
