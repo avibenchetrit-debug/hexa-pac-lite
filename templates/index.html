@@ -8986,7 +8986,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
         <label>Date visite technique</label>
         <input type="hidden" name="date_visite_technique" id="fp-date-visite-tech-hidden" value="À déterminer">
         <div class="fp-date-row">
-          <input type="date" id="fp-date-visite-tech" name="date_visite_technique_date" class="fp-input">
+          <input type="text" inputmode="numeric" placeholder="jj/mm/aaaa" maxlength="10" id="fp-date-visite-tech" name="date_visite_technique_date" class="fp-input">
           <label class="fp-checkbox-inline">
             <input type="checkbox" id="fp-visite-tech-undefined">
             <span>À déterminer</span>
@@ -9192,18 +9192,52 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     const dateInput = q('#fp-date-visite-tech', form);
     const dateHidden = q('#fp-date-visite-tech-hidden', form);
     const undefinedInput = q('#fp-visite-tech-undefined', form);
+    function isoToFr(iso){
+      const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || '').trim());
+      return m ? (m[3] + '/' + m[2] + '/' + m[1]) : '';
+    }
+    function frToIso(fr){
+      const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(String(fr || '').trim());
+      if (!m) return '';
+      const d = +m[1], mo = +m[2], y = +m[3];
+      if (mo < 1 || mo > 12 || d < 1 || d > 31 || y < 1900 || y > 2100) return '';
+      const dt = new Date(y, mo - 1, d);
+      if (dt.getFullYear() !== y || dt.getMonth() !== mo - 1 || dt.getDate() !== d) return '';
+      return m[3] + '-' + m[2] + '-' + m[1];
+    }
+    function maskDateFr(v){
+      const dg = String(v || '').replace(/\D/g, '').slice(0, 8);
+      let out = dg.slice(0, 2);
+      if (dg.length >= 3) out += '/' + dg.slice(2, 4);
+      if (dg.length >= 5) out += '/' + dg.slice(4, 8);
+      return out;
+    }
+    function updateHiddenFromInput(){
+      const raw = String((dateInput && dateInput.value) || '').trim();
+      const complete = /^\d{2}\/\d{2}\/\d{4}$/.test(raw);
+      const iso = frToIso(raw);
+      const invalide = complete && !iso;
+      if (dateInput) { dateInput.style.borderColor = invalide ? '#B91C1C' : ''; dateInput.title = invalide ? 'Date invalide — format jj/mm/aaaa' : ''; }
+      if (dateHidden) dateHidden.value = iso || 'À déterminer';
+    }
     function syncDateVisite(fromHidden=false){
       if (fromHidden) {
         const iso = (dateHidden && /^\d{4}-\d{2}-\d{2}$/.test(dateHidden.value || '')) ? dateHidden.value : '';
         if (undefinedInput) undefinedInput.checked = !iso;
-        if (dateInput) dateInput.value = iso;
+        if (dateInput) { dateInput.value = isoToFr(iso); dateInput.style.borderColor = ''; dateInput.title = ''; }
       }
       const undef = !!undefinedInput?.checked;
       if (dateInput) dateInput.disabled = undef;
-      if (dateHidden) dateHidden.value = undef ? 'À déterminer' : (dateInput?.value || 'À déterminer');
+      if (undef) {
+        if (dateHidden) dateHidden.value = 'À déterminer';
+        if (dateInput) { dateInput.style.borderColor = ''; dateInput.title = ''; }
+      } else {
+        updateHiddenFromInput();
+      }
     }
+    dateInput?.addEventListener('input', function(){ if (dateInput) dateInput.value = maskDateFr(dateInput.value); updateHiddenFromInput(); });
+    dateInput?.addEventListener('blur', updateHiddenFromInput);
     undefinedInput?.addEventListener('change', syncDateVisite);
-    dateInput?.addEventListener('change', syncDateVisite);
     syncBailleurAdresse();
     syncDateVisite();
     const alim = q('[name="alimentation_electrique"]', form);
