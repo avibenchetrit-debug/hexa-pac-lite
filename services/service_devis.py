@@ -783,7 +783,7 @@ def calculer_notedim(prospect, state_simulateur, catalogue_pac):
     modele_kw = float_value(value(modele, "puiss_chauf", "puiss35", "puissance_kw", default=p_pac_reco_kw), p_pac_reco_kw)
     return {
         "surface_habitable": number_fr(surface_habitable, 0),
-        "surface_chauffee": number_fr(surface_chauffee, 1),
+        "surface_chauffee": number_fr(surface_chauffee, 0),
         "hsp": _fmt_fr_num(hsp),
         "zone_climatique": zone,
         "temperature_base": _fmt_fr_num(temperature_base),

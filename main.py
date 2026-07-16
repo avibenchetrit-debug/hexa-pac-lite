@@ -1562,7 +1562,7 @@ def _devis_context(numero: str) -> dict:
         cee *= int(bonif.get("multiplicateur") or 5)
     reste = max(prix_ttc - mpr - cee, 0)
     mensualite_10 = reste / 120 if reste else 0
-    surface_chauffee = round(_float_value(lead.get("surface_logement_m2"), 100) * 0.9, 1)
+    surface_chauffee = round(_float_value(lead.get("surface_logement_m2"), 100) * 0.9)
     return {
         "lead": lead,
         "numero": numero,
@@ -1952,6 +1952,7 @@ def _backup_catalogue() -> str | None:
 
 @app.post("/api/catalogue-pac/import-xlsx")
 async def import_catalogue_xlsx(request: Request, file: UploadFile = File(...), confirm: str = Form("")) -> JSONResponse:
+    raise HTTPException(status_code=410, detail="Import XLSX désactivé : remplacement total du catalogue, trop risqué")
     _require_admin(request)
     raw = await file.read()
     try:
@@ -4368,7 +4369,7 @@ async def _send_devis(numero: str, payload: dict, request: Request) -> dict:
         "modele": (modele_obj.get("nom") or modele_obj.get("ref")) if modele_obj else None,
         "etas35": devis_value(modele_obj or {}, "etas35", default=None),
         "etas55": devis_value(modele_obj or {}, "etas55", default=None),
-        "surface": devis_value(state, "surface_chauffee", default="") or devis_value(prospect, "surface_habitable", "surface_logement_m2", default="") or None,
+        "surface": round(_float_value(devis_value(state, "surface_chauffee", default="") or devis_value(prospect, "surface_habitable", "surface_logement_m2", default=""), 0)) or None,
     }
 
     prenom = html.escape(str(prospect.get("prenom") or ""))
