@@ -3441,19 +3441,13 @@ def _commit_numero_dossier() -> str:
     return numero_dossier
 
 
-def _persisted_numero_dossier(numero: str, version) -> str | None:
-    """Numero de dossier deja fige dans devis_meta pour (numero, version), sinon None (retrocompat)."""
-    if version is None:
-        return None
-    try:
-        v = int(version)
-    except (TypeError, ValueError):
-        return None
-    for it in (_read_devis_meta().get(numero, []) or []):
-        if isinstance(it, dict) and int(it.get("version") or 0) == v:
-            nd = it.get("numero_dossier")
-            return nd if nd else None
-    return None
+def _lead_numero_dossier(numero: str) -> str | None:
+    """Numero de dossier de l'AFFAIRE (le lead) : le PLUS ANCIEN numero_dossier persiste sur ses devis
+    (min lexicographique du format HXyy-NNNN zero-padde = plus petit compteur = premier devis envoye).
+    None si aucun. Lecture seule : n'alloue/ne persiste JAMAIS rien (le preview ne brule pas de numero)."""
+    nums = [it.get("numero_dossier") for it in (_read_devis_meta().get(numero, []) or [])
+            if isinstance(it, dict) and it.get("numero_dossier")]
+    return min(nums) if nums else None
 
 
 def _notedim_path(numero: str, version: int) -> str:
@@ -3511,7 +3505,7 @@ def _build_devis_context(request: Request, numero: str, version: int | None = No
         "ville_chantier": ville_chantier,
         "usage_bien": prospect.get("usage_bien", "proprietaire_occupant"),
         "numero_devis": generer_numero_devis(prospect, version if version is not None else _next_sent_version(numero)),
-        "numero_dossier": numero_dossier or _persisted_numero_dossier(numero, version) or _peek_numero_dossier(),
+        "numero_dossier": numero_dossier or _lead_numero_dossier(numero) or _peek_numero_dossier(),
         "date_emission": today.strftime("%d/%m/%Y"),
         "date_validite": (today + timedelta(days=60)).strftime("%d/%m/%Y"),
         "date_visite_technique": date_visite,
@@ -4020,7 +4014,7 @@ async def emettre_facture(numero: str, request: Request) -> JSONResponse:
         seq = int(counters.get(f"facture_{annee}") or 0) + 1
         numero_facture = f"FA-{annee}-{seq:04d}"
         # Rendu + PDF AVANT tout commit : un echec ne consomme aucun numero.
-        html_facture = _render_facture_html(request, numero, numero_facture, numero_devis_ref, date_fin_travaux, _persisted_numero_dossier(numero, version_devis))
+        html_facture = _render_facture_html(request, numero, numero_facture, numero_devis_ref, date_fin_travaux, _lead_numero_dossier(numero))
         pdf_bytes = _html_to_pdf_playwright(html_facture, request)
         pdf_bytes = _append_fiche_technique(pdf_bytes, numero)
         pdf_bytes = _append_fiche_ballon(pdf_bytes, numero)
@@ -4375,7 +4369,7 @@ async def _send_devis(numero: str, payload: dict, request: Request) -> dict:
     avec_sous_traitant = (variante == "devis")
 
     version = _next_sent_version(numero)
-    numero_dossier = _commit_numero_dossier()
+    numero_dossier = _lead_numero_dossier(numero) or _commit_numero_dossier()
     devis_path, devis_html, version = _ensure_devis_pdf(numero, request, version, avec_sous_traitant, numero_dossier)
     notedim_path = _ensure_notedim_pdf(numero, request, version) if variante == "devis" else None
 
