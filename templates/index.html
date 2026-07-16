@@ -8986,9 +8986,9 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
         <label>Date visite technique</label>
         <input type="hidden" name="date_visite_technique" id="fp-date-visite-tech-hidden" value="À déterminer">
         <div class="fp-date-row">
-          <input type="date" id="fp-date-visite-tech" name="date_visite_technique_date" class="fp-input" disabled>
+          <input type="date" id="fp-date-visite-tech" name="date_visite_technique_date" class="fp-input">
           <label class="fp-checkbox-inline">
-            <input type="checkbox" id="fp-visite-tech-undefined" checked>
+            <input type="checkbox" id="fp-visite-tech-undefined">
             <span>À déterminer</span>
           </label>
         </div>`;
@@ -9193,9 +9193,10 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     const dateHidden = q('#fp-date-visite-tech-hidden', form);
     const undefinedInput = q('#fp-visite-tech-undefined', form);
     function syncDateVisite(fromHidden=false){
-      if (fromHidden && dateHidden && dateHidden.value && dateHidden.value !== 'À déterminer') {
-        if (undefinedInput) undefinedInput.checked = false;
-        if (dateInput) dateInput.value = dateHidden.value;
+      if (fromHidden) {
+        const iso = (dateHidden && /^\d{4}-\d{2}-\d{2}$/.test(dateHidden.value || '')) ? dateHidden.value : '';
+        if (undefinedInput) undefinedInput.checked = !iso;
+        if (dateInput) dateInput.value = iso;
       }
       const undef = !!undefinedInput?.checked;
       if (dateInput) dateInput.disabled = undef;

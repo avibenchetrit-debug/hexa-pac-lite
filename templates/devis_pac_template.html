@@ -3399,7 +3399,7 @@
 <div class="infos-row"><span class="infos-label">Adresse</span><span class="infos-value">{{ adresse_personne }}</span></div>
 <div class="infos-row"><span class="infos-label">Code postal</span><span class="infos-value">{{ cp_personne }}</span></div>
 <div class="infos-row"><span class="infos-label">Ville</span><span class="infos-value">{{ ville_personne }}</span></div>
-<div class="infos-row"><span class="infos-label">Propriétaire occupant</span><span class="infos-value">{{ "Oui" if usage_bien == "occupant" else "Non (bailleur)" }}</span></div>
+<div class="infos-row"><span class="infos-label">Propriétaire occupant</span><span class="infos-value">{{ "Oui" if usage_bien == "proprietaire_occupant" else "Non (bailleur)" }}</span></div>
 <div class="infos-row"><span class="infos-label">Catégorie de revenu</span><span class="infos-value">{{ categorie_revenu_label }}</span></div>
 <div class="infos-row"><span class="infos-label">Précarité</span><span class="infos-value">{{ categorie_CEE_label }}</span></div>
 </div>
@@ -3425,7 +3425,7 @@
 <section class="legal-intro">
 {% if mode != 'facture' %}
 <div class="legal-intro-headline">{{ "Pré-devis" if pre_devis else "Devis" }} gratuit et sans engagement.</div>
-<div class="legal-intro-text">{{ "Pré-devis" if pre_devis else "Devis" }} à faire valider après visite technique, sous réserve de la conformité électrique de l'installation existante. L'entité s'engage à respecter la réglementation technique ainsi que les règles de l'art applicables aux travaux sur l'existant. La visite technique permettra de confirmer le dimensionnement, le modèle de pompe à chaleur retenu ainsi que le montant final de l'offre.</div>
+<div class="legal-intro-text">{% if pre_devis %}Pré-devis à faire valider après visite technique, sous réserve de la conformité électrique de l'installation existante. L'entité s'engage à respecter la réglementation technique ainsi que les règles de l'art applicables aux travaux sur l'existant. La visite technique permettra de confirmer le dimensionnement, le modèle de pompe à chaleur retenu ainsi que le montant final de l'offre.{% else %}L'entité s'engage à respecter la réglementation technique ainsi que les règles de l'art applicables aux travaux sur l'existant.{% endif %}</div>
 {% endif %}
 <div class="pac-heating-note">
 <div class="pac-heating-note-label">Solution chauffage</div>
@@ -3463,7 +3463,7 @@
 </div>
 <div class="sub-line">
 <div class="sub-line-header"><span class="sub-line-name">Travaux induits</span><span class="sub-line-qt">{{ qt_travaux_induits }}</span><span class="sub-line-pu">{{ prix_travaux_induits_ht }}</span><span class="sub-line-tva">{{ tva_taux }}</span><span class="sub-line-total">{{ prix_travaux_induits_ttc }}</span></div>
-<div class="specs"><div class="specs-block"><div class="specs-block-title">Travaux induits</div><ul class="specs-list"><li>Protection et sécurisation des zones d'intervention</li><li>Création ou adaptation des passages techniques</li><li>Reprises localisées d'étanchéité et de calfeutrement</li><li>Adaptation ponctuelle des réseaux et équipements existants</li><li>Dépose et évacuation des équipements remplacés</li></ul></div><div class="specs-block"><div class="specs-block-title">Non inclus</div><ul class="specs-list"><li>Renforcement ou mise en conformité complète de l'installation électrique</li><li>Modification des émetteurs ou réseaux hors descriptif</li><li>Travaux de maçonnerie ou de couverture lourde</li><li>Prestations de décoration et reprises complètes de finition</li></ul></div></div>
+<div class="specs"><div class="specs-block"><div class="specs-block-title">Travaux induits</div><ul class="specs-list"><li>Protection et sécurisation des zones d'intervention</li><li>Création ou adaptation des passages techniques</li><li>Reprises localisées d'étanchéité et de calfeutrement</li><li>Adaptation ponctuelle des réseaux et équipements existants</li><li>Dépose et évacuation des équipements remplacés - chaudière</li></ul></div><div class="specs-block"><div class="specs-block-title">Non inclus</div><ul class="specs-list"><li>Renforcement ou mise en conformité complète de l'installation électrique</li><li>Modification des émetteurs ou réseaux hors descriptif</li><li>Travaux de maçonnerie ou de couverture lourde</li><li>Prestations de décoration et reprises complètes de finition</li></ul></div></div>
 </div>
 <div class="lot-subtotal"><span class="lot-subtotal-label">Sous-total lot</span><div class="lot-subtotal-amounts"><span class="ht"><span class="label">HT</span>{{ total_ht }}</span><span class="ttc"><span class="label">TTC</span>{{ total_ttc }}</span></div></div>
 </div>
