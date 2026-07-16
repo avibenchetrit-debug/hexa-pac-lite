@@ -4847,6 +4847,7 @@ async def list_factures(numero: str) -> JSONResponse:
             "created_at": rec.get("created_at", ""),
             "available": bool(path and os.path.exists(path)),
         })
+    items.sort(key=lambda x: x.get("created_at") or "", reverse=True)
     return JSONResponse(items)
 
 

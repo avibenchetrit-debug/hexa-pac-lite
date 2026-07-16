@@ -5744,7 +5744,7 @@ body.comments-panel-open {
 .docs-devis-title{ cursor:pointer; user-select:none; }
 .docs-devis-title::before{ content:'▾'; display:inline-block; width:14px; color:#64748B; font-size:11px; }
 .docs-devis-block.is-collapsed .docs-devis-title::before{ content:'▸'; }
-.docs-devis-block.is-collapsed #docs-devis-list{ display:none; }
+.docs-devis-block.is-collapsed #docs-devis-list, .docs-devis-block.is-collapsed #docs-factures-list{ display:none; }
 .docs-devis-actions{ display:flex; gap:6px; flex-wrap:wrap; }
 .docs-notedim-row{ display:flex; flex-wrap:wrap; align-items:center; gap:6px; padding-top:8px; border-top:1px solid #EDF2F7; margin-top:2px; }
 .docs-notedim-label{ font-size:11px; color:#888; width:100%; margin-bottom:2px; }
@@ -13969,8 +13969,8 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
         <div class="docs-devis-block" id="docs-nrp-block" style="display:none">
           <div id="docs-nrp-list"></div>
         </div>
-        <div class="docs-devis-block" id="docs-factures-block" style="display:none">
-          <div class="docs-devis-title">🧾 Factures</div>
+        <div class="docs-devis-block is-collapsed" id="docs-factures-block" style="display:none">
+          <div class="docs-devis-title" id="docs-factures-title" onclick="toggleFacturesEnvoyees()">🧾 Factures</div>
           <div id="docs-factures-list"></div>
         </div>
         <button type="button" class="docs-nav-back" id="docs-nav-back" style="display:none;">‹ Retour</button>
@@ -14445,6 +14445,11 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     if (b) b.classList.toggle('is-collapsed');
   }
   window.toggleDevisEnvoyes = toggleDevisEnvoyes;
+  function toggleFacturesEnvoyees(){
+    const b = document.getElementById('docs-factures-block');
+    if (b) b.classList.toggle('is-collapsed');
+  }
+  window.toggleFacturesEnvoyees = toggleFacturesEnvoyees;
 
   async function refreshDevisList() {
     const root = document.getElementById('docs-devis-list');
@@ -14485,6 +14490,21 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
         const dateFin = document.getElementById('facture-date-fin')?.value || '';
         const st = document.getElementById('facture-status');
         if (!dateFin) { if (st) { st.textContent = 'Renseignez la date de fin de travaux.'; st.style.color = '#B91C1C'; } return; }
+        const _now = new Date();
+        const todayIso = `${_now.getFullYear()}-${String(_now.getMonth()+1).padStart(2,'0')}-${String(_now.getDate()).padStart(2,'0')}`;
+        if (dateFin > todayIso) {
+          const finFr = dateFin.split('-').reverse().join('/');
+          if (!confirm(`Vous êtes sur le point d'émettre une facture pour des travaux non terminés (fin prévue le ${finFr}). Ce type de facture est généralement refusé par les organismes CEE/ANAH. Confirmer quand même ?`)) { if (st) st.textContent = ''; return; }
+        }
+        try {
+          const _dv = await fetch(`/api/devis/${encodeURIComponent(currentProspect)}/list`, { cache:'no-store' });
+          const _devis = _dv.ok ? await _dv.json() : [];
+          const _sents = (Array.isArray(_devis) ? _devis : []).map(d => String(d.sent_at || '').slice(0, 10)).filter(Boolean).sort();
+          const _dernier = _sents.length ? _sents[_sents.length - 1] : '';
+          if (_dernier && todayIso < _dernier) {
+            if (!confirm(`Incohérence de dates : la date du jour est antérieure à l'envoi du devis de référence (${_dernier.split('-').reverse().join('/')}). Confirmer l'émission quand même ?`)) { if (st) st.textContent = ''; return; }
+          }
+        } catch (_) { /* contrôle indicatif : n'empêche pas l'émission si la vérif échoue */ }
         if (st) { st.textContent = 'Génération…'; st.style.color = '#475569'; }
         try {
           const r = await fetch(`/api/facture/${encodeURIComponent(currentProspect)}`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ date_fin_travaux: dateFin }) });
