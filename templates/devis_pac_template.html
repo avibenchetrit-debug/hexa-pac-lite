@@ -3406,9 +3406,9 @@
 <div class="infos-col">
 <div class="infos-col-title">Dossier</div>
 <div class="infos-row"><span class="infos-label">Date d'émission</span><span class="infos-value">{{ date_emission }}</span></div>
-<div class="infos-row"><span class="infos-label">Durée de validité</span><span class="infos-value">{{ date_validite }}</span></div>
+{% if mode != 'facture' %}<div class="infos-row"><span class="infos-label">Durée de validité</span><span class="infos-value">{{ date_validite }}</span></div>{% endif %}
 <div class="infos-row"><span class="infos-label">Visite technique</span><span class="infos-value">{{ date_visite_technique }}</span></div>
-<div class="infos-row"><span class="infos-label">Début travaux</span><span class="infos-value">{{ date_debut_travaux }}</span></div>
+{% if mode != 'facture' %}<div class="infos-row"><span class="infos-label">Début travaux</span><span class="infos-value">{{ date_debut_travaux }}</span></div>{% endif %}
 {% if mode == 'facture' %}<div class="infos-row"><span class="infos-label">Fin travaux</span><span class="infos-value">{{ date_fin_travaux }}</span></div>{% endif %}
 <div class="infos-row"><span class="infos-label">Adresse chantier</span><span class="infos-value">{{ adresse_chantier }}</span></div>
 <div class="infos-row"><span class="infos-label">CP chantier</span><span class="infos-value">{{ cp_chantier }}</span></div>
@@ -3512,6 +3512,7 @@
 <div class="recap-line aide"><span class="label">Estimation aide Prime CEE</span><span class="amount">- {{ montant_cee }}</span></div>
 <div style="font-size: 9.5px; color: var(--gris-mute); padding: 2px 0 4px; margin-top: 0; line-height: 1.4;">Le reste à payer correspond au total TTC diminué des estimations d'aides MaPrimeRénov' et Prime CEE.</div>
 <div class="recap-rac"><span class="recap-rac-label">Montant total à régler</span><span class="recap-rac-amount">{{ reste_a_charge }}</span></div>
+{% if mode != 'facture' %}
 {% if montant_mpr_affiche and montant_mpr_affiche != '0' %}
 <div style="background:#F4F5F7;border-radius:0 0 6px 6px;padding:8px 24px 9px;font-size:8px;line-height:1.5;color:#4A5567;">
 {% if mode_mpr == 'sans_attente' %}
@@ -3520,6 +3521,7 @@
 <strong style="color:#002E5A;font-size:8.5px;">Option retenue : démarrage après notification</strong> — Ce montant intègre MaPrimeRénov' (<strong>{{ montant_mpr_affiche }} €</strong>), avancée par Hexa-Rénov'. Les travaux débuteront après réception de la notification d'octroi de l'Anah (délai moyen : 5 mois).
 {% endif %}
 </div>
+{% endif %}
 {% endif %}
 
 </div>
@@ -3537,7 +3539,7 @@
 <div class="tva-cgi">Taux de TVA applicable selon la réglementation en vigueur (articles 278 et s. du CGI).</div>
 <div style="margin-top:14px;padding-top:10px;border-top:1px solid var(--gris-ligne);">
   <div style="font-size:9px;text-transform:uppercase;letter-spacing:0.18em;color:var(--rouge);font-weight:700;margin-bottom:5px;">Prestations non comprises</div>
-  <div style="font-size:9.5px;color:var(--gris-mute);line-height:1.5;">Le présent devis ne comprend ni le désembouage du circuit de chauffage, ni la dépose et l'évacuation d'une éventuelle cuve à fioul. Si ces prestations s'avèrent nécessaires, elles feront l'objet d'un chiffrage complémentaire. Une aide à la dépose de cuve à fioul pouvant atteindre 1&nbsp;200&nbsp;€ est mobilisable.</div>
+  <div style="font-size:9.5px;color:var(--gris-mute);line-height:1.5;">{{ "La présente facture" if mode == 'facture' else "Le présent devis" }} ne comprend ni le désembouage du circuit de chauffage, ni la dépose et l'évacuation d'une éventuelle cuve à fioul. Si ces prestations s'avèrent nécessaires, elles feront l'objet d'un chiffrage complémentaire. Une aide à la dépose de cuve à fioul pouvant atteindre 1&nbsp;200&nbsp;€ est mobilisable.</div>
 </div>
 
 </div>
@@ -3744,7 +3746,7 @@ Dans le cas où l'aide notifiée au client est inférieure au montant de l'aide 
 <!-- ========== ANNEXE : CONDITIONS GÉNÉRALES DE VENTE ========== -->
 <section class="cgv-section">
 <div class="cgv-header">
-<div class="cgv-header-eyebrow">Annexe au présent devis</div>
+<div class="cgv-header-eyebrow">{{ "Annexe à la présente facture" if mode == 'facture' else "Annexe au présent devis" }}</div>
 <h2 class="cgv-header-title">Conditions Générales de Vente</h2>
 <div class="cgv-header-meta">
         SAS HEXA RÉNOV' · 58 Rue de la Sablière, 92600 Asnières-sur-Seine · RCS Nanterre 845 229 152 · SIRET 845 229 152 00028 · TVA FR 89 845 229 152
