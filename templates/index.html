@@ -15988,7 +15988,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
       ? '—'
       : `${anahLabel} (MPR) · ${ceeLabel} (CEE)`;
     const energieLbl = ENERGIE_LABEL[state.energie_avant] || '—';
-    const zoneValue = state.zone_detail || state.zone || '';
+    const zoneValue = state.zone_detail || '';
 
     // mensualité affichée dans Avant/Après selon option
     const creditLine = state.option==='opt3'
