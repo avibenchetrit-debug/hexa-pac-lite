@@ -3842,7 +3842,10 @@ async def devis_pdf(numero: str, request: Request, variante: str | None = None):
 @app.get("/devis-public/{numero}/{token}", response_class=HTMLResponse)
 async def devis_public(numero: str, token: str, request: Request):
     if not _verify_devis_token(numero, token):
-        raise HTTPException(status_code=403, detail="Lien invalide")
+        return _render_template_response(request, "erreur.html", {
+            "titre": "Ce lien n'est plus valide",
+            "message": "Le lien que vous avez utilisé n'est plus accessible. Cela peut arriver si votre devis a été mis à jour depuis son envoi. Contactez-nous, nous vous renvoyons votre devis à jour immédiatement.",
+        })
     _items = _sent_devis_items(numero)
     if _items:
         _item = _items[0]
@@ -3923,10 +3926,16 @@ def _inject_devis_bar(html_devis: str, bar: str) -> str:
 @app.get("/devis-public/{numero}/{version}/{token}", response_class=HTMLResponse)
 async def devis_public_versionne(numero: str, version: int, token: str, request: Request):
     if not _verify_devis_token_v(numero, version, token):
-        raise HTTPException(status_code=403, detail="Lien invalide")
+        return _render_template_response(request, "erreur.html", {
+            "titre": "Ce lien n'est plus valide",
+            "message": "Le lien que vous avez utilisé n'est plus accessible. Cela peut arriver si votre devis a été mis à jour depuis son envoi. Contactez-nous, nous vous renvoyons votre devis à jour immédiatement.",
+        })
     items = _sent_devis_items(numero)
     if version < 1 or version > len(items):
-        raise HTTPException(status_code=404, detail="Version introuvable")
+        return _render_template_response(request, "erreur.html", {
+            "titre": "Ce lien n'est plus valide",
+            "message": "Ce devis n'est plus disponible. Contactez-nous, nous vous renvoyons votre devis à jour immédiatement.",
+        })
     item = items[version - 1]
     html_file = item.get("html_file")
     if html_file and os.path.exists(html_file):
@@ -3935,7 +3944,10 @@ async def devis_public_versionne(numero: str, version: int, token: str, request:
     pdf_file = item.get("file")
     if pdf_file and os.path.exists(pdf_file):
         return FileResponse(pdf_file, media_type="application/pdf", headers={"Content-Disposition": "inline"})
-    raise HTTPException(status_code=404, detail="Devis introuvable")
+    return _render_template_response(request, "erreur.html", {
+        "titre": "Ce lien n'est plus valide",
+        "message": "Ce devis n'est plus disponible. Contactez-nous, nous vous renvoyons votre devis à jour immédiatement.",
+    })
 
 
 @app.get("/devis-public/{numero}/{version}/{token}/pdf")
@@ -4106,7 +4118,10 @@ async def devis_open_pixel(numero: str, version: int, token: str, request: Reque
 @app.get("/notedim-public/{numero}/{token}", response_class=HTMLResponse)
 async def notedim_public(numero: str, token: str, request: Request):
     if not _verify_notedim_token(numero, token):
-        raise HTTPException(status_code=403, detail="Lien invalide")
+        return _render_template_response(request, "erreur.html", {
+            "titre": "Ce lien n'est plus valide",
+            "message": "Le lien que vous avez utilisé n'est plus accessible. Cela peut arriver si votre devis a été mis à jour depuis son envoi. Contactez-nous, nous vous renvoyons votre devis à jour immédiatement.",
+        })
     html_nd = _render_notedim_html(request, numero)
     barre = (
         '<div style="position:fixed;top:0;left:0;right:0;z-index:9999;'

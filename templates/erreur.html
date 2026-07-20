@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ titre }} — Hexa Rénov'</title>
+  <style>
+    body { margin:0; font-family:'Inter',Arial,Helvetica,sans-serif; background:#F4F6F9; color:#002E5A; }
+    .wrap { min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px; box-sizing:border-box; }
+    .box { max-width:520px; width:100%; background:#fff; border:1px solid #E1E5EB; border-radius:16px; padding:40px 32px; box-shadow:0 16px 40px rgba(0,46,90,.08); text-align:center; }
+    .logo { height:44px; width:auto; margin:0 auto 24px; display:block; }
+    hr.accent { height:3px; width:48px; background:#E2214B; border:0; margin:0 auto 24px; border-radius:2px; }
+    h1 { margin:0 0 16px; color:#002E5A; font-size:24px; font-weight:700; }
+    p { color:#4A5567; font-size:15px; line-height:1.6; margin:0 0 28px; }
+    .contact { color:#8A92A0; font-size:13px; }
+    .contact a { color:#002E5A; font-weight:600; text-decoration:none; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <main class="box">
+      <img src="/static/Logo.svg" alt="Hexa Rénov'" class="logo">
+      <hr class="accent">
+      <h1>{{ titre }}</h1>
+      <p>{{ message }}</p>
+      <div class="contact">Une question&nbsp;? Appelez-nous au <a href="tel:+33970702511">09 70 70 25 11</a></div>
+    </main>
+  </div>
+</body>
+</html>
