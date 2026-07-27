@@ -15397,6 +15397,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
       mode_mpr: state.mode_mpr || 'attente',
       financement_mpr: state.financement_mpr || 'cash',
       afficher_apercu: state.afficher_apercu !== false,
+      afficher_mention_mpr: state.afficher_mention_mpr !== false,
       ballon_ref: state.ballon_ref || '',
       // Éco 20 ans (roi()) : incluses uniquement si lastRoi existe, sinon clés omises
       // pour ne pas écraser une valeur déjà persistée (merge côté backend).
@@ -15450,6 +15451,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
       state.financement_mpr = saved.financement_mpr || 'cash';
       if (saved.niveau_actif) state.niveau_actif = saved.niveau_actif;
       state.afficher_apercu = (saved.afficher_apercu !== false);
+      state.afficher_mention_mpr = (saved.afficher_mention_mpr !== false);
       if (saved.ballon_ref) state.ballon_ref = saved.ballon_ref;
       state.modele_force = !!saved.modele_pac_id;
     } catch(e) {
@@ -16177,6 +16179,10 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
           <input type="checkbox" id="sim-afficher-apercu" ${state.afficher_apercu !== false ? 'checked' : ''} style="width:16px;height:16px;flex:0 0 auto;cursor:pointer;">
           <span>Afficher les économies et le ROI sur le devis/pré-devis</span>
         </label>
+        <label class="sim-apercu-toggle" style="display:flex;align-items:center;gap:8px;margin:10px 0 6px;font-size:13px;cursor:pointer;user-select:none;">
+          <input type="checkbox" id="sim-afficher-mention-mpr" ${state.afficher_mention_mpr !== false ? 'checked' : ''} style="width:16px;height:16px;flex:0 0 auto;cursor:pointer;">
+          <span>Afficher la mention MaPrimeRénov' (option de démarrage) sur le devis/pré-devis</span>
+        </label>
         <button type="button" id="btn-voir-devis" class="cta-primary-large">📄 Voir le devis</button>`;
   }
 
@@ -16289,6 +16295,9 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
       document.addEventListener('change', (e)=>{
         if (e.target && e.target.id === 'sim-afficher-apercu'){
           state.afficher_apercu = e.target.checked;
+          scheduleSaveSimulatorState();
+        } else if (e.target && e.target.id === 'sim-afficher-mention-mpr'){
+          state.afficher_mention_mpr = e.target.checked;
           scheduleSaveSimulatorState();
         }
       });

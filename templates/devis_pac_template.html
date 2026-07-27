@@ -3514,6 +3514,7 @@
 <div class="recap-rac"><span class="recap-rac-label">Montant total à régler</span><span class="recap-rac-amount">{{ reste_a_charge }}</span></div>
 {% if mode != 'facture' %}
 {% if montant_mpr_affiche and montant_mpr_affiche != '0' %}
+{% if afficher_mention_mpr %}
 <div style="background:#F4F5F7;border-radius:0 0 6px 6px;padding:8px 24px 9px;font-size:8px;line-height:1.5;color:#4A5567;">
 {% if mode_mpr == 'sans_attente' %}
 <strong style="color:#002E5A;font-size:8.5px;">Option retenue : démarrage sans attente</strong> — Ce montant n'intègre pas MaPrimeRénov' (<strong>{{ montant_mpr_affiche }} €</strong>), qui vous sera versée directement par l'Anah après travaux. Cette option, retenue à votre demande, permet un démarrage immédiat du chantier.
@@ -3521,6 +3522,7 @@
 <strong style="color:#002E5A;font-size:8.5px;">Option retenue : démarrage après notification</strong> — Ce montant intègre MaPrimeRénov' (<strong>{{ montant_mpr_affiche }} €</strong>), avancée par Hexa-Rénov'. Les travaux débuteront après réception de la notification d'octroi de l'Anah (délai moyen : 5 mois).
 {% endif %}
 </div>
+{% endif %}
 {% endif %}
 {% endif %}
 

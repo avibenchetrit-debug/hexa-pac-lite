@@ -3545,6 +3545,7 @@ def _build_devis_context(request: Request, numero: str, version: int | None = No
     context["reste_a_charge"] = money(_reste_affiche)
     context["mode_mpr"] = "sans_attente" if _sans_attente else "attente"
     context["montant_mpr_affiche"] = f"{round(_mpr_total):,}".replace(",", " ")
+    context["afficher_mention_mpr"] = state.get("afficher_mention_mpr") is not False
     context["financement_devis"] = calculer_financement_devis(_base_credit, admin)
     context["economie_devis"] = calculer_economie_devis(
         _surface_eco, _zone_eco,
