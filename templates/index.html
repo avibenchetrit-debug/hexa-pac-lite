@@ -14025,12 +14025,13 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     return docStatus.counts[countKey(catId, sousId, ssId)] || 0;
   }
 
-  function statutBadge(sous) {
+  function statutBadge(cat, sous) {
     if (sous.statut !== 'Ok / Manquant') return '';
-    const key = countKey(currentSlot?.categorie_id || '', sous.id, null);
+    const key = countKey(cat.id, sous.id, null);
     const st = docStatus.statuts[key];
     if (st === 'ok') return '<span class="docs-statut-ok">✅ OK</span>';
-    return '<span class="docs-statut-manquant">🔴 MANQUANT</span>';
+    if (st === 'manquant') return '<span class="docs-statut-manquant">🔴 MANQUANT</span>';
+    return '';
   }
 
   function countBadge(n) {
@@ -14139,7 +14140,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'docs-folder-item';
-      const st = !sous.sous_sous_categories ? statutBadge(sous) : '';
+      const st = !sous.sous_sous_categories ? statutBadge(cat, sous) : '';
       btn.innerHTML = `
         <span class="docs-folder-icon-wrap"><span class="docs-folder-icon">${sous.icon || '📄'}</span></span>
         <div class="docs-folder-text">
