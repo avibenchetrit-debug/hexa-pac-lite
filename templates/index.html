@@ -2600,12 +2600,6 @@ input, select, textarea, .toggle-pill, .field-readonly {
       font-size: 12px;
     }
     .cadastre-row input[readonly] { cursor: default; }
-    #zone-abf-input.abf-verified[readonly] {
-      background: var(--paper);
-      color: var(--noir);
-      font-weight: 600;
-      border-color: var(--vert);
-    }
     .btn-verifier-cadastre {
       display: inline-flex; align-items: center; gap: 5px;
       padding: 8px 14px;
@@ -3099,13 +3093,6 @@ input, select, textarea, .toggle-pill, .field-readonly {
       letter-spacing: 0.02em; transition: background 0.12s, border-color 0.12s;
     }
     .btn-rechercher-dpe:hover { background: var(--paper); border-color: var(--bleu); }
-    #zone-abf-input.abf-verified {
-      background: var(--paper) !important;
-      color: var(--noir) !important;
-      font-weight: 600;
-      border-color: var(--vert) !important;
-      cursor: text;
-    }
     .psb-badge {
       display: inline-flex; align-items: center; padding: 3px 9px;
       border-radius: 4px; font-size: 10px; font-weight: 700;
@@ -3167,8 +3154,6 @@ input, select, textarea, .toggle-pill, .field-readonly {
   .dpe-source-badge--audit { background: #DBEAFE; color: #1E40AF; }
   .dpe-source-badge--urbs { background: #FFEDD5; color: #9A3412; }
   .dpe-source-badge--manuel { background: #F1F5F9; color: #475569; }
-  .psb-badge-mh { background: #FEE2E2 !important; color: #991B1B !important; font-weight: 700; }
-  .psb-badge-zone-mh { background: #FFEDD5 !important; color: #9A3412 !important; font-weight: 700; }
     .dpe-source-pills { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
     .dpe-source-pill {
       padding: 8px 14px;
@@ -3601,8 +3586,6 @@ input, select, textarea, .toggle-pill, .field-readonly {
   
   /* === Couleurs réglementaires : Rouge (OUI) / Vert (NON) === */
   .regl-oui select, .regl-oui input[type="text"], .regl-oui input[type="hidden"] + select { background: #FEE2E2 !important; border-color: #EF4444 !important; color: #991B1B !important; }
-  #field-zone-classee.regl-oui select, #field-batiment-classe.regl-oui select { background: #FEE2E2 !important; border-color: #EF4444 !important; color: #991B1B !important; }
-  #zone-protegee-select.regl-oui, #batiment-classe-select.regl-oui { background: #FEE2E2 !important; }
   select.regl-oui-val { background: #FEE2E2 !important; border-color: #EF4444 !important; color: #991B1B !important; font-weight: 700; }
   select.regl-non-val { background: #DCFCE7 !important; border-color: #22C55E !important; color: #166534 !important; font-weight: 700; }
   .field-regl-oui { background: #FFF1F2; border-radius: 6px; padding: 2px; }
@@ -7737,31 +7720,6 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
           <div id="registre-copro-status" class="cadastre-status reg-hint"></div>
         </div>
       </div>
-      <div class="row row-2 reg-grid">
-        <div class="field" data-label="Bâtiment classé">
-          <label><span class="label-row"><span>Bâtiment classé</span><span id="badge-batiment-classe" class="badge-auto-generic">Auto</span></span></label>
-          <select id="batiment-classe-select" class="reg-auto-input" disabled>
-            <option value="">—</option>
-            <option value="oui" >Oui</option>
-            <option value="non" >Non</option>
-          </select>
-          <input type="hidden" name="batiment_classe" id="batiment-classe-hidden" value="">
-          <input type="hidden" name="batiment_classe_label" id="batiment-classe-label-hidden" value="">
-          <input type="hidden" name="batiment_classe_force" id="batiment-classe-force-input" value="">
-          <div id="batiment-classe-status" class="cadastre-status reg-hint">Monument historique classé ou inscrit (bâtiment lui-même)</div>
-        </div>
-        <div class="field" data-label="Bâtiment en zone classée">
-          <label><span class="label-row"><span>Bâtiment en zone classée</span><span id="badge-zone-protegee" class="badge-auto-generic">Auto</span></span></label>
-          <select id="zone-protegee-select" class="reg-auto-input" disabled>
-            <option value="">—</option>
-            <option value="oui" >Oui</option>
-            <option value="non" >Non</option>
-          </select>
-          <input type="hidden" name="zone_protegee_mh" id="zone-protegee-hidden" value="">
-          <input type="hidden" name="zone_protegee_force" id="zone-protegee-force-input" value="">
-          <div id="zone-protegee-status" class="cadastre-status reg-hint">Périmètre protection MH (ABF)</div>
-        </div>
-      </div>
     </div>
 
     <!-- BLOC 5 : Caractéristiques du bien -->
@@ -8206,11 +8164,6 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
         regTitle.className = 'sub-bloc-title';
         regTitle.textContent = 'Données réglementaires';
       }
-      qa('.row.reg-grid', blockAdresse).forEach(row => {
-        if (row.querySelector('#batiment-classe-select') || row.querySelector('#zone-protegee-select')) row.remove();
-      });
-      q('#batiment-classe-select')?.closest('.field')?.remove();
-      q('#zone-protegee-select')?.closest('.field')?.remove();
     }
 
     // BLOC 4: Caractéristiques du bien (2 sous-blocs)
@@ -8584,7 +8537,6 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
  *   - Badge DPE Auto -> DPE Officiel ou Audit Officiel selon source
  *   - Suppression CTA Télécharger DPE (inutile)
  *   - Affichage numéro officiel dans champ dpe_numero
- *   - Couleurs Rouge/Vert pour batiment_classe et zone_classee
  *   - Re-binding identique création et modification
  */
 (function () {
@@ -8723,50 +8675,6 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     const parts = String(iso).slice(0, 10).split('-');
     if (parts.length === 3) return parts[2] + '/' + parts[1] + '/' + parts[0];
     return iso;
-  }
-
-  /**
-   * Applique les couleurs Rouge/Vert sur les champs bâtiment classé / zone classée.
-   */
-  function majCouleursReglementaire(batimentClasse, zoneClassee) {
-    function colorSel(el, val) {
-      if (!el) return;
-      const v = (val !== undefined ? String(val) : el.value || '').toLowerCase();
-      if (v === 'oui' || v === 'true') {
-        el.setAttribute('style', 'background: #fee2e2 !important; color: #991b1b !important;');
-      } else if (v === 'non' || v === 'false') {
-        el.setAttribute('style', 'background: #dcfce7 !important; color: #166534 !important;');
-      }
-    }
-    const zs = document.getElementById('zone-protegee-select');
-    const bs = document.getElementById('batiment-classe-select');
-    if (zs) {
-      if (zoneClassee !== undefined && zoneClassee !== null) {
-        const v = (zoneClassee === true || zoneClassee === 'oui') ? 'oui' : 'non';
-        zs.value = v;
-      }
-      colorSel(zs, zs.value);
-    }
-    if (bs) {
-      if (batimentClasse !== undefined && batimentClasse !== null) {
-        const v = (batimentClasse === true || batimentClasse === 'oui') ? 'oui' : 'non';
-        bs.value = v;
-      }
-      colorSel(bs, bs.value);
-    }
-  }
-
-  function _colorerChamp(name, valeur, oui, non) {
-    const el = document.querySelector(`[name="${name}"], [data-field="${name}"]`);
-    if (!el) return;
-    const v = String(valeur || '').toLowerCase();
-    const wrapper = el.closest('.field, .dpe-field, .field-row, td') || el;
-    wrapper.classList.remove('regl-oui', 'regl-non');
-    if (v === 'oui' || v === 'true' || v === '1') {
-      wrapper.classList.add('regl-oui');
-    } else if (v === 'non' || v === 'false' || v === '0') {
-      wrapper.classList.add('regl-non');
-    }
   }
 
   function marquerChampsAutoRemplis() {
@@ -9043,7 +8951,6 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
 
   // Exposition globale pour PJAX / rechargement
   window.majBadgesSourceDpe = majBadgesSource;
-  window.majCouleursReglementaire = majCouleursReglementaire;
   window.lancerRechercheDpeAuto = lancerRechercheDpeAutomatique;
   window.appliquerDpeOfficiel = appliquerDpeOfficiel;
   window.appliquerAuditOfficiel = appliquerAuditOfficiel;
@@ -9872,7 +9779,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     modifie: 'Modifié',
   };
   const GENERIC_AUTO_BADGES = new Set([
-    'badge-parcelle', 'badge-zone-abf', 'badge-registre-copro',
+    'badge-parcelle', 'badge-registre-copro',
     'badge-nb-niveaux', 'badge-hauteur', 'badge-hsp', 'badge-prix-m2',
   ]);
   const ALL_DPE_BADGE_IDS = [
@@ -9915,7 +9822,6 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
   window.setDpeBadgeEl = setDpeBadgeEl;
   const GENERIC_FIELD_MAP = {
     'badge-parcelle': 'parcelle_cadastrale',
-    'badge-zone-abf': 'zone_abf',
     'badge-registre-copro': 'registre_copro',
   };
   function setSourceBadge(badgeId, kind) {
@@ -10197,49 +10103,9 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
         await lancerRechercheDpeSources(adresse, cp5);
       }
       recalculerCategories();
-      majBadgesReglementairesBandeau();
     } catch (e) {
       console.debug('chargerDonneesAdresse:', e);
     }
-  }
-
-  function majBadgesReglementairesBandeau() {
-    const bar = document.getElementById('prospect-sticky-bar');
-    if (!bar) return;
-    const bc = document.getElementById('batiment-classe-hidden')?.value;
-    const zp = document.getElementById('zone-protegee-hidden')?.value;
-    bar.querySelector('.psb-badge-mh')?.remove();
-    bar.querySelector('.psb-badge-zone-mh')?.remove();
-    const badges = bar.querySelector('.psb-badges');
-    if (!badges) return;
-    const isOui = (v) => ['true', '1', 'oui', 'Oui'].includes(String(v));
-    if (isOui(bc)) {
-      const s = document.createElement('span');
-      s.className = 'psb-badge psb-badge-mh';
-      s.textContent = 'MH CLASSÉ';
-      badges.appendChild(s);
-    }
-    if (isOui(zp)) {
-      const s = document.createElement('span');
-      s.className = 'psb-badge psb-badge-zone-mh';
-      s.textContent = 'ZONE MH';
-      badges.appendChild(s);
-    }
-  }
-
-  function setRegForceMode(toggleId, inputId, hiddenForceId, enableEdit) {
-    const toggle = document.getElementById(toggleId);
-    const input = document.getElementById(inputId);
-    const hidden = document.getElementById(hiddenForceId);
-    if (!toggle || !input) return;
-    const forced = !!toggle.checked;
-    if (hidden) hidden.value = forced ? '1' : '';
-    if (input.tagName === 'SELECT') {
-      input.disabled = !forced && !enableEdit;
-    } else {
-      input.readOnly = !forced;
-    }
-    input.classList.toggle('reg-auto-input', !forced);
   }
 
   function parcelleValide(value) {
@@ -10259,8 +10125,6 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     lastReglementaireKey = key;
     await Promise.all([
       rechercheParcelleAuto(lat, lon, parcelleRef),
-      rechercheBatimentClasse(lat, lon),
-      rechercheZoneProtegee(lat, lon),
     ]);
   }
 
@@ -10271,62 +10135,6 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     if (sel) sel.disabled = false;
   }
 
-  async function rechercheBatimentClasse(lat, lon) {
-    const statusEl = document.getElementById('batiment-classe-status');
-    const sel = document.getElementById('batiment-classe-select');
-    const hidden = document.getElementById('batiment-classe-hidden');
-    if (!window.OPTIONAL_BACKEND_APIS_ENABLED) return;
-    if (statusEl) statusEl.textContent = '⏳ Mérimée…';
-    try {
-      const data = await window.fetchOptionalBackendApi(`/api/batiment-classe?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}`);
-      if (!data) return;
-      if (data.batiment_classe === true || data.batiment_classe === false || data.batiment_classe === 'Oui' || data.batiment_classe === 'Non') {
-        const v = (data.batiment_classe === true || data.batiment_classe === 'Oui') ? 'oui' : 'non';
-        if (sel) sel.value = v;
-        if (hidden) hidden.value = data.batiment_classe ? 'true' : 'false';
-        document.getElementById('batiment-classe-label-hidden').value = data.label || '';
-        if (statusEl) statusEl.textContent = data.batiment_classe ? (data.label || 'Monument historique') : 'Non classé MH';
-      } else if (data.warning) {
-        if (statusEl) statusEl.innerHTML = '<span style="color:#EA580C;">⚠ Non vérifié</span>';
-        if (sel) sel.disabled = false;
-      }
-    } catch {
-      if (statusEl) statusEl.innerHTML = '<span style="color:#EA580C;">⚠ Non vérifié</span>';
-      if (sel) sel.disabled = false;
-    }
-    majBadgesReglementairesBandeau();
-    if (window.majCouleursReglementaire) window.majCouleursReglementaire();
-  }
-
-  async function rechercheZoneProtegee(lat, lon) {
-    const statusEl = document.getElementById('zone-protegee-status');
-    const sel = document.getElementById('zone-protegee-select');
-    const hidden = document.getElementById('zone-protegee-hidden');
-    if (!window.OPTIONAL_BACKEND_APIS_ENABLED) return;
-    if (statusEl) statusEl.textContent = '⏳ Périmètre MH…';
-    try {
-      const data = await window.fetchOptionalBackendApi(`/api/zone-protegee?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}`);
-      if (!data) return;
-      if (data.zone_protegee === true || data.zone_protegee === false) {
-        const v = data.zone_protegee ? 'oui' : 'non';
-        if (sel) sel.value = v;
-        if (hidden) hidden.value = data.zone_protegee ? 'true' : 'false';
-        if (statusEl) {
-          statusEl.textContent = data.zone_protegee
-            ? '⚠ Zone ABF — délais d\'instruction +2 mois · ' + (data.label || v)
-            : 'Périmètre protection MH (ABF) — ' + (data.label || v);
-        }
-      } else if (data.warning) {
-        if (statusEl) statusEl.innerHTML = '<span style="color:#EA580C;">⚠ Non vérifié</span>';
-        if (sel) sel.disabled = false;
-      }
-    } catch {
-      if (statusEl) statusEl.innerHTML = '<span style="color:#EA580C;">⚠ Non vérifié</span>';
-      if (sel) sel.disabled = false;
-    }
-    majBadgesReglementairesBandeau();
-    if (window.majCouleursReglementaire) window.majCouleursReglementaire();
-  }
 
   async function rechercheParcelleAuto(lat, lon, parcelleRef) {
     const inputEl = document.getElementById('parcelle-cadastrale-input');
@@ -10583,13 +10391,9 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
       sel.addEventListener('change', () => {
         const v = sel.value;
         hidden.value = asBool ? (v === 'oui' ? 'true' : v === 'non' ? 'false' : '') : v;
-        majBadgesReglementairesBandeau();
       });
     };
-    syncSelectHidden('batiment-classe-select', 'batiment-classe-hidden', true);
-    syncSelectHidden('zone-protegee-select', 'zone-protegee-hidden', true);
     syncSelectHidden('registre-copro-select', 'registre-copro-hidden-sync', false);
-    majBadgesReglementairesBandeau();
   });
 
   function updateCommercialStatutUI() {
@@ -11769,7 +11573,6 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
         btnSave.dataset.ctaMode = savedNumero ? 'view' : 'create';
         setSaveCtaLabel(savedNumero ? 'MODIFIER' : 'ENREGISTRER');
         saveToast('Prospect enregistré ✓', '#0D6B3B');
-        majBadgesReglementairesBandeau();
         if (typeof window.syncCurrentProspectToSimulatorState === 'function') {
           window.syncCurrentProspectToSimulatorState();
         }
@@ -12333,10 +12136,6 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     recalculerCategories();
   })();
 
-  const abfInit = document.getElementById('zone-abf-input');
-  if (abfInit && abfInit.value && !/auto-vérification/i.test(abfInit.value)) {
-    abfInit.classList.add('abf-verified');
-  }
   const dpeNumInit = document.getElementById('dpe-numero');
   if (dpeNumInit && dpeNumInit.value) {
     majBadgeDPE('ademe', dpeNumInit.value);
@@ -12403,68 +12202,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
   })();
   </script>
   <script>
-  // === Couleurs réglementaires (zone classée / bâtiment classé) ===
   (function() {
-    function colorerSelectRegl() {
-      var selects = ['zone-protegee-select', 'batiment-classe-select'];
-      selects.forEach(function(id) {
-        var el = document.getElementById(id);
-        if (!el) return;
-        function update() {
-          var v = (el.value || '').toLowerCase();
-          if (v === 'oui' || v === 'true') {
-            el.style.background = '#FEE2E2'; el.style.borderColor = '#EF4444'; el.style.color = '#991B1B'; el.style.fontWeight = '700';
-          } else if (v === 'non' || v === 'false') {
-            el.style.background = '#DCFCE7'; el.style.borderColor = '#22C55E'; el.style.color = '#166534'; el.style.fontWeight = '700';
-          } else {
-            el.style.background = ''; el.style.borderColor = ''; el.style.color = ''; el.style.fontWeight = '';
-          }
-        }
-        update();
-        el.addEventListener('change', update);
-      });
-    }
-    // Init + PJAX — répéter pour attraper le remplissage async des champs réglementaires
-    (function initRegl() {
-      var n = 0;
-      var iv = setInterval(function() { colorerSelectRegl(); n++; if(n >= 15) clearInterval(iv); }, 400);
-    })();
-    document.addEventListener('pjax:complete', function() {
-      var n = 0; var iv = setInterval(function() { colorerSelectRegl(); n++; if(n >= 10) clearInterval(iv); }, 300);
-    });
-
-    // Exposition globale pour fiche_dpe_auto.js
-    window.majCouleursReglementaire = function(batimentClasse, zoneClassee) {
-      function colorSelect(el, val) {
-        if (!el) return;
-        const v = (val || el.value || '').toString().toLowerCase();
-        if (v === 'oui' || v === 'true') {
-          el.style.background = '#fee2e2'; el.style.color = '#991b1b';
-        } else if (v === 'non' || v === 'false') {
-          el.style.background = '#dcfce7'; el.style.color = '#166534';
-        } else {
-          el.style.background = ''; el.style.color = '';
-        }
-      }
-      const zs = document.getElementById('zone-protegee-select');
-      const bs = document.getElementById('batiment-classe-select');
-      if (zs) {
-        if (zoneClassee !== undefined && zoneClassee !== null) {
-          const v = zoneClassee === true || zoneClassee === 'oui' ? 'oui' : 'non';
-          zs.value = v;
-        }
-        colorSelect(zs, zs.value);
-        zs.dispatchEvent(new Event('change'));
-      }
-      if (bs) {
-        if (batimentClasse !== undefined && batimentClasse !== null) {
-          const v = batimentClasse === true || batimentClasse === 'oui' ? 'oui' : 'non';
-          bs.value = v;
-        }
-        colorSelect(bs, bs.value);
-        bs.dispatchEvent(new Event('change'));
-      }
-    };
     // Mise à jour synthèse Bloc7 depuis les selects isolation
     window.majBloc7Synthese = function(data) {
       if (!data) return;
