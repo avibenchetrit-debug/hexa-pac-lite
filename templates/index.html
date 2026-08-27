@@ -6540,6 +6540,20 @@ input:focus{ outline:none; border-color: var(--c-navy,#002E5A); box-shadow:0 0 0
 .fiche-rel-btn{ border:none; border-radius:9999px; padding:5px 11px; font-size:11.5px; font-weight:700; cursor:pointer; font-family:inherit; background:#E2E8F0; color:#334155; }
 .fiche-rel-btn:hover{ background:#CBD5E1; }
 .fiche-rel-muted{ font-size:11.5px; color:#94A3B8; }
+/* Facture acquittée — écran de génération */
+.fa-acq-check{ display:flex; align-items:center; gap:7px; flex-wrap:wrap; font-size:12px; color:#334155; cursor:pointer; flex-basis:100%; margin-top:8px; }
+.fa-acq-check input{ width:15px; height:15px; cursor:pointer; }
+.fa-acq-check > span:first-of-type{ font-weight:700; color:#002E5A; }
+.fa-acq-aide{ font-size:11px; color:#94A3B8; flex-basis:100%; margin-left:22px; }
+.fa-reg{ flex-basis:100%; margin:8px 0 0 22px; padding:10px 12px; background:#F3FBF6; border:1px solid #CBE6D6; border-left:3px solid #2D7A4F; border-radius:4px; }
+.fa-reg-title{ font-size:10px; text-transform:uppercase; letter-spacing:.14em; color:#2D7A4F; font-weight:700; margin-bottom:8px; }
+.fa-reg-title span{ letter-spacing:0; text-transform:none; font-weight:400; color:#94A3B8; }
+.fa-reg-row{ display:flex; gap:8px; margin-bottom:5px; }
+.fa-reg-row input{ flex:1; min-width:0; padding:5px 7px; font-size:12px; font-family:inherit; border:1px solid #CBD5E1; border-radius:4px; }
+.fa-reg-row input:focus{ outline:2px solid #2D7A4F; outline-offset:1px; border-color:#2D7A4F; }
+.fa-reg-total{ margin-top:8px; padding-top:7px; border-top:1px solid #CBE6D6; font-size:12px; color:#334155; display:flex; justify-content:space-between; }
+.fa-reg-total b{ color:#2D7A4F; font-variant-numeric:tabular-nums; }
+.fa-acq-tag{ display:inline-block; margin-left:6px; padding:1px 7px; border-radius:9999px; background:#DCFCE7; color:#15803D; font-size:10px; font-weight:700; letter-spacing:.06em; }
 .adm-bareme-table { width:100%; border-collapse:collapse; font-size:12px; background:#fff; }
 .adm-bareme-table th { background:#f3f4f6; color:#374151; font-weight:700; padding:8px; border-bottom:1px solid #d1d5db; text-align:left; }
 .adm-bareme-table td { padding:6px 8px; border-bottom:1px solid #f3f4f6; vertical-align:middle; }
@@ -13570,7 +13584,32 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
         + '<label style="font-size:12px;color:#475569;">Fin travaux <input type="date" id="facture-date-fin" style="margin-left:4px;"></label>'
         + '<button type="button" id="facture-generate-btn" class="hexa-meta-card-action">\u{1F9FE} Générer la facture</button>'
         + '<span id="facture-status" style="font-size:12px;"></span>'
+        + '<label class="fa-acq-check"><input type="checkbox" id="facture-acquittee"><span>Facture acquittée</span>'
+        + '<span class="fa-acq-aide">le montant à régler passe à 0,00 € et un encadré « Règlements reçus » s\'ajoute au document</span></label>'
+        + '<div id="facture-reglements" class="fa-reg" hidden>'
+        +   '<div class="fa-reg-title">Règlements reçus <span>(5 lignes maximum)</span></div>'
+        +   [0,1,2,3,4].map(function(i){ return '<div class="fa-reg-row">'
+        +     '<input type="number" step="0.01" min="0" class="fa-reg-montant" placeholder="Montant €" aria-label="Montant du règlement ' + (i+1) + '">'
+        +     '<input type="date" class="fa-reg-date" aria-label="Date du règlement ' + (i+1) + '">'
+        +   '</div>'; }).join('')
+        +   '<div class="fa-reg-total">Total réglé <b id="fa-reg-total">0,00 €</b></div>'
+        + '</div>'
         + '</div>');
+      const cbAcq = document.getElementById('facture-acquittee');
+      const boxReg = document.getElementById('facture-reglements');
+      const majTotalReglements = function(){
+        let t = 0;
+        document.querySelectorAll('.fa-reg-montant').forEach(function(el){ t += parseFloat(el.value) || 0; });
+        const out = document.getElementById('fa-reg-total');
+        if (out) out.textContent = t.toLocaleString('fr-FR', { minimumFractionDigits:2, maximumFractionDigits:2 }) + ' €';
+      };
+      cbAcq?.addEventListener('change', function(){
+        if (boxReg) boxReg.hidden = !cbAcq.checked;
+        majTotalReglements();
+      });
+      document.querySelectorAll('.fa-reg-montant').forEach(function(el){
+        el.addEventListener('input', majTotalReglements);
+      });
       document.getElementById('facture-generate-btn')?.addEventListener('click', async () => {
         const dateFin = document.getElementById('facture-date-fin')?.value || '';
         const st = document.getElementById('facture-status');
@@ -13592,7 +13631,12 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
         } catch (_) { /* contrôle indicatif : n'empêche pas l'émission si la vérif échoue */ }
         if (st) { st.textContent = 'Génération…'; st.style.color = '#475569'; }
         try {
-          const r = await fetch(`/api/facture/${encodeURIComponent(currentProspect)}`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ date_fin_travaux: dateFin }) });
+          const acquittee = !!document.getElementById('facture-acquittee')?.checked;
+          const reglements = acquittee ? Array.from(document.querySelectorAll('.fa-reg-row')).map(function(row){
+            return { montant: row.querySelector('.fa-reg-montant')?.value || '',
+                     date: row.querySelector('.fa-reg-date')?.value || '' };
+          }).filter(function(x){ return x.montant || x.date; }) : [];
+          const r = await fetch(`/api/facture/${encodeURIComponent(currentProspect)}`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ date_fin_travaux: dateFin, acquittee: acquittee, reglements: reglements }) });
           const body = await r.json().catch(() => ({}));
           if (r.ok && body.success) { if (st) { st.textContent = '\u2705 Facture ' + (body.numero_facture || '') + ' générée'; st.style.color = '#15803D'; } refreshFacturesList(); }
           else { if (st) { st.textContent = '\u274C ' + (body.detail || 'Erreur'); st.style.color = '#B91C1C'; } }
@@ -13631,7 +13675,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     block.style.display = '';
     root.innerHTML = items.map(f => `
       <div class="docs-devis-row">
-        <div><b>${escapeHtml(f.numero_facture || '')}</b>${f.numero_devis_ref ? ` — réf. devis ${escapeHtml(f.numero_devis_ref)}` : ''}</div>
+        <div><b>${escapeHtml(f.numero_facture || '')}</b>${f.numero_devis_ref ? ` — réf. devis ${escapeHtml(f.numero_devis_ref)}` : ''}${f.acquittee ? ' <span class="fa-acq-tag">ACQUITTÉE</span>' : ''}</div>
         <div style="font-size:12px;color:#475569;margin-top:2px;">Émise le ${escapeHtml(f.date_emission || '—')} · Fin travaux ${escapeHtml(f.date_fin_travaux || '—')}${(f.montant_ttc !== null && f.montant_ttc !== undefined && f.montant_ttc !== '') ? ` · ${escapeHtml(String(f.montant_ttc))} € TTC` : ''}</div>
         <div class="docs-devis-actions">
           ${f.available ? `<button type="button" class="hexa-meta-card-action" data-facture-download="${escapeHtml(f.numero_facture || '')}">📥 Télécharger</button>` : '<span class="pv-muted" style="font-size:12px;">PDF indisponible</span>'}

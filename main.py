@@ -4061,11 +4061,37 @@ def _facture_pdf_path(numero: str, numero_facture: str) -> str:
     return os.path.join(FACTURES_DIR, f"{numero}_{safe}.pdf")
 
 
-def _render_facture_html(request: Request, numero: str, numero_facture: str, numero_devis_ref: str, date_fin_travaux: str, numero_dossier: str | None = None) -> str:
+MAX_REGLEMENTS = 5
+
+
+def _normaliser_reglements(rows) -> tuple[list, float]:
+    """Règlements reçus saisis à la main : au plus 5 lignes {montant, date}.
+
+    Renvoie (lignes prêtes à imprimer, total). Une ligne sans montant ni date
+    est ignorée : l'encadré n'affiche jamais de ligne vide sur un document client.
+    """
+    lignes, total = [], 0.0
+    for row in (rows or [])[:MAX_REGLEMENTS]:
+        if not isinstance(row, dict):
+            continue
+        montant = float_value(row.get("montant"))
+        date_fr = _format_date_fr(str(row.get("date") or "").strip())
+        if montant <= 0 and not date_fr:
+            continue
+        total += max(montant, 0.0)
+        lignes.append({"montant": money(montant), "date": date_fr or "—"})
+    return lignes, round(total, 2)
+
+
+def _render_facture_html(request: Request, numero: str, numero_facture: str, numero_devis_ref: str, date_fin_travaux: str, numero_dossier: str | None = None, acquittee: bool = False, reglements=None) -> str:
     ctx = _build_devis_context(request, numero, avec_sous_traitant=True, numero_dossier=numero_dossier)
     if ctx.get("_error_template"):
         raise HTTPException(status_code=400, detail="Champs manquants : facture impossible")
     ctx["mode"] = "facture"
+    lignes, total = _normaliser_reglements(reglements)
+    ctx["facture_acquittee"] = bool(acquittee)
+    ctx["reglements"] = lignes if acquittee else []
+    ctx["reglements_total"] = money(total)
     ctx["numero_facture"] = numero_facture
     ctx["numero_devis_ref"] = numero_devis_ref
     ctx["date_fin_travaux"] = _format_date_fr(date_fin_travaux) or date_fin_travaux
@@ -4091,6 +4117,11 @@ async def emettre_facture(numero: str, request: Request) -> JSONResponse:
     date_fin_travaux = str(payload.get("date_fin_travaux") or "").strip()
     if not date_fin_travaux:
         raise HTTPException(status_code=400, detail="Date de fin de travaux requise")
+    acquittee = payload.get("acquittee")
+    if isinstance(acquittee, str):
+        acquittee = acquittee.strip().lower() not in ("", "0", "false", "non", "off")
+    acquittee = bool(acquittee)
+    reglements = payload.get("reglements") if isinstance(payload.get("reglements"), list) else []
     prospect = _find_lead(numero)
     if not prospect:
         raise HTTPException(status_code=404, detail="Prospect introuvable")
@@ -4110,7 +4141,9 @@ async def emettre_facture(numero: str, request: Request) -> JSONResponse:
         seq = int(counters.get(f"facture_{annee}") or 0) + 1
         numero_facture = f"FA-{annee}-{seq:04d}"
         # Rendu + PDF AVANT tout commit : un echec ne consomme aucun numero.
-        html_facture = _render_facture_html(request, numero, numero_facture, numero_devis_ref, date_fin_travaux, _lead_numero_dossier(numero))
+        html_facture = _render_facture_html(request, numero, numero_facture, numero_devis_ref,
+                                            date_fin_travaux, _lead_numero_dossier(numero),
+                                            acquittee=acquittee, reglements=reglements)
         pdf_bytes = _html_to_pdf_playwright(html_facture, request)
         pdf_bytes = _append_fiche_technique(pdf_bytes, numero)
         pdf_bytes = _append_fiche_ballon(pdf_bytes, numero)
@@ -4128,6 +4161,8 @@ async def emettre_facture(numero: str, request: Request) -> JSONResponse:
             "date_emission": datetime.now(PARIS_TZ).strftime("%d/%m/%Y"),
             "date_fin_travaux": date_fin_travaux,
             "montant_ttc": _facture_montant_ttc(numero),
+            "acquittee": acquittee,
+            "reglements": _normaliser_reglements(reglements)[0] if acquittee else [],
             "file": pdf_path,
             "created_at": now,
         }
