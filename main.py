@@ -317,6 +317,34 @@ async def _auth_enforcement(request: Request, call_next):
     return await call_next(request)
 
 
+# ============ VERSION DÉPLOYÉE ============
+# Sans ça, impossible de constater qu'un push est bien arrivé en production :
+# /health répondait "ok" quelle que soit la version du code servie.
+def _app_version() -> str:
+    """Identifiant du code réellement déployé.
+
+    HEXA_VERSION prime (valeur forcée à la main) ; sinon RAILWAY_GIT_COMMIT_SHA,
+    que Railway injecte pour un déploiement lié à GitHub ; sinon 'dev' en local.
+    """
+    for var in ("HEXA_VERSION", "RAILWAY_GIT_COMMIT_SHA"):
+        value = str(os.environ.get(var) or "").strip()
+        if value:
+            return value[:12]
+    return "dev"
+
+
+APP_VERSION = _app_version()
+
+
+# Déclaré APRÈS l'enforcement auth : il l'enveloppe, donc l'en-tête est posé
+# sur toutes les réponses, y compris les 302 vers /login et les 401.
+@app.middleware("http")
+async def _version_header(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["x-hexa-version"] = APP_VERSION
+    return response
+
+
 def _admin_password() -> str:
     pwd = os.environ.get("ADMIN_PASSWORD")
     if not pwd:
@@ -1678,7 +1706,7 @@ async def login_page() -> HTMLResponse:
 
 @app.get("/health")
 async def health() -> JSONResponse:
-    return JSONResponse({"status": "ok"})
+    return JSONResponse({"status": "ok", "version": APP_VERSION})
 
 
 @app.get("/api/baremes")
