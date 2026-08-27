@@ -1068,6 +1068,33 @@ DETECT_SIMU_J = 3
 # Borne haute "jamais contacté" : ignore les leads créés il y a plus de N jours.
 DETECT_JAMAIS_CONTACTE_MAX_J = 30
 
+# Statuts qui ferment commercialement l'affaire : aucune relance automatique,
+# aucune détection. "injoignable" n'en fait PAS partie : c'est précisément
+# l'état que la séquence de relance NRP cherche à débloquer.
+STATUTS_TERMINAUX = {"signe", "perdu", "vt_refuse", "installation_finie"}
+
+
+def _statut_terminal(lead) -> bool:
+    return _normalize_statut((lead or {}).get("statut", "")) in STATUTS_TERMINAUX
+
+
+def _relances_actives_lead(lead) -> bool:
+    """Interrupteur par lead. Absent = actif (rétrocompatible)."""
+    return (lead or {}).get("relances_actives") is not False
+
+
+def _relances_actives_global() -> bool:
+    """Interrupteur global (Admin → Relances). Absent = actif."""
+    cfg = load_parametres_admin().get("relances")
+    return (cfg or {}).get("actif") is not False
+
+
+def _relances_possibles(lead) -> bool:
+    """Les trois conditions réunies pour qu'une relance automatique parte."""
+    return (_relances_actives_global()
+            and _relances_actives_lead(lead)
+            and not _statut_terminal(lead))
+
 
 def _normalize_assigne(value):
     """Normalise une identité déclarative en minuscule. Tolérant : ne rejette
@@ -1161,6 +1188,10 @@ PROSPECT_FIELDS = [
     "statut_updated_at",   # iso Paris : déjà écrit par /status, déclaré pour cohérence
     "injoignable_at",      # iso Paris : posé quand statut -> injoignable
 
+    # Relances automatiques (interrupteur par lead)
+    "relances_actives",    # bool : False = plus aucune relance auto sur ce lead
+    "relances_updated_at", # iso Paris : date du dernier basculement
+
     # Visite technique (marque permanente, independante du statut)
     "vt_validee",          # bool : VT validee (autorise le devis complet)
     "vt_date",             # iso Paris : date de validation VT
@@ -1175,6 +1206,7 @@ DEFAULT_PROSPECT_VALUES = {
     "rappel": None,
     "actions_log": [],
     "vt_validee": False,
+    "relances_actives": True,
 }
 
 IMPORT_PROSPECT_FIELDS = [
@@ -1326,6 +1358,9 @@ def _relances_hour():
 
 def _run_relances_once():
     now = datetime.now(PARIS_TZ)
+    if not _relances_actives_global():
+        print("[relances] interrupteur global sur OFF -> aucun envoi")
+        return
     if now.weekday() >= 5:
         print("[relances] week-end -> skip")
         return
@@ -2559,8 +2594,9 @@ def _detection_items(lead, ctx):
     statut = _normalize_statut(lead.get("statut", ""))
     today = ctx["today"]
     out = []
-    # Leads terminés (perdu/signé) : aucune relance (ni devis, ni simu, ni jamais contacté).
-    if statut in ("perdu", "signe"):
+    # Affaire close ou relances arrêtées sur ce lead : aucune détection
+    # (ni devis, ni simu, ni jamais contacté).
+    if _statut_terminal(lead) or not _relances_actives_lead(lead):
         return out
 
     rejets = {}
@@ -3100,6 +3136,8 @@ async def save_relances_config(request: Request):
     payload = await _read_request_payload(request)
     params = load_parametres_admin()
     cfg = dict(params.get("relances") or DEFAULT_PARAMETRES_ADMIN["relances"])
+    if "actif" in payload:
+        cfg["actif"] = bool(payload.get("actif"))
     if "max" in payload:
         cfg["max"] = int(float_value(payload.get("max"), cfg.get("max", 6)))
     if "hour" in payload:
@@ -4543,7 +4581,8 @@ def _relance_config():
             "contenu": str(m.get("contenu") or DEFAULT_RELANCE_MESSAGES[k]["contenu"]),
         }
     hour = int(float_value(cfg.get("hour"), int(os.environ.get("RELANCES_HOUR_PARIS", "10") or "10")))
-    return {"max": maxr, "niveaux_jours": [int(float_value(x, 0)) for x in niveaux], "messages": messages, "hour": hour}
+    return {"max": maxr, "niveaux_jours": [int(float_value(x, 0)) for x in niveaux],
+            "messages": messages, "hour": hour, "actif": cfg.get("actif") is not False}
 
 
 def _relances_a_faire(today):
@@ -4558,7 +4597,7 @@ def _relances_a_faire(today):
         numero = str(lead.get("numero") or "").strip()
         if not numero:
             continue
-        if _normalize_statut(lead.get("statut", "")) in ("signe", "perdu"):
+        if not _relances_possibles(lead):
             continue
         items = meta.get(numero)
         if not isinstance(items, list) or not items:
@@ -4592,8 +4631,10 @@ def _send_relance(numero: str, version: int, request: Request) -> dict:
     prospect = _find_lead(numero)
     if not prospect:
         raise HTTPException(status_code=404, detail="Prospect introuvable")
-    if _normalize_statut(prospect.get("statut", "")) in ("signe", "perdu"):
-        return {"ok": False, "skip": "lead signé/perdu"}
+    if _statut_terminal(prospect):
+        return {"ok": False, "skip": f"lead {_normalize_statut(prospect.get('statut', ''))}"}
+    if not _relances_actives_lead(prospect):
+        return {"ok": False, "skip": "relances arrêtées sur ce lead"}
     email_to = str(prospect.get("email") or "").strip()
     if not email_to:
         raise HTTPException(status_code=400, detail="Email prospect manquant")
@@ -4706,7 +4747,7 @@ def _relances_nrp_a_faire(today):
         if not numero:
             continue
         statut = _normalize_statut(lead.get("statut", ""))
-        if statut in ("signe", "perdu"):
+        if not _relances_possibles(lead):
             continue
         nrp_count = int(lead.get("nrp_count") or 0)
         if nrp_count < 1 and statut not in ("rappeler", "injoignable"):
@@ -4761,8 +4802,10 @@ def _send_nrp_relance(numero: str, request: Request) -> dict:
         if idx is None:
             raise HTTPException(status_code=404, detail="Prospect introuvable")
         lead = leads[idx]
-        if _normalize_statut(lead.get("statut", "")) in ("signe", "perdu"):
-            return {"ok": False, "skip": "lead signé/perdu"}
+        if _statut_terminal(lead):
+            return {"ok": False, "skip": f"lead {_normalize_statut(lead.get('statut', ''))}"}
+        if not _relances_actives_lead(lead):
+            return {"ok": False, "skip": "relances arrêtées sur ce lead"}
         rc = int(lead.get("nrp_relance_count") or 0)
         if rc >= maxr:
             return {"ok": False, "skip": "max atteint"}
@@ -4815,6 +4858,99 @@ def get_relances_nrp_a_faire() -> JSONResponse:
 @app.post("/api/relances-nrp/{numero}/send")
 async def post_relance_nrp_send(numero: str, request: Request) -> JSONResponse:
     return JSONResponse(_send_nrp_relance(numero, request))
+
+
+def _sequences_relances(lead) -> list:
+    """Séquences de relance en cours pour ce lead, prêtes à afficher sur la fiche.
+
+    Reproduit les conditions réelles de _relances_a_faire / _relances_nrp_a_faire
+    pour ne jamais annoncer une séquence qui ne partira pas.
+    """
+    numero = str((lead or {}).get("numero") or "").strip()
+    today = _today_paris().isoformat()
+    out = []
+
+    def _bloc(type_, libelle, reference, envoyees, maxr, niveaux, base_dt, motif_arret=""):
+        finie = envoyees >= maxr or envoyees >= len(niveaux)
+        prochaine = ""
+        if not finie and base_dt is not None and not motif_arret:
+            prochaine = (base_dt.date() + timedelta(days=int(niveaux[envoyees]))).isoformat()
+        return {
+            "type": type_, "libelle": libelle, "reference": reference,
+            "envoyees": envoyees, "max": maxr,
+            "terminee": finie, "motif_arret": motif_arret,
+            "prochaine": prochaine,
+            "due": bool(prochaine) and prochaine <= today,
+        }
+
+    cfg = _relance_config()
+    items = _read_devis_meta().get(numero)
+    if isinstance(items, list) and items:
+        it = items[-1]
+        out.append(_bloc(
+            "devis",
+            "Pré-devis" if it.get("variante") == "pre_devis" else "Devis",
+            it.get("numero_devis") or f"v{it.get('version') or ''}",
+            int(it.get("relance_count") or 0),
+            cfg["max"], cfg["niveaux_jours"],
+            _parse_paris_dt(it.get("sent_at")),
+        ))
+
+    base_nrp = _parse_paris_dt((lead or {}).get("nrp_updated_at"))
+    if base_nrp is not None:
+        motif = ""
+        if items or str((lead or {}).get("date_envoi_devis") or "").strip():
+            motif = "un devis a été envoyé"
+        elif not str((lead or {}).get("email") or "").strip():
+            motif = "pas d'email sur la fiche"
+        else:
+            rep = _dernier_repondu(numero)
+            rep_dt = _parse_paris_dt(rep) if rep else None
+            if rep_dt is not None and rep_dt > base_nrp:
+                motif = "le prospect a répondu depuis"
+        cfg_nrp = _relance_nrp_config()
+        out.append(_bloc(
+            "nrp", "Relance NRP", f"{int((lead or {}).get('nrp_count') or 0)} appel(s) sans réponse",
+            int((lead or {}).get("nrp_relance_count") or 0),
+            cfg_nrp["max"], cfg_nrp["niveaux_jours"], base_nrp, motif,
+        ))
+    return out
+
+
+@app.get("/api/leads/{numero}/relances")
+def get_lead_relances(numero: str) -> JSONResponse:
+    """État des relances pour un lead : interrupteurs + séquences en cours."""
+    lead = _find_lead(numero)
+    if not lead:
+        raise HTTPException(status_code=404, detail="Prospect introuvable")
+    statut = _normalize_statut(lead.get("statut", ""))
+    return JSONResponse({
+        "numero": numero,
+        "actives": _relances_actives_lead(lead),
+        "global_actif": _relances_actives_global(),
+        "statut": statut,
+        "statut_terminal": statut in STATUTS_TERMINAUX,
+        "sequences": _sequences_relances(lead),
+    })
+
+
+@app.post("/api/leads/{numero}/relances")
+async def set_lead_relances(numero: str, request: Request) -> JSONResponse:
+    """Arrête ou réactive les relances automatiques de CE lead. Payload : {actif: bool}."""
+    payload = await _read_request_payload(request)
+    actif = payload.get("actif")
+    if isinstance(actif, str):
+        actif = actif.strip().lower() not in ("0", "false", "non", "off", "")
+    leads = _read_leads()
+    index = _find_lead_index(leads, numero)
+    if index is None:
+        raise HTTPException(status_code=404, detail="Prospect non trouvé")
+    leads[index]["relances_actives"] = bool(actif)
+    leads[index]["relances_updated_at"] = _now_paris_iso()
+    leads[index]["updated_at"] = _now_iso()
+    _atomic_write_json(LEADS_PATH, leads)
+    return JSONResponse({"ok": True, "actives": bool(actif),
+                         "sequences": _sequences_relances(leads[index])})
 
 
 @app.get("/api/relances/a-faire")

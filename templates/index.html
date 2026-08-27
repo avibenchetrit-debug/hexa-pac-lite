@@ -6515,6 +6515,31 @@ input:focus{ outline:none; border-color: var(--c-navy,#002E5A); box-shadow:0 0 0
 .adm-toggle-label { display:flex; align-items:center; gap:8px; font-size:13px; font-weight:700; color:#002E5A; }
 .adm-hint, .adm-hint-inline { font-size:11.5px; color:#6b7280; line-height:1.45; margin:6px 0 0; }
 .adm-hint-inline { margin:4px 0 0; }
+/* Interrupteur global des relances (Admin) */
+.rel-switch-box{ border:1px solid #BBF7D0; background:#F0FDF4; border-radius:10px; padding:12px 14px; margin:0 0 14px; }
+.rel-switch-box.is-off{ border-color:#FECACA; background:#FEF2F2; }
+.rel-switch{ display:flex; align-items:center; gap:12px; cursor:pointer; }
+.rel-switch input{ position:absolute; opacity:0; width:0; height:0; }
+.rel-switch-track{ flex:0 0 auto; width:44px; height:24px; border-radius:9999px; background:#16A34A; position:relative; transition:background .15s; }
+.rel-switch-box.is-off .rel-switch-track{ background:#DC2626; }
+.rel-switch-knob{ position:absolute; top:3px; left:23px; width:18px; height:18px; border-radius:50%; background:#fff; transition:left .15s; }
+.rel-switch-box.is-off .rel-switch-knob{ left:3px; }
+.rel-switch-texte{ display:flex; flex-direction:column; gap:2px; }
+.rel-switch-texte b{ font-size:13px; color:#14532D; letter-spacing:.01em; }
+.rel-switch-box.is-off .rel-switch-texte b{ color:#7F1D1D; }
+.rel-switch-texte span{ font-size:11.5px; color:#4B5563; }
+.rel-switch:focus-within .rel-switch-track{ outline:2px solid #002E5A; outline-offset:2px; }
+/* Bloc relances de la fiche prospect */
+.fiche-rel-row{ display:flex; align-items:flex-start; gap:10px; margin:2px 0 12px; flex-wrap:wrap; }
+.fiche-rel-seqs{ display:flex; flex-direction:column; gap:3px; }
+.fiche-rel-seq{ font-size:11.5px; color:#4A5568; }
+.fiche-rel-seq b{ color:#002E5A; }
+.fiche-rel-due{ color:#B45309; font-weight:700; }
+.fiche-rel-off{ display:inline-flex; align-items:center; gap:6px; border-radius:9999px; padding:5px 11px; font-size:11.5px; font-weight:700; background:#FEE2E2; color:#991B1B; }
+.fiche-rel-on{ display:inline-flex; align-items:center; gap:6px; border-radius:9999px; padding:5px 11px; font-size:11.5px; font-weight:700; background:#DCFCE7; color:#15803D; }
+.fiche-rel-btn{ border:none; border-radius:9999px; padding:5px 11px; font-size:11.5px; font-weight:700; cursor:pointer; font-family:inherit; background:#E2E8F0; color:#334155; }
+.fiche-rel-btn:hover{ background:#CBD5E1; }
+.fiche-rel-muted{ font-size:11.5px; color:#94A3B8; }
 .adm-bareme-table { width:100%; border-collapse:collapse; font-size:12px; background:#fff; }
 .adm-bareme-table th { background:#f3f4f6; color:#374151; font-weight:700; padding:8px; border-bottom:1px solid #d1d5db; text-align:left; }
 .adm-bareme-table td { padding:6px 8px; border-bottom:1px solid #f3f4f6; vertical-align:middle; }
@@ -7503,6 +7528,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
 <div class="fiche-statvt-top">
   <div class="fiche-statut-row"><span class="fiche-statut-lbl">Statut</span><span id="fiche-statut-slot"></span></div>
   <div class="fiche-vt-row"><span class="fiche-vt-lbl">Visite technique</span><span id="fiche-vt-slot"></span></div>
+  <div class="fiche-rel-row"><span class="fiche-vt-lbl">Relances auto</span><span id="fiche-relances-slot"></span></div>
 </div>
 
   
@@ -16132,15 +16158,25 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
   }
   function renderRelancesSection(){
     return `
+      <div id="rel-switch-box" class="rel-switch-box">
+        <label class="rel-switch">
+          <input type="checkbox" id="rel-actif">
+          <span class="rel-switch-track"><span class="rel-switch-knob"></span></span>
+          <span class="rel-switch-texte">
+            <b id="rel-actif-titre">Relances automatiques</b>
+            <span id="rel-actif-detail">—</span>
+          </span>
+        </label>
+      </div>
       <div class="adm-field adm-field-row"><span class="adm-lab">Heure d'envoi quotidien (Paris)</span><span><input type="number" id="rel-hour" min="0" max="23" style="width:70px"> h <span style="color:#94A3B8;font-size:12px">— automatique, hors week-end</span></span></div>
       <h4 style="margin:16px 0 6px;color:#002E5A;font-size:14px">Relances DEVIS / pré-devis</h4>
-      <div class="adm-field adm-field-row"><span class="adm-lab">Nombre max de relances</span><input type="number" id="rel-dev-max" min="1" max="12" style="width:70px"></div>
+      <div class="adm-field adm-field-row"><span class="adm-lab">Nombre max de relances <span class="adm-hint-inline">0 = aucune relance devis</span></span><input type="number" id="rel-dev-max" min="0" max="12" style="width:70px"></div>
       <div class="adm-field adm-field-row"><span class="adm-lab">Délais (jours depuis l'envoi, séparés par virgule)</span><input type="text" id="rel-dev-niveaux" placeholder="3,7,14,30,60,90" style="width:240px"></div>
       <div style="margin:10px 0"><b style="font-size:13px">Message — devis NON ouvert</b><input type="text" id="rel-dev-no-sujet" placeholder="Sujet" style="width:100%;margin:4px 0;box-sizing:border-box"><textarea id="rel-dev-no-contenu" rows="6" style="width:100%;box-sizing:border-box"></textarea></div>
       <div style="margin:10px 0"><b style="font-size:13px">Message — devis OUVERT</b><input type="text" id="rel-dev-ou-sujet" placeholder="Sujet" style="width:100%;margin:4px 0;box-sizing:border-box"><textarea id="rel-dev-ou-contenu" rows="6" style="width:100%;box-sizing:border-box"></textarea></div>
       <div style="font-size:11px;color:#64748B;background:#F8FAFC;border-radius:6px;padding:6px 10px">Placeholders : <code>{prenom}</code> <code>{numero}</code> <code>{modele_pac}</code> <code>{reste_a_charge}</code> <code>{type_document}</code></div>
       <h4 style="margin:18px 0 6px;color:#002E5A;font-size:14px">Relances NRP (prospect pas joignable)</h4>
-      <div class="adm-field adm-field-row"><span class="adm-lab">Nombre max de relances</span><input type="number" id="rel-nrp-max" min="1" max="12" style="width:70px"></div>
+      <div class="adm-field adm-field-row"><span class="adm-lab">Nombre max de relances <span class="adm-hint-inline">0 = aucune relance NRP</span></span><input type="number" id="rel-nrp-max" min="0" max="12" style="width:70px"></div>
       <div class="adm-field adm-field-row"><span class="adm-lab">Délais (jours depuis le dernier appel)</span><input type="text" id="rel-nrp-niveaux" placeholder="1,3,7" style="width:240px"></div>
       <div style="margin:10px 0"><b style="font-size:13px">Message NRP</b><input type="text" id="rel-nrp-sujet" placeholder="Sujet" style="width:100%;margin:4px 0;box-sizing:border-box"><textarea id="rel-nrp-contenu" rows="6" style="width:100%;box-sizing:border-box"></textarea></div>
       <div style="font-size:11px;color:#64748B;background:#F8FAFC;border-radius:6px;padding:6px 10px">Placeholders : <code>{prenom}</code></div>
@@ -16155,6 +16191,9 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
       const g = id => document.getElementById(id);
       const set = (id, v) => { const el=g(id); if(el) el.value = (v==null?'':v); };
       set('rel-hour', dev.hour ?? 10);
+      const actif = dev.actif !== false;
+      g('rel-actif').checked = actif;
+      majSwitchRelances();
       set('rel-dev-max', dev.max ?? 6);
       set('rel-dev-niveaux', (dev.niveaux_jours||[]).join(','));
       const dm = dev.messages||{}, no = dm.non_ouvert||{}, ou = dm.ouvert||{};
@@ -16164,7 +16203,27 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
       set('rel-nrp-niveaux', (nrp.niveaux_jours||[]).join(','));
       const nm = nrp.message||{};
       set('rel-nrp-sujet', nm.sujet); set('rel-nrp-contenu', nm.contenu);
+      const cb = g('rel-actif');
+      if(cb && !cb.dataset.bound){ cb.dataset.bound='1'; cb.addEventListener('change', majSwitchRelances); }
     } catch(_){}
+  }
+  /** parseInt qui accepte 0 : parseInt(x)||N renvoyait N quand l'utilisateur saisissait 0. */
+  function entierOuDefaut(valeur, defaut){
+    const n = parseInt(String(valeur ?? '').trim(), 10);
+    return Number.isFinite(n) && n >= 0 ? n : defaut;
+  }
+  function majSwitchRelances(){
+    const box = document.getElementById('rel-switch-box');
+    const cb = document.getElementById('rel-actif');
+    if(!box || !cb) return;
+    const on = !!cb.checked;
+    box.classList.toggle('is-off', !on);
+    const t = document.getElementById('rel-actif-titre');
+    const d = document.getElementById('rel-actif-detail');
+    if(t) t.textContent = on ? 'Relances automatiques ACTIVES' : 'Relances automatiques ARRÊTÉES';
+    if(d) d.textContent = on
+      ? "Les relances devis et NRP partent chaque jour ouvré à l'heure ci-dessous."
+      : "Plus aucune relance automatique ne part, pour aucun prospect. Les envois manuels restent possibles.";
   }
   async function saveRelancesSection(){
     const g = id => document.getElementById(id);
@@ -16172,8 +16231,9 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     const btn = g('rel-save'); if(btn){ btn.disabled=true; btn.textContent='Enregistrement…'; }
     try {
       const devPayload = {
-        hour: parseInt(g('rel-hour').value,10)||10,
-        max: parseInt(g('rel-dev-max').value,10)||6,
+        actif: !!g('rel-actif').checked,
+        hour: entierOuDefaut(g('rel-hour').value, 10),
+        max: entierOuDefaut(g('rel-dev-max').value, 6),
         niveaux_jours: parseNiv(g('rel-dev-niveaux').value),
         messages: {
           non_ouvert: { sujet: g('rel-dev-no-sujet').value, contenu: g('rel-dev-no-contenu').value },
@@ -16181,7 +16241,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
         },
       };
       const nrpPayload = {
-        max: parseInt(g('rel-nrp-max').value,10)||3,
+        max: entierOuDefaut(g('rel-nrp-max').value, 3),
         niveaux_jours: parseNiv(g('rel-nrp-niveaux').value),
         message: { sujet: g('rel-nrp-sujet').value, contenu: g('rel-nrp-contenu').value },
       };
@@ -19820,6 +19880,65 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
       });
     });
   }
+  /** Bloc "Relances auto" de la fiche : etat + sequences en cours + interrupteur du lead. */
+  async function renderFicheRelances(lead){
+    const slot = document.getElementById('fiche-relances-slot');
+    if(!slot) return;
+    const numero = String((lead && lead.numero) || document.body.dataset.prospectNumero || '').trim();
+    if(!numero){ slot.innerHTML = ''; return; }
+    slot.innerHTML = '<span class="fiche-rel-muted">…</span>';
+    let d;
+    try {
+      const r = await fetch('/api/leads/' + encodeURIComponent(numero) + '/relances', { cache:'no-store' });
+      if(!r.ok) throw new Error('HTTP ' + r.status);
+      d = await r.json();
+    } catch(_) { slot.innerHTML = '<span class="fiche-rel-muted">état des relances indisponible</span>'; return; }
+
+    const jour = iso => { const m = String(iso||'').match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? m[3]+'/'+m[2]+'/'+m[1] : ''; };
+    let html = '';
+    if(!d.actives){
+      html += '<span class="fiche-rel-off">⏸ Relances arrêtées sur ce prospect</span>'
+            + ' <button type="button" class="fiche-rel-btn" data-rel="on">Réactiver</button>';
+    } else if(d.statut_terminal){
+      html += '<span class="fiche-rel-off">⏹ Aucune relance — statut « ' + escapeHtml(d.statut) + ' »</span>';
+    } else if(!d.global_actif){
+      html += '<span class="fiche-rel-off">⏸ Relances coupées globalement (Admin)</span>';
+    } else {
+      html += '<span class="fiche-rel-on">▶ Relances actives</span>'
+            + ' <button type="button" class="fiche-rel-btn" data-rel="off">⏸ Arrêter pour ce prospect</button>';
+    }
+    const seqs = Array.isArray(d.sequences) ? d.sequences : [];
+    if(seqs.length){
+      html += '<span class="fiche-rel-seqs">' + seqs.map(function(sq){
+        let etat;
+        if(sq.terminee) etat = 'séquence terminée';
+        else if(sq.motif_arret) etat = 'arrêtée — ' + escapeHtml(sq.motif_arret);
+        else if(!d.actives || d.statut_terminal || !d.global_actif) etat = 'en pause';
+        else if(sq.due) etat = '<span class="fiche-rel-due">à envoyer au prochain passage</span>';
+        else etat = 'prochaine le ' + jour(sq.prochaine);
+        return '<span class="fiche-rel-seq"><b>' + escapeHtml(sq.libelle) + '</b> ' + escapeHtml(sq.reference)
+             + ' — relance ' + sq.envoyees + '/' + sq.max + ' · ' + etat + '</span>';
+      }).join('') + '</span>';
+    } else {
+      html += '<span class="fiche-rel-seqs"><span class="fiche-rel-seq fiche-rel-muted">aucune séquence en cours</span></span>';
+    }
+    slot.innerHTML = html;
+    slot.querySelectorAll('[data-rel]').forEach(function(b){
+      b.addEventListener('click', async function(){
+        b.disabled = true;
+        try {
+          const r = await fetch('/api/leads/' + encodeURIComponent(numero) + '/relances', {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({ actif: b.dataset.rel === 'on' })
+          });
+          if(!r.ok) throw new Error('HTTP ' + r.status);
+          toastMsg(b.dataset.rel === 'on' ? '✓ Relances réactivées' : '✓ Relances arrêtées pour ce prospect', '#0D6B3B');
+          renderFicheRelances({ numero: numero });
+        } catch(err){ toastMsg('❌ ' + err.message, '#B91C1C'); b.disabled = false; }
+      });
+    });
+  }
+
   function renderFicheVt(lead){
     const slot = document.getElementById('fiche-vt-slot');
     if(!slot) return;
@@ -19890,6 +20009,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     renderSuivi(lead);
     renderFicheStatut(lead);
     renderFicheVt(lead);
+    renderFicheRelances(lead);
   }
   async function openFiche(p, opts){
     opts = opts || {};
