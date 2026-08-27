@@ -3482,6 +3482,22 @@ def _notedim_path(numero: str, version: int) -> str:
     return os.path.join(DEVIS_DIR, f"{numero}_notedim_v{version}.pdf")
 
 
+def _surface_chauffee_doc(prospect: dict, state: dict) -> str:
+    """Surface chauffée affichée sur le devis et la facture, prête à imprimer.
+
+    C'est elle qui justifie la puissance retenue, pas la surface habitable.
+    Lue à la source — le state du simulateur — et jamais recalculée ; repli sur
+    90 % de la surface habitable, même règle que la note de dimensionnement.
+    Arrondie à l'entier : pas de 55.800000000000004 sur un document client.
+    """
+    surface = float_value(devis_value(state, "surface_chauffee", default=""))
+    if surface <= 0:
+        surface = float_value(
+            devis_value(prospect, "surface_habitable", "surface_logement_m2", default="")
+        ) * 0.9
+    return f"{round(surface)} m²" if surface > 0 else "—"
+
+
 def _build_devis_context(request: Request, numero: str, version: int | None = None, avec_sous_traitant: bool = True, numero_dossier: str | None = None) -> dict:
     prospect = _find_lead(numero)
     if not prospect:
@@ -3540,6 +3556,7 @@ def _build_devis_context(request: Request, numero: str, version: int | None = No
         "date_debut_travaux": "À déterminer",
         "type_logement": _label_type_logement(prospect.get("type_logement", "")),
         "surface_habitable": str(devis_value(prospect, "surface_habitable", "surface_logement_m2", default="")),
+        "surface_chauffee": _surface_chauffee_doc(prospect, state),
         "chauffage_actuel": str(devis_value(prospect, "chauffage_actuel", "mode_chauffage", default="")).capitalize(),
         "parcelle_cadastrale": prospect.get("parcelle_cadastrale", ""),
         "zone_climatique": calculer_zone_climatique(cp_chantier),
