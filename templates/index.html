@@ -18266,9 +18266,27 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     input.addEventListener('input', ()=>{ confirmBtn.disabled = input.value.trim().toUpperCase()!=='SUPPRIMER'; });
     document.getElementById('adm-del-cancel').addEventListener('click', ()=>wrap.remove());
     wrap.addEventListener('click', e=>{ if(e.target===wrap) wrap.remove(); });
-    confirmBtn.addEventListener('click', ()=>{
+    confirmBtn.addEventListener('click', async ()=>{
       if(input.value.trim().toUpperCase()!=='SUPPRIMER') return;
-      window.HexaConfig.models.splice(i,1); wrap.remove(); rerenderBody();
+      confirmBtn.disabled = true;
+      // Retire le modèle puis PERSISTE côté serveur (comme l'ajout/l'édition des specs).
+      // Sans ce POST, la suppression n'existait qu'en mémoire et le modèle réapparaissait au refresh.
+      const removed = window.HexaConfig.models.splice(i,1);
+      const payload = (window.HexaConfig.models || []).map(m=>Object.assign({}, m));
+      const server = await saveCatalogueToServer(payload);
+      if (server.ok) {
+        persistCatalogueLocal(payload);
+        saveConfig(false);
+        window.dispatchEvent(new CustomEvent('hexa-config-changed'));
+        adminToast('✓ Produit supprimé', '#0D6B3B');
+        wrap.remove();
+        rerenderBody();
+      } else {
+        // Échec réseau/serveur : on restaure le modèle pour rester cohérent avec le serveur.
+        window.HexaConfig.models.splice(i,0,...removed);
+        confirmBtn.disabled = false;
+        adminToast(`❌ Suppression non enregistrée : ${server.error||'erreur serveur'}`, '#B91C1C', 9000);
+      }
     });
   }
 
