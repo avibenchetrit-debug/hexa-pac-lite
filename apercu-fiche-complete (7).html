@@ -15018,6 +15018,9 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
 
     return { sKey, ceeDevis, ceeConserve, mprDevis, aidesDevis, g29,
              contextePret,
+             // Categorie AYANT SERVI a ces montants : le bandeau l'affiche telle quelle, sinon un
+             // state modifie pendant l'await afficherait SUP au-dessus de chiffres calcules en TMO.
+             categorie: state.categorie,
              mensO1, mensO2, fraisO2, mensOpt, nMois, dim };
   }
 
@@ -15068,12 +15071,12 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
   }
 
 
-  async function render(){
+  async function render(seq){
     const c = await calcul();
     const r = roi(c);
     const sel=(a,b)=>a===b?'selected':'';
-    const anahLabel = LABELS_ANAH[state.categorie] || '—';
-    const ceeLabel = LABELS_CEE[state.categorie] || '—';
+    const anahLabel = LABELS_ANAH[c.categorie] || '—';
+    const ceeLabel = LABELS_CEE[c.categorie] || '—';
     const catLabel = (anahLabel === '—' && ceeLabel === '—')
       ? '—'
       : `${anahLabel} (MPR) · ${ceeLabel} (CEE)`;
@@ -15245,8 +15248,16 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
 
   // Mise à jour PARTIELLE : recalcule et réinjecte uniquement les zones de résultat,
   // sans recréer les inputs (prix, surface) -> le curseur n'est jamais perturbé.
+  // Rendus concurrents : refresh() et patch() sont async (calcul() attend les baremes).
+  // Sans jeton, un rendu lance AVANT une modification de la fiche peut ecrire son HTML
+  // APRES le rendu a jour et refiger l'ecran sur l'ancienne categorie de revenus.
+  // Regle : seul le dernier rendu demarre a le droit d'ecrire dans le DOM.
+  let __renderSeq = 0;
+
   async function patch(){
+    const seq = ++__renderSeq;
     const c = await calcul();
+    if (seq !== __renderSeq) return;
     const r = roi(c);
     const energieLbl = ENERGIE_LABEL[state.energie_avant] || '—';
     const creditLine = state.option==='opt3' ? ''
@@ -15353,6 +15364,7 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
   }
 
   async function refresh(){
+    const seq = ++__renderSeq;
     const content=document.getElementById('sim-drawer-content');
     const body=document.querySelector('.sim-body');
     if(!content) return;
@@ -15364,8 +15376,10 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
     if (focusId && active && typeof active.selectionStart==='number'){
       caretStart=active.selectionStart; caretEnd=active.selectionEnd;
     }
-    // 2) Réinjecter
-    content.innerHTML=await render();
+    // 2) Réinjecter (sauf si un rendu plus recent a demarre entre-temps)
+    const html = await render(seq);
+    if (seq !== __renderSeq) return;
+    content.innerHTML=html;
     bind();
     // 3) Restaurer scroll
     const body2=document.querySelector('.sim-body');
