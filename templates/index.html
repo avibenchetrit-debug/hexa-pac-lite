@@ -14571,9 +14571,13 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
       if (saved.iso_toit) state.iso_toit = saved.iso_toit;
       if (saved.iso_mur) state.iso_mur = saved.iso_mur;
       if (saved.iso_menuiserie) state.iso_menuiserie = saved.iso_menuiserie;
-      if (saved.alimentation_electrique || saved.alimentation) state.phase_electrique = saved.alimentation_electrique || saved.alimentation;
-      if (saved.categorie_revenu) state.categorie = saved.categorie_revenu;
-      if (saved.type_logement) state.type_logement = saved.type_logement;
+      // Champs DERIVES de la fiche (aucun controle du tiroir ne les modifie) : lireContexteFiche()
+      // vient de les poser depuis le DOM de la fiche, qui fait foi. Le state persiste n'est plus
+      // qu'un repli quand la fiche ne fournit pas la valeur -- sinon une categorie de revenus
+      // modifiee sur la fiche restait ecrasee par l'ancienne et les aides se figeaient dessus.
+      if (!state.phase_electrique && (saved.alimentation_electrique || saved.alimentation)) state.phase_electrique = saved.alimentation_electrique || saved.alimentation;
+      if (!state.categorie && saved.categorie_revenu) state.categorie = saved.categorie_revenu;
+      if (!state.type_logement && saved.type_logement) state.type_logement = saved.type_logement;
       if (saved.surface_chauffee) { state.surface_chauffee = Number(saved.surface_chauffee); state.surface_forcee = true; }
       if (saved.option) state.option = saved.option;
       state.mode_mpr = saved.mode_mpr || 'attente';
@@ -14898,6 +14902,9 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
              resteAttente, mprTotal, reste_affiche, base_credit,
              mensOptNet, nMoisNet, modeMpr, finMpr, sansAttente,
              contextePret,
+             // Categorie AYANT SERVI a ces montants : le bandeau l'affiche telle quelle, sinon un
+             // state modifie pendant l'await afficherait SUP au-dessus de chiffres calcules en TMO.
+             categorie: state.categorie,
              mensO1, mensO2, fraisO2, mensOpt, nMois, dim, finView };
   }
 
@@ -15107,14 +15114,15 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
       }
     });
   }
-  async function render(){
+  async function render(seq){
     const c = await calcul();
     const r = roi(c);
-    lastRoi = r;
+    // lastRoi part au devis (eco 20 ans) : un rendu perime ne doit pas l'ecraser.
+    if (seq === undefined || seq === __renderSeq) lastRoi = r;
     const bs = ballonSim(state);
     const sel=(a,b)=>a===b?'selected':'';
-    const anahLabel = LABELS_ANAH[state.categorie] || '—';
-    const ceeLabel = LABELS_CEE[state.categorie] || '—';
+    const anahLabel = LABELS_ANAH[c.categorie] || '—';
+    const ceeLabel = LABELS_CEE[c.categorie] || '—';
     const catLabel = (anahLabel === '—' && ceeLabel === '—')
       ? '—'
       : `${anahLabel} (MPR) · ${ceeLabel} (CEE)`;
@@ -15318,8 +15326,16 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
 
   // Mise à jour PARTIELLE : recalcule et réinjecte uniquement les zones de résultat,
   // sans recréer les inputs (prix, surface) -> le curseur n'est jamais perturbé.
+  // Rendus concurrents : refresh() et patch() sont async (calcul() attend les baremes).
+  // Sans jeton, un rendu lance AVANT une modification de la fiche peut ecrire son HTML
+  // APRES le rendu a jour et refiger l'ecran sur l'ancienne categorie de revenus.
+  // Regle : seul le dernier rendu demarre a le droit d'ecrire dans le DOM.
+  let __renderSeq = 0;
+
   async function patch(){
+    const seq = ++__renderSeq;
     const c = await calcul();
+    if (seq !== __renderSeq) return;
     const r = roi(c);
     lastRoi = r;
     const bs = ballonSim(state);
@@ -15450,6 +15466,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
   }
 
   async function refresh(){
+    const seq = ++__renderSeq;
     const content=document.getElementById('sim-drawer-content');
     const body=document.querySelector('.sim-body');
     if(!content) return;
@@ -15461,8 +15478,10 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     if (focusId && active && typeof active.selectionStart==='number'){
       caretStart=active.selectionStart; caretEnd=active.selectionEnd;
     }
-    // 2) Réinjecter
-    content.innerHTML=await render();
+    // 2) Réinjecter (sauf si un rendu plus recent a demarre entre-temps)
+    const html = await render(seq);
+    if (seq !== __renderSeq) return;
+    content.innerHTML=html;
     bind();
     // 3) Restaurer scroll
     const body2=document.querySelector('.sim-body');
