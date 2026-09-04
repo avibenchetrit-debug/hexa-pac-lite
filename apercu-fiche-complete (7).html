@@ -14745,6 +14745,9 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       categorie_revenu: state.categorie || '',
       type_logement: state.type_logement || '',
       surface_chauffee: state.surface_chauffee || '',
+      // Distingue une surface saisie a la main dans le simulateur (choix propre a
+      // la simulation, a conserver) d'une surface deduite de la fiche (a relire).
+      surface_forcee: !!state.surface_forcee,
       option: state.option || ''
     };
   }
@@ -14780,10 +14783,18 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
       if (saved.iso_toit) state.iso_toit = saved.iso_toit;
       if (saved.iso_mur) state.iso_mur = saved.iso_mur;
       if (saved.iso_menuiserie) state.iso_menuiserie = saved.iso_menuiserie;
-      if (saved.alimentation_electrique || saved.alimentation) state.phase_electrique = saved.alimentation_electrique || saved.alimentation;
-      if (saved.categorie_revenu) state.categorie = saved.categorie_revenu;
-      if (saved.type_logement) state.type_logement = saved.type_logement;
-      if (saved.surface_chauffee) { state.surface_chauffee = Number(saved.surface_chauffee); state.surface_forcee = true; }
+      // Champs pilotes par la fiche prospect (categorie ANAH/CEE, zone, revenus,
+      // type de logement, alimentation, surface) : ils ne sont VOLONTAIREMENT pas
+      // restaures depuis le snapshot. Les recharger figerait le simulateur sur la
+      // valeur du jour de sa creation : modifier le RFR sur la fiche (categorie
+      // TMO -> SUPERIEUR) n'aurait plus aucun effet sur les montants MPR/CEE.
+      // Ils sont relus a chaque ouverture par lireContexteFiche().
+      // Seule exception : une surface explicitement forcee a la main dans le
+      // simulateur, qui est bien un choix propre a la simulation.
+      if (saved.surface_forcee && saved.surface_chauffee) {
+        state.surface_chauffee = Number(saved.surface_chauffee);
+        state.surface_forcee = true;
+      }
       if (saved.option) state.option = saved.option;
       state.modele_force = !!saved.modele_pac_id;
     } catch(e) {
@@ -15418,9 +15429,14 @@ body.hexa-view-prospects #hexa-admin-btn{ display:none; }
 
     const sub = document.getElementById('sim-drawer-prospect');
     if (sub) sub.textContent = state.numero || '—';
+    // Le state sauvegarde ne porte que les choix propres a la simulation.
+    // On relit la fiche APRES son chargement : categorie, zone, revenus, type de
+    // logement et surface sont donc toujours ceux de la fiche a jour, et les
+    // montants MPR/CEE sont recalcules dessus a chaque ouverture.
+    const finaliserOuverture = () => { lireContexteFiche(); syncDimensionnement(); refresh(); };
     Promise.all([chargerBaremes(), loadSimulatorState(state.numero)])
-      .then(()=>{ syncDimensionnement(); refresh(); })
-      .catch(()=>{ syncDimensionnement(); refresh(); });
+      .then(finaliserOuverture)
+      .catch(finaliserOuverture);
 
     // PAS de fermeture des panneaux droits : gauche et droite cohabitent.
     requestAnimationFrame(()=>{
