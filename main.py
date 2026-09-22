@@ -80,6 +80,7 @@ REPO_BAREMES_PATH = os.path.join(REPO_DATA_DIR, "baremes.json")
 DOCUMENTS_CATEGORIES_PATH = os.path.join(DATA_DIR, "documents_categories.json")
 REPO_DOCUMENTS_CATEGORIES_PATH = os.path.join(REPO_DATA_DIR, "documents_categories.json")
 DOCUMENTS_DIR = os.path.join(DATA_DIR, "documents")
+CATALOGUE_BACKUP_DIR = os.path.join(DATA_DIR, "backups", "catalogue")
 
 DEFAULT_DELEGATAIRES = [
     {"nom": "PICOTY", "mwh_precaire": 12.50, "mwh_classique": 7.20, "actif": True}
@@ -279,7 +280,9 @@ def _auth_is_public(path: str) -> bool:
 
 
 def _auth_is_admin_only(method: str, path: str) -> bool:
-    if method == "POST" and path == "/api/catalogue-pac":
+    if method == "POST" and (
+        path == "/api/catalogue-pac" or path.startswith("/api/catalogue-pac/")
+    ):
         return True
     if path.startswith("/api/admin/"):
         if method == "GET" and path in _AUTH_ADMIN_GET_OK:
@@ -624,6 +627,54 @@ def save_parametres_admin_atomic(payload):
     _atomic_write_json(PARAMETRES_ADMIN_PATH, data)
 
 
+def _catalogue_version() -> str:
+    """Empreinte sha256 du catalogue sur disque ("" si le fichier n'existe pas encore)."""
+    try:
+        with open(CATALOGUE_PAC_PATH, "rb") as f:
+            return hashlib.sha256(f.read()).hexdigest()
+    except FileNotFoundError:
+        return ""
+
+
+def _rotate_catalogue_backups(keep: int = 30) -> None:
+    """Ne conserve que les `keep` sauvegardes les plus recentes."""
+    try:
+        noms = sorted(
+            n for n in os.listdir(CATALOGUE_BACKUP_DIR)
+            if n.startswith("catalogue_pac-") and n.endswith(".json")
+        )
+    except FileNotFoundError:
+        return
+    for nom in noms[:-keep] if len(noms) > keep else []:
+        try:
+            os.remove(os.path.join(CATALOGUE_BACKUP_DIR, nom))
+        except OSError:
+            pass
+
+
+def _backup_catalogue() -> str | None:
+    """Copie horodatee du catalogue courant avant remplacement (None si aucun fichier)."""
+    if not os.path.exists(CATALOGUE_PAC_PATH):
+        return None
+    os.makedirs(CATALOGUE_BACKUP_DIR, exist_ok=True)
+    ts = datetime.now(PARIS_TZ).strftime("%Y%m%d-%H%M%S")
+    dest = os.path.join(CATALOGUE_BACKUP_DIR, f"catalogue_pac-{ts}.json")
+    collision = 0
+    while os.path.exists(dest):
+        collision += 1
+        dest = os.path.join(CATALOGUE_BACKUP_DIR, f"catalogue_pac-{ts}-{collision:02d}.json")
+    shutil.copyfile(CATALOGUE_PAC_PATH, dest)
+    _rotate_catalogue_backups()
+    return dest
+
+
+def _write_catalogue_pac(models) -> str:
+    """Sauvegarde le catalogue courant PUIS ecrit la nouvelle liste. Renvoie la version ecrite."""
+    _backup_catalogue()
+    _atomic_write_json(CATALOGUE_PAC_PATH, models)
+    return _catalogue_version()
+
+
 def _read_catalogue_pac():
     catalogue = _read_json(CATALOGUE_PAC_PATH, DEFAULT_CATALOGUE_PAC)
     if not isinstance(catalogue, list):
@@ -644,7 +695,8 @@ def _read_catalogue_pac():
             changed = True
         migrated.append(next_item)
     if changed:
-        _atomic_write_json(CATALOGUE_PAC_PATH, migrated)
+        # Migration de schema : passe par _write_catalogue_pac pour etre sauvegardee elle aussi.
+        _write_catalogue_pac(migrated)
     return migrated
 
 
@@ -1403,6 +1455,18 @@ def start_relances_scheduler():
 
 @app.on_event("startup")
 async def startup_event():
+    # Garde volume : en prod Railway, DATA_DIR doit pointer HORS du depot. Sinon chaque
+    # deploiement repart du catalogue versionne et efface les modeles saisis en admin.
+    # On alerte sans rien modifier automatiquement.
+    _data_dir_resolu = os.path.abspath(DATA_DIR)
+    _base = os.path.abspath(BASE_DIR)
+    if os.environ.get("RAILWAY_ENVIRONMENT") and (
+        _data_dir_resolu == _base or _data_dir_resolu.startswith(_base + os.sep)
+    ):
+        print(
+            f"CRITICAL: DATA_DIR={_data_dir_resolu} est dans le depot ({_base}) : les donnees "
+            "seront perdues au prochain deploiement. Montez un volume et definissez DATA_DIR."
+        )
     _init_storage()
     _migrate_leads_schema()
     _admin_password()
@@ -1766,7 +1830,9 @@ def get_zones_departements() -> JSONResponse:
 
 @app.get("/api/catalogue-pac")
 def get_catalogue_pac() -> JSONResponse:
-    return JSONResponse(_read_catalogue_pac())
+    # Corps inchange (la liste brute) pour rester compatible ; la version part en en-tete.
+    models = _read_catalogue_pac()
+    return JSONResponse(models, headers={"X-Catalogue-Version": _catalogue_version()})
 
 
 @app.get("/api/gmaps-key")
@@ -1997,20 +2063,51 @@ async def post_catalogue_pac(request: Request) -> JSONResponse:
             status_code=400, detail=f"Payload JSON invalide: {exc}"
         ) from exc
 
+    courant = _read_catalogue_pac()
+    version = _catalogue_version()
+
+    # 1) Verrou optimiste : sans If-Match a jour, on refuse sans rien ecrire.
+    if_match = (request.headers.get("If-Match") or "").strip().strip('"')
+    if not if_match:
+        raise HTTPException(
+            status_code=409,
+            detail="Version du catalogue manquante (If-Match). Rechargez l'admin.",
+        )
+    if if_match != version:
+        raise HTTPException(
+            status_code=409,
+            detail="Le catalogue a ete modifie ailleurs. Rechargez l'admin avant d'enregistrer.",
+        )
+
     validated = _normalize_catalogue_list(payload)
 
-    _atomic_write_json(CATALOGUE_PAC_PATH, validated)
-    return JSONResponse({"ok": True, "count": len(validated)})
+    # 2) Garde anti-suppression : toute ref presente avant et absente apres doit etre
+    #    explicitement confirmee via X-Catalogue-Deleted. C'est ce qui empeche une liste
+    #    tronquee (modeles a 0 filtres par le simulateur) d'effacer le catalogue.
+    def _refs(liste):
+        return {
+            str(m.get("ref", "")).strip()
+            for m in liste
+            if isinstance(m, dict) and str(m.get("ref", "")).strip()
+        }
 
+    confirmees = {
+        r.strip()
+        for r in (request.headers.get("X-Catalogue-Deleted") or "").split(",")
+        if r.strip()
+    }
+    manquantes = sorted(_refs(courant) - _refs(validated) - confirmees)
+    if manquantes:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Suppression non confirmee pour : {', '.join(manquantes)}. Rechargez l'admin.",
+        )
 
-def _backup_catalogue() -> str | None:
-    """Copie horodatée du catalogue courant avant remplacement (None si aucun fichier)."""
-    if not os.path.exists(CATALOGUE_PAC_PATH):
-        return None
-    ts = datetime.now(PARIS_TZ).strftime("%Y%m%d-%H%M%S")
-    dest = os.path.join(DATA_DIR, f"catalogue_pac.backup-{ts}.json")
-    shutil.copyfile(CATALOGUE_PAC_PATH, dest)
-    return dest
+    nouvelle = _write_catalogue_pac(validated)
+    return JSONResponse(
+        {"ok": True, "count": len(validated), "version": nouvelle},
+        headers={"X-Catalogue-Version": nouvelle},
+    )
 
 
 @app.post("/api/catalogue-pac/import-xlsx")
@@ -2036,10 +2133,87 @@ async def import_catalogue_xlsx(request: Request, file: UploadFile = File(...), 
         return JSONResponse({"ok": False, "error": "Aucun modèle valide — remplacement annulé.", "warnings": warnings}, status_code=400)
 
     validated = _normalize_catalogue_list(models)
-    backup = _backup_catalogue()
-    _atomic_write_json(CATALOGUE_PAC_PATH, validated)
+    version = _write_catalogue_pac(validated)
     return JSONResponse({"ok": True, "confirmed": True, "count": len(validated),
-                         "backup": os.path.basename(backup) if backup else None, "warnings": warnings})
+                         "version": version, "warnings": warnings})
+
+
+@app.post("/api/catalogue-pac/import-xlsx-merge")
+async def import_catalogue_xlsx_merge(
+    request: Request, file: UploadFile = File(...), confirm: str = Form("")
+) -> JSONResponse:
+    """Import Excel en AJOUT / MISE A JOUR par ref : ne supprime jamais un modele existant.
+
+    Sans `confirm`, renvoie l'apercu (ce qui serait ajoute / mis a jour) sans rien ecrire.
+    """
+    raw = await file.read()
+    try:
+        from services.import_catalogue_pac import parse_catalogue_xlsx_report
+        models, warnings = parse_catalogue_xlsx_report(io.BytesIO(raw))
+    except Exception as exc:  # noqa: BLE001
+        return JSONResponse({"ok": False, "error": f"Lecture Excel impossible : {exc}"}, status_code=400)
+
+    if not models:
+        return JSONResponse(
+            {"ok": False, "error": "Aucun modele valide dans le fichier.", "warnings": warnings},
+            status_code=400,
+        )
+
+    fusion = [dict(m) for m in _read_catalogue_pac() if isinstance(m, dict)]
+    position = {
+        str(m.get("ref", "")).strip(): i
+        for i, m in enumerate(fusion)
+        if str(m.get("ref", "")).strip()
+    }
+
+    ajouts, mises_a_jour = [], []
+    for m in models:
+        ref = str(m.get("ref", "")).strip()
+        if not ref:
+            continue
+        if ref in position:
+            cible = dict(fusion[position[ref]])
+            # Une cellule vide de l'Excel n'ecrase jamais une valeur deja saisie.
+            cible.update({k: v for k, v in m.items() if v not in (None, "", [])})
+            fusion[position[ref]] = cible
+            mises_a_jour.append(ref)
+        else:
+            position[ref] = len(fusion)
+            fusion.append(dict(m))
+            ajouts.append(ref)
+
+    apercu = {"ajouts": ajouts, "mises_a_jour": mises_a_jour, "total_apres": len(fusion)}
+    if str(confirm).strip().lower() not in ("1", "true", "oui", "yes"):
+        return JSONResponse({"ok": True, "confirmed": False, "warnings": warnings, **apercu})
+
+    validated = _normalize_catalogue_list(fusion)
+    version = _write_catalogue_pac(validated)
+    return JSONResponse({"ok": True, "confirmed": True, "count": len(validated),
+                         "version": version, "warnings": warnings, **apercu})
+
+
+@app.get("/api/admin/storage-status")
+def get_storage_status() -> JSONResponse:
+    """Diagnostic volume : ou DATA_DIR pointe reellement, et etat des sauvegardes catalogue."""
+    resolu = os.path.abspath(DATA_DIR)
+    try:
+        backups = sorted(
+            n for n in os.listdir(CATALOGUE_BACKUP_DIR)
+            if n.startswith("catalogue_pac-") and n.endswith(".json")
+        )
+    except FileNotFoundError:
+        backups = []
+    return JSONResponse({
+        "data_dir": DATA_DIR,
+        "data_dir_resolu": resolu,
+        "dans_le_depot": resolu == os.path.abspath(BASE_DIR)
+        or resolu.startswith(os.path.abspath(BASE_DIR) + os.sep),
+        "railway": bool(os.environ.get("RAILWAY_ENVIRONMENT")),
+        "catalogue_version": _catalogue_version(),
+        "catalogue_modeles": len(_read_catalogue_pac()),
+        "backups": len(backups),
+        "backup_recent": backups[-1] if backups else None,
+    })
 
 
 @app.post("/api/leads")

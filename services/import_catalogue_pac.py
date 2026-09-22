@@ -18,11 +18,17 @@ _SOURCE_MAP = {
     "etas 55°c (%)": "etas55",
     "prix achat ht": "achat",
     "prix vente ttc": "ttc",
+    # Champs de tracabilite : stockes tels quels, branches sur AUCUN calcul.
+    "référence fabricant": "ref_fabricant",
+    "référence eprel": "eprel",
+    "numéro d'agrément": "agrement",
 }
 
 
 def _norm_label(v):
-    return " ".join(str(v if v is not None else "").strip().lower().split())
+    # L'apostrophe typographique d'Excel doit matcher la cle droite ("numéro d'agrément").
+    s = str(v if v is not None else "").replace("’", "'")
+    return " ".join(s.strip().lower().split())
 
 
 def _to_number(v):
@@ -108,6 +114,9 @@ def _parse_sheet(ws, warnings):
             "etas55": _to_number(cell("etas 55°c (%)", j)),
             "achat": _to_number(cell("prix achat ht", j)),
             "ttc": ttc,
+            "ref_fabricant": _cell_text(cell("référence fabricant", j)) or None,
+            "eprel": _cell_text(cell("référence eprel", j)) or None,
+            "agrement": _cell_text(cell("numéro d'agrément", j)) or None,
             "description_specs": [
                 {"champ": _spec_label(r[0]), "valeur": _cell_text(r[j] if j < len(r) else "")}
                 for r in spec_rows
