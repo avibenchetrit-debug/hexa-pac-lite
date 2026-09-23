@@ -239,7 +239,12 @@ def calculer_mpr(prospect, state_simulateur, admin_params):
 
 def resoudre_ballon(state_simulateur, admin_params):
     """Résout le ballon choisi (state.ballon_ref) depuis admin_params['ballon_thermo'].
-    Retourne {ref, nom, fourniture_ht, prix_pose_ht, description_specs} ou None si Aucun."""
+    Retourne {ref, nom, fourniture_ht, prix_pose_ht, description_specs} ou None si Aucun.
+
+    En chauffage + ECS la PAC produit l'eau chaude : pas de ballon, même si un ancien
+    état sauvegardé porte encore un ballon_ref."""
+    if service_avec_ecs(state_simulateur):
+        return None
     ref = str(value(state_simulateur, "ballon_ref", default="") or "").strip()
     if not ref:
         return None
@@ -259,13 +264,19 @@ def resoudre_ballon(state_simulateur, admin_params):
     }
 
 
+def service_avec_ecs(state_simulateur):
+    """Vrai seulement si le service est explicitement « chauffage + ECS »."""
+    service = str(value(state_simulateur, "service", default="") or "").strip()
+    return service in ("chauffage_ecs", "chauffage+ecs")
+
+
 def calculer_mpr_ballon(prospect, admin_params):
-    """Forfait MPR ballon par catégorie (indépendant de la MPR PAC)."""
-    categorie = value(prospect, "categorie_revenu", "categorie", default="modeste")
-    bt = (admin_params or {}).get("ballon_thermo") or {}
-    forfaits = bt.get("forfaits_mpr") or {}
-    defaults = {"tres_modeste": 1200, "modeste": 800, "intermediaire": 400, "superieur": 0}
-    return float_value(forfaits.get(categorie), defaults.get(categorie, 0))
+    """MPR ballon : toujours 0.
+
+    Depuis le 01/09/2026 (décret 2026-822), le chauffe-eau thermodynamique n'est plus
+    financé par MaPrimeRénov' par geste. Le paramètre admin ballon_thermo.forfaits_mpr
+    est conservé (masqué) mais n'est plus lu."""
+    return 0
 
 
 def calculer_cee_bar_th_171(prospect, state_simulateur, admin_params):
@@ -731,6 +742,9 @@ def validate_prospect_for_devis(prospect, state_simulateur):
         missing.append("Catégorie de revenu")
     if not value(state_simulateur, "modele_pac_id", "modele_pac"):
         missing.append("Modèle PAC (simulateur)")
+    if (value(state_simulateur, "ballon_ref") and not service_avec_ecs(state_simulateur)
+            and not value(state_simulateur, "ballon_emplacement")):
+        missing.append("Emplacement du ballon (simulateur)")
     return missing
 
 
