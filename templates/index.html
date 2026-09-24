@@ -6082,6 +6082,7 @@ body.sim-left-open .hexa-app-shell__main{
 .sim-mod-nom{ font-size:11px; color:#1A2233; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .sim-mod-kw{ font-size:11px; color:#64748B; text-align:right; }
 .sim-mod-reste{ font-size:13px; font-weight:800; color:#0D6B3B; text-align:right; }
+.sim-mod-reste-lib{ display:block; font-size:9.5px; font-weight:500; color:#64748B; line-height:1.1; white-space:nowrap; }
 .sim-cards-foot{ text-align:center; margin:8px 0 4px; }
 .sim-voir-tous{ font-size:10.5px; color:#8A92A0; text-decoration:none; cursor:pointer; }
 .sim-voir-tous:hover{ text-decoration:underline; }
@@ -15388,7 +15389,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
             + '<span class="sim-mod-radio">' + (sel ? '●' : '○') + '</span>'
             + '<span class="sim-mod-nom">' + esc(m.label || m.nom) + '</span>'
             + '<span class="sim-mod-kw">' + (Math.round(puissanceModele(m)*10)/10) + ' kW</span>'
-            + '<span class="sim-mod-reste">' + eur(reste) + '</span>'
+            + '<span class="sim-mod-reste">' + eur(reste) + '<small class="sim-mod-reste-lib">reste à charge</small></span>'   // Lot 4c : pas le prix
             + '</div>';
         }).join('');
         return '<div class="sim-marque-block">'
