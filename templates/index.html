@@ -7403,6 +7403,52 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     }
   };
 
+  // --- Brouillon : notes/échanges d'une fiche pas encore enregistrée ---
+  // La clé TMP-… remplace le numéro jusqu'au 1er enregistrement ; sessionStorage
+  // la garde après un F5 sur /nouveau.
+  const DRAFT_STORAGE_KEY = 'hexa_draft_key';
+  window.hexaEstBrouillon = function (cle) {
+    return /^TMP-/.test(String(cle || ''));
+  };
+  function nouvelleCleBrouillon() {
+    if (window.crypto && typeof window.crypto.randomUUID === 'function') return 'TMP-' + window.crypto.randomUUID();
+    const hex = (n) => Array.from({ length: n }, () => Math.floor(Math.random() * 16).toString(16)).join('');
+    return `TMP-${hex(8)}-${hex(4)}-${hex(4)}-${hex(4)}-${hex(12)}`;
+  }
+  // reprendre=true (F5, retour arrière) : réutiliser la clé de l'onglet si elle existe.
+  window.hexaDemarrerBrouillon = function (reprendre) {
+    let cle = '';
+    if (reprendre) { try { cle = sessionStorage.getItem(DRAFT_STORAGE_KEY) || ''; } catch (_) {} }
+    if (!window.hexaEstBrouillon(cle)) cle = nouvelleCleBrouillon();
+    document.body.dataset.draftKey = cle;
+    try { sessionStorage.setItem(DRAFT_STORAGE_KEY, cle); } catch (_) {}
+    setCount('count-notes', 0);
+    setCount('count-echanges', 0);
+    window.mettreAJourCompteursHeader(cle);
+    return cle;
+  };
+  window.hexaOublierBrouillon = function () {
+    delete document.body.dataset.draftKey;
+    try { sessionStorage.removeItem(DRAFT_STORAGE_KEY); } catch (_) {}
+  };
+  // Après le 1er enregistrement : notes/échanges du brouillon -> lead `numero`.
+  window.hexaRattacherBrouillon = async function (numero) {
+    const cle = document.body.dataset.draftKey;
+    if (!window.hexaEstBrouillon(cle) || !numero) return;
+    try {
+      const r = await fetch(`/api/drafts/${encodeURIComponent(cle)}/attach/${encodeURIComponent(numero)}`, { method: 'POST' });
+      if (!r.ok) return; // on garde la clé : un nouvel essai reste possible
+      window.hexaOublierBrouillon();
+    } catch (_) {
+      return;
+    }
+    window.mettreAJourCompteursHeader(numero);
+    // Un panneau resté ouvert pointe encore sur la clé TMP : le rebrancher sur le lead.
+    const ouvert = (id) => { const p = document.getElementById(id); return !!p && (p.classList.contains('is-open') || p.classList.contains('open')); };
+    if (ouvert('notes-panel') && typeof window.ouvrirNotesInternes === 'function') window.ouvrirNotesInternes(numero);
+    if (ouvert('exchanges-panel') && typeof window.ouvrirEchanges === 'function') window.ouvrirEchanges(numero);
+  };
+
   function init() {
     const numero = document.body.dataset.prospectNumero;
     if (numero) window.mettreAJourCompteursHeader(numero);
@@ -7517,12 +7563,12 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     </div>
     <div class="prospect-sticky-actions psb-actions">
       <button type="button" class="header-icon-btn psb-cta-btn btn-notes fiche-action-btn" data-cta="N" title="Notes internes"
-        onclick="(window.ouvrirNotesInternes||window.ouvrirCommentaires)(document.body.dataset.prospectNumero)">
+        onclick="(window.ouvrirNotesInternes||window.ouvrirCommentaires)(document.body.dataset.prospectNumero||document.body.dataset.draftKey)">
         <span class="header-letter">N</span>
         <span class="fiche-action-count" id="count-notes">0</span>
       </button>
       <button type="button" class="header-icon-btn psb-cta-btn btn-echanges fiche-action-btn" data-cta="E" title="Échanges"
-        onclick="(window.ouvrirEchanges||window.ouvrirEchangesLazy||function(){})(document.body.dataset.prospectNumero)">
+        onclick="(window.ouvrirEchanges||window.ouvrirEchangesLazy||function(){})(document.body.dataset.prospectNumero||document.body.dataset.draftKey)">
         <span class="header-letter">E</span>
         <span class="fiche-action-count" id="count-echanges">0</span>
       </button>
@@ -10553,7 +10599,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
   };
 
   // ===== FORMAT TÉLÉPHONE : XX XX XX XX XX =====
-  window.showToast = window.showToast || function(message, type='success') {
+  window.showToast = window.showToast || function(message, type='success', dureeMs=2000) {
     const toast = document.createElement('div');
     toast.className = 'hexa-toast hexa-toast-' + type;
     toast.textContent = message;
@@ -10581,7 +10627,8 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
       toast.style.opacity = '0';
       toast.style.transform = 'translateY(8px)';
       setTimeout(() => toast.remove(), 200);
-    }, 2000);
+    }, dureeMs);
+    return toast;
   };
 
   document.addEventListener('click', (e) => {
@@ -11613,6 +11660,12 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
         btnSave.dataset.ctaMode = savedNumero ? 'view' : 'create';
         setSaveCtaLabel(savedNumero ? 'MODIFIER' : 'ENREGISTRER');
         saveToast('Prospect enregistré ✓', '#0D6B3B');
+        // 1er enregistrement : les notes/échanges saisis en brouillon rejoignent le lead.
+        // Aussi quand la création a fusionné dans un lead existant (created=false, sans
+        // numéro de départ) : sinon ils resteraient sous la clé TMP et seraient purgés.
+        if (savedNumero && (data.created || !prospectNumero) && typeof window.hexaRattacherBrouillon === 'function') {
+          window.hexaRattacherBrouillon(savedNumero);
+        }
         if (typeof window.syncCurrentProspectToSimulatorState === 'function') {
           window.syncCurrentProspectToSimulatorState();
         }
@@ -12544,7 +12597,8 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     currentProspect = numero;
     (function(){
       var cp = window.HexaCurrentProspect;
-      var sub = (cp && cp.nom_complet) ? (cp.nom_complet + ' · ' + (cp.numero||numero)) : numero;
+      var sub = window.hexaEstBrouillon(numero) ? 'Nouveau prospect (non enregistré)'
+        : (cp && cp.nom_complet) ? (cp.nom_complet + ' · ' + (cp.numero||numero)) : numero;
       document.getElementById('notes-panel-prospect').textContent = sub;
     })();
     const panel = document.getElementById('notes-panel');
@@ -12574,7 +12628,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
 
   window.ajouterNoteInterne = async function () {
     if (!currentProspect) {
-      const fallback = (document.body.dataset.prospectNumero || window.HexaCurrentProspect?.numero || '').trim();
+      const fallback = (document.body.dataset.prospectNumero || window.HexaCurrentProspect?.numero || document.body.dataset.draftKey || '').trim();
       if (fallback) {
         currentProspect = fallback;
       } else {
@@ -12755,8 +12809,11 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     document.getElementById('exchanges-template')?.addEventListener('change', (e) => {
       const id = e.target.value;
       const tpl = templatesForType(activeType).find(t => t.id === id);
-      if (tpl) document.getElementById('exchanges-contenu').value = templateText(tpl);
+      if (tpl) { document.getElementById('exchanges-contenu').value = templateText(tpl); messageEnCours = true; }
     });
+    ['exchanges-contenu', 'exchanges-objet'].forEach(id => document.getElementById(id)?.addEventListener('input', (e) => {
+      messageEnCours = !!(document.getElementById('exchanges-contenu').value.trim() || document.getElementById('exchanges-objet').value.trim());
+    }));
     document.getElementById('exchanges-submit')?.addEventListener('click', () => window.enregistrerEchange());
     document.querySelectorAll('[data-email-template]').forEach(btn => {
       btn.addEventListener('click', () => ouvrirModeleEmail(Number(btn.dataset.emailTemplate || 0)));
@@ -12813,15 +12870,35 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
       const sujet = document.getElementById('email-template-sujet')?.value || '';
       const contenu = document.getElementById('email-template-contenu')?.value || '';
       const auteur = hexaAuteurCourant();
+      const manque = contactManquantBrouillon('email');
+      if (manque) { signalerContactManquant(manque); return; }
+      const email = (document.querySelector('[name="email"]')?.value || '').trim();
       const r = await fetch(`/api/modeles-email/${currentProspect}/envoyer`, {
         method:'POST',
         headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ sujet, contenu, auteur })
+        body: JSON.stringify({ sujet, contenu, auteur, email })
       });
-      if (!r.ok) { alert('Envoi impossible'); return; }
+      if (!r.ok) {
+        const err = await r.json().catch(() => ({}));
+        alert(err.detail || 'Envoi impossible');
+        return;
+      }
+      retirerToastContact();
       wrap.remove();
       await chargerHistorique();
     });
+  }
+
+  // Vrai dès que l'utilisateur a saisi un message (au clavier ou via un modèle) qui
+  // n'est pas encore enregistré : setActiveType ne doit plus l'effacer. Sans ça, la
+  // réponse de chargerHistorique (qui rappelle setActiveType) vidait le texte tapé
+  // pendant le chargement du panneau.
+  let messageEnCours = false;
+
+  function viderMessage() {
+    document.getElementById('exchanges-contenu').value = '';
+    document.getElementById('exchanges-objet').value = '';
+    messageEnCours = false;
   }
 
   function setActiveType(type) {
@@ -12843,8 +12920,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
         `<option value="${escapeHtml(t.id)}">${escapeHtml(t.label)}</option>`).join('');
       sel.innerHTML = '<option value="">— Choisir un modèle —</option>' + opts;
     }
-    document.getElementById('exchanges-contenu').value = '';
-    document.getElementById('exchanges-objet').value = '';
+    if (!messageEnCours) viderMessage();
   }
 
   function setAllHistoryExpanded(expanded) {
@@ -12956,7 +13032,8 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     exchangeConfig = null;
     (function(){
       var cp = window.HexaCurrentProspect;
-      var sub = (cp && cp.nom_complet) ? (cp.nom_complet + ' · ' + (cp.numero||numero)) : numero;
+      var sub = window.hexaEstBrouillon(numero) ? 'Nouveau prospect (non enregistré)'
+        : (cp && cp.nom_complet) ? (cp.nom_complet + ' · ' + (cp.numero||numero)) : numero;
       document.getElementById('exchanges-panel-prospect').textContent = sub;
     })();
     const panel = document.getElementById('exchanges-panel');
@@ -12968,6 +13045,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
       document.body.classList.add('panel-is-open');
     }
     const type = (canal || 'sms').toLowerCase();
+    messageEnCours = false;
     setActiveType(['sms', 'whatsapp', 'email'].includes(type) ? type : 'sms');
     await chargerHistorique();
     setTimeout(() => document.getElementById('exchanges-contenu')?.focus({ preventScroll: true }), 300);
@@ -12985,10 +13063,36 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     document.body.classList.remove('comments-panel-open');
   };
 
+  // Fiche pas encore enregistrée : aucun lead côté serveur, le destinataire est celui
+  // saisi dans le formulaire en cours. Renvoie le message d'erreur, ou '' si c'est bon.
+  let toastContactManquant = null;
+  function retirerToastContact() {
+    if (toastContactManquant) toastContactManquant.remove();
+    toastContactManquant = null;
+  }
+  function signalerContactManquant(msg) {
+    retirerToastContact();
+    if (window.showToast) toastContactManquant = window.showToast(msg, 'error', 4000) || null;
+    else alert(msg);
+  }
+
+  function contactManquantBrouillon(type) {
+    if (!window.hexaEstBrouillon(currentProspect)) return '';
+    const champ = (name) => (document.querySelector(`[name="${name}"]`)?.value || '').trim();
+    if ((type === 'sms' || type === 'whatsapp') && !champ('telephone')) return 'Saisissez d’abord le téléphone';
+    if (type === 'email' && !champ('email')) return 'Saisissez d’abord l’email';
+    return '';
+  }
+
   window.enregistrerEchange = async function () {
     if (!currentProspect) return;
     const contenu = (document.getElementById('exchanges-contenu')?.value || '').trim();
     if (!contenu) return;
+    const manque = contactManquantBrouillon(activeType);
+    if (manque) {
+      signalerContactManquant(manque);
+      return;
+    }
     const btn = document.getElementById('exchanges-submit');
     btn.disabled = true;
     try {
@@ -13008,8 +13112,8 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
       });
       const data = await resp.json().catch(() => ({}));
       if (!resp.ok) throw new Error(data.msg || data.detail || `HTTP ${resp.status}`);
-      document.getElementById('exchanges-contenu').value = '';
-      document.getElementById('exchanges-objet').value = '';
+      retirerToastContact();
+      viderMessage();
       document.getElementById('exchanges-template').value = '';
       await chargerHistorique();
     } catch (err) {
@@ -14209,7 +14313,10 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     user_modified_price: false,
     sous_dimensionnement: false,
     selection_alerte: null,
-    ballon_ref: ''
+    ballon_ref: '',
+    ballon_emplacement: '',        // réponse à « Où sera installé le ballon ? »
+    ballon_voir_tous: false,       // transitoire : lien « voir tous » (non sauvegardé)
+    gestion_ecs: ''                // lu fiche (alerte ECS liée à la chaudière)
   };
   const state = { ...DEFAULT_SIM_STATE };
 
@@ -14531,6 +14638,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
       afficher_apercu: state.afficher_apercu !== false,
       afficher_mention_mpr: state.afficher_mention_mpr !== false,
       ballon_ref: state.ballon_ref || '',
+      ballon_emplacement: state.ballon_emplacement || '',
       // Éco 20 ans (roi()) : incluses uniquement si lastRoi existe, sinon clés omises
       // pour ne pas écraser une valeur déjà persistée (merge côté backend).
       ...(lastRoi ? {
@@ -14593,6 +14701,9 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
       state.afficher_apercu = (saved.afficher_apercu !== false);
       state.afficher_mention_mpr = (saved.afficher_mention_mpr !== false);
       if (saved.ballon_ref) state.ballon_ref = saved.ballon_ref;
+      // Ancien état « chauffage + ECS » avec un ballon : on ne le réaffiche pas.
+      if (!ballonAutorise(state)) state.ballon_ref = '';
+      if (saved.ballon_emplacement) state.ballon_emplacement = saved.ballon_emplacement;
       state.modele_force = !!saved.modele_pac_id;
     } catch(e) {
       console.warn('Aucun state simulateur sauvegardé', e);
@@ -14692,6 +14803,9 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     // Énergie avant (bloc 7)
     const mc = document.querySelector('select[name="mode_chauffage"]')?.value;
     if (mc) state.energie_avant = mc;
+    // Le bloc 7 est reconstruit au chargement : le select vivant s'appelle "ecs"
+    // (le <select name="gestion_ecs"> d'origine n'existe plus dans le DOM).
+    state.gestion_ecs = (document.querySelector('select[name="ecs"]') || document.querySelector('select[name="gestion_ecs"]'))?.value || '';
     const typeLogement = document.querySelector('[name="type_logement"]')?.value;
     if (typeLogement) state.type_logement = typeLogement;
     const phase = document.querySelector('[name="alimentation_electrique"]')?.value
@@ -14801,17 +14915,100 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     return factureApresMensuelle > 0 ? factureApresMensuelle : null;
   }
 
+  // Ballon thermodynamique : proposé seulement en chauffage seul (en chauffage + ECS,
+  // la PAC produit l'eau chaude). Aligné sur resoudre_ballon() côté back.
+  function ballonAutorise(state){
+    return !(state && (state.service === 'chauffage_ecs' || state.service === 'chauffage+ecs'));
+  }
+  function ballonConfig(){
+    return (M3_CONFIG && M3_CONFIG.ballon_thermo) || (window.HexaConfig && window.HexaConfig.ballon_thermo) || {};
+  }
   function ballonSim(state){
     const ref = state && state.ballon_ref;
-    if (!ref) return { actif:false, totalTTC:0, mpr:0, economieEcs:0 };
-    const bt = (M3_CONFIG && M3_CONFIG.ballon_thermo) || (window.HexaConfig && window.HexaConfig.ballon_thermo) || {};
+    if (!ref || !ballonAutorise(state)) return { actif:false, totalTTC:0, mpr:0, economieEcs:0 };
+    const bt = ballonConfig();
     const modeles = Array.isArray(bt.modeles) ? bt.modeles : [];
     const m = modeles.find(function(x){ return x && x.ref === ref; });
     if (!m) return { actif:false, totalTTC:0, mpr:0, economieEcs:0 };
     const totalTTC = Math.round(((Number(m.fourniture_ht)||0) + (Number(bt.prix_pose_ht)||0)) * 1.055);
-    const mpr = Number((bt.forfaits_mpr||{})[state.categorie]) || 0;
+    // MPR ballon = 0 : plus financé par geste depuis le 01/09/2026 (décret 2026-822).
     const economieEcs = Number(m.economie_ecs_mois) || 0;
-    return { actif:true, totalTTC: totalTTC, mpr: mpr, economieEcs: economieEcs };
+    return { actif:true, totalTTC: totalTTC, mpr: 0, economieEcs: economieEcs };
+  }
+
+  // « Où sera installé le ballon ? » -> type de ballon recommandé (admin : type_installation)
+  const BALLON_EMPLACEMENTS = [
+    { value:'piece_non_chauffee', label:'Pièce non chauffée de plus de 15 m² (garage, cellier)', type:'compact', typeLabel:'COMPACT' },
+    { value:'petite_piece_gaines', label:'Petite pièce mais gaines possibles vers l\'extérieur', type:'compact_gainable', typeLabel:'COMPACT GAINABLE' },
+    { value:'pas_de_place', label:'Pas de place adaptée, mur donnant sur l\'extérieur', type:'split', typeLabel:'SPLIT' }
+  ];
+  function ballonRecommandation(state){
+    return BALLON_EMPLACEMENTS.find(e => e.value === state.ballon_emplacement) || null;
+  }
+  function ballonModele(ref){
+    const modeles = Array.isArray(ballonConfig().modeles) ? ballonConfig().modeles : [];
+    return modeles.find(m => m && m.ref === ref) || null;
+  }
+  // Le ballon choisi n'est pas du type recommandé pour l'emplacement (même règle que
+  // validate_prospect_for_devis côté serveur). Faux si l'une des deux infos manque.
+  function ballonInadapte(state){
+    const reco = ballonRecommandation(state);
+    const m = state.ballon_ref ? ballonModele(state.ballon_ref) : null;
+    return !!(reco && m && m.type_installation && m.type_installation !== reco.type);
+  }
+  // Emplacement renseigné : si le ballon choisi n'est pas du bon type, prendre le premier
+  // modèle du type recommandé (s'il en existe un ; sinon on garde le choix).
+  function ballonAlignerSurEmplacement(state){
+    const reco = ballonRecommandation(state);
+    if (!reco || !state.ballon_ref) return;
+    const m = ballonModele(state.ballon_ref);
+    if (m && m.type_installation === reco.type) return;
+    const modeles = Array.isArray(ballonConfig().modeles) ? ballonConfig().modeles : [];
+    const bon = modeles.find(x => x && x.type_installation === reco.type);
+    if (bon) state.ballon_ref = bon.ref;
+  }
+  // Modèles proposés : filtrés sur le type recommandé, sauf « voir tous » ou aucun modèle
+  // du bon type. Le modèle déjà choisi reste toujours dans la liste. Sans ballon choisi,
+  // la question (et son lien « voir tous ») est masquée : on ne filtre pas.
+  function ballonModelesProposes(state){
+    const modeles = Array.isArray(ballonConfig().modeles) ? ballonConfig().modeles : [];
+    const reco = ballonRecommandation(state);
+    if (!state.ballon_ref || !reco || state.ballon_voir_tous) return { modeles, filtre:false };
+    const filtres = modeles.filter(m => m && (m.type_installation === reco.type || m.ref === state.ballon_ref));
+    if (!filtres.some(m => m.type_installation === reco.type)) return { modeles, filtre:false };
+    return { modeles: filtres, filtre: filtres.length < modeles.length };
+  }
+  // Eau chaude produite par la chaudière déposée, en chauffage seul, sans ballon.
+  function alerteEcsChaudiere(state){
+    if (!ballonAutorise(state) || state.ballon_ref) return false;
+    if (!['fioul','gaz'].includes(state.energie_avant)) return false;
+    return state.gestion_ecs === 'chaudiere' || state.gestion_ecs === state.energie_avant;
+  }
+  function renderBallonBloc(state, bs){
+    if (!ballonAutorise(state)) return '';
+    const { modeles, filtre } = ballonModelesProposes(state);
+    const reco = ballonRecommandation(state);
+    const alerte = alerteEcsChaudiere(state)
+      ? `<div class="sim-note sim-note--warn" id="sim-alerte-ecs">L'eau chaude est produite par la chaudière qui sera déposée : proposez Chauffage + ECS ou un ballon.</div>`
+      : '';
+    const inadapte = ballonInadapte(state)
+      ? `<div class="sim-note sim-note--warn" id="sim-ballon-inadapte">Ce ballon n'est pas adapté à l'emplacement indiqué</div>`
+      : '';
+    const question = state.ballon_ref ? `
+          <div class="sim-pnl-line sim-pnl-ballon-emplacement">
+            <label class="sim-field sim-field--requis" style="width:100%"><span>Où sera installé le ballon ? *</span>
+              <select id="sim-ballon-emplacement">
+                <option value="" ${!state.ballon_emplacement?'selected':''}>— Choisir —</option>
+                ${BALLON_EMPLACEMENTS.map(e=>`<option value="${e.value}" ${state.ballon_emplacement===e.value?'selected':''}>${e.label}</option>`).join('')}
+              </select>
+            </label>
+          </div>
+          ${inadapte}
+          ${reco ? `<div class="sim-note" id="sim-ballon-reco">Recommandé : <b>${reco.typeLabel}</b>${filtre ? ` · <a href="#" id="sim-ballon-voir-tous">voir tous les ballons</a>` : (state.ballon_voir_tous ? ` · <a href="#" id="sim-ballon-voir-reco">voir les ballons recommandés</a>` : '')}</div>` : ''}` : '';
+    return `${alerte}
+          <div class="sim-pnl-line sim-pnl-ballon"><span>Ballon thermodynamique (ECS)</span><select id="sim-ballon" class="sim-model-select"><option value="" ${!state.ballon_ref?'selected':''}>Aucun</option>${modeles.map(b=>`<option value="${b.ref}" ${state.ballon_ref===b.ref?'selected':''}>${b.nom||b.ref}</option>`).join('')}</select></div>${question}
+          ${bs.actif ? `<div class="sim-pnl-line"><span>+ Chauffe-eau thermodynamique (fourni posé)</span><b id="sim-ballon-montant">${eur(bs.totalTTC)}</b></div>
+          <div class="sim-pnl-line sim-pnl-sub"><span>= Sous-total PAC + ballon</span><b id="sim-soustotal">${eur((state.prix_pac||0) + bs.totalTTC)}</b></div>` : ''}`;
   }
 
   async function calcul(){
@@ -15209,7 +15406,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
             </select>
           </label>
         </div>
-        <div class="sim-note">${state.service==='chauffage_ecs' ? 'Prime CEE identique avec ou sans ECS — proposer un <b>chauffe-eau thermodynamique</b> en plus pour le ballon.' : 'Chauffage seul par défaut (prime identique). Pour l\'ECS, vendre un chauffe-eau thermodynamique.'}</div>
+        <div class="sim-note" id="sim-service-note">${ballonAutorise(state) ? 'La PAC assure le chauffage. Pour l\'eau chaude : conserver l\'existant ou ajouter un ballon thermodynamique (sans aide MaPrimeRénov\' depuis le 01/09/2026).' : 'La PAC (modèle DUO) assure le chauffage et l\'eau chaude. Aucun ballon à ajouter.'}</div>
 
         ${renderNiveaux()}
 
@@ -15227,19 +15424,13 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
             </span>
           </div>
           ${state.selection_alerte ? `<div class="sim-note sim-note--warn" id="sim-selection-alerte">${state.selection_alerte}</div>` : ''}
-          <div class="sim-pnl-line sim-pnl-ballon"><span>Ballon thermodynamique (ECS)</span><select id="sim-ballon" class="sim-model-select"><option value="" ${!state.ballon_ref?'selected':''}>Aucun</option>${((((M3_CONFIG&&M3_CONFIG.ballon_thermo&&M3_CONFIG.ballon_thermo.modeles)||(window.HexaConfig&&window.HexaConfig.ballon_thermo&&window.HexaConfig.ballon_thermo.modeles))||[]).map(b=>`<option value="${b.ref}" ${state.ballon_ref===b.ref?'selected':''}>${b.nom||b.ref}</option>`).join(''))}</select></div>
-          ${bs.actif ? `<div class="sim-pnl-line"><span>+ Chauffe-eau thermodynamique (fourni posé)</span><b id="sim-ballon-montant">${eur(bs.totalTTC)}</b></div>
-          <div class="sim-pnl-line sim-pnl-sub"><span>= Sous-total PAC + ballon</span><b id="sim-soustotal">${eur((state.prix_pac||0) + bs.totalTTC)}</b></div>` : ''}
+${renderBallonBloc(state, bs)}
           <div class="sim-pnl-sep"></div>
           <div class="sim-pnl-line sim-pnl-minus"><span>– MaPrimeRénov'${bs.actif ? ' — PAC' : ' (devis)'}</span><b id="sim-mpr">${eurDash(c.mprDevis, c.contextePret)}</b></div>
-          ${bs.actif ? `<div class="sim-pnl-line sim-pnl-minus"><span>– MaPrimeRénov' — Ballon thermo</span><b id="sim-mpr-ballon">${eurDash(bs.mpr, c.contextePret)}</b></div>` : ''}
           <div class="sim-pnl-line sim-pnl-minus"><span>– Prime CEE (devis)</span><b id="sim-cee">${eurDash(c.ceeDevis, c.contextePret)}</b></div>
-          <div class="sim-pnl-line sim-pnl-sub"><span>= Aides déduites</span><b id="sim-aides">${eurDash(c.aidesDevis + (bs.actif ? bs.mpr : 0), c.contextePret)}</b></div>
+          <div class="sim-pnl-line sim-pnl-sub"><span>= Aides déduites</span><b id="sim-aides">${eurDash(c.aidesDevis, c.contextePret)}</b></div>
           <div class="sim-pnl-sep sim-pnl-sep--strong"></div>
           <div class="sim-pnl-line sim-pnl-reste"><span>Reste à charge</span><strong id="sim-reste">${eurDash(c.reste_affiche, c.contextePret)}</strong></div>
-        </div>
-        <div class="sim-marge">
-          <span>CEE conservé installateur <i>(écrêtement, hors devis)</i></span><b id="sim-conserve">${eurDash(c.ceeConserve, c.contextePret)}</b>
         </div>
 
         <!-- ZONE DYNAMIQUE : recalculée sans toucher aux champs de saisie -->
@@ -15358,13 +15549,11 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     // cellules compte de résultat
     const set=(id,val)=>{ const el=document.getElementById(id); if(el) el.textContent=val; };
     set('sim-mpr', eurDash(c.mprDevis, c.contextePret));
-    set('sim-mpr-ballon', eurDash(bs.mpr, c.contextePret));
     set('sim-cee', eurDash(c.ceeDevis, c.contextePret));
-    set('sim-aides', eurDash(c.aidesDevis + (bs.actif ? bs.mpr : 0), c.contextePret));
+    set('sim-aides', eurDash(c.aidesDevis, c.contextePret));
     set('sim-reste', eurDash(c.reste_affiche, c.contextePret));
     set('sim-ballon-montant', eur(bs.totalTTC));
     set('sim-soustotal', eur((state.prix_pac||0) + bs.totalTTC));
-    set('sim-conserve', eurDash(c.ceeConserve, c.contextePret));
     const prixInput = document.getElementById('sim-prix');
     if (prixInput && document.activeElement !== prixInput) {
       prixInput.value = new Intl.NumberFormat('fr-FR').format(state.prix_pac||0);
@@ -15385,8 +15574,16 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
   function bind(){
     const onIn=(id,fn)=>{ const el=document.getElementById(id); if(!el)return;
       const ev=el.tagName==='SELECT'?'change':'input'; el.addEventListener(ev,e=>{fn(e.target.value); scheduleSaveSimulatorState(); refresh();}); };
-    onIn('sim-service',v=>{ state.service=v; state.modele_force=false; });
+    onIn('sim-service',v=>{
+      state.service=v; state.modele_force=false;
+      // Chauffage + ECS : la PAC fait l'eau chaude, le ballon sort du calcul et du devis.
+      if (!ballonAutorise(state)) state.ballon_ref='';
+    });
     onIn('sim-ballon',v=>{ state.ballon_ref=v; });
+    onIn('sim-ballon-emplacement',v=>{ state.ballon_emplacement=v; state.ballon_voir_tous=false; ballonAlignerSurEmplacement(state); });
+    const voirBallons=(id,tous)=>document.getElementById(id)?.addEventListener('click',e=>{ e.preventDefault(); state.ballon_voir_tous=tous; refresh(); });
+    voirBallons('sim-ballon-voir-tous', true);
+    voirBallons('sim-ballon-voir-reco', false);
     onIn('iso-toit',v=>{ state.iso_toit=v; state.modele_force=false; });
     onIn('iso-mur',v=>{ state.iso_mur=v; state.modele_force=false; });
     onIn('iso-menuiserie',v=>{ state.iso_menuiserie=v; state.modele_force=false; });
@@ -16684,6 +16881,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
         <div class="adm-field adm-field-row"><span class="adm-lab">Prix fourniture</span><span class="adm-euro"><input type="text" inputmode="numeric" class="adm-bt-fourniture adm-money" data-idx="${i}" value="${adminEscape(m.fourniture_ht != null ? m.fourniture_ht : 0)}"><i>€ HT</i></span></div>
         <div class="adm-field adm-field-row"><span class="adm-lab">Coût fourniture</span><span class="adm-euro"><input type="text" inputmode="numeric" class="adm-bt-cout adm-money" data-idx="${i}" value="${adminEscape(m.cout_fourniture_ht != null ? m.cout_fourniture_ht : 0)}"><i>€ HT</i></span></div>
         <div class="adm-field adm-field-row"><span class="adm-lab">Économie ECS estimée</span><span class="adm-euro"><input type="text" inputmode="numeric" class="adm-bt-ecs adm-money" data-idx="${i}" value="${adminEscape(m.economie_ecs_mois != null ? m.economie_ecs_mois : 25)}"><i>€/mois</i></span></div>
+        <div class="adm-field adm-field-row"><span class="adm-lab">Type d'installation</span><select class="adm-bt-type" data-idx="${i}">${[['','— Non renseigné —'],['compact','Compact'],['compact_gainable','Compact gainable'],['split','Split']].map(([v,l])=>`<option value="${v}" ${(m.type_installation||'')===v?'selected':''}>${l}</option>`).join('')}</select></div>
         <div class="adm-field adm-field-row adm-bt-marge-row"><span class="adm-lab">Marge (admin)</span><span class="adm-bt-marge" data-idx="${i}"><b>${eur(margeBallon(m))}</b> HT</span></div>
         <div class="adm-field adm-field-row"><span class="adm-lab">Fiche &amp; specs</span><span class="adm-ballon-btns"><button type="button" class="adm-btn adm-btn-cancel adm-bt-desc" data-bt-desc="${i}">✎ Specs (${(Array.isArray(m.description_specs)?m.description_specs.length:0)})</button><button type="button" class="adm-btn adm-btn-cancel adm-fiche-ballon-btn" data-ref="${adminEscape(m.ref||('ballon-'+(i+1)))}">📎 Fiche PDF</button></span></div>
       </div>`).join('');
@@ -16698,7 +16896,8 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
           ['modeste','MO (Modeste)'],
           ['intermediaire','INT (Intermédiaire)'],
           ['superieur','SUP (Supérieur)']
-        ].map(([k,l])=>`<div class="adm-field adm-field-row"><span class="adm-lab">MPR ${l}</span><span class="adm-euro"><input type="text" inputmode="numeric" class="adm-bt-mpr adm-money" data-cat="${k}" value="${adminEscape(forfaits[k] != null ? forfaits[k] : 0)}"><i>€</i></span></div>`).join('')}
+        ].map(([k,l])=>`<div class="adm-field adm-field-row" style="display:none"><span class="adm-lab">MPR ${l}</span><span class="adm-euro"><input type="text" inputmode="numeric" class="adm-bt-mpr adm-money" data-cat="${k}" value="${adminEscape(forfaits[k] != null ? forfaits[k] : 0)}"><i>€</i></span></div>`).join('')}
+        <div class="adm-field adm-field-row adm-bt-mpr-supprime"><span class="adm-lab">MaPrimeRénov' ballon</span><span>Supprimé depuis le 01/09/2026 (hors Rénovation d'ampleur)</span></div>
         <p class="adm-section-help">Coût de pose (calcul marge) réglé dans « Réglages généraux → Coût Hexa ». Chaque modèle a sa fourniture, son coût, ses specs et sa fiche PDF.</p>
       </div>
       <div class="adm-actions"><button type="button" class="adm-btn-save" id="btn-save-ballon-thermo">Enregistrer</button></div>
@@ -17272,6 +17471,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     const fournis = Array.from(document.querySelectorAll('.adm-bt-fourniture'));
     const couts = Array.from(document.querySelectorAll('.adm-bt-cout'));
     const ecs = Array.from(document.querySelectorAll('.adm-bt-ecs'));
+    const types = Array.from(document.querySelectorAll('.adm-bt-type'));
     const anciens = (cfg.ballon_thermo && Array.isArray(cfg.ballon_thermo.modeles)) ? cfg.ballon_thermo.modeles : [];
     const specsByRef = {};
     anciens.forEach(function(m){ if (m && m.ref) specsByRef[m.ref] = Array.isArray(m.description_specs) ? m.description_specs : []; });
@@ -17283,6 +17483,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
         fourniture_ht: num(fournis[i]),
         cout_fourniture_ht: num(couts[i]),
         economie_ecs_mois: num(ecs[i]),
+        type_installation: (types[i] && types[i].value) || '',
         description_specs: Array.isArray(specsByRef[ref]) ? specsByRef[ref] : []
       };
     });
@@ -20310,6 +20511,8 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     setFieldValue('situation_propriete', 'proprietaire');
     document.body.dataset.prospectNumero='';
     window.HexaCurrentProspect = { numero:'', nom_complet:'' };
+    // Clé brouillon pour N/E avant le 1er enregistrement (reprise après F5 / retour arrière)
+    if (typeof window.hexaDemarrerBrouillon === 'function') window.hexaDemarrerBrouillon(!!opts.skipHistory);
     if (typeof window.syncSimulateurDepuisFiche === 'function') {
       window.syncSimulateurDepuisFiche(true);
     }

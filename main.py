@@ -3362,18 +3362,102 @@ async def purge_echanges_orphelins(request: Request) -> JSONResponse:
     payload = await _read_request_payload(request)
     confirm = bool(payload.get("confirm"))
     echanges = _read_echanges()
+    notes = _read_notes()
     numeros_leads = {str(l.get("numero") or "").strip() for l in _read_leads()}
-    orphelins = sorted(n for n in echanges.keys() if str(n).strip() not in numeros_leads)
+    maintenant = datetime.now(PARIS_TZ)
+
+    def _orphelin(numero, entries_par_fichier):
+        numero = str(numero).strip()
+        if numero in numeros_leads:
+            return False
+        if not numero.startswith(DRAFT_PREFIX):
+            return True
+        # Brouillon d'une fiche pas encore enregistrée : on ne le purge qu'au-delà de
+        # 48 h sans activité, sinon on effacerait les notes d'une saisie en cours.
+        derniere = _derniere_activite_brouillon(entries_par_fichier)
+        return derniere is None or (maintenant - derniere) > DRAFT_TTL
+
+    orphelins = sorted(
+        n for n in echanges.keys() if _orphelin(n, [echanges.get(n), notes.get(n)])
+    )
+    notes_orphelines = sorted(
+        n for n in notes.keys()
+        if str(n).strip().startswith(DRAFT_PREFIX) and _orphelin(n, [echanges.get(n), notes.get(n)])
+    )
     if confirm:
         for n in orphelins:
             echanges.pop(n, None)
         _atomic_write_json(ECHANGES_PATH, echanges)
+        if notes_orphelines:
+            for n in notes_orphelines:
+                notes.pop(n, None)
+            _atomic_write_json(NOTES_PATH, notes)
     return JSONResponse({
         "ok": True,
         "dry_run": not confirm,
         "orphelins": orphelins,
         "nb_supprimes": len(orphelins) if confirm else 0,
         "nb_restants": len(echanges),
+        "notes_orphelines": notes_orphelines,
+        "nb_notes_supprimees": len(notes_orphelines) if confirm else 0,
+    })
+
+
+# ---------------------------------------------------------------------------
+# Brouillons : notes/échanges saisis sur une fiche pas encore enregistrée
+# ---------------------------------------------------------------------------
+DRAFT_PREFIX = "TMP-"
+DRAFT_TTL = timedelta(hours=48)
+_DRAFT_KEY_RE = re.compile(r"^TMP-[0-9a-fA-F-]{8,64}$")
+
+
+def _derniere_activite_brouillon(listes):
+    """Date la plus récente parmi les notes (`date`) et échanges (`created_at`)."""
+    derniere = None
+    for entries in listes:
+        for e in entries if isinstance(entries, list) else []:
+            if not isinstance(e, dict):
+                continue
+            brut = str(e.get("date") or e.get("created_at") or "").strip()
+            try:
+                d = datetime.fromisoformat(brut)
+            except ValueError:
+                continue
+            if d.tzinfo is None:
+                d = d.replace(tzinfo=PARIS_TZ)
+            if derniere is None or d > derniere:
+                derniere = d
+    return derniere
+
+
+@app.post("/api/drafts/{draft_key}/attach/{numero}")
+def attacher_brouillon(draft_key: str, numero: str) -> JSONResponse:
+    """Rattache au lead `numero` les notes et échanges saisis sous la clé brouillon.
+    Concatène si le lead en a déjà ; idempotent (un second appel ne déplace rien)."""
+    draft_key = str(draft_key or "").strip()
+    numero = str(numero or "").strip()
+    if not _DRAFT_KEY_RE.match(draft_key):
+        raise HTTPException(status_code=400, detail="Clé brouillon invalide")
+    if not _find_lead(numero):
+        raise HTTPException(status_code=404, detail="Prospect introuvable")
+    deplaces = {}
+    for path, lire in ((NOTES_PATH, _read_notes), (ECHANGES_PATH, _read_echanges)):
+        data = lire()
+        brouillon = data.pop(draft_key, None)
+        if not isinstance(brouillon, list) or not brouillon:
+            deplaces[os.path.basename(path)] = 0
+            if brouillon is not None:
+                _atomic_write_json(path, data)
+            continue
+        existants = data.get(numero)
+        data[numero] = (existants if isinstance(existants, list) else []) + brouillon
+        _atomic_write_json(path, data)
+        deplaces[os.path.basename(path)] = len(brouillon)
+    return JSONResponse({
+        "ok": True,
+        "numero": numero,
+        "notes": deplaces.get("notes.json", 0),
+        "echanges": deplaces.get("echanges.json", 0),
     })
 
 
@@ -3719,7 +3803,7 @@ def _build_devis_context(request: Request, numero: str, version: int | None = No
     state = _load_state_simulateur(numero, prospect, catalogue)
     admin = _admin_payload_with_m3()
 
-    missing = validate_prospect_for_devis(prospect, state)
+    missing = validate_prospect_for_devis(prospect, state, admin)
     if missing:
         return {"request": request, "missing": missing, "numero": numero, "_error_template": "erreur_champs_manquants.html"}
 
@@ -3865,7 +3949,7 @@ def _build_notedim_context(request: Request, numero: str) -> dict:
     prospect = _lead_for_response(prospect)
     catalogue = _read_catalogue_pac()
     state = _load_state_simulateur(numero, prospect, catalogue)
-    missing = validate_prospect_for_devis(prospect, state)
+    missing = validate_prospect_for_devis(prospect, state, load_parametres_admin())
     if missing:
         return {"request": request, "missing": missing, "numero": numero, "_error_template": "erreur_champs_manquants.html"}
     now = datetime.now(PARIS_TZ)
@@ -4004,7 +4088,9 @@ def _append_fiche_ballon(pdf_bytes: bytes, numero: str) -> bytes:
             return pdf_bytes
         catalogue = _read_catalogue_pac()
         state = _load_state_simulateur(numero, prospect, catalogue)
-        ballon_ref = str(state.get("ballon_ref") or "").strip()
+        # Même règle que le devis : en chauffage + ECS, pas de ballon (donc pas de fiche).
+        ballon = resoudre_ballon(state, load_parametres_admin())
+        ballon_ref = str((ballon or {}).get("ref") or "").strip()
         if not ballon_ref:
             return pdf_bytes
         index = _read_fiches_index()
@@ -4062,7 +4148,7 @@ async def validate_devis(numero: str) -> JSONResponse:
         raise HTTPException(status_code=404, detail="Prospect introuvable")
     catalogue = _read_catalogue_pac()
     state = _load_state_simulateur(numero, _lead_for_response(prospect), catalogue)
-    missing = validate_prospect_for_devis(_lead_for_response(prospect), state)
+    missing = validate_prospect_for_devis(_lead_for_response(prospect), state, load_parametres_admin())
     return JSONResponse({"ok": not missing, "missing": missing})
 
 
@@ -5719,8 +5805,14 @@ async def envoyer_modele_email(numero: str, request: Request) -> JSONResponse:
     payload = await _read_request_payload(request)
     lead = _find_lead(numero)
     if not lead:
-        raise HTTPException(status_code=404, detail="Prospect introuvable")
-    email_to = str(lead.get("email") or "").strip()
+        if not str(numero).startswith(DRAFT_PREFIX):
+            raise HTTPException(status_code=404, detail="Prospect introuvable")
+        # Fiche pas encore enregistrée : l'adresse vient du formulaire en cours.
+        email_to = str(payload.get("email") or "").strip()
+        if not email_to:
+            raise HTTPException(status_code=400, detail="Saisissez d'abord l'email")
+    else:
+        email_to = str(lead.get("email") or "").strip()
     if not email_to:
         raise HTTPException(status_code=400, detail="Email prospect manquant")
     sujet = str(payload.get("sujet") or "")

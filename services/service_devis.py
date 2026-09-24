@@ -239,7 +239,12 @@ def calculer_mpr(prospect, state_simulateur, admin_params):
 
 def resoudre_ballon(state_simulateur, admin_params):
     """Résout le ballon choisi (state.ballon_ref) depuis admin_params['ballon_thermo'].
-    Retourne {ref, nom, fourniture_ht, prix_pose_ht, description_specs} ou None si Aucun."""
+    Retourne {ref, nom, fourniture_ht, prix_pose_ht, description_specs} ou None si Aucun.
+
+    En chauffage + ECS la PAC produit l'eau chaude : pas de ballon, même si un ancien
+    état sauvegardé porte encore un ballon_ref."""
+    if service_avec_ecs(state_simulateur):
+        return None
     ref = str(value(state_simulateur, "ballon_ref", default="") or "").strip()
     if not ref:
         return None
@@ -259,13 +264,19 @@ def resoudre_ballon(state_simulateur, admin_params):
     }
 
 
+def service_avec_ecs(state_simulateur):
+    """Vrai seulement si le service est explicitement « chauffage + ECS »."""
+    service = str(value(state_simulateur, "service", default="") or "").strip()
+    return service in ("chauffage_ecs", "chauffage+ecs")
+
+
 def calculer_mpr_ballon(prospect, admin_params):
-    """Forfait MPR ballon par catégorie (indépendant de la MPR PAC)."""
-    categorie = value(prospect, "categorie_revenu", "categorie", default="modeste")
-    bt = (admin_params or {}).get("ballon_thermo") or {}
-    forfaits = bt.get("forfaits_mpr") or {}
-    defaults = {"tres_modeste": 1200, "modeste": 800, "intermediaire": 400, "superieur": 0}
-    return float_value(forfaits.get(categorie), defaults.get(categorie, 0))
+    """MPR ballon : toujours 0.
+
+    Depuis le 01/09/2026 (décret 2026-822), le chauffe-eau thermodynamique n'est plus
+    financé par MaPrimeRénov' par geste. Le paramètre admin ballon_thermo.forfaits_mpr
+    est conservé (masqué) mais n'est plus lu."""
+    return 0
 
 
 def calculer_cee_bar_th_171(prospect, state_simulateur, admin_params):
@@ -687,7 +698,33 @@ def format_sous_traitant(sous_traitant):
     return "\n".join(line for line in lines if line)
 
 
-def validate_prospect_for_devis(prospect, state_simulateur):
+# Réponse à « Où sera installé le ballon ? » -> type de ballon exigé (miroir de
+# BALLON_EMPLACEMENTS dans templates/index.html).
+BALLON_TYPE_PAR_EMPLACEMENT = {
+    "piece_non_chauffee": "compact",
+    "petite_piece_gaines": "compact_gainable",
+    "pas_de_place": "split",
+}
+
+
+def ballon_inadapte(state_simulateur, admin_params):
+    """Vrai si le ballon retenu n'est pas du type exigé par l'emplacement indiqué.
+    Faux quand une des infos manque (pas de ballon, emplacement ou type non renseigné) :
+    l'emplacement manquant est signalé à part."""
+    if service_avec_ecs(state_simulateur):
+        return False
+    ref = str(value(state_simulateur, "ballon_ref", default="") or "").strip()
+    attendu = BALLON_TYPE_PAR_EMPLACEMENT.get(str(value(state_simulateur, "ballon_emplacement", default="") or ""))
+    if not ref or not attendu:
+        return False
+    bt = (admin_params or {}).get("ballon_thermo") or {}
+    modeles = bt.get("modeles") if isinstance(bt.get("modeles"), list) else []
+    modele = next((m for m in modeles if isinstance(m, dict) and str(m.get("ref", "")).strip() == ref), None)
+    type_modele = str((modele or {}).get("type_installation") or "").strip()
+    return bool(type_modele) and type_modele != attendu
+
+
+def validate_prospect_for_devis(prospect, state_simulateur, admin_params=None):
     missing = []
     checks = [
         ("civilite", "Civilité"),
@@ -731,6 +768,11 @@ def validate_prospect_for_devis(prospect, state_simulateur):
         missing.append("Catégorie de revenu")
     if not value(state_simulateur, "modele_pac_id", "modele_pac"):
         missing.append("Modèle PAC (simulateur)")
+    if (value(state_simulateur, "ballon_ref") and not service_avec_ecs(state_simulateur)
+            and not value(state_simulateur, "ballon_emplacement")):
+        missing.append("Emplacement du ballon (simulateur)")
+    if ballon_inadapte(state_simulateur, admin_params):
+        missing.append("Ballon non adapté à l'emplacement indiqué (simulateur)")
     return missing
 
 
