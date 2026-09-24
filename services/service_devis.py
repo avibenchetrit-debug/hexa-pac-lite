@@ -588,7 +588,9 @@ def calculer_financement_devis(reste_a_charge, admin_params):
 
 
 def calculer_economie_devis(surface, zone, etas35, etas55, emetteur, service, facture_avant, admin_params):
-    """Facture après PAC (€/mois) + économie — réplique fidèle de calculerFactureApresPac() JS."""
+    """OBSOLÈTE — remplacé par calculerEconomies / services/economies.py (Lot 2).
+
+    Facture après PAC (€/mois) + économie — réplique fidèle de calculerFactureApresPac() JS."""
     params = (admin_params or {}).get("params_eco_energie") or {}
     surface = float_value(surface)
     if surface <= 0:

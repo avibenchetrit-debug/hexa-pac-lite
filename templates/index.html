@@ -8370,7 +8370,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
         const coutLabel = q('label', coutField);
         if (coutLabel) {
           const target = q('.label-row > span:first-child', coutLabel) || coutLabel;
-          if (target.firstChild) target.firstChild.textContent = 'Coût chauffage';
+          if (target.firstChild) target.firstChild.textContent = 'Facture annuelle de l\'énergie de la chaudière (fioul, gaz…)';
           if (!q('.req', coutLabel)) {
             const req = document.createElement('span');
             req.className = 'req';
@@ -9998,10 +9998,11 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
       energie: document.getElementById('type-chauffage-energie')?.value,
     });
     if (cout != null) {
-      el.value = cout;
-      el.dispatchEvent(new Event('input', { bubbles: true }));
-      el.dispatchEvent(new Event('change', { bubbles: true }));
-      if (u) marquerUrbsField('cout_energetique_mensuel_eur', 'badge-cout', u.source_dpe === 'officiel' ? 'officiel' : 'enrichi');
+      // Lot 2 : écriture automatique via setCoutEnergieAuto -> jamais par-dessus une saisie réelle.
+      const ecrit = typeof window.setCoutEnergieAuto === 'function'
+        ? window.setCoutEnergieAuto(cout, 'dpe')
+        : (el.value = cout, el.dispatchEvent(new Event('input', { bubbles: true })), el.dispatchEvent(new Event('change', { bubbles: true })), true);
+      if (ecrit && u) marquerUrbsField('cout_energetique_mensuel_eur', 'badge-cout', u.source_dpe === 'officiel' ? 'officiel' : 'enrichi');
     }
   }
   ['conso-kwh-input', 'surface-input'].forEach(id => {
@@ -14295,9 +14296,13 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     surface_forcee: false,
     service: 'chauffage_seul',
     prix_pac: null,
-    facture_avant: 200,            // €/mois
-    facture_avant_defaut: true,    // true tant que le coût réel n'est pas saisi (=> warning ROI)
-    facture_apres: 100,            // €/mois
+    facture_avant: 0,              // €/mois affichés « Aujourd'hui » (calculerEconomies, Lot 2)
+    facture_avant_defaut: true,    // true tant qu'aucun coût n'est connu (ni saisi, ni DPE, ni estimé)
+    facture_apres: 0,              // €/mois après PAC (calculerEconomies, Lot 2)
+    cout_mensuel_fiche: null,      // coût de la fiche (€/mois), base du calcul
+    cout_source: '',               // reel | a_confirmer | audit | dpe | estime
+    nombre_personnes: null,
+    eco: null,                     // dernier résultat de calculerEconomies
     option: 'opt1',                // opt1 | opt2 | opt3 (financement propre)
     iso_toit: 'isole',
     iso_mur: 'isole',
@@ -14641,7 +14646,8 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
       ballon_emplacement: state.ballon_emplacement || '',
       // Éco 20 ans (roi()) : incluses uniquement si lastRoi existe, sinon clés omises
       // pour ne pas écraser une valeur déjà persistée (merge côté backend).
-      ...(lastRoi ? {
+      ...(lastRoi && !lastRoi.indisponible ? {
+        eco_calc_version: 2,       // Lot 2 : éco calculée par calculerEconomies (le devis ignore les anciennes)
         eco_20_ans: Math.round(lastRoi.total20),
         annee_rentable: lastRoi.anneeRentable,
         inflation_avant_pct: Math.round(lastRoi.infAvant * 100),
@@ -14773,8 +14779,11 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     state.altitude = null;
     state.surface_habitable = null;
     if (!state.surface_forcee) state.surface_chauffee = null;
-    state.facture_avant = 200;
+    state.cout_mensuel_fiche = null;
     state.facture_avant_defaut = true;
+    state.cout_source = (typeof window.hexaCoutSource === 'function') ? window.hexaCoutSource() : '';
+    const nbPers = num(document.querySelector('[name="nombre_personnes"]')?.value);
+    state.nombre_personnes = nbPers != null && nbPers > 0 ? nbPers : null;
     const categorieInput = document.getElementById('categorie-input')?.value || '';
     if (['tres_modeste', 'modeste', 'intermediaire', 'superieur'].includes(categorieInput)) {
       state.categorie = categorieInput;
@@ -14829,11 +14838,11 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
       || document.querySelector('[name="cout_energetique_mensuel_eur"]')?.value
       || document.querySelector('[name="cout_chauffage"]')?.value);
     if (coutMensuel!=null && coutMensuel>0) {
-      state.facture_avant = coutMensuel;
+      state.cout_mensuel_fiche = coutMensuel;
       state.facture_avant_defaut = false;
     } else {
       const coutAnnuel = num(document.getElementById('cout-annuel-input')?.value || document.querySelector('[name="cout_energetique_annuel_eur"]')?.value);
-      if (coutAnnuel!=null && coutAnnuel>0) { state.facture_avant=Math.round(coutAnnuel/12); state.facture_avant_defaut = false; }
+      if (coutAnnuel!=null && coutAnnuel>0) { state.cout_mensuel_fiche=Math.round(coutAnnuel/12); state.facture_avant_defaut = false; }
     }
   }
 
@@ -14884,6 +14893,8 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     return { montant, erreur: null, details: { typeLogement, etas, surface, zone, categorie, kwhc, mwhc, prixUnitaire, mult } };
   }
 
+  // OBSOLÈTE — remplacé par calculerEconomies / services/economies.py (Lot 2).
+  // Conservée pour mémoire : norme théorique (surface × conso zone / SCOP) sans lien avec la maison.
   // Estimation réelle de la facture après PAC (€/mois). Renvoie null si données insuffisantes.
   function calculerFactureApresPac(){
     // 1. Surface
@@ -14913,6 +14924,29 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     const factureApresMensuelle = Math.round(coutAnnuel / 12);
     // 6.
     return factureApresMensuelle > 0 ? factureApresMensuelle : null;
+  }
+
+  // Lot 2 : économies à partir de la facture de la fiche (calculerEconomies, bloc HEXA-ECONOMIES).
+  // null si aucun coût connu ou énergie inconnue : jamais de valeur inventée.
+  function economiesSim(){
+    const E = window.HexaEconomies;
+    const mensuel = Number(state.cout_mensuel_fiche) || 0;
+    if (!E || !(mensuel > 0)) return null;
+    const params = M3_CONFIG?.params_eco_energie || {};
+    const modele = getModeleActuel();
+    const emetteur = document.querySelector('[name="type_emetteurs"]')?.value || '';
+    const scop = E.scopModele(modele?.etas35 ?? modele?.raw?.etas35, modele?.etas55 ?? modele?.raw?.etas55, emetteur, state.service, params);
+    const energie = E.cleEnergie(state.energie_avant);
+    const res = E.calculerEconomies({
+      facture_annuelle: mensuel * 12,
+      energie: state.energie_avant,
+      ecs_chaudiere: E.ecsParChaudiere(state.gestion_ecs, energie),
+      personnes: state.nombre_personnes,
+      service: state.service,
+      ballon: ballonSim(state).actif,
+      scop
+    }, params);
+    return res.ok ? res : null;
   }
 
   // Ballon thermodynamique : proposé seulement en chauffage seul (en chauffage + ECS,
@@ -15014,8 +15048,10 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
   async function calcul(){
     if (Object.keys(GRILLE).length === 0 || !CATALOGUE_PAC.length) { await chargerBaremes(); }
     const dim = syncDimensionnement();
-    const factureApresCalc = calculerFactureApresPac();
-    if (factureApresCalc != null && factureApresCalc > 0) state.facture_apres = factureApresCalc;
+    const eco = economiesSim();
+    state.eco = eco;
+    state.facture_avant = eco ? eco.avant_mensuel : 0;
+    state.facture_apres = eco ? eco.apres_mensuel : 0;
     const contextePret = !!state.categorie && !!state.zone && Number.isFinite(dim.surface_chauffee) && dim.surface_chauffee > 0;
     const sKey = trancheSurface(state.surface_chauffee);
     const node = GRILLE['etas_140_plus']?.[sKey]; // ETAS supprime (valeur figee, ecrasee ensuite par forfaits_mpr)
@@ -15114,46 +15150,48 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
 
   // ROI : cumul des économies (facture avant inflatée − (facture après inflatée + crédit tant qu'il court))
   // comparé au reste à charge déboursé (g29). Renvoie l'année de rentabilité + total 20 ans.
+  // Lot 2 : projection de calculerEconomies (hausse appliquée séparément au chauffage actuel, à
+  // l'ECS actuelle et à la facture après PAC). L'économie ECS fixe du ballon n'existe plus.
   function roi(c){
     const pe = M3_CONFIG?.params_eco_energie || {};
-    const inflA = pe.inflation_annuelle_pct || {};
-    // inflation de l'énergie actuelle (avant), en décimal, fallback constante en dur
-    const infAvant = (inflA[state.energie_avant] != null ? inflA[state.energie_avant]/100
-                      : (inflA.defaut != null ? inflA.defaut/100 : (INFLATION[state.energie_avant] ?? INFLATION.defaut)));
-    // inflation de l'électricité (PAC), en décimal, fallback constante
-    const inflElec = (inflA.electricite != null ? inflA.electricite/100 : INFLATION_ELEC);
-    // durée de vie PAC, fallback constante
     const dureeVie = Number(pe.duree_vie_pac_ans) || DUREE_VIE_PAC;
-    const annAvant0 = state.facture_avant*12;
-    const annApres0 = state.facture_apres*12;
     const mensAnnee = c.mensOptNet*12;                 // coût crédit annuel
     const dureeCreditAns = c.nMoisNet/12;
     const estCredit = (mensAnnee > 0 && dureeCreditAns > 0);
+    const eco = state.eco;
+    if (!eco || !window.HexaEconomies) {
+      return { indisponible: true, anneeRentable: null, total20: 0, infAvant: 0, inflElec: 0,
+               dureeCreditAns, cumulNet: 0, estCredit, dureeVie };
+    }
     // Au comptant, le client débourse g29 ; à crédit, rien au départ (tout financé) => seuil 0
     const seuilRentabilite = estCredit ? 0 : c.resteAttente;
-    const bsEcs = ballonSim(state);
-    const ecsAn0 = bsEcs.actif ? bsEcs.economieEcs*12 : 0;
-    let cumul = 0; let anneeRentable = null;
-    for (let an=1; an<=dureeVie; an++){
-      const factAvant = annAvant0*Math.pow(1+infAvant, an-1);
-      const factApres = annApres0*Math.pow(1+inflElec, an-1);
-      const credit = (an <= dureeCreditAns) ? mensAnnee : 0;
-      const ecsAnnee = ecsAn0*Math.pow(1+inflElec, an-1);
-      const econoAnnee = factAvant - factApres + ecsAnnee - credit;
-      cumul += econoAnnee;
-      if (anneeRentable===null && cumul >= seuilRentabilite) anneeRentable = an;
-    }
-    // total20 = cumul des gains nets sur dureeVie, moins ce qui a été déboursé au départ (g29 au comptant, 0 à crédit)
-    const total20 = cumul - (estCredit ? 0 : c.resteAttente);
-    return { anneeRentable, total20, infAvant, inflElec, dureeCreditAns, cumulNet: cumul, estCredit };
+    const pr = window.HexaEconomies.projeter(eco, {
+      creditAnnuel: mensAnnee, dureeCreditAns, debourseInitial: seuilRentabilite
+    });
+    // total20 (nom historique) = cumul net sur la durée de vie, moins le déboursé initial
+    return { anneeRentable: pr.anneeRentable, total20: pr.total, infAvant: eco.inflation_avant,
+             inflElec: eco.inflation_apres, dureeCreditAns, cumulNet: pr.cumul, estCredit,
+             dureeVie: eco.duree_ans };
+  }
+
+  // Ligne « Base : … » sous le résultat (source du coût + hypothèses réellement utilisées)
+  const LIBELLE_BASE = { reel:'facture réelle', a_confirmer:'facture communiquée (à confirmer)', audit:'théorique audit',
+                         dpe:'théorique DPE', estime:'estimée' };
+  function ligneBase(r){
+    const eco = state.eco; if (!eco) return '';
+    const lib = LIBELLE_BASE[state.cout_source] || 'facture saisie';
+    const pct = (Math.round(eco.inflation_avant * 1000) / 10).toString().replace('.', ',');
+    const scop = eco.scop.toFixed(1).replace('.', ',');
+    return `Base : ${lib} · hausse énergie ${pct} %/an · SCOP ${scop} · durée ${r.dureeVie} ans`;
   }
 
   // Phrase commerciale simple, prête à dire au téléphone, chiffres ajustés à l'option
   function phraseCommerciale(c, r, energieLbl, totalApres, delta){
     const av = eur(state.facture_avant);
     const ap = eur(totalApres);
+    if (r.indisponible) return '';
     if (!r.anneeRentable){
-      return `Cette configuration se rentabilise au-delà de 20 ans. Ajustez le financement ou le modèle pour améliorer la rentabilité.`;
+      return `Cette configuration se rentabilise au-delà de ${r.dureeVie} ans. Ajustez le financement ou le modèle pour améliorer la rentabilité.`;
     }
     if (r.estCredit && delta >= 0){
       return `<ul>
@@ -15180,6 +15218,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
 
   // Explication du calcul en langage très simple
   function explicationCalcul(c, r, energieLbl){
+    if (r.indisponible) return '';
     if (r.estCredit){
       return `<b>« Mais le crédit, je le paie quand même ? »</b> Oui — mais avec l'argent que vous donniez déjà à votre ${energieLbl} :
 <ul>
@@ -15194,7 +15233,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
 <ul>
 <li>Vous avancez ${eur(c.reste_affiche)} une seule fois.</li>
 <li>Vos économies de chauffage vous remboursent cette somme en ${r.anneeRentable} ans.</li>
-<li>Ensuite, tout est pour vous : sur 20 ans, ça fait ${eur(r.total20)} dans votre poche.</li>
+<li>Ensuite, tout est pour vous : sur ${r.dureeVie} ans, ça fait ${eur(r.total20)} dans votre poche.</li>
 <li>Le prix du ${energieLbl} augmente d'environ ${Math.round(r.infAvant*100)}%/an → l'écart se creuse en votre faveur chaque année.</li>
 </ul>`;
   }
@@ -15485,27 +15524,29 @@ ${renderBallonBloc(state, bs)}
         </div>
         ${state.option==='opt1' && c.finView.mention ? `<div class="sim-note">${c.finView.mention}</div>` : ''}
 
-        ${state.facture_avant_defaut ? `<div style="margin:0 0 10px;padding:9px 11px;border:1px solid #F59E0B;border-radius:8px;background:#FEF3C7;color:#8A4B00;font-size:12px;line-height:1.45;">⚠️ Facture actuelle non renseignée — les économies et le ROI affichés sont <b>indicatifs</b> (estimation par défaut ${eur(state.facture_avant)}/mois). Renseignez le coût de chauffage actuel pour un calcul fiable.</div>` : ''}
+        ${!state.eco ? `<div class="sim-note sim-note--warn" id="sim-eco-indisponible">Économies non calculées : renseignez la facture de l'énergie de la chaudière, ou la surface et l'énergie du logement pour l'estimer.</div>` : ''}
+        ${state.eco && state.eco.alerte ? `<div class="sim-note sim-note--warn" id="sim-eco-alerte">Résultat inhabituel : vérifiez la facture et l'énergie saisies.</div>` : ''}
         <!-- AVANT / APRÈS PAC (live) -->
         <div class="sim-section-label">Avant / Après PAC</div>
         <div class="sim-aa">
-          <div class="sa-line"><span>Avant — ${energieLbl}</span><b class="muted">${eur(state.facture_avant)}/mois</b></div>
+          <div class="sa-line"><span>Avant — ${energieLbl}${state.eco ? (state.eco.ecs_traitee ? ' <i>(chauffage + eau chaude)</i>' : (state.eco.ecs_avant > 0 ? ' <i>(chauffage, hors eau chaude)</i>' : '')) : ''}</span><b class="muted" id="sim-facture-avant">${state.eco ? eur(state.facture_avant) + '/mois' : '—'}</b></div>
           <div class="sim-pnl-sep"></div>
-          <div class="sa-line"><span>Après — PAC</span><b>${eur(state.facture_apres)}/mois</b></div>
+          <div class="sa-line"><span>Après — PAC${state.eco && state.eco.ecs_traitee ? ' <i>(chauffage + eau chaude)</i>' : ''}</span><b id="sim-facture-apres">${state.eco ? eur(state.facture_apres) + '/mois' : '—'}</b></div>
           ${creditLine}
           <div class="sim-pnl-sep"></div>
           <div class="sa-line total"><span>Total après</span><b>${eur(totalApres)}/mois</b></div>
-          <div class="sa-delta ${delta>=0?'win':'warn'}">${delta>=0?`✓ Économie de ${eur(delta)}/mois (${eur(delta*12)}/an) dès maintenant`:`Surcoût de ${eur(Math.abs(delta))}/mois (${eur(Math.abs(delta)*12)}/an) pendant le crédit`}</div>
+          <div class="sa-delta ${delta>=0?'win':'warn'}"${state.eco ? '' : ' hidden'}>${delta>=0?`✓ Économie de ${eur(delta)}/mois (${eur(delta*12)}/an) dès maintenant`:`Surcoût de ${eur(Math.abs(delta))}/mois (${eur(Math.abs(delta)*12)}/an) pendant le crédit`}</div>
         </div>
 
         <!-- ROI -->
         <div class="sim-roi">
           <div class="sim-roi-head">
-            ${!r.anneeRentable ? `Rentabilité au-delà de 20 ans` : r.estCredit ? (delta>=0 ? `Moins cher dès le <b>1er mois</b>` : `Rentable dès la <b>${r.anneeRentable}ᵉ année</b>`) : `Remboursé en <b>${r.anneeRentable} ans</b>`}
+            ${r.indisponible ? `Économies à calculer` : !r.anneeRentable ? `Rentabilité au-delà de ${r.dureeVie} ans` : r.estCredit ? (delta>=0 ? `Moins cher dès le <b>1er mois</b>` : `Rentable dès la <b>${r.anneeRentable}ᵉ année</b>`) : `Remboursé en <b>${r.anneeRentable} ans</b>`}
             <button type="button" class="sim-info-btn" id="sim-roi-info" aria-label="Détail calcul">i</button>
           </div>
           <div class="sim-roi-phrase">${phraseRoi}</div>
-          <div class="sim-roi-big-wrap">${r.anneeRentable?`<span class="sim-roi-big">${eur(r.total20)}</span><span class="sim-roi-big-sub">économisés sur 20 ans</span>`:''}</div>
+          <div class="sim-roi-big-wrap">${r.anneeRentable?`<span class="sim-roi-big">${eur(r.total20)}</span><span class="sim-roi-big-sub">économisés sur ${r.dureeVie} ans</span>`:''}</div>
+          ${state.eco ? `<div class="sim-roi-base" id="sim-roi-base" style="font-size:11px;color:#6B7280;margin-top:4px;">${ligneBase(r)}</div>` : ''}
           <div class="sim-roi-pop" id="sim-roi-pop" hidden>
             ${explicationCalcul(c, r, energieLbl)}
           </div>
@@ -16334,7 +16375,13 @@ ${renderBallonBloc(state, bs)}
       scop_defaut:3.5,
       prix_kwh:{ electricite:0.21, gaz:0.12, fioul:0.13, bois:0.07 },
       inflation_annuelle_pct:{ electricite:3, gaz:4, fioul:4, bois:2.5, defaut:4 },
-      duree_vie_pac_ans:20
+      duree_vie_pac_ans:20,
+      // Lot 2 : calcul des économies (calculerEconomies)
+      rendement_pct:{ fioul:85, gaz:90, bois:75, electricite:100, pac:250 },
+      ecs_kwh_par_personne:800,
+      cop_ecs_duo:2.5,
+      cop_ecs_cet:2.8,
+      coef_periode:{ avant_1975:1.3, '1975_2000':1.0, apres_2000:0.7, inconnue:1.0 }
     };
   }
   function defaultParamsFinancement(){
@@ -16549,11 +16596,13 @@ ${renderBallonBloc(state, bs)}
     const conso = Object.assign(d.conso_zone_kwh_m2_an, eco.conso_zone_kwh_m2_an || {});
     const prix = Object.assign(d.prix_kwh, eco.prix_kwh || {});
     const infl = Object.assign(d.inflation_annuelle_pct, eco.inflation_annuelle_pct || {});
+    const rend = Object.assign(d.rendement_pct, eco.rendement_pct || {});
+    const coefP = Object.assign(d.coef_periode, eco.coef_periode || {});
     return `
       <div class="adm-section-block" data-section="params-eco-energie">
         <div class="adm-section-header">
           <div class="adm-section">Hypothèses économie d'énergie</div>
-          <p class="adm-hint">Hypothèses servant à estimer l'économie d'énergie. Saisie uniquement — aucun calcul branché pour l'instant.</p>
+          <p class="adm-hint">Hypothèses utilisées par le calcul des économies du simulateur et du devis / pré-devis : besoin de chaleur déduit de la facture du client, facture après PAC, estimation quand aucune facture n'est connue, projection sur la durée de vie.</p>
         </div>
         <div class="adm-subsection"><h3>Consommation par zone climatique (kWh/m²/an)</h3>
           <label class="adm-field">Zone H1 <div class="adm-input-with-unit"><input type="number" id="adm-eco-conso-h1" value="${adminEscape(conso.h1 ?? 150)}" step="1" min="0"><span class="adm-unit">kWh/m²/an</span></div></label>
@@ -16575,6 +16624,24 @@ ${renderBallonBloc(state, bs)}
           <label class="adm-field">Fioul <div class="adm-input-with-unit"><input type="number" id="adm-eco-infl-fioul" value="${adminEscape(infl.fioul ?? 4)}" step="0.1" min="0"><span class="adm-unit">%</span></div></label>
           <label class="adm-field">Bois <div class="adm-input-with-unit"><input type="number" id="adm-eco-infl-bois" value="${adminEscape(infl.bois ?? 2.5)}" step="0.1" min="0"><span class="adm-unit">%</span></div></label>
           <label class="adm-field">Défaut <div class="adm-input-with-unit"><input type="number" id="adm-eco-infl-defaut" value="${adminEscape(infl.defaut ?? 4)}" step="0.1" min="0"><span class="adm-unit">%</span></div></label>
+        </div>
+        <div class="adm-subsection"><h3>Rendement de l'installation actuelle (%)</h3>
+          <label class="adm-field">Fioul <div class="adm-input-with-unit"><input type="number" id="adm-eco-rend-fioul" value="${adminEscape(rend.fioul ?? 85)}" step="1" min="1"><span class="adm-unit">%</span></div></label>
+          <label class="adm-field">Gaz / GPL <div class="adm-input-with-unit"><input type="number" id="adm-eco-rend-gaz" value="${adminEscape(rend.gaz ?? 90)}" step="1" min="1"><span class="adm-unit">%</span></div></label>
+          <label class="adm-field">Bois / granulés <div class="adm-input-with-unit"><input type="number" id="adm-eco-rend-bois" value="${adminEscape(rend.bois ?? 75)}" step="1" min="1"><span class="adm-unit">%</span></div></label>
+          <label class="adm-field">Électrique <div class="adm-input-with-unit"><input type="number" id="adm-eco-rend-elec" value="${adminEscape(rend.electricite ?? 100)}" step="1" min="1"><span class="adm-unit">%</span></div></label>
+          <label class="adm-field">PAC existante <div class="adm-input-with-unit"><input type="number" id="adm-eco-rend-pac" value="${adminEscape(rend.pac ?? 250)}" step="1" min="1"><span class="adm-unit">%</span></div></label>
+        </div>
+        <div class="adm-subsection"><h3>Eau chaude sanitaire</h3>
+          <label class="adm-field">Besoin par personne <div class="adm-input-with-unit"><input type="number" id="adm-eco-ecs-kwh" value="${adminEscape(eco.ecs_kwh_par_personne ?? 800)}" step="10" min="0"><span class="adm-unit">kWh/an</span></div></label>
+          <label class="adm-field">COP ECS PAC DUO <div class="adm-input-with-unit"><input type="number" id="adm-eco-cop-duo" value="${adminEscape(eco.cop_ecs_duo ?? 2.5)}" step="0.1" min="0"></div></label>
+          <label class="adm-field">COP ballon thermodynamique <div class="adm-input-with-unit"><input type="number" id="adm-eco-cop-cet" value="${adminEscape(eco.cop_ecs_cet ?? 2.8)}" step="0.1" min="0"></div></label>
+        </div>
+        <div class="adm-subsection"><h3>Coefficient par période de construction (estimation sans facture)</h3>
+          <label class="adm-field">Avant 1975 <div class="adm-input-with-unit"><input type="number" id="adm-eco-coef-avant-1975" value="${adminEscape(coefP.avant_1975 ?? 1.3)}" step="0.05" min="0"></div></label>
+          <label class="adm-field">1975 – 2000 <div class="adm-input-with-unit"><input type="number" id="adm-eco-coef-1975-2000" value="${adminEscape(coefP['1975_2000'] ?? 1.0)}" step="0.05" min="0"></div></label>
+          <label class="adm-field">Après 2000 <div class="adm-input-with-unit"><input type="number" id="adm-eco-coef-apres-2000" value="${adminEscape(coefP.apres_2000 ?? 0.7)}" step="0.05" min="0"></div></label>
+          <label class="adm-field">Année inconnue <div class="adm-input-with-unit"><input type="number" id="adm-eco-coef-inconnue" value="${adminEscape(coefP.inconnue ?? 1.0)}" step="0.05" min="0"></div></label>
         </div>
         <div class="adm-subsection"><h3>Durée de vie PAC</h3>
           <label class="adm-field">Durée de vie <div class="adm-input-with-unit"><input type="number" id="adm-eco-duree-vie" value="${adminEscape(eco.duree_vie_pac_ans ?? 20)}" step="1" min="0"><span class="adm-unit">ans</span></div></label>
@@ -16880,7 +16947,6 @@ ${renderBallonBloc(state, bs)}
         <div class="adm-field adm-field-row"><span class="adm-lab">Libellé</span><input type="text" class="adm-bt-nom" data-idx="${i}" data-ref="${adminEscape(m.ref||('ballon-'+(i+1)))}" value="${adminEscape(m.nom||'')}"></div>
         <div class="adm-field adm-field-row"><span class="adm-lab">Prix fourniture</span><span class="adm-euro"><input type="text" inputmode="numeric" class="adm-bt-fourniture adm-money" data-idx="${i}" value="${adminEscape(m.fourniture_ht != null ? m.fourniture_ht : 0)}"><i>€ HT</i></span></div>
         <div class="adm-field adm-field-row"><span class="adm-lab">Coût fourniture</span><span class="adm-euro"><input type="text" inputmode="numeric" class="adm-bt-cout adm-money" data-idx="${i}" value="${adminEscape(m.cout_fourniture_ht != null ? m.cout_fourniture_ht : 0)}"><i>€ HT</i></span></div>
-        <div class="adm-field adm-field-row"><span class="adm-lab">Économie ECS estimée</span><span class="adm-euro"><input type="text" inputmode="numeric" class="adm-bt-ecs adm-money" data-idx="${i}" value="${adminEscape(m.economie_ecs_mois != null ? m.economie_ecs_mois : 25)}"><i>€/mois</i></span></div>
         <div class="adm-field adm-field-row"><span class="adm-lab">Type d'installation</span><select class="adm-bt-type" data-idx="${i}">${[['','— Non renseigné —'],['compact','Compact'],['compact_gainable','Compact gainable'],['split','Split']].map(([v,l])=>`<option value="${v}" ${(m.type_installation||'')===v?'selected':''}>${l}</option>`).join('')}</select></div>
         <div class="adm-field adm-field-row adm-bt-marge-row"><span class="adm-lab">Marge (admin)</span><span class="adm-bt-marge" data-idx="${i}"><b>${eur(margeBallon(m))}</b> HT</span></div>
         <div class="adm-field adm-field-row"><span class="adm-lab">Fiche &amp; specs</span><span class="adm-ballon-btns"><button type="button" class="adm-btn adm-btn-cancel adm-bt-desc" data-bt-desc="${i}">✎ Specs (${(Array.isArray(m.description_specs)?m.description_specs.length:0)})</button><button type="button" class="adm-btn adm-btn-cancel adm-fiche-ballon-btn" data-ref="${adminEscape(m.ref||('ballon-'+(i+1)))}">📎 Fiche PDF</button></span></div>
@@ -17470,11 +17536,14 @@ ${renderBallonBloc(state, bs)}
     const noms = Array.from(document.querySelectorAll('.adm-bt-nom'));
     const fournis = Array.from(document.querySelectorAll('.adm-bt-fourniture'));
     const couts = Array.from(document.querySelectorAll('.adm-bt-cout'));
-    const ecs = Array.from(document.querySelectorAll('.adm-bt-ecs'));
     const types = Array.from(document.querySelectorAll('.adm-bt-type'));
     const anciens = (cfg.ballon_thermo && Array.isArray(cfg.ballon_thermo.modeles)) ? cfg.ballon_thermo.modeles : [];
     const specsByRef = {};
-    anciens.forEach(function(m){ if (m && m.ref) specsByRef[m.ref] = Array.isArray(m.description_specs) ? m.description_specs : []; });
+    const ecsByRef = {};  // economie_ecs_mois : plus saisie ni utilisée (Lot 2), conservée telle quelle
+    anciens.forEach(function(m){
+      if (m && m.ref) specsByRef[m.ref] = Array.isArray(m.description_specs) ? m.description_specs : [];
+      if (m && m.ref && m.economie_ecs_mois != null) ecsByRef[m.ref] = m.economie_ecs_mois;
+    });
     const modeles = noms.map((el,i)=>{
       const ref = el.dataset.ref || ('ballon-'+(i+1));
       return {
@@ -17482,7 +17551,7 @@ ${renderBallonBloc(state, bs)}
         nom: (el.value||'').trim(),
         fourniture_ht: num(fournis[i]),
         cout_fourniture_ht: num(couts[i]),
-        economie_ecs_mois: num(ecs[i]),
+        ...(ecsByRef[ref] != null ? { economie_ecs_mois: ecsByRef[ref] } : {}),
         type_installation: (types[i] && types[i].value) || '',
         description_specs: Array.isArray(specsByRef[ref]) ? specsByRef[ref] : []
       };
@@ -18305,10 +18374,19 @@ ${renderBallonBloc(state, bs)}
         scop_defaut:n('adm-eco-scop'),
         prix_kwh:{ electricite:n('adm-eco-prix-elec'), gaz:n('adm-eco-prix-gaz'), fioul:n('adm-eco-prix-fioul'), bois:n('adm-eco-prix-bois') },
         inflation_annuelle_pct:{ electricite:n('adm-eco-infl-elec'), gaz:n('adm-eco-infl-gaz'), fioul:n('adm-eco-infl-fioul'), bois:n('adm-eco-infl-bois'), defaut:n('adm-eco-infl-defaut') },
-        duree_vie_pac_ans:n('adm-eco-duree-vie')
+        duree_vie_pac_ans:n('adm-eco-duree-vie'),
+        rendement_pct:{ fioul:n('adm-eco-rend-fioul'), gaz:n('adm-eco-rend-gaz'), bois:n('adm-eco-rend-bois'), electricite:n('adm-eco-rend-elec'), pac:n('adm-eco-rend-pac') },
+        ecs_kwh_par_personne:n('adm-eco-ecs-kwh'),
+        cop_ecs_duo:n('adm-eco-cop-duo'),
+        cop_ecs_cet:n('adm-eco-cop-cet'),
+        coef_periode:{ avant_1975:n('adm-eco-coef-avant-1975'), '1975_2000':n('adm-eco-coef-1975-2000'), apres_2000:n('adm-eco-coef-apres-2000'), inconnue:n('adm-eco-coef-inconnue') }
       };
       const r = await fetch('/api/admin/params-eco-energie', { method:'POST', headers: window.adminHeaders(), body: JSON.stringify(payload) });
-      if (r.ok) { M3_ADMIN.params_eco_energie = payload; adminToast('✓ Paramètres économiques sauvegardés', '#0D6B3B'); }
+      if (r.ok) {
+        M3_ADMIN.params_eco_energie = payload;
+        if (typeof window.hexaEstimationCoutRecharger === 'function') window.hexaEstimationCoutRecharger();
+        adminToast('✓ Paramètres économiques sauvegardés', '#0D6B3B');
+      }
       else adminToast("❌ Erreur lors de l'enregistrement", '#B91C1C');
     });
     document.getElementById('btn-save-params-financement')?.addEventListener('click', async ()=>{
@@ -20371,6 +20449,8 @@ ${renderBallonBloc(state, bs)}
     setFieldValue('ville_chantier', readLeadValue(lead, 'ville_chantier'), { notify:false });
     setFieldValue('dpe_connu', readLeadValue(lead, 'dpe_connu'), { notify:false });
     setFieldValue('cout_energetique_mensuel_eur', readLeadValue(lead, 'cout_energetique_mensuel_eur'), { notify:false });
+    setFieldValue('cout_energie_source', readLeadValue(lead, 'cout_energie_source'), { notify:false });
+    if (typeof window.hexaCoutApresChargement === 'function') window.hexaCoutApresChargement();
     setCategorieFromLead(readLeadValue(lead, 'categorie'));
     syncChoiceWidgets();
     window.syncBailleurAdresseProspect?.();
@@ -20511,6 +20591,7 @@ ${renderBallonBloc(state, bs)}
     setFieldValue('situation_propriete', 'proprietaire');
     document.body.dataset.prospectNumero='';
     window.HexaCurrentProspect = { numero:'', nom_complet:'' };
+    if (typeof window.hexaCoutApresChargement === 'function') window.hexaCoutApresChargement();
     // Clé brouillon pour N/E avant le 1er enregistrement (reprise après F5 / retour arrière)
     if (typeof window.hexaDemarrerBrouillon === 'function') window.hexaDemarrerBrouillon(!!opts.skipHistory);
     if (typeof window.syncSimulateurDepuisFiche === 'function') {
@@ -20576,5 +20657,452 @@ ${renderBallonBloc(state, bs)}
   setInterval(tickParisClock, 1000);
 })();
 </script>
+<script>
+/* HEXA-ECONOMIES:DEBUT — Lot 2 : économies d'énergie et facture après PAC.
+   Miroir exact de services/economies.py (même logique, mêmes clés de résultat) ;
+   tests/test_lot2_economies.py rejoue les mêmes cas sur les deux implémentations.
+   Fonctions pures : aucune lecture du DOM ici. */
+(function () {
+  'use strict';
+  const DEFAULT_PARAMS = {
+    conso_zone_kwh_m2_an: { h1: 150, h2: 130, h3: 110 },
+    scop_defaut: 3.5,
+    prix_kwh: { electricite: 0.21, gaz: 0.12, fioul: 0.13, bois: 0.07 },
+    inflation_annuelle_pct: { electricite: 3, gaz: 4, fioul: 4, bois: 2.5, defaut: 4 },
+    duree_vie_pac_ans: 20,
+    rendement_pct: { fioul: 85, gaz: 90, bois: 75, electricite: 100, pac: 250 },
+    ecs_kwh_par_personne: 800,
+    cop_ecs_duo: 2.5,
+    cop_ecs_cet: 2.8,
+    coef_periode: { avant_1975: 1.3, '1975_2000': 1.0, apres_2000: 0.7, inconnue: 1.0 }
+  };
+  const RENDEMENT_BALLON_ELECTRIQUE = 0.9;
+  const PERSONNES_DEFAUT = 2;
+  const PLAFOND_PART_ECS = 0.30;
+  const SOURCES = ['reel', 'a_confirmer', 'audit', 'dpe', 'estime'];
+
+  function num(v, defaut) {
+    if (v === null || v === undefined) return defaut;
+    const s = String(v).replace(',', '.').replace(/[\s ]/g, '');
+    if (!s) return defaut;
+    const n = Number(s);
+    return Number.isFinite(n) ? n : defaut;
+  }
+  const r2 = (x) => Math.round(x * 100) / 100;
+
+  function paramsComplets(params) {
+    const out = {};
+    params = (params && typeof params === 'object') ? params : {};
+    Object.keys(DEFAULT_PARAMS).forEach((k) => {
+      const d = DEFAULT_PARAMS[k];
+      const v = params[k];
+      if (d && typeof d === 'object') {
+        const fusion = Object.assign({}, d);
+        if (v && typeof v === 'object') {
+          Object.keys(v).forEach((kk) => { if (num(v[kk], null) !== null) fusion[kk] = v[kk]; });
+        }
+        out[k] = fusion;
+      } else {
+        out[k] = num(v, null) !== null ? v : d;
+      }
+    });
+    return out;
+  }
+
+  function cleEnergie(mode) {
+    const e = String(mode || '').trim().toLowerCase();
+    if (!e) return null;
+    if (e.startsWith('pac') || e.includes('pompe')) return 'pac';
+    if (e.includes('fioul') || e.includes('fuel')) return 'fioul';
+    if (e.includes('gaz') || e.includes('gpl') || e.includes('propane') || e.includes('butane')) return 'gaz';
+    if (e.includes('bois') || e.includes('granul') || e.includes('biomasse')) return 'bois';
+    if (e.includes('elec') || e.includes('élec')) return 'electricite';
+    return null;
+  }
+  const cleTarif = (energie) => (energie === 'pac' || energie === 'electricite') ? 'electricite' : energie;
+  function prix(p, energie) { return num(p.prix_kwh[cleTarif(energie)], 0) || 0; }
+  function inflation(p, energie) {
+    let v = num(p.inflation_annuelle_pct[cleTarif(energie)], null);
+    if (v === null) v = num(p.inflation_annuelle_pct.defaut, 4);
+    return v / 100;
+  }
+
+  function periodeConstruction(annee) {
+    const s = String(annee || '').trim().toLowerCase();
+    const annees = (s.match(/(1[5-9]\d\d|20\d\d)/g) || []).map(Number);
+    if (!annees.length) return 'inconnue';
+    let ref;
+    if (s.includes('avant')) ref = Math.min(...annees) - 1;
+    else if (s.includes('apr')) ref = Math.max(...annees) + 1;
+    else ref = Math.max(...annees);
+    if (ref < 1975) return 'avant_1975';
+    if (ref <= 2000) return '1975_2000';
+    return 'apres_2000';
+  }
+
+  function ecsParChaudiere(ecsFiche, energie) {
+    const v = String(ecsFiche || '').trim().toLowerCase();
+    if (!v) return true;
+    return v === 'chaudiere' || (energie != null && v === energie);
+  }
+
+  function scopModele(etas35, etas55, emetteur, service, params) {
+    const p = paramsComplets(params);
+    const etas = (emetteur === 'plancher_chauffant' && service === 'chauffage_seul') ? num(etas35, 0) : num(etas55, 0);
+    const scop = etas && etas > 0 ? (etas / 100) * 2.5 : 0;
+    return scop > 0 ? scop : (num(p.scop_defaut, 3.5) || 3.5);
+  }
+
+  function estimerFactureAnnuelle(surfaceChauffee, zone, annee, energie, ecsChaudiere, personnes, params) {
+    const p = paramsComplets(params);
+    energie = cleEnergie(energie);
+    const surface = num(surfaceChauffee, 0) || 0;
+    if (surface <= 0 || !energie) return null;
+    const z = String(zone || '').toLowerCase();
+    const zr = z.startsWith('h1') ? 'h1' : (z.startsWith('h3') ? 'h3' : 'h2');
+    const conso = num(p.conso_zone_kwh_m2_an[zr], 130) || 130;
+    const coef = num(p.coef_periode[periodeConstruction(annee)], 1.0) || 1.0;
+    const rend = (num(p.rendement_pct[energie], 100) || 100) / 100;
+    const px = prix(p, energie);
+    let facture = surface * conso * coef / rend * px;
+    if (ecsChaudiere) {
+      const n = num(personnes, null) || PERSONNES_DEFAUT;
+      facture += n * num(p.ecs_kwh_par_personne, 800) / rend * px;
+    }
+    return r2(facture);
+  }
+
+  function calculerEconomies(entree, params) {
+    const p = paramsComplets(params);
+    const A = num(entree.facture_annuelle, 0) || 0;
+    const energie = cleEnergie(entree.energie);
+    if (A <= 0) return { ok: false, raison: 'facture' };
+    if (!energie) return { ok: false, raison: 'energie' };
+    const n = num(entree.personnes, null) || PERSONNES_DEFAUT;
+    const ecsChaudiere = !!entree.ecs_chaudiere;
+    const service = String(entree.service || 'chauffage_seul');
+    const duo = service === 'chauffage_ecs' || service === 'chauffage+ecs';
+    const ballon = !!entree.ballon && !duo;
+    const scop = num(entree.scop, 0) || num(p.scop_defaut, 3.5) || 3.5;
+
+    const rend = (num(p.rendement_pct[energie], 100) || 100) / 100;
+    const px = prix(p, energie);
+    const prixElec = num(p.prix_kwh.electricite, 0.21) || 0.21;
+    const kwhEcs = n * (num(p.ecs_kwh_par_personne, 800) || 0);
+
+    const ecsAvant = ecsChaudiere ? Math.min(kwhEcs / rend * px, PLAFOND_PART_ECS * A) : 0;
+    const chauffageAvant = A - ecsAvant;
+    const besoin = px > 0 ? chauffageAvant / px * rend : 0;
+    const chauffageApres = besoin / scop * prixElec;
+    const copEcs = (duo || ballon) ? (duo ? num(p.cop_ecs_duo, 2.5) : num(p.cop_ecs_cet, 2.8)) : null;
+    const ecsTraitee = copEcs !== null && copEcs > 0;
+    const ecsActuelle = ecsTraitee ? (ecsChaudiere ? ecsAvant : kwhEcs / RENDEMENT_BALLON_ELECTRIQUE * prixElec) : 0;
+    const ecsApres = ecsTraitee ? kwhEcs / copEcs * prixElec : 0;
+
+    const avant = chauffageAvant + ecsActuelle;
+    const apres = chauffageApres + ecsApres;
+    const inflEnergie = inflation(p, energie);
+    const inflElec = inflation(p, 'electricite');
+    return {
+      ok: true,
+      energie,
+      facture_annuelle: r2(A),
+      ecs_avant: r2(ecsAvant),
+      chauffage_avant: r2(chauffageAvant),
+      besoin_kwh: Math.round(besoin * 10) / 10,
+      chauffage_apres: r2(chauffageApres),
+      ecs_traitee: ecsTraitee,
+      ecs_actuelle: r2(ecsActuelle),
+      ecs_apres: r2(ecsApres),
+      economie_chauffage: r2(chauffageAvant - chauffageApres),
+      economie_ecs: r2(ecsActuelle - ecsApres),
+      avant_annuel: r2(avant),
+      apres_annuel: r2(apres),
+      economie_annuelle: r2(avant - apres),
+      avant_mensuel: Math.round(avant / 12),
+      apres_mensuel: Math.round(apres / 12),
+      scop: r2(scop),
+      inflation_avant: inflEnergie,
+      inflation_ecs_avant: ecsChaudiere ? inflEnergie : inflElec,
+      inflation_apres: inflElec,
+      duree_ans: Math.round(num(p.duree_vie_pac_ans, 20) || 20),
+      alerte: apres > avant || apres < 0.2 * avant
+    };
+  }
+
+  // Projection sur la durée de vie : hausse appliquée séparément à chaque composante,
+  // mensualité de financement tant que le crédit court (comme roi() avant le Lot 2).
+  function projeter(res, opts) {
+    const credit = Number(opts && opts.creditAnnuel) || 0;
+    const dureeCreditAns = Number(opts && opts.dureeCreditAns) || 0;
+    const debourse = Number(opts && opts.debourseInitial) || 0;
+    let cumul = 0, anneeRentable = null;
+    for (let an = 1; an <= res.duree_ans; an++) {
+      const k = an - 1;
+      const avant = res.chauffage_avant * Math.pow(1 + res.inflation_avant, k)
+                  + res.ecs_actuelle * Math.pow(1 + res.inflation_ecs_avant, k);
+      const apres = res.apres_annuel * Math.pow(1 + res.inflation_apres, k);
+      cumul += avant - apres - (an <= dureeCreditAns ? credit : 0);
+      if (anneeRentable === null && cumul >= debourse) anneeRentable = an;
+    }
+    return { anneeRentable, total: cumul - debourse, cumul };
+  }
+
+  window.HexaEconomies = {
+    DEFAULT_PARAMS, SOURCES, paramsComplets, cleEnergie, periodeConstruction, ecsParChaudiere,
+    scopModele, estimerFactureAnnuelle, calculerEconomies, projeter
+  };
+})();
+/* HEXA-ECONOMIES:FIN */
+</script>
+<script>
+/* HEXA — Lot 2 : champ « Facture de l'énergie de la chaudière » (cout_energetique_mensuel_eur).
+   - Stockage inchangé en €/mois ; affichage €/an ou €/mois au choix.
+   - Source de la valeur (cout_energie_source, enregistrée dans le lead) :
+       reel (saisie à la main) · a_confirmer (lead antérieur au Lot 2) · audit · dpe · estime
+   - reel et a_confirmer ne sont JAMAIS remplacées par une écriture automatique : ni par
+     setCoutEnergieAuto, ni par un import qui écrit directement dans le champ (protection
+     au niveau du champ, sur les événements non émis par l'utilisateur).
+   - Sans valeur : estimation automatique (source estime) à partir du logement. */
+(function () {
+  'use strict';
+  const ID = 'cout-energie-input';
+  const RANG = { '': 0, estime: 1, dpe: 2, audit: 3 };
+  const PROTEGEES = ['reel', 'a_confirmer'];
+  const AUTO = ['estime', 'dpe', 'audit'];
+  const BADGES = {
+    reel: { txt: 'Réel', cls: 'cout-src--reel', titre: 'Montant saisi à la main' },
+    a_confirmer: { txt: 'À confirmer', cls: 'cout-src--confirmer', titre: 'Montant repris d\'un ancien dossier : cliquez pour le confirmer' },
+    dpe: { txt: 'Théorique DPE', cls: 'cout-src--theorique', titre: 'Coût théorique du DPE' },
+    audit: { txt: 'Théorique audit', cls: 'cout-src--theorique', titre: 'Coût théorique de l\'audit énergétique' },
+    estime: { txt: 'Estimé', cls: 'cout-src--estime', titre: 'Estimé selon la surface, la zone, l\'année et l\'énergie' }
+  };
+  let valeurProtegee = null;
+  let ecritureInterne = false;
+  let unite = 'an';
+  try { unite = localStorage.getItem('hexa_cout_unite') === 'mois' ? 'mois' : 'an'; } catch (_) {}
+
+  const champ = () => document.getElementById(ID);
+  const nombre = (v) => { const n = parseFloat(String(v == null ? '' : v).replace(/\s/g, '').replace(',', '.')); return Number.isFinite(n) ? n : null; };
+
+  function inputSource() {
+    let s = document.querySelector('[name="cout_energie_source"]');
+    if (!s) {
+      const form = document.getElementById('form-prospect');
+      if (!form) return null;
+      s = document.createElement('input');
+      s.type = 'hidden'; s.name = 'cout_energie_source'; s.id = 'cout-energie-source';
+      form.appendChild(s);
+    }
+    return s;
+  }
+  function source() { return (inputSource() && inputSource().value) || ''; }
+  window.hexaCoutSource = source;
+
+  function ecrireSource(s) {
+    const i = inputSource(); if (!i) return;
+    i.value = s;
+    valeurProtegee = PROTEGEES.includes(s) ? (champ() ? champ().value : null) : null;
+    majBadge();
+  }
+
+  function synchroniserAnnuelCache() {
+    const a = document.getElementById('cout-annuel-input');
+    const m = nombre(champ() && champ().value);
+    if (a) a.value = m ? String(Math.round(m * 12)) : '';
+  }
+
+  // ---- affichage €/an ↔ €/mois ----
+  function proxyAnnuel() { return document.getElementById('cout-energie-annuel'); }
+  function syncAffichage() {
+    const el = champ(), px = proxyAnnuel();
+    if (!el || !px) return;
+    el.style.display = unite === 'an' ? 'none' : '';
+    px.style.display = unite === 'an' ? '' : 'none';
+    if (document.activeElement !== px) {
+      const m = nombre(el.value);
+      px.value = m ? String(Math.round(m * 12)) : '';
+    }
+    document.querySelectorAll('.cout-unite-btn').forEach(b => b.classList.toggle('active', b.dataset.unite === unite));
+  }
+
+  function majBadge() {
+    const b = document.getElementById('badge-cout-source');
+    if (!b) return;
+    const s = source();
+    const def = BADGES[s];
+    b.className = 'cout-src-badge ' + (def ? def.cls : '');
+    b.textContent = def ? def.txt : '';
+    b.title = def ? def.titre : '';
+    b.style.display = def ? '' : 'none';
+  }
+
+  // Écriture automatique publique (DPE, audit, estimation). N'écrit jamais sur reel / a_confirmer,
+  // ni une source moins fiable sur une plus fiable (estime < dpe < audit).
+  window.setCoutEnergieAuto = function (montantMensuel, src) {
+    const el = champ();
+    if (!el || !AUTO.includes(src)) return false;
+    const cur = source();
+    if (PROTEGEES.includes(cur)) return false;
+    if ((RANG[src] || 0) < (RANG[cur] || 0)) return false;
+    const m = Math.round(Number(montantMensuel));
+    if (!(m > 0)) return false;
+    ecrireSource(src);
+    ecritureInterne = true;
+    try {
+      el.value = String(m);
+      synchroniserAnnuelCache();
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+    } finally { ecritureInterne = false; }
+    syncAffichage();
+    return true;
+  };
+
+  // Protection au niveau du champ : toute écriture automatique (événement non émis par
+  // l'utilisateur) qui n'est pas passée par setCoutEnergieAuto. Phase de capture : la valeur
+  // est rétablie avant que les autres écouteurs (simulateur, requis…) ne la lisent.
+  document.addEventListener('input', function (e) {
+    const el = champ();
+    if (e.target !== el || e.isTrusted || ecritureInterne) return;
+    if (PROTEGEES.includes(source())) {
+      if (valeurProtegee != null && el.value !== valeurProtegee) {
+        el.value = valeurProtegee;
+        synchroniserAnnuelCache();
+      }
+    } else if (nombre(el.value)) {
+      // Import DPE / audit qui écrit directement (setChamp) : valeur théorique
+      ecrireSource('dpe');
+    }
+    syncAffichage();
+  }, true);
+
+  function saisieUtilisateur(valeurMensuelle) {
+    const el = champ();
+    if (!el) return;
+    const vide = !String(valeurMensuelle).trim();
+    ecritureInterne = true;
+    try {
+      el.value = vide ? '' : String(valeurMensuelle);
+      ecrireSource(vide ? '' : 'reel');
+      synchroniserAnnuelCache();
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+    } finally { ecritureInterne = false; }
+    syncAffichage();
+    if (vide) planifierEstimation();
+  }
+
+  // ---- estimation automatique (source estime) ----
+  let paramsP = null, zonesP = null, minuterie = null;
+  function charger() {
+    if (!paramsP) paramsP = fetch('/api/admin/m3', { cache: 'no-store' }).then(r => r.ok ? r.json() : {}).then(d => (d && d.params_eco_energie) || {}).catch(() => ({}));
+    if (!zonesP) zonesP = fetch('/api/zones-departements', { cache: 'no-store' }).then(r => r.ok ? r.json() : {}).catch(() => ({}));
+    return Promise.all([paramsP, zonesP]);
+  }
+  window.hexaEstimationCoutRecharger = function () { paramsP = null; };
+  function valeurChamp(sel) { const e = document.querySelector(sel); return e ? e.value : ''; }
+  async function lancerEstimation() {
+    const el = champ(), E = window.HexaEconomies;
+    if (!el || !E) return;
+    const cur = source();
+    if (cur && cur !== 'estime') return;          // seule une valeur vide ou estimée se recalcule
+    if (!cur && nombre(el.value)) return;          // valeur sans source : traitée au chargement
+    const [params, zones] = await charger();
+    const surface = nombre(valeurChamp('#surface-input') || valeurChamp('[name="surface_logement_m2"]'));
+    const cp = String(valeurChamp('#cp-chantier') || valeurChamp('[name="code_postal_chantier"]')).replace(/\D/g, '').slice(0, 5);
+    const dept = cp.startsWith('97') ? cp.slice(0, 3) : cp.slice(0, 2);
+    const zone = (zones && zones[dept]) || '';
+    const mode = valeurChamp('select[name="mode_chauffage"]');
+    const energie = E.cleEnergie(mode);
+    const ecs = valeurChamp('select[name="ecs"]') || valeurChamp('select[name="gestion_ecs"]');
+    const annuel = E.estimerFactureAnnuelle(surface ? surface * 0.9 : 0, zone, valeurChamp('[name="annee_construction"]'),
+      mode, E.ecsParChaudiere(ecs, energie), valeurChamp('[name="nombre_personnes"]'), params);
+    if (annuel && annuel > 0) window.setCoutEnergieAuto(annuel / 12, 'estime');
+  }
+  function planifierEstimation() {
+    clearTimeout(minuterie);
+    minuterie = setTimeout(() => { lancerEstimation().catch(() => {}); }, 250);
+  }
+  window.hexaEstimerCout = lancerEstimation;
+  const DECLENCHEURS = ['#surface-input', '[name="surface_logement_m2"]', '#cp-chantier', '[name="code_postal_chantier"]',
+    '[name="annee_construction"]', 'select[name="mode_chauffage"]', 'select[name="ecs"]', '[name="nombre_personnes"]'];
+  ['input', 'change'].forEach(t => document.addEventListener(t, function (e) {
+    if (e.target && e.target.matches && DECLENCHEURS.some(s => e.target.matches(s))) planifierEstimation();
+  }));
+
+  // Après chargement d'un lead (ou nouvelle fiche) : lead antérieur au Lot 2 -> a_confirmer.
+  window.hexaCoutApresChargement = function () {
+    const el = champ();
+    if (!el) return;
+    const s = source();
+    if (!s && nombre(el.value)) ecrireSource('a_confirmer');
+    else ecrireSource(s);
+    syncAffichage();
+    if (!nombre(el.value)) planifierEstimation();
+  };
+
+  // ---- construction de l'interface autour du champ ----
+  function installer() {
+    const el = champ();
+    if (!el || document.getElementById('badge-cout-source')) return !!el;
+    inputSource();
+    const field = el.closest('.field');
+    const label = field && field.querySelector('label');
+    // Le libellé est long : on le laisse passer à la ligne, et l'unité + la source vont sur
+    // une ligne à part sous la saisie (sinon elles sortent du champ, libellé tronqué).
+    const texte = label && label.querySelector('.label-row > span:first-child');
+    if (texte) { texte.style.flexShrink = '1'; texte.style.minWidth = '0'; texte.style.whiteSpace = 'normal'; }
+    const hint = label && label.querySelector('.hint');
+    if (hint) hint.textContent = '';                  // « (€/mois) » : l'unité est désormais au choix
+    const meta = document.createElement('div');
+    meta.className = 'cout-meta';
+    meta.innerHTML = '<span class="cout-unite" role="group" aria-label="Unité">' +
+      '<button type="button" class="cout-unite-btn" data-unite="an">€/an</button>' +
+      '<button type="button" class="cout-unite-btn" data-unite="mois">€/mois</button></span>' +
+      '<span id="badge-cout-source" class="cout-src-badge" style="display:none"></span>';
+    meta.querySelector('#badge-cout-source').addEventListener('click', () => { if (source() === 'a_confirmer') ecrireSource('reel'); });
+    const px = document.createElement('input');
+    px.type = 'text'; px.id = 'cout-energie-annuel'; px.setAttribute('inputmode', 'numeric');
+    px.placeholder = 'ex: 4 800'; px.autocomplete = 'off';
+    px.setAttribute('aria-label', 'Facture annuelle (€/an)');
+    el.insertAdjacentElement('afterend', px);
+    px.insertAdjacentElement('afterend', meta);
+    px.addEventListener('input', (e) => {
+      if (!e.isTrusted) return;
+      const an = nombre(px.value);
+      saisieUtilisateur(an ? String(Math.round(an / 12)) : '');
+    });
+    el.addEventListener('input', (e) => {
+      if (!e.isTrusted) return;
+      saisieUtilisateur(el.value);
+    });
+    field && field.addEventListener('click', (e) => {
+      const btn = e.target.closest && e.target.closest('.cout-unite-btn');
+      if (!btn) return;
+      e.preventDefault();
+      unite = btn.dataset.unite === 'mois' ? 'mois' : 'an';
+      try { localStorage.setItem('hexa_cout_unite', unite); } catch (_) {}
+      syncAffichage();
+    });
+    window.hexaCoutApresChargement();
+    return true;
+  }
+  function demarrer() { if (!installer()) setTimeout(demarrer, 300); }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => setTimeout(demarrer, 0));
+  else setTimeout(demarrer, 0);
+})();
+</script>
+<style id="hexa-lot2-cout">
+  .cout-meta { display: flex; align-items: center; gap: 6px; margin-top: 5px; flex-wrap: wrap; }
+  .cout-unite { display: inline-flex; border: 1px solid #CBD5E1; border-radius: 6px; overflow: hidden; vertical-align: middle; }
+  .cout-unite-btn { border: 0; background: #fff; color: #475569; font-size: 11px; font-weight: 600; padding: 1px 7px; cursor: pointer; font-family: inherit; }
+  .cout-unite-btn.active { background: #002E5A; color: #fff; }
+  .cout-src-badge { display: inline-block; padding: 1px 7px; border-radius: 10px; font-size: 11px; font-weight: 700; border: 1px solid transparent; }
+  .cout-src--reel { background: #E8F5EC; color: #0D6B3B; border-color: #A8D5A8; }
+  .cout-src--theorique { background: #EFF6FF; color: #1D4ED8; border-color: #BFDBFE; }
+  .cout-src--estime { background: #FEF3C7; color: #B45309; border-color: #F59E0B; }
+  .cout-src--confirmer { background: #F1F5F9; color: #475569; border-color: #CBD5E1; cursor: pointer; }
+</style>
 </body>
 </html>
