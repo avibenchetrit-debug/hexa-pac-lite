@@ -3537,13 +3537,13 @@
 <div class="recap-rac{% if facture_acquittee %} is-acquittee{% endif %}"><span class="recap-rac-label">Montant total à régler</span><span class="recap-rac-amount">{% if facture_acquittee %}0,00 €{% else %}{{ reste_a_charge }}{% endif %}</span></div>
 {% if mode != 'facture' %}
 {% if avance_mpr %}
-<div class="recap-line recap-avance-mpr"><span class="label">Avance de la prime MaPrimeRénov' <span style="font-weight:400;color:var(--gris-mute);">(rendue à l'accord de l'Anah)</span></span><span class="amount">{{ avance_mpr }}</span></div>
+<div class="recap-line recap-avance-mpr"><span class="label">Avance de la prime MaPrimeRénov' : <strong>{{ montant_mpr_affiche }} €</strong> <span style="font-weight:400;color:var(--gris-mute);">(remboursée au versement de la prime, après les travaux)</span></span></div>
 {% endif %}
 {% if montant_mpr_affiche and montant_mpr_affiche != '0' %}
 {% if afficher_mention_mpr %}
 <div style="background:#F4F5F7;border-radius:0 0 6px 6px;padding:8px 24px 9px;font-size:8px;line-height:1.5;color:#4A5567;">
 {% if mode_mpr == 'sans_attente' %}
-<strong style="color:#002E5A;font-size:8.5px;">Option retenue : démarrage sans attente</strong> — Ce montant intègre MaPrimeRénov' (<strong>{{ montant_mpr_affiche }} €</strong>), que vous avancez au démarrage du chantier : elle vous est rendue à l'accord de l'Anah. Cette option, retenue à votre demande, permet un démarrage immédiat du chantier.
+<strong style="color:#002E5A;font-size:8.5px;">Démarrage sans attente</strong> : vous avancez la prime MaPrimeRénov' (<strong>{{ montant_mpr_affiche }} €</strong>) au démarrage du chantier. Elle vous est remboursée au versement de la prime par l'Anah, après les travaux. Le reste à charge ci-dessus tient déjà compte de cette prime.
 {% else %}
 <strong style="color:#002E5A;font-size:8.5px;">Option retenue : démarrage après notification</strong> — Ce montant intègre MaPrimeRénov' (<strong>{{ montant_mpr_affiche }} €</strong>), avancée par Hexa-Rénov'. Les travaux débuteront après réception de la notification d'octroi de l'Anah (délai moyen : 5 mois).
 {% endif %}
@@ -3632,7 +3632,7 @@
   <tr>
     <td style="text-align:left;vertical-align:top;width:30%;">
       <div style="font-size:10px;font-weight:700;color:#E2214B;">Aujourd'hui</div>
-      <div style="font-size:9px;color:#8A92A0;">{% if avance_mpr_poche %}vous avancez la prime ({{ avance_mpr }}), rendue à l'accord{% elif projet_apercu.mode == 'comptant' %}paiement comptant{% else %}vous démarrez sans avance{% endif %}</div>
+      <div style="font-size:9px;color:#8A92A0;">{% if avance_mpr_poche %}vous avancez la prime ({{ montant_mpr_affiche }} €), remboursée après les travaux{% elif projet_apercu.mode == 'comptant' %}paiement comptant{% else %}vous démarrez sans avance{% endif %}</div>
     </td>
     <td style="text-align:center;vertical-align:top;width:40%;">
       <div style="font-size:10px;font-weight:700;color:#002E5A;">{{ projet_apercu.annee_rentable }}{{ 'ʳᵉ' if projet_apercu.annee_rentable == 1 else 'ᵉ' }} année · remboursé</div>
@@ -3675,7 +3675,7 @@
 <table style="width:100%;border-collapse:collapse;margin-top:6px;border-top:1px solid #E1E5EB;">
   <tr>
     <td style="padding:6px 0 0;font-size:10px;text-transform:uppercase;letter-spacing:0.08em;color:#8A92A0;">Financement</td>
-    <td style="padding:6px 0 0;text-align:right;font-size:12px;font-weight:700;color:#002E5A;">{% if projet_apercu.mode == 'comptant' %}Paiement comptant{% else %}<span class="devis-montant-finance">Montant financé {{ montant_finance }}</span> · {{ projet_apercu.taux_pct }} % · {{ projet_apercu.duree_mois }} mois · 1ʳᵉ échéance à {{ projet_apercu.premiere_echeance_jours }} j{% endif %}</td>
+    <td style="padding:6px 0 0;text-align:right;font-size:12px;font-weight:700;color:#002E5A;">{% if projet_apercu.mode == 'comptant' %}Paiement comptant{% else %}{% if projet_apercu.libelle_financement %}<span class="devis-financement-libelle">{{ projet_apercu.libelle_financement }}</span> · {% endif %}<span class="devis-montant-finance">Montant financé {{ montant_finance }}</span> · {{ projet_apercu.taux_pct }} % · {{ projet_apercu.duree_mois }} mois{% if projet_apercu.premiere_echeance_jours %} · 1ʳᵉ échéance à {{ projet_apercu.premiere_echeance_jours }} j{% endif %}{% endif %}</td>
   </tr>
 </table>
 

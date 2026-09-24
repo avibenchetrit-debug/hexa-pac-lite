@@ -23,6 +23,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Redirect
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from services.economies import (
+    _arrondi,
     calculer_economies,
     cle_energie,
     ecs_par_chaudiere,
@@ -3956,7 +3957,8 @@ def _build_devis_context(request: Request, numero: str, version: int | None = No
     context["avance_mpr_poche"] = _sans_attente and _fin_mpr != "credit"   # avancée de sa poche (non financée)
     context["montant_finance"] = money(_base_credit)
     context["afficher_mention_mpr"] = state.get("afficher_mention_mpr") is not False
-    context["financement_devis"] = calculer_financement_devis(_base_credit, admin)
+    # financement choisi dans le simulateur (opt1 Crédit Travaux par défaut, comme le simulateur)
+    context["financement_devis"] = calculer_financement_devis(_base_credit, admin, str(state.get("option") or "opt1").strip())
     # Mêmes clés qu'avant le Lot 2 (compatibilité) ; l'économie ECS fixe du ballon n'existe plus.
     context["economie_devis"] = {
         "facture_apres_mois": _eco_res.get("apres_mensuel") if _eco_res.get("ok") else None,
@@ -3970,9 +3972,11 @@ def _build_devis_context(request: Request, numero: str, version: int | None = No
         _fav = float_value(_eco.get("facture_avant_mois"))
         _fap = max(0.0, float_value(_eco.get("facture_apres_mois")))
         _mens = float_value(_fin.get("mensualite"))
-        _total_credit = round(_fap + _mens)
-        _eco_pendant = round(_fav - _total_credit)
-        _eco_apres = round(_fav - _fap)
+        # arrondi demi vers le haut (= Math.round / Intl du simulateur) : round() de Python arrondit
+        # au pair (186,5 -> 186 au lieu de 187) et le devis s'écartait d'un euro du simulateur
+        _total_credit = _arrondi(_fap + _mens)
+        _eco_pendant = _arrondi(_fav - (_fap + _mens))
+        _eco_apres = _arrondi(_fav - _fap)
         # Éco sur la durée et année de rentabilité : recalculées ici pour TOUS les devis (même
         # projection que le simulateur : financement net de l'option choisie, hausse par
         # composante), à partir du lead et du dernier état simulateur sauvegardé. Plus jamais de
@@ -3994,12 +3998,14 @@ def _build_devis_context(request: Request, numero: str, version: int | None = No
                 "facture_avant": round(_fav),
                 "facture_apres": round(_fap),
                 "total_credit": _total_credit,
-                "mensualite_credit": round(_mens),
+                "mensualite_credit": _arrondi(_mens),
                 "eco_pendant": _eco_pendant,
                 "eco_apres": _eco_apres,
-                "taux_pct": _fin.get("taux_pct"),
+                # « 4,9 », « 0 » (comme le simulateur), jamais « 0.0 »
+                "taux_pct": f"{float_value(_fin.get('taux_pct')):g}".replace(".", ","),
                 "duree_mois": _fin.get("duree_mois"),
                 "premiere_echeance_jours": _fin.get("premiere_echeance_jours"),
+                "libelle_financement": _fin.get("libelle"),
                 "eco_20_ans": _eco20,
                 "eco_20_ans_fmt": _eco20_fmt,
                 "annee_rentable": _proj["annee_rentable"],

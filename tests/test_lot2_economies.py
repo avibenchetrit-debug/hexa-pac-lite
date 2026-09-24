@@ -356,7 +356,7 @@ def test_devis_jamais_de_surcout_pendant_le_credit(client, monkeypatch):
     _preparer(dict(LEAD, cout_energetique_mensuel_eur="400", cout_energie_source="reel"),
               {"service": "chauffage_seul", "option": "opt1"})
     reel = main.calculer_financement_devis
-    monkeypatch.setattr(main, "calculer_financement_devis", lambda b, a: dict(reel(b, a), mensualite=400))
+    monkeypatch.setattr(main, "calculer_financement_devis", lambda b, a, *o: dict(reel(b, a, *o), mensualite=400))
     pa = main._build_devis_context(None, "PR-00077")["projet_apercu"]
     assert pa["eco_pendant"] < 0
     html = client.get("/api/devis/PR-00077/preview").text
