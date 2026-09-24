@@ -15,6 +15,7 @@ TYPE_EMETTEURS_LABELS = {
     "radiateurs_basse_temp": "Radiateurs basse température",
     "radiateurs_classiques": "Radiateurs classiques (acier récent)",
     "radiateurs_fonte": "Radiateurs fonte (anciens)",
+    "convecteurs_electriques": "Convecteurs électriques",
 }
 
 TEMP_BASE_ZONE = {"H1": -7, "H2": -4, "H3": 0}
@@ -572,23 +573,36 @@ def _pmt(taux_annuel, n_mois, capital):
     return capital * i / (1 - (1 + i) ** (-n_mois))
 
 
-def calculer_financement_devis(reste_a_charge, admin_params):
-    """Financement Option 1 (Crédit Travaux) — réplique JS, taux/durée conditionnels au seuil."""
+def calculer_financement_devis(reste_a_charge, admin_params, option="opt1"):
+    """Financement choisi dans le simulateur — réplique JS (mensO1 / mensO2) :
+    opt1 Crédit Travaux (taux/durée selon le seuil), opt2 Éco-PTZ (barème eco_ptz)."""
     fin = (admin_params or {}).get("params_financement") or {}
+    libelles = fin.get("libelles") or {}
     rac = float_value(reste_a_charge)
-    seuil = float_value(fin.get("seuil_rac_eur"), 6000)
-    credit = fin.get("credit_travaux") or {}
-    sous = rac < seuil
-    bareme = (credit.get("sous_seuil") if sous else credit.get("sur_seuil")) or {}
-    taux_pct = float_value(bareme.get("taux_pct"), 5.90 if sous else 4.90)
-    duree_mois = int(float_value(bareme.get("duree_mois"), 156 if sous else 180))
+    if option == "opt2":
+        bareme = fin.get("eco_ptz") or {}
+        taux_pct = float_value(bareme.get("taux_pct"), 0)
+        duree_mois = int(float_value(bareme.get("duree_mois"), 180))
+        libelle = libelles.get("option2") or "Éco-PTZ"
+    else:
+        option = "opt1"
+        seuil = float_value(fin.get("seuil_rac_eur"), 6000)
+        credit = fin.get("credit_travaux") or {}
+        sous = rac < seuil
+        bareme = (credit.get("sous_seuil") if sous else credit.get("sur_seuil")) or {}
+        taux_pct = float_value(bareme.get("taux_pct"), 5.90 if sous else 4.90)
+        duree_mois = int(float_value(bareme.get("duree_mois"), 156 if sous else 180))
+        libelle = libelles.get("option1") or "Crédit Travaux"
     mensualite = _pmt(taux_pct / 100, duree_mois, rac)
     return {
+        "option": option,
+        "libelle": libelle,
         "mensualite": round(mensualite, 2),
         "taux_pct": taux_pct,
         "duree_mois": duree_mois,
         "reste_a_charge": round(rac, 2),
-        "premiere_echeance_jours": int(float_value(fin.get("premiere_echeance_jours"), 180)),
+        # comme le simulateur : l'échéance différée n'est annoncée que pour le Crédit Travaux
+        "premiere_echeance_jours": int(float_value(fin.get("premiere_echeance_jours"), 180)) if option == "opt1" else None,
     }
 
 
