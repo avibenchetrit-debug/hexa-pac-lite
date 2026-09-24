@@ -27,7 +27,12 @@ from services.economies import (
     cle_energie,
     ecs_par_chaudiere,
     estimer_facture_annuelle,
+    facture_electricite_totale,
+    financement_net,
     mention_devis,
+    phrase_aujourdhui,
+    phrase_baisse,
+    projeter,
     scop_modele,
     source_effective,
 )
@@ -202,6 +207,7 @@ DEFAULT_PARAMS_ECO_ENERGIE = {
     "cop_ecs_duo": 2.5,
     "cop_ecs_cet": 2.8,
     "coef_periode": {"avant_1975": 1.3, "1975_2000": 1.0, "apres_2000": 0.7, "inconnue": 1.0},
+    "usages_specifiques_kwh_an": 2500,
 }
 
 DEFAULT_PARAMS_FINANCEMENT = {
@@ -3809,6 +3815,20 @@ def _surface_chauffee_doc(prospect: dict, state: dict) -> str:
     return f"{round(surface)} m²" if surface > 0 else "—"
 
 
+def _zone_depuis_cp(prospect: dict) -> str:
+    """Zone H1/H2/H3 du département du CP chantier (table officielle DEPT_ZONE ; Corse 2A/2B)."""
+    cp = re.sub(r"\D", "", str(devis_value(prospect, "cp_chantier", "code_postal_chantier", "cp", default="")))[:5]
+    if len(cp) < 2:
+        return ""
+    if cp.startswith("97"):
+        dept = cp[:3]
+    elif cp.startswith("20"):
+        dept = "2A" if int(cp[:3] or 0) < 202 else "2B"
+    else:
+        dept = cp[:2]
+    return DEPT_ZONE.get(dept, "")
+
+
 def _economies_devis(prospect: dict, state: dict, modele_obj, admin: dict, zone_contexte) -> tuple[dict, str]:
     """Lot 2 : calcul des économies pour le devis (services/economies.py).
     Coût de la fiche (€/mois, sinon €/an ÷ 12) et sa source ; sans coût -> estimation (« estime »)."""
@@ -3824,7 +3844,8 @@ def _economies_devis(prospect: dict, state: dict, modele_obj, admin: dict, zone_
     if annuel <= 0:
         surface = float_value(devis_value(state, "surface_chauffee", default="")) or (
             float_value(devis_value(prospect, "surface_habitable", "surface_logement_m2", default="")) * 0.9)
-        annuel = estimer_facture_annuelle(surface, devis_value(state, "zone", default=zone_contexte),
+        # zone de l'état simulateur, sinon celle du département du CP (jamais H2 par défaut)
+        annuel = estimer_facture_annuelle(surface, devis_value(state, "zone", default="") or _zone_depuis_cp(prospect) or zone_contexte,
                                           devis_value(prospect, "annee_construction", default=""),
                                           energie, ecs_chaudiere, personnes, params) or 0
         source = "estime"
@@ -3839,6 +3860,7 @@ def _economies_devis(prospect: dict, state: dict, modele_obj, admin: dict, zone_
         "service": service,
         "ballon": resoudre_ballon(state, admin) is not None,
         "scop": scop,
+        "facture_electricite_totale": facture_electricite_totale(energie, source),
     }, params)
     return res, source
 
@@ -3945,14 +3967,21 @@ def _build_devis_context(request: Request, numero: str, version: int | None = No
         _total_credit = round(_fap + _mens)
         _eco_pendant = round(_fav - _total_credit)
         _eco_apres = round(_fav - _fap)
-        if _fav > 0 and _eco_apres > 0:
-            # Éco sur la durée : seulement si le simulateur l'a calculée avec le Lot 2 ; une valeur
-            # antérieure (facture après théorique, ECS fixe) n'est plus montrée -> « — ».
-            _eco_v2 = str(state.get("eco_calc_version") or "") == "2"
-            _eco20_raw = state.get("eco_20_ans") if _eco_v2 else None
-            _eco20_fmt = (f"{round(float_value(_eco20_raw)):,}".replace(",", " ")
-                          if str(_eco20_raw).strip() not in ("", "None") else None)
-            _opt = str(state.get("option") or "").strip()
+        # Éco sur la durée et année de rentabilité : recalculées ici pour TOUS les devis (même
+        # projection que le simulateur : financement net de l'option choisie, hausse par
+        # composante), à partir du lead et du dernier état simulateur sauvegardé. Plus jamais de
+        # « — » : si le calcul est impossible ou non rentable sur la durée de vie, le bloc est masqué.
+        _opt = str(state.get("option") or "").strip()
+        _mens_net, _duree_net = financement_net(_reste_net, _opt or "opt1",
+                                                admin.get("params_financement") or DEFAULT_PARAMS_FINANCEMENT)
+        _credit_annuel, _duree_credit_ans = _mens_net * 12, _duree_net / 12
+        _est_credit = _credit_annuel > 0 and _duree_credit_ans > 0
+        _proj = projeter(_eco_res, _credit_annuel, _duree_credit_ans, 0 if _est_credit else _reste_net)
+        if _fav > 0 and _eco_apres > 0 and _proj["annee_rentable"] is not None:
+            _eco20 = round(_proj["total"])
+            _eco20_fmt = f"{_eco20:,}".replace(",", " ")
+            _phrase_auj = phrase_aujourdhui(_eco_res, _fav)
+            _phrase_baisse = phrase_baisse(_fav, _fap)
             _mode = {"opt1": "credit", "opt2": "ecoptz", "opt3": "comptant"}.get(_opt) or ("comptant" if round(_mens) <= 0 else "credit")
             _duree_vie = int(float_value((admin.get("params_eco_energie") or {}).get("duree_vie_pac_ans", 20)) or 20)
             projet_apercu = {
@@ -3965,16 +3994,17 @@ def _build_devis_context(request: Request, numero: str, version: int | None = No
                 "taux_pct": _fin.get("taux_pct"),
                 "duree_mois": _fin.get("duree_mois"),
                 "premiere_echeance_jours": _fin.get("premiere_echeance_jours"),
-                # Éco 20 ans calculée par le simulateur, transmise telle quelle (pas de recalcul)
-                "eco_20_ans": state.get("eco_20_ans"),
+                "eco_20_ans": _eco20,
                 "eco_20_ans_fmt": _eco20_fmt,
-                "annee_rentable": state.get("annee_rentable") if _eco_v2 else None,
+                "annee_rentable": _proj["annee_rentable"],
                 "inflation_avant_pct": round(_eco_res["inflation_avant"] * 100, 1),
                 "inflation_elec_pct": state.get("inflation_elec_pct"),
                 "energie_avant": state.get("energie_avant"),
                 "mode": _mode,
                 "duree_vie_pac_ans": _duree_vie,
                 "mention_economies": mention_devis(_eco_source, _eco_res),
+                "phrase_aujourdhui": _phrase_auj,
+                "phrase_baisse": _phrase_baisse,
                 "alerte_economies": bool(_eco_res.get("alerte")),
             }
     # Interrupteur par lead : décocher masque le bloc éco/ROI (devis + pré-devis + e-mail).

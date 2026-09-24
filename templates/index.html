@@ -14641,6 +14641,8 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
       mode_mpr: state.mode_mpr || 'attente',
       financement_mpr: state.financement_mpr || 'cash',
       afficher_apercu: state.afficher_apercu !== false,
+      apercu_choix_manuel: !!state.apercu_choix_manuel,
+      apercu_decoche_auto: !!state.apercu_decoche_auto,
       afficher_mention_mpr: state.afficher_mention_mpr !== false,
       ballon_ref: state.ballon_ref || '',
       ballon_emplacement: state.ballon_emplacement || '',
@@ -14705,6 +14707,8 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
       state.financement_mpr = saved.financement_mpr || 'cash';
       if (saved.niveau_actif) state.niveau_actif = saved.niveau_actif;
       state.afficher_apercu = (saved.afficher_apercu !== false);
+      state.apercu_choix_manuel = !!saved.apercu_choix_manuel;
+      state.apercu_decoche_auto = !!saved.apercu_decoche_auto;
       state.afficher_mention_mpr = (saved.afficher_mention_mpr !== false);
       if (saved.ballon_ref) state.ballon_ref = saved.ballon_ref;
       // Ancien état « chauffage + ECS » avec un ballon : on ne le réaffiche pas.
@@ -14944,7 +14948,8 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
       personnes: state.nombre_personnes,
       service: state.service,
       ballon: ballonSim(state).actif,
-      scop
+      scop,
+      facture_electricite_totale: E.factureElectriciteTotale(state.energie_avant, state.cout_source)
     }, params);
     return res.ok ? res : null;
   }
@@ -15052,6 +15057,15 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     state.eco = eco;
     state.facture_avant = eco ? eco.avant_mensuel : 0;
     state.facture_apres = eco ? eco.apres_mensuel : 0;
+    // Économie nulle ou négative : on n'affiche pas le bloc économies sur le devis. Seulement si
+    // l'utilisateur n'a pas réglé la case lui-même ; on ne recoche que ce qu'on a décoché.
+    if (eco && !state.apercu_choix_manuel) {
+      if (eco.economie_annuelle <= 0 && state.afficher_apercu !== false) {
+        state.afficher_apercu = false; state.apercu_decoche_auto = true; scheduleSaveSimulatorState();
+      } else if (eco.economie_annuelle > 0 && state.apercu_decoche_auto) {
+        state.afficher_apercu = true; state.apercu_decoche_auto = false; scheduleSaveSimulatorState();
+      }
+    }
     const contextePret = !!state.categorie && !!state.zone && Number.isFinite(dim.surface_chauffee) && dim.surface_chauffee > 0;
     const sKey = trancheSurface(state.surface_chauffee);
     const node = GRILLE['etas_140_plus']?.[sKey]; // ETAS supprime (valeur figee, ecrasee ensuite par forfaits_mpr)
@@ -15185,6 +15199,17 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     return `Base : ${lib} · hausse énergie ${pct} %/an · SCOP ${scop} · durée ${r.dureeVie} ans`;
   }
 
+  // « Aujourd'hui » : montant déclaré d'abord ; si une part (eau chaude, usages domestiques)
+  // est retirée du calcul, on précise la part chauffage — jamais uniquement celle-ci.
+  function aujourdhuiTxt(energieLbl){
+    const eco = state.eco;
+    const declare = eco ? Math.round(eco.facture_annuelle / 12) : state.facture_avant;
+    if (eco && state.facture_avant < declare) {
+      return `${eur(declare)}/mois de ${energieLbl}, dont ${eur(state.facture_avant)} pour le chauffage`;
+    }
+    return `${eur(state.facture_avant)}/mois de ${energieLbl}`;
+  }
+
   // Phrase commerciale simple, prête à dire au téléphone, chiffres ajustés à l'option
   function phraseCommerciale(c, r, energieLbl, totalApres, delta){
     const av = eur(state.facture_avant);
@@ -15195,7 +15220,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     }
     if (r.estCredit && delta >= 0){
       return `<ul>
-<li>Aujourd'hui : ${av}/mois de ${energieLbl} — de l'argent perdu.</li>
+<li>Aujourd'hui : ${aujourdhuiTxt(energieLbl)} — de l'argent perdu.</li>
 <li>Demain : ${ap}/mois (${eur(state.facture_apres)} d'électricité + ${eur(c.mensOpt)} qui remboursent votre installation).</li>
 <li>Vous payez déjà <b>${eur(delta)} de moins</b> chaque mois, sans rien avancer.</li>
 <li>Crédit terminé : votre facture tombe à <b>${eur(state.facture_apres)}/mois</b>.</li>
@@ -15222,7 +15247,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     if (r.estCredit){
       return `<b>« Mais le crédit, je le paie quand même ? »</b> Oui — mais avec l'argent que vous donniez déjà à votre ${energieLbl} :
 <ul>
-<li><b>Avant</b> : ${eur(state.facture_avant)}/mois partaient chez votre fournisseur, sans rien vous rapporter.</li>
+<li><b>Avant</b> : ${aujourdhuiTxt(energieLbl)} partaient chez votre fournisseur, sans rien vous rapporter.</li>
 <li><b>Maintenant</b> : ${eur(c.mensOpt)}/mois remboursent votre propre installation.</li>
 <li>Vous ne payez pas la pompe à chaleur en plus de votre chauffage — vous la payez à la place, et pour moins cher.</li>
 <li>Le prix du ${energieLbl} augmente d'environ ${Math.round(r.infAvant*100)}%/an. Votre crédit, lui, ne bouge pas.</li>
@@ -15529,7 +15554,7 @@ ${renderBallonBloc(state, bs)}
         <!-- AVANT / APRÈS PAC (live) -->
         <div class="sim-section-label">Avant / Après PAC</div>
         <div class="sim-aa">
-          <div class="sa-line"><span>Avant — ${energieLbl}${state.eco ? (state.eco.ecs_traitee ? ' <i>(chauffage + eau chaude)</i>' : (state.eco.ecs_avant > 0 ? ' <i>(chauffage, hors eau chaude)</i>' : '')) : ''}</span><b class="muted" id="sim-facture-avant">${state.eco ? eur(state.facture_avant) + '/mois' : '—'}</b></div>
+          <div class="sa-line"><span>Avant — ${energieLbl}${state.eco ? (state.eco.ecs_traitee ? ' <i>(chauffage + eau chaude)</i>' : (state.facture_avant < Math.round(state.eco.facture_annuelle / 12) ? ` <i>(${eur(Math.round(state.eco.facture_annuelle / 12))} déclarés, dont chauffage)</i>` : '')) : ''}</span><b class="muted" id="sim-facture-avant">${state.eco ? eur(state.facture_avant) + '/mois' : '—'}</b></div>
           <div class="sim-pnl-sep"></div>
           <div class="sa-line"><span>Après — PAC${state.eco && state.eco.ecs_traitee ? ' <i>(chauffage + eau chaude)</i>' : ''}</span><b id="sim-facture-apres">${state.eco ? eur(state.facture_apres) + '/mois' : '—'}</b></div>
           ${creditLine}
@@ -15685,6 +15710,8 @@ ${renderBallonBloc(state, bs)}
       document.addEventListener('change', (e)=>{
         if (e.target && e.target.id === 'sim-afficher-apercu'){
           state.afficher_apercu = e.target.checked;
+          state.apercu_choix_manuel = true;        // réglage de l'utilisateur : plus d'automatisme
+          state.apercu_decoche_auto = false;
           scheduleSaveSimulatorState();
         } else if (e.target && e.target.id === 'sim-afficher-mention-mpr'){
           state.afficher_mention_mpr = e.target.checked;
@@ -16381,7 +16408,8 @@ ${renderBallonBloc(state, bs)}
       ecs_kwh_par_personne:800,
       cop_ecs_duo:2.5,
       cop_ecs_cet:2.8,
-      coef_periode:{ avant_1975:1.3, '1975_2000':1.0, apres_2000:0.7, inconnue:1.0 }
+      coef_periode:{ avant_1975:1.3, '1975_2000':1.0, apres_2000:0.7, inconnue:1.0 },
+      usages_specifiques_kwh_an:2500
     };
   }
   function defaultParamsFinancement(){
@@ -16636,6 +16664,9 @@ ${renderBallonBloc(state, bs)}
           <label class="adm-field">Besoin par personne <div class="adm-input-with-unit"><input type="number" id="adm-eco-ecs-kwh" value="${adminEscape(eco.ecs_kwh_par_personne ?? 800)}" step="10" min="0"><span class="adm-unit">kWh/an</span></div></label>
           <label class="adm-field">COP ECS PAC DUO <div class="adm-input-with-unit"><input type="number" id="adm-eco-cop-duo" value="${adminEscape(eco.cop_ecs_duo ?? 2.5)}" step="0.1" min="0"></div></label>
           <label class="adm-field">COP ballon thermodynamique <div class="adm-input-with-unit"><input type="number" id="adm-eco-cop-cet" value="${adminEscape(eco.cop_ecs_cet ?? 2.8)}" step="0.1" min="0"></div></label>
+        </div>
+        <div class="adm-subsection"><h3>Chauffage électrique</h3>
+          <label class="adm-field">Usages hors chauffage retirés de la facture d'électricité totale <div class="adm-input-with-unit"><input type="number" id="adm-eco-usages-spec" value="${adminEscape(eco.usages_specifiques_kwh_an ?? 2500)}" step="100" min="0"><span class="adm-unit">kWh/an</span></div></label>
         </div>
         <div class="adm-subsection"><h3>Coefficient par période de construction (estimation sans facture)</h3>
           <label class="adm-field">Avant 1975 <div class="adm-input-with-unit"><input type="number" id="adm-eco-coef-avant-1975" value="${adminEscape(coefP.avant_1975 ?? 1.3)}" step="0.05" min="0"></div></label>
@@ -18379,7 +18410,8 @@ ${renderBallonBloc(state, bs)}
         ecs_kwh_par_personne:n('adm-eco-ecs-kwh'),
         cop_ecs_duo:n('adm-eco-cop-duo'),
         cop_ecs_cet:n('adm-eco-cop-cet'),
-        coef_periode:{ avant_1975:n('adm-eco-coef-avant-1975'), '1975_2000':n('adm-eco-coef-1975-2000'), apres_2000:n('adm-eco-coef-apres-2000'), inconnue:n('adm-eco-coef-inconnue') }
+        coef_periode:{ avant_1975:n('adm-eco-coef-avant-1975'), '1975_2000':n('adm-eco-coef-1975-2000'), apres_2000:n('adm-eco-coef-apres-2000'), inconnue:n('adm-eco-coef-inconnue') },
+        usages_specifiques_kwh_an:n('adm-eco-usages-spec')
       };
       const r = await fetch('/api/admin/params-eco-energie', { method:'POST', headers: window.adminHeaders(), body: JSON.stringify(payload) });
       if (r.ok) {
@@ -20674,11 +20706,13 @@ ${renderBallonBloc(state, bs)}
     ecs_kwh_par_personne: 800,
     cop_ecs_duo: 2.5,
     cop_ecs_cet: 2.8,
-    coef_periode: { avant_1975: 1.3, '1975_2000': 1.0, apres_2000: 0.7, inconnue: 1.0 }
+    coef_periode: { avant_1975: 1.3, '1975_2000': 1.0, apres_2000: 0.7, inconnue: 1.0 },
+    usages_specifiques_kwh_an: 2500
   };
   const RENDEMENT_BALLON_ELECTRIQUE = 0.9;
   const PERSONNES_DEFAUT = 2;
   const PLAFOND_PART_ECS = 0.30;
+  const PLAFOND_USAGES_SPECIFIQUES = 0.50;
   const SOURCES = ['reel', 'a_confirmer', 'audit', 'dpe', 'estime'];
 
   function num(v, defaut) {
@@ -20790,8 +20824,12 @@ ${renderBallonBloc(state, bs)}
     const prixElec = num(p.prix_kwh.electricite, 0.21) || 0.21;
     const kwhEcs = n * (num(p.ecs_kwh_par_personne, 800) || 0);
 
-    const ecsAvant = ecsChaudiere ? Math.min(kwhEcs / rend * px, PLAFOND_PART_ECS * A) : 0;
-    const chauffageAvant = A - ecsAvant;
+    // 0) facture d'électricité totale : on retire les usages hors chauffage, plafonnés à 50 %
+    const horsChauffage = (energie === 'electricite' && entree.facture_electricite_totale)
+      ? Math.min((num(p.usages_specifiques_kwh_an, 0) || 0) * prixElec, PLAFOND_USAGES_SPECIFIQUES * A) : 0;
+    const aCalcul = A - horsChauffage;
+    const ecsAvant = ecsChaudiere ? Math.min(kwhEcs / rend * px, PLAFOND_PART_ECS * aCalcul) : 0;
+    const chauffageAvant = aCalcul - ecsAvant;
     const besoin = px > 0 ? chauffageAvant / px * rend : 0;
     const chauffageApres = besoin / scop * prixElec;
     const copEcs = (duo || ballon) ? (duo ? num(p.cop_ecs_duo, 2.5) : num(p.cop_ecs_cet, 2.8)) : null;
@@ -20807,6 +20845,8 @@ ${renderBallonBloc(state, bs)}
       ok: true,
       energie,
       facture_annuelle: r2(A),
+      hors_chauffage_annuel: r2(horsChauffage),
+      hors_chauffage_mensuel: Math.round(horsChauffage / 12),
       ecs_avant: r2(ecsAvant),
       chauffage_avant: r2(chauffageAvant),
       besoin_kwh: Math.round(besoin * 10) / 10,
@@ -20848,9 +20888,22 @@ ${renderBallonBloc(state, bs)}
     return { anneeRentable, total: cumul - debourse, cumul };
   }
 
+  // Chauffage électrique + montant déclaré (reel / a_confirmer) : facture d'électricité TOTALE.
+  function factureElectriciteTotale(energie, source) {
+    return cleEnergie(energie) === 'electricite' && (source === 'reel' || source === 'a_confirmer');
+  }
+  // Part retirée d'une facture d'électricité totale (€/an) : même règle que calculerEconomies.
+  function horsChauffageAnnuel(factureAnnuelle, params) {
+    const p = paramsComplets(params);
+    const A = num(factureAnnuelle, 0) || 0;
+    return Math.min((num(p.usages_specifiques_kwh_an, 0) || 0) * (num(p.prix_kwh.electricite, 0.21) || 0.21),
+                    PLAFOND_USAGES_SPECIFIQUES * A);
+  }
+
   window.HexaEconomies = {
     DEFAULT_PARAMS, SOURCES, paramsComplets, cleEnergie, periodeConstruction, ecsParChaudiere,
-    scopModele, estimerFactureAnnuelle, calculerEconomies, projeter
+    scopModele, estimerFactureAnnuelle, calculerEconomies, projeter,
+    factureElectriciteTotale, horsChauffageAnnuel
   };
 })();
 /* HEXA-ECONOMIES:FIN */
@@ -20926,10 +20979,43 @@ ${renderBallonBloc(state, bs)}
     document.querySelectorAll('.cout-unite-btn').forEach(b => b.classList.toggle('active', b.dataset.unite === unite));
   }
 
+  // Libellé et ligne « hors chauffage » selon l'énergie (chauffage électrique = facture totale)
+  const LIBELLE_COUT = 'Facture annuelle de l\'énergie de la chaudière (fioul, gaz…)';
+  const LIBELLE_COUT_ELEC = 'Facture d\'électricité totale';
+  function majLibelleEtHorsChauffage() {
+    const el = champ(), E = window.HexaEconomies;
+    if (!el || !E) return;
+    const field = el.closest('.field');
+    const texte = field && field.querySelector('.label-row > span:first-child');
+    const mode = (document.querySelector('select[name="mode_chauffage"]') || {}).value || '';
+    const s = source();
+    const elec = E.cleEnergie(mode) === 'electricite';
+    // saisie à venir (source vide) ou montant déclaré : c'est la facture d'électricité totale
+    const totale = elec && (s === '' || E.factureElectriciteTotale(mode, s));
+    if (texte && texte.firstChild) texte.firstChild.textContent = totale ? LIBELLE_COUT_ELEC : LIBELLE_COUT;
+    const ligne = document.getElementById('cout-hors-chauffage');
+    if (!ligne) return;
+    const m = nombre(el.value);
+    if (E.factureElectriciteTotale(mode, s) && m) {
+      Promise.resolve(paramsP || charger().then(r => r[0])).then(params => {
+        const hors = Math.round(E.horsChauffageAnnuel(m * 12, params) / 12);
+        ligne.textContent = hors > 0 ? `dont ~${hors} €/mois hors chauffage retirés du calcul` : '';
+        ligne.style.display = hors > 0 ? '' : 'none';
+      });
+    } else {
+      ligne.textContent = '';
+      ligne.style.display = 'none';
+    }
+  }
+
   function majBadge() {
     const b = document.getElementById('badge-cout-source');
     if (!b) return;
     const s = source();
+    // Affichage seulement : dès qu'un badge de source est affiché, le badge DPE « MODIFIÉ » est masqué (CSS)
+    const f = champ() && champ().closest('.field');
+    if (f) f.dataset.coutSource = s;
+    majLibelleEtHorsChauffage();
     const def = BADGES[s];
     b.className = 'cout-src-badge ' + (def ? def.cls : '');
     b.textContent = def ? def.txt : '';
@@ -21011,8 +21097,9 @@ ${renderBallonBloc(state, bs)}
     const [params, zones] = await charger();
     const surface = nombre(valeurChamp('#surface-input') || valeurChamp('[name="surface_logement_m2"]'));
     const cp = String(valeurChamp('#cp-chantier') || valeurChamp('[name="code_postal_chantier"]')).replace(/\D/g, '').slice(0, 5);
-    const dept = cp.startsWith('97') ? cp.slice(0, 3) : cp.slice(0, 2);
-    const zone = (zones && zones[dept]) || '';
+    const dept = cp.startsWith('97') ? cp.slice(0, 3)
+      : (cp.startsWith('20') ? (Number(cp.slice(0, 3)) < 202 ? '2A' : '2B') : cp.slice(0, 2));
+    const zone = (zones && zones[dept]) || '';          // table officielle H1/H2/H3 par département
     const mode = valeurChamp('select[name="mode_chauffage"]');
     const energie = E.cleEnergie(mode);
     const ecs = valeurChamp('select[name="ecs"]') || valeurChamp('select[name="gestion_ecs"]');
@@ -21025,6 +21112,12 @@ ${renderBallonBloc(state, bs)}
     minuterie = setTimeout(() => { lancerEstimation().catch(() => {}); }, 250);
   }
   window.hexaEstimerCout = lancerEstimation;
+  document.addEventListener('change', function (e) {
+    if (e.target && e.target.matches && e.target.matches('select[name="mode_chauffage"]')) majLibelleEtHorsChauffage();
+  });
+  document.addEventListener('input', function (e) {
+    if (e.target === champ()) majLibelleEtHorsChauffage();
+  });
   const DECLENCHEURS = ['#surface-input', '[name="surface_logement_m2"]', '#cp-chantier', '[name="code_postal_chantier"]',
     '[name="annee_construction"]', 'select[name="mode_chauffage"]', 'select[name="ecs"]', '[name="nombre_personnes"]'];
   ['input', 'change'].forEach(t => document.addEventListener(t, function (e) {
@@ -21060,7 +21153,8 @@ ${renderBallonBloc(state, bs)}
     meta.innerHTML = '<span class="cout-unite" role="group" aria-label="Unité">' +
       '<button type="button" class="cout-unite-btn" data-unite="an">€/an</button>' +
       '<button type="button" class="cout-unite-btn" data-unite="mois">€/mois</button></span>' +
-      '<span id="badge-cout-source" class="cout-src-badge" style="display:none"></span>';
+      '<span id="badge-cout-source" class="cout-src-badge" style="display:none"></span>' +
+      '<span id="cout-hors-chauffage" class="cout-hors-chauffage" style="display:none"></span>';
     meta.querySelector('#badge-cout-source').addEventListener('click', () => { if (source() === 'a_confirmer') ecrireSource('reel'); });
     const px = document.createElement('input');
     px.type = 'text'; px.id = 'cout-energie-annuel'; px.setAttribute('inputmode', 'numeric');
@@ -21103,6 +21197,8 @@ ${renderBallonBloc(state, bs)}
   .cout-src--theorique { background: #EFF6FF; color: #1D4ED8; border-color: #BFDBFE; }
   .cout-src--estime { background: #FEF3C7; color: #B45309; border-color: #F59E0B; }
   .cout-src--confirmer { background: #F1F5F9; color: #475569; border-color: #CBD5E1; cursor: pointer; }
+  .cout-hors-chauffage { font-size: 11px; color: #6B7280; flex-basis: 100%; }
+  .field[data-cout-source]:not([data-cout-source=""]) #badge-cout { display: none !important; }
 </style>
 </body>
 </html>

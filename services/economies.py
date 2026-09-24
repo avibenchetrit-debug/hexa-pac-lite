@@ -25,6 +25,8 @@ DEFAULT_PARAMS = {
     "cop_ecs_duo": 2.5,
     "cop_ecs_cet": 2.8,
     "coef_periode": {"avant_1975": 1.3, "1975_2000": 1.0, "apres_2000": 0.7, "inconnue": 1.0},
+    # Chauffage électrique : part de la facture totale hors chauffage (électroménager, éclairage…)
+    "usages_specifiques_kwh_an": 2500,
 }
 
 # Rendement d'un ballon électrique existant (ECS actuelle quand la chaudière ne la fait pas).
@@ -33,6 +35,8 @@ RENDEMENT_BALLON_ELECTRIQUE = 0.9
 PERSONNES_DEFAUT = 2
 # Part maximale de l'ECS dans la facture de la chaudière.
 PLAFOND_PART_ECS = 0.30
+# Part maximale des usages spécifiques retirée d'une facture d'électricité totale.
+PLAFOND_USAGES_SPECIFIQUES = 0.50
 
 SOURCES = ("reel", "a_confirmer", "audit", "dpe", "estime")
 
@@ -167,6 +171,9 @@ def calculer_economies(entree, params):
         service            'chauffage_seul' | 'chauffage_ecs'
         ballon             bool : ballon thermodynamique retenu (chauffage seul)
         scop               SCOP du modèle (sinon scop_defaut)
+        facture_electricite_totale  bool : A est la facture d'électricité TOTALE du foyer
+                           (chauffage électrique, montant déclaré) -> on retire les usages
+                           spécifiques avant le calcul (voir facture_electricite_totale())
     Renvoie {'ok': False, 'raison': …} si le calcul est impossible (jamais de valeur inventée)."""
     p = params_complets(params)
     A = _num(entree.get("facture_annuelle"), 0) or 0
@@ -187,10 +194,16 @@ def calculer_economies(entree, params):
     prix_elec = _num(p["prix_kwh"].get("electricite"), 0.21) or 0.21
     kwh_ecs = n * (_num(p["ecs_kwh_par_personne"], 800) or 0)
 
+    # 0) facture d'électricité totale : on retire les usages hors chauffage, plafonnés à 50 %
+    hors_chauffage = 0.0
+    if energie == "electricite" and entree.get("facture_electricite_totale"):
+        hors_chauffage = min((_num(p["usages_specifiques_kwh_an"], 0) or 0) * prix_elec,
+                             PLAFOND_USAGES_SPECIFIQUES * A)
+    a_calcul = A - hors_chauffage
     # a) part ECS dans la facture (si la même chaudière la produit), plafonnée à 30 %
-    ecs_avant = min(kwh_ecs / rend * prix, PLAFOND_PART_ECS * A) if ecs_chaudiere else 0.0
+    ecs_avant = min(kwh_ecs / rend * prix, PLAFOND_PART_ECS * a_calcul) if ecs_chaudiere else 0.0
     # b) c) d) chauffage seul, avant -> besoin -> après
-    chauffage_avant = A - ecs_avant
+    chauffage_avant = a_calcul - ecs_avant
     besoin = chauffage_avant / prix * rend if prix > 0 else 0.0
     chauffage_apres = besoin / scop * prix_elec
     # f) ECS : comptée seulement si réellement traitée (PAC DUO ou ballon thermodynamique)
@@ -207,6 +220,8 @@ def calculer_economies(entree, params):
         "ok": True,
         "energie": energie,
         "facture_annuelle": round(A, 2),
+        "hors_chauffage_annuel": round(hors_chauffage, 2),
+        "hors_chauffage_mensuel": _arrondi(hors_chauffage / 12),
         "ecs_avant": round(ecs_avant, 2),
         "chauffage_avant": round(chauffage_avant, 2),
         "besoin_kwh": round(besoin, 1),
@@ -230,6 +245,83 @@ def calculer_economies(entree, params):
         # h) garde-fou, jamais bloquant
         "alerte": apres > avant or apres < 0.2 * avant,
     }
+
+
+def facture_electricite_totale(energie, source):
+    """Chauffage électrique + montant déclaré (reel / a_confirmer) : c'est la facture
+    d'électricité totale du foyer, usages hors chauffage compris."""
+    return cle_energie(energie) == "electricite" and str(source or "") in ("reel", "a_confirmer")
+
+
+def _pmt(taux_annuel, n_mois, capital):
+    """Mensualité — même formule que pmt() du simulateur."""
+    if capital <= 0 or n_mois <= 0:
+        return 0.0
+    i = taux_annuel / 12
+    if i == 0:
+        return capital / n_mois
+    return capital * i / (1 - (1 + i) ** (-n_mois))
+
+
+def financement_net(reste_a_charge, option, params_financement):
+    """(mensualité, durée en mois) du financement choisi, calculé sur le reste à charge net :
+    miroir de mensOptNet / nMoisNet du simulateur (opt1 Crédit Travaux selon le seuil,
+    opt2 Éco-PTZ, opt3 comptant)."""
+    fin = params_financement if isinstance(params_financement, dict) else {}
+    reste = _num(reste_a_charge, 0) or 0
+    if option == "opt1":
+        seuil = _num(fin.get("seuil_rac_eur"), 0) or 0
+        ct = fin.get("credit_travaux") or {}
+        bareme = (ct.get("sous_seuil") if reste < seuil else ct.get("sur_seuil")) or {}
+    elif option == "opt2":
+        bareme = fin.get("eco_ptz") or {}
+    else:
+        return 0.0, 0
+    duree = _num(bareme.get("duree_mois"), 0) or 0
+    return _pmt((_num(bareme.get("taux_pct"), 0) or 0) / 100, duree, reste), duree
+
+
+def projeter(res, credit_annuel=0.0, duree_credit_ans=0.0, debourse_initial=0.0):
+    """Projection sur la durée de vie — miroir de projeter() du simulateur."""
+    cumul, annee_rentable = 0.0, None
+    for an in range(1, int(res["duree_ans"]) + 1):
+        k = an - 1
+        avant = (res["chauffage_avant"] * (1 + res["inflation_avant"]) ** k
+                 + res["ecs_actuelle"] * (1 + res["inflation_ecs_avant"]) ** k)
+        apres = res["apres_annuel"] * (1 + res["inflation_apres"]) ** k
+        cumul += avant - apres - (credit_annuel if an <= duree_credit_ans else 0)
+        if annee_rentable is None and cumul >= debourse_initial:
+            annee_rentable = an
+    return {"annee_rentable": annee_rentable, "total": cumul - debourse_initial, "cumul": cumul}
+
+
+DE_ENERGIE = {"fioul": "de fioul", "gaz": "de gaz", "bois": "de bois", "electricite": "d'électricité",
+              "pac": "d'électricité"}
+
+
+def phrase_aujourdhui(resultat, avant_mensuel):
+    """« Aujourd'hui : 400 €/mois de fioul, dont 359 € pour le chauffage » : montant déclaré
+    d'abord, puis la part chauffage quand une part (ECS, usages domestiques) est retirée.
+    Chaîne vide si rien n'est retiré (le montant affiché EST le montant déclaré)."""
+    declare = _arrondi(resultat["facture_annuelle"] / 12)
+    avant = _arrondi(avant_mensuel)
+    if avant >= declare:
+        return ""
+    de = DE_ENERGIE.get(resultat.get("energie"), "d'énergie")
+    return f"Aujourd'hui : {declare} €/mois {de}, dont {avant} € pour le chauffage"
+
+
+def phrase_baisse(avant_mensuel, apres_mensuel):
+    """Baisse réelle de la facture : ≥ 50 % « divisée par deux », 30-50 % « baisse de X % »,
+    < 30 % aucune phrase (jamais écrite en dur)."""
+    if not avant_mensuel or avant_mensuel <= 0:
+        return ""
+    baisse = (avant_mensuel - apres_mensuel) / avant_mensuel
+    if baisse >= 0.5:
+        return "votre facture est divisée par deux"
+    if baisse >= 0.3:
+        return f"baisse de {_arrondi(baisse * 100)} %"
+    return ""
 
 
 MENTION_BASE = {

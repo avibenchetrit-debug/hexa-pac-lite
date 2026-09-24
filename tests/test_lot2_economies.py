@@ -129,6 +129,79 @@ def test_source_effective_et_mention():
     assert "une estimation selon les caractéristiques du logement" in eco.mention_devis("estime", r)
 
 
+# ---------------------------------------------------------------- chauffage électrique (facture totale)
+ELEC = dict(facture_annuelle=150 * 12, energie="electricite", ecs_chaudiere=False, personnes=4,
+            service="chauffage_seul", ballon=False, scop=3.2, facture_electricite_totale=True)
+
+
+def test_electrique_facture_totale_retire_les_usages_specifiques():
+    r = eco.calculer_economies(ELEC, {})
+    # 2 500 kWh × 0,21 € = 525 €/an (~44 €/mois) retirés avant le calcul
+    assert r["hors_chauffage_annuel"] == pytest.approx(525) and r["hors_chauffage_mensuel"] == 44
+    assert r["chauffage_avant"] == pytest.approx(1800 - 525)
+    assert r["besoin_kwh"] == pytest.approx((1800 - 525) / 0.21, rel=1e-4)
+    assert r["apres_annuel"] == pytest.approx((1800 - 525) / 3.2, abs=0.01)
+    assert r["facture_annuelle"] == 1800            # le montant déclaré reste celui saisi
+
+
+def test_electrique_part_retiree_plafonnee_a_50_pourcent():
+    r = eco.calculer_economies(dict(ELEC, facture_annuelle=600), {})
+    assert r["hors_chauffage_annuel"] == pytest.approx(300)
+
+
+def test_electrique_rien_retire_hors_montant_declare():
+    # estimation / DPE : pas une facture totale -> rien retiré
+    assert eco.calculer_economies(dict(ELEC, facture_electricite_totale=False), {})["hors_chauffage_annuel"] == 0
+    # autre énergie : l'indicateur est sans effet
+    assert eco.calculer_economies(dict(REF, facture_electricite_totale=True), {})["hors_chauffage_annuel"] == 0
+    assert eco.facture_electricite_totale("electricite", "reel") is True
+    assert eco.facture_electricite_totale("electricite", "a_confirmer") is True
+    assert eco.facture_electricite_totale("electricite", "estime") is False
+    assert eco.facture_electricite_totale("fioul", "reel") is False
+
+
+def test_usages_specifiques_reglables_en_admin():
+    r = eco.calculer_economies(ELEC, {"usages_specifiques_kwh_an": 1000})
+    assert r["hors_chauffage_annuel"] == pytest.approx(210)
+
+
+# ---------------------------------------------------------------- phrases du devis
+def test_phrase_aujourdhui_montant_declare_d_abord():
+    r = eco.calculer_economies(REF, {})
+    assert eco.phrase_aujourdhui(r, r["avant_mensuel"]) == "Aujourd'hui : 400 €/mois de fioul, dont 359 € pour le chauffage"
+    duo = eco.calculer_economies(dict(REF, service="chauffage_ecs"), {})
+    assert eco.phrase_aujourdhui(duo, duo["avant_mensuel"]) == ""        # rien retiré : 400 affiché tel quel
+    el = eco.calculer_economies(ELEC, {})
+    assert eco.phrase_aujourdhui(el, el["avant_mensuel"]) == "Aujourd'hui : 150 €/mois d'électricité, dont 106 € pour le chauffage"
+
+
+@pytest.mark.parametrize("avant, apres, phrase", [
+    (359, 154, "votre facture est divisée par deux"),   # -57 %
+    (200, 100, "votre facture est divisée par deux"),   # -50 %
+    (200, 120, "baisse de 40 %"),
+    (200, 140, "baisse de 30 %"),
+    (200, 150, ""),                                     # -25 % : pas de phrase
+    (200, 210, ""),
+])
+def test_phrase_baisse_selon_la_baisse_reelle(avant, apres, phrase):
+    assert eco.phrase_baisse(avant, apres) == phrase
+
+
+# ---------------------------------------------------------------- projection et financement
+def test_financement_net_et_projection():
+    fin = main.DEFAULT_PARAMS_FINANCEMENT
+    m1, n1 = eco.financement_net(3190, "opt1", fin)
+    assert n1 == 156 and m1 == pytest.approx(29.33, abs=0.01)           # sous le seuil : 5,9 % / 156 mois
+    assert eco.financement_net(8000, "opt1", fin)[1] == 180              # au-dessus du seuil
+    assert eco.financement_net(3190, "opt2", fin) == (pytest.approx(3190 / 180), 180)   # Éco-PTZ 0 %
+    assert eco.financement_net(3190, "opt3", fin) == (0.0, 0)
+    r = eco.calculer_economies(REF, {})
+    pr = eco.projeter(r, m1 * 12, n1 / 12, 0)
+    assert pr["annee_rentable"] == 1 and round(pr["total"]) == 74085   # = simulateur (capture 02)
+    comptant = eco.projeter(r, 0, 0, 3190)
+    assert comptant["annee_rentable"] == 2 and comptant["total"] == pytest.approx(comptant["cumul"] - 3190)
+
+
 # ---------------------------------------------------------------- parité JS / Python
 CAS_PARITE = [
     REF,
@@ -141,11 +214,16 @@ CAS_PARITE = [
     dict(REF, energie="bois", facture_annuelle=2100, personnes=3, scop=4.1, service="chauffage_ecs"),
     dict(REF, energie="electricite", facture_annuelle=2500, ecs_chaudiere=True, personnes=1),
     dict(REF, facture_annuelle=300, energie="gaz", scop=2.0),
+    ELEC,                                                           # facture d'électricité totale
+    dict(ELEC, facture_annuelle=600),                               # plafond 50 %
+    dict(ELEC, ecs_chaudiere=True, service="chauffage_ecs"),        # + ECS
+    dict(ELEC, facture_electricite_totale=False),                   # estimation : rien retiré
 ]
 PARAMS_PARITE = [{}, {"rendement_pct": {"fioul": 70}, "cop_ecs_duo": 3, "prix_kwh": {"electricite": 0.25},
-                      "inflation_annuelle_pct": {"fioul": 6}, "duree_vie_pac_ans": 15}]
+                      "inflation_annuelle_pct": {"fioul": 6}, "duree_vie_pac_ans": 15, "usages_specifiques_kwh_an": 1800}]
 ESTIMATIONS = [(108, "H1", "1968", "fioul", True, 4), (90, "H2b", "1989-2000", "gaz", False, 2),
                (150, "H3", "après 2021", "pac", True, None), (0, "H1", "", "fioul", True, 4)]
+PROJECTIONS = [(0, 0, 0), (29.33 * 12, 13, 0), (0, 0, 3190), (80 * 12, 15, 0)]
 
 NODE_RUNNER = r"""
 const fs = require('fs'), vm = require('vm');
@@ -155,10 +233,14 @@ if (a < 0 || b < 0) throw new Error('bloc HEXA-ECONOMIES introuvable');
 const ctx = { window: {} }; vm.createContext(ctx); vm.runInContext(html.slice(a, b), ctx);
 const E = ctx.window.HexaEconomies;
 const entree = JSON.parse(fs.readFileSync(0, 'utf8'));
+const calculs = entree.params.map(p => entree.cas.map(c => E.calculerEconomies(c, p)));
 const out = {
-  calculs: entree.params.map(p => entree.cas.map(c => E.calculerEconomies(c, p))),
+  calculs,
   estimations: entree.estimations.map(e => E.estimerFactureAnnuelle(...e, {})),
   periodes: entree.periodes.map(x => E.periodeConstruction(x)),
+  projections: calculs[0].filter(r => r.ok).map(r => entree.projections.map(([c, d, s]) =>
+    E.projeter(r, { creditAnnuel: c, dureeCreditAns: d, debourseInitial: s }))),
+  horsChauffage: [1800, 600, 0].map(x => E.horsChauffageAnnuel(x, {})),
 };
 process.stdout.write(JSON.stringify(out));
 """
@@ -170,7 +252,8 @@ def test_parite_js_python(tmp_path):
     runner.write_text(NODE_RUNNER, encoding="utf-8")
     html = os.path.join(os.path.dirname(__file__), "..", "templates", "index.html")
     periodes = ["1968", "avant 1948", "1948-1974", "1989-2000", "2001-2005", "après 2021", "", "inconnue"]
-    entree = {"cas": CAS_PARITE, "params": PARAMS_PARITE, "estimations": [list(e) for e in ESTIMATIONS], "periodes": periodes}
+    entree = {"cas": CAS_PARITE, "params": PARAMS_PARITE, "estimations": [list(e) for e in ESTIMATIONS],
+              "periodes": periodes, "projections": [list(x) for x in PROJECTIONS]}
     res = subprocess.run(["node", str(runner), html], input=json.dumps(entree), capture_output=True,
                          text=True, encoding="utf-8", check=True)
     js = json.loads(res.stdout)
@@ -187,6 +270,22 @@ def test_parite_js_python(tmp_path):
     assert js["estimations"] == [pytest.approx(eco.estimer_facture_annuelle(*e, {}), abs=0.011)
                                  if eco.estimer_facture_annuelle(*e, {}) is not None else None for e in ESTIMATIONS]
     assert js["periodes"] == [eco.periode_construction(x) for x in periodes]
+    ok = [eco.calculer_economies(c, {}) for c in CAS_PARITE]
+    ok = [r for r in ok if r["ok"]]
+    for r, projs_js in zip(ok, js["projections"]):
+        for (c, d, s), pj in zip(PROJECTIONS, projs_js):
+            pp = eco.projeter(r, c, d, s)
+            assert pj["anneeRentable"] == pp["annee_rentable"]
+            assert pj["total"] == pytest.approx(pp["total"], abs=0.01)
+    hors = [min(2500 * 0.21, 0.5 * x) for x in (1800, 600, 0)]
+    assert js["horsChauffage"] == pytest.approx(hors)
+
+
+# ---------------------------------------------------------------- zone du département (CP)
+@pytest.mark.parametrize("cp, zone", [("75002", "H1"), ("13001", "H3"), ("20090", main.DEPT_ZONE["2A"]),
+                                      ("20200", main.DEPT_ZONE["2B"]), ("", "")])
+def test_zone_depuis_cp(cp, zone):
+    assert main._zone_depuis_cp({"cp_chantier": cp}) == zone
 
 
 # ---------------------------------------------------------------- devis
@@ -204,36 +303,86 @@ LEAD = {"numero": "PR-00077", "civilite": "Mme", "nom": "Martin", "prenom": "Lé
 
 def _preparer(lead, state):
     main._atomic_write_json(main.LEADS_PATH, [lead])
+    main._atomic_write_json(main._state_simulateur_path(lead["numero"]), {})   # état vierge
     main.save_state_simulateur_atomic(lead["numero"], state)
 
 
-def test_devis_reprend_le_calcul_et_la_mention(client):
+def test_devis_calcule_toujours_cote_serveur(client):
+    # lead existant, simulateur jamais rouvert depuis le Lot 2 : ancienne éco dans l'état, ignorée
     _preparer(dict(LEAD, cout_energetique_mensuel_eur="400", cout_energie_source="reel"),
-              {"service": "chauffage_seul", "eco_calc_version": 2, "eco_20_ans": 31000, "annee_rentable": 4})
+              {"service": "chauffage_seul", "eco_20_ans": 109662, "annee_rentable": 3})
     ctx = main._build_devis_context(None, "PR-00077")
     pa = ctx["projet_apercu"]
     assert pa is not None, ctx.get("missing")
-    assert ctx["economie_devis"]["facture_avant_mois"] == 359
-    assert pa["facture_avant"] == 359
+    assert pa["facture_avant"] == 359 and pa["eco_20_ans"] not in (None, 109662)
+    assert pa["eco_20_ans_fmt"] and pa["annee_rentable"] >= 1
     assert pa["mention_economies"].startswith("Estimation indicative calculée sur votre facture déclarée")
-    assert pa["eco_20_ans_fmt"] == "31 000"
+    assert pa["phrase_aujourdhui"] == "Aujourd'hui : 400 €/mois de fioul, dont 359 € pour le chauffage"
     html = client.get("/api/devis/PR-00077/preview").text
-    assert "Estimation indicative calculée sur votre facture déclarée" in html
+    bloc = html.split('<div class="projet-apercu">')[1].split('<div class="anah-mention-block')[0]
+    assert "Vous gagnez" in bloc and "Rentabilisé en" in bloc      # on examine bien le bloc économies
+    assert "—" not in bloc
+    assert "Aujourd'hui : 400 €/mois de fioul, dont 359 € pour le chauffage" in html.replace("&#39;", "'")
 
 
-def test_devis_ignore_une_eco_calculee_avant_le_lot_2():
-    _preparer(dict(LEAD, cout_energetique_mensuel_eur="400"),
-              {"service": "chauffage_seul", "eco_20_ans": 60000, "annee_rentable": 3, "eco_calc_version": ""})
+def test_devis_accord_an_ans(client):
+    _preparer(dict(LEAD, cout_energetique_mensuel_eur="400", cout_energie_source="reel"), {"service": "chauffage_seul"})
     pa = main._build_devis_context(None, "PR-00077")["projet_apercu"]
-    assert pa["eco_20_ans_fmt"] is None and pa["annee_rentable"] is None
-    assert "les informations communiquées" in pa["mention_economies"]   # coût sans source -> à confirmer
+    html = client.get("/api/devis/PR-00077/preview").text
+    n = pa["annee_rentable"]
+    unite = "an" if n == 1 else "ans"
+    assert f">{n} {unite}</div>" in html
+    assert "1 ans" not in html and "1ᵉ année" not in html
 
 
-def test_devis_sans_cout_estime_et_reste_generable(client):
+def test_devis_bloc_masque_si_donnee_manquante(client):
+    # énergie actuelle non reconnue (réseau de chaleur) : aucun calcul possible -> bloc entièrement
+    # masqué (pas de tiret, pas de trou), devis toujours générable
+    _preparer(dict(LEAD, mode_chauffage="reseau_chaleur", cout_energetique_mensuel_eur="300", cout_energie_source="reel"),
+              {"service": "chauffage_seul"})
+    ctx = main._build_devis_context(None, "PR-00077")
+    assert ctx["projet_apercu"] is None and ctx.get("_error_template") is None
+    html = client.get("/api/devis/PR-00077/preview").text
+    assert '<div class="projet-apercu">' not in html
+
+
+def test_devis_bloc_masque_si_non_rentable(monkeypatch):
+    _preparer(dict(LEAD, cout_energetique_mensuel_eur="400", cout_energie_source="reel"), {"service": "chauffage_seul"})
+    monkeypatch.setattr(main, "projeter", lambda *a, **k: {"annee_rentable": None, "total": -500, "cumul": -500})
+    assert main._build_devis_context(None, "PR-00077")["projet_apercu"] is None
+
+
+def test_devis_jamais_de_surcout_pendant_le_credit(client, monkeypatch):
+    _preparer(dict(LEAD, cout_energetique_mensuel_eur="400", cout_energie_source="reel"),
+              {"service": "chauffage_seul", "option": "opt1"})
+    reel = main.calculer_financement_devis
+    monkeypatch.setattr(main, "calculer_financement_devis", lambda b, a: dict(reel(b, a), mensualite=400))
+    pa = main._build_devis_context(None, "PR-00077")["projet_apercu"]
+    assert pa["eco_pendant"] < 0
+    html = client.get("/api/devis/PR-00077/preview").text
+    assert "Pendant le crédit" not in html and "Après le crédit" in html
+
+
+def test_devis_sans_cout_estime_avec_la_zone_du_cp(client):
+    # pas de zone dans l'état ni de coût : estimation avec la zone du département (75 -> H1)
     _preparer(dict(LEAD, annee_construction="1968"), {"service": "chauffage_seul"})
+    res, source = main._economies_devis(main._lead_for_response(main._find_lead("PR-00077")),
+                                        main._load_state_simulateur("PR-00077", {}, []), None,
+                                        main._admin_payload_with_m3(), "")
+    params = main._admin_payload_with_m3().get("params_eco_energie") or {}
+    attendu_h1 = eco.estimer_facture_annuelle(108, "H1", "1968", "fioul", True, 4, params)
+    assert source == "estime" and res["facture_annuelle"] == pytest.approx(attendu_h1, abs=0.01)
     pa = main._build_devis_context(None, "PR-00077")["projet_apercu"]
     assert pa is not None and "une estimation selon les caractéristiques du logement" in pa["mention_economies"]
     assert client.get("/api/devis/PR-00077/validate").json()["ok"] is True
+
+
+def test_devis_electrique_facture_totale(client):
+    _preparer(dict(LEAD, mode_chauffage="electricite", ecs="independant", cout_energetique_mensuel_eur="150",
+                   cout_energie_source="reel"), {"service": "chauffage_seul"})
+    pa = main._build_devis_context(None, "PR-00077")["projet_apercu"]
+    assert pa is not None
+    assert pa["phrase_aujourdhui"] == "Aujourd'hui : 150 €/mois d'électricité, dont 106 € pour le chauffage"
 
 
 def test_devis_garde_fou_ne_bloque_pas(client):
