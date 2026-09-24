@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
-"""Lot 4 : devis et pré-devis en « tout de suite » (MaPrimeRénov' avancée par le client).
-
-Même règle que le simulateur : le montant à régler est toujours le vrai reste à charge ; l'avance
-de la prime est sur une ligne à part ; elle n'entre dans le montant financé que si elle est
-ajoutée au crédit."""
+"""Devis et pré-devis en « tout de suite » : retour à l'état d'avant les demandes sur l'avance
+MaPrimeRénov' (Lot 5, A). « Montant total à régler » = reste à charge + prime avancée, mention
+« Option retenue : démarrage sans attente — Ce montant n'intègre pas MaPrimeRénov' … », frise
+« vous démarrez sans avance », pas de ligne « Avance de la prime », pas de « Montant financé ».
+Conservé : le financement du devis suit l'option du simulateur (Éco-PTZ)."""
 import pytest
 from fastapi.testclient import TestClient
 
@@ -16,11 +16,11 @@ LEAD = {"numero": "PR-00088", "civilite": "Mme", "nom": "Martin", "prenom": "Lé
         "mode_chauffage": "fioul", "ecs": "chaudiere", "type_emetteurs": "radiateurs_classiques",
         "alimentation_electrique": "monophase", "categorie": "tres_modeste", "nombre_personnes": "4",
         "cout_energetique_mensuel_eur": "400", "cout_energie_source": "reel"}
-LIGNE = "Avance de la prime MaPrimeRénov' : <strong>"
-PARENTHESE = "(remboursée au versement de la prime, après les travaux)"
-MENTION = ("Démarrage sans attente</strong> : vous avancez la prime MaPrimeRénov' (<strong>{mpr} €</strong>) au démarrage du "
-           "chantier. Elle vous est remboursée au versement de la prime par l'Anah, après les travaux. Le reste à charge "
-           "ci-dessus tient déjà compte de cette prime.")
+MENTION = ("Option retenue : démarrage sans attente</strong> — Ce montant n'intègre pas MaPrimeRénov' "
+           "(<strong>{mpr} €</strong>), qui vous sera versée directement par l'Anah après travaux. Cette option, "
+           "retenue à votre demande, permet un démarrage immédiat du chantier.")
+RETIRES = ("Avance de la prime MaPrimeRénov'", "Montant financé", "remboursée au versement de la prime",
+           "vous avancez la prime", "tient déjà compte de cette prime")
 
 
 @pytest.fixture
@@ -41,41 +41,28 @@ def _euros(txt):
     return round(float_value(str(txt).replace("€", "").replace(" ", "").replace(",", ".")))
 
 
-def test_attente_reste_net_sans_ligne_d_avance(client):
+def test_attente_montant_a_regler_net(client):
     ctx = _devis({"mode_mpr": "attente"})
-    assert ctx["avance_mpr"] == ""
-    assert _euros(ctx["montant_finance"]) == _euros(ctx["reste_a_charge"])
+    assert "avance_mpr" not in ctx and "montant_finance" not in ctx
     html = client.get(f"/api/devis/{LEAD['numero']}/preview?variante=devis").text
-    assert LIGNE not in html
+    assert all(t not in html for t in RETIRES)
+    assert "vous démarrez sans avance" in html
 
 
 @pytest.mark.parametrize("variante", ["devis", "pre_devis"])
-def test_tout_de_suite_de_sa_poche(client, variante):
+@pytest.mark.parametrize("fin_mpr", ["cash", "credit"])
+def test_tout_de_suite_etat_d_avant(client, variante, fin_mpr):
     net = _euros(_devis({"mode_mpr": "attente"})["reste_a_charge"])
-    ctx = _devis({"mode_mpr": "sans_attente", "financement_mpr": "cash"})
-    mpr = _euros(ctx["avance_mpr"])
+    ctx = _devis({"mode_mpr": "sans_attente", "financement_mpr": fin_mpr})
+    mpr = _euros(ctx["montant_mpr_affiche"])
     assert mpr > 0
-    assert _euros(ctx["reste_a_charge"]) == net                 # le vrai reste à charge, pas reste + avance
-    assert _euros(ctx["montant_finance"]) == net                # l'avance n'est pas financée
+    assert _euros(ctx["reste_a_charge"]) == net + mpr            # montant à régler : prime non déduite
+    base = _euros(ctx["financement_devis"]["reste_a_charge"])
+    assert base == (net + mpr if fin_mpr == "credit" else net)    # base de la mensualité : inchangée
     html = client.get(f"/api/devis/{LEAD['numero']}/preview?variante={variante}").text
-    assert f"{LIGNE}{ctx['montant_mpr_affiche']} €</strong>" in html and PARENTHESE in html
     assert MENTION.format(mpr=ctx["montant_mpr_affiche"]) in html
-    assert f"Montant financé {ctx['montant_finance']}" in html
-    assert "n'intègre pas MaPrimeRénov'" not in html            # l'ancienne mention contredirait le montant
-    assert f"vous avancez la prime ({ctx['montant_mpr_affiche']} €), remboursée après les travaux" in html
-    assert "vous démarrez sans avance" not in html and "rendue à l'accord" not in html
-
-
-def test_tout_de_suite_ajoutee_au_credit(client):
-    net = _euros(_devis({"mode_mpr": "attente"})["reste_a_charge"])
-    ctx = _devis({"mode_mpr": "sans_attente", "financement_mpr": "credit"})
-    mpr = _euros(ctx["avance_mpr"])
-    assert _euros(ctx["reste_a_charge"]) == net
-    assert _euros(ctx["montant_finance"]) == net + mpr          # avance ajoutée au crédit : financée
-    assert _euros(ctx["financement_devis"]["reste_a_charge"]) == net + mpr   # la mensualité suit
-    html = client.get(f"/api/devis/{LEAD['numero']}/preview?variante=devis").text
-    assert f"Montant financé {ctx['montant_finance']}" in html and LIGNE in html
-    assert "vous démarrez sans avance" in html                   # avance financée : rien à sortir au départ
+    assert "vous démarrez sans avance" in html
+    assert all(t not in html for t in RETIRES)
 
 
 @pytest.mark.parametrize("option, taux, duree", [("opt1", None, None), ("opt2", 0, 180)])
@@ -88,6 +75,5 @@ def test_financement_du_devis_suit_l_option_du_simulateur(client, option, taux, 
     if option == "opt2":
         assert fin["taux_pct"] == taux and fin["duree_mois"] == duree and fin["premiere_echeance_jours"] is None
     html = client.get(f"/api/devis/{LEAD['numero']}/preview?variante=pre_devis").text
-    attendu = f"{fin['libelle']}</span> · <span class=\"devis-montant-finance\">Montant financé {ctx['montant_finance']}</span> · "
-    assert attendu in html and f" · {fin['duree_mois']} mois" in html
+    assert f"{fin['libelle']}</span> · " in html and f" · {fin['duree_mois']} mois" in html
     assert (" · 0 % · 180 mois" in html) == (option == "opt2")
