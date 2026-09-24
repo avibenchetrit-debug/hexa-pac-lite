@@ -21898,8 +21898,36 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
         const pop = q('#p-fin-appel-pop');
         if (pop && !pop.hidden && !(e.target.closest && e.target.closest('.p-fin-appel'))) { pop.hidden = true; q('#p-fin-appel-btn').setAttribute('aria-expanded', 'false'); }
       });
-      if (actions) { barreProspect.insertBefore(j, actions); barreProspect.insertBefore(a, actions); barreProspect.insertBefore(fa, actions); }
-      else { barreProspect.appendChild(j); barreProspect.appendChild(a); barreProspect.appendChild(fa); }
+      // Lot 5c : « Suivi du dossier » (Statut / VT / Relances) dans un panneau ouvert depuis le bandeau ;
+      // la barre existante y est DÉPLACÉE (mêmes id, mêmes écouteurs, même logique)
+      const sv = document.createElement('div');
+      sv.className = 'p-suivi';
+      sv.innerHTML = '<button type="button" class="p-suivi-btn" id="p-suivi-btn" aria-expanded="false" aria-haspopup="dialog">Suivi : <b id="p-suivi-statut">—</b> ▾</button>'
+        + '<div class="p-suivi-pop" id="p-suivi-pop" role="dialog" aria-label="Suivi du dossier" hidden></div>';
+      q('#p-suivi-btn', sv).addEventListener('click', (e) => {
+        e.stopPropagation();
+        const pop = q('#p-suivi-pop'); pop.hidden = !pop.hidden;
+        e.currentTarget.setAttribute('aria-expanded', pop.hidden ? 'false' : 'true');
+      });
+      const fermerPanneaux = () => {
+        [['#p-suivi-pop', '#p-suivi-btn'], ['#p-fin-appel-pop', '#p-fin-appel-btn']].forEach(([p, b]) => {
+          const pop = q(p); if (pop && !pop.hidden) { pop.hidden = true; const bt = q(b); if (bt) bt.setAttribute('aria-expanded', 'false'); }
+        });
+      };
+      document.addEventListener('click', (e) => {
+        const pop = q('#p-suivi-pop');
+        // clic dehors (un élément retiré du DOM par un nouveau rendu du statut n'est pas « dehors »)
+        if (pop && !pop.hidden && document.contains(e.target) && !(e.target.closest && e.target.closest('.p-suivi'))) {
+          pop.hidden = true; q('#p-suivi-btn').setAttribute('aria-expanded', 'false');
+        }
+      });
+      document.addEventListener('keydown', (e) => { if (e.key === 'Escape') fermerPanneaux(); });
+      if (actions) { barreProspect.insertBefore(j, actions); barreProspect.insertBefore(a, actions); barreProspect.insertBefore(sv, actions); barreProspect.insertBefore(fa, actions); }
+      else { barreProspect.appendChild(j); barreProspect.appendChild(a); barreProspect.appendChild(sv); barreProspect.appendChild(fa); }
+      const statvt = q('.fiche-statvt-top');
+      if (statvt) q('#p-suivi-pop', sv).appendChild(statvt);
+      const slotStatut = q('#fiche-statut-slot');
+      if (slotStatut && 'MutationObserver' in window) new MutationObserver(majSuivi).observe(slotStatut, { childList: true, subtree: true, characterData: true });
     }
 
     // --- Lot 5 : parcours (barre d'étapes, carte d'une étape, navigation). Le <form> est déplacé dans
@@ -22265,7 +22293,14 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
   function planifierMaj() { clearTimeout(minuterieMaj); minuterieMaj = setTimeout(() => { majTout(); planifierExpress(); }, 150); }
   function majTout() {
     if (!construit) return;
-    majChoix(); majBlocs(); majJauge(); majEligibilite(); majRequis(); majEtapes();
+    majChoix(); majBlocs(); majJauge(); majEligibilite(); majRequis(); majEtapes(); majSuivi();
+  }
+  // Lot 5c : statut actuel affiché dans le bouton « Suivi : … »
+  function majSuivi() {
+    const b = q('#p-suivi-statut'); if (!b) return;
+    const l = q('#fiche-statut-slot .pv-statut-label');
+    const t = l ? l.textContent.trim() : '';
+    if (b.textContent !== (t || '—')) b.textContent = t || '—';
   }
 
   // Hauteur : la grille occupe la hauteur disponible, le bloc ouvert défile à l'intérieur
@@ -22763,6 +22798,32 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     height: 26px !important; min-height: 26px !important; font-size: 12px !important; padding-top: 0 !important; padding-bottom: 0 !important;
     display: inline-flex !important; align-items: center; box-sizing: border-box; line-height: 1; }
   body.l5 .fiche-statvt-top .pv-statut-label, body.l5 .fiche-statvt-top .fiche-rel-seq { font-size: 12px !important; }
+  /* Lot 5c : « Suivi du dossier » dans un panneau du bandeau ; 20 px libres au-dessus des étapes */
+  .p-suivi { position: relative; flex: none; }
+  .p-suivi-btn { border: 1px solid #94A3B8; background: #fff; color: #334155; border-radius: 8px; padding: 4px 10px; font: inherit;
+    font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+  .p-suivi-btn b { color: #002E5A; }
+  .p-suivi-btn[aria-expanded="true"] { background: #F1F5F9; border-color: #002E5A; }
+  .p-suivi-pop { position: absolute; right: 0; top: calc(100% + 8px); z-index: 70; min-width: 470px; background: #fff; border: 1px solid #E2E8F0;
+    border-radius: 10px; box-shadow: 0 12px 30px rgba(0, 0, 0, .15); padding: 12px 14px; }
+  .p-suivi-pop[hidden] { display: none; }
+  body.l5 .p-suivi-pop .fiche-statvt-top { flex-direction: column; align-items: flex-start !important; gap: 10px; border: 0; margin: 0 !important; padding: 0 !important; }
+  body.l5 .p-suivi-pop .fiche-statvt-top::before { font-size: 12px; color: #002E5A; font-weight: 800; }
+  body.l5 .p-suivi-pop .fiche-statvt-top > div { display: flex; gap: 8px; flex-wrap: wrap; }
+  body.l5 .p-suivi-pop .fiche-statvt-top > .l4-aide { flex-basis: auto; }
+  body.l5 .p-suivi-pop .fiche-statut-lbl, body.l5 .p-suivi-pop .fiche-vt-lbl { white-space: nowrap; min-width: 110px; }
+  body.l5 .l4-grille { margin-top: 20px; }
+  /* les panneaux du bandeau (Suivi du dossier, Fin d'appel) dépassent sous le bandeau : il ne doit pas les rogner */
+  body.l5 .prospect-sticky-bar { overflow: visible !important; }
+  /* avec « Suivi » et « Fin d'appel » dans le bandeau : la jauge garde sa place (« Manque : » cliquable),
+     un nom ou un e-mail trop long se tronque avec « … » */
+  body.l5 .prospect-sticky-bar .psb-main { flex: 0 1 auto; min-width: 190px; overflow: hidden; }
+  body.l5 .prospect-sticky-bar .psb-name { max-width: 200px; min-width: 0; }
+  body.l5 .prospect-sticky-bar .psb-contact { flex: 0 1 auto; min-width: 120px; overflow: hidden; }
+  body.l5 .prospect-sticky-bar .psb-contact > .prospect-sticky-tel { flex: none; white-space: nowrap; }   /* le téléphone ne se tronque jamais */
+  body.l5 .prospect-sticky-bar .psb-contact > .prospect-sticky-email { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  body.l5 .prospect-sticky-bar .l4-jauge { flex: 0 1 auto; min-width: 380px; }
+  body.l5 .prospect-sticky-bar .l4-jauge-barre { width: 36px; }
 </style>
 </body>
 </html>
