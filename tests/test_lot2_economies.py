@@ -391,3 +391,34 @@ def test_devis_garde_fou_ne_bloque_pas(client):
     assert ctx.get("_error_template") is None
     assert client.get("/api/devis/PR-00077/validate").json()["ok"] is True
     assert client.get("/api/devis/PR-00077/preview").status_code == 200
+
+
+# ---------------------------------------------------------------- lead jamais simulé : chauffage seul
+CATALOGUE = [
+    {"ref": "ATL-EXCELLIA-S-DUO-9", "nom": "ALFEA EXCELLIA S DUO 9", "puiss_chauf": 10.08, "ttc": 14990},
+    {"ref": "ATL-EXCELLIA-S-9", "nom": "ALFEA EXCELLIA S 9", "puiss_chauf": 10.08, "ttc": 12990},
+]
+
+
+def test_lead_jamais_simule_chauffage_seul_et_modele_non_duo():
+    main._atomic_write_json(main.LEADS_PATH, [dict(LEAD, alimentation_electrique="monophase")])
+    main._atomic_write_json(main._state_simulateur_path("PR-00077"), {})
+    state = main._load_state_simulateur("PR-00077", main._find_lead("PR-00077"), CATALOGUE)
+    assert state["service"] == "chauffage_seul"                 # = DEFAULT_SIM_STATE du simulateur
+    assert state["modele_pac_id"] == "ATL-EXCELLIA-S-9"          # jamais un DUO en chauffage seul
+
+
+def test_modele_par_defaut_suit_le_service():
+    from services.service_devis import select_default_modele
+    assert select_default_modele({}, CATALOGUE)["ref"] == "ATL-EXCELLIA-S-9"
+    assert select_default_modele({}, CATALOGUE, "chauffage_seul")["ref"] == "ATL-EXCELLIA-S-9"
+    assert select_default_modele({}, CATALOGUE, "chauffage_ecs")["ref"] == "ATL-EXCELLIA-S-DUO-9"
+
+
+def test_devis_lead_jamais_simule_ecs_non_comptee():
+    _preparer(dict(LEAD, cout_energetique_mensuel_eur="400", cout_energie_source="reel"), {})
+    main._atomic_write_json(main._state_simulateur_path("PR-00077"), {})   # aucun état simulateur
+    pa = main._build_devis_context(None, "PR-00077")["projet_apercu"]
+    assert pa is not None
+    assert pa["facture_avant"] == 359                            # chauffage seul : part ECS retirée
+    assert pa["phrase_aujourdhui"] == "Aujourd'hui : 400 €/mois de fioul, dont 359 € pour le chauffage"

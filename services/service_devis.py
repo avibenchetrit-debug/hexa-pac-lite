@@ -198,14 +198,19 @@ def parse_legacy_description(text):
     return specs
 
 
-def select_default_modele(prospect, catalogue):
+def select_default_modele(prospect, catalogue, service=None):
+    """Modèle par défaut d'un lead jamais simulé. Suit le service comme le simulateur : DUO en
+    chauffage + ECS, jamais de DUO en chauffage seul (défaut, aligné sur le simulateur)."""
     phase = str(value(prospect, "alimentation_electrique", "phase_electrique", default="")).lower()
     wants_tri = "tri" in phase
-    service_ecs = True
+    service = service or value(prospect, "service", default="chauffage_seul")
+    service_ecs = service in ("chauffage_ecs", "chauffage+ecs")
     compatibles = []
     for modele in catalogue or []:
         nom_ref = f"{modele.get('nom', '')} {modele.get('ref', '')}".upper()
         if service_ecs and "DUO" not in nom_ref:
+            continue
+        if not service_ecs and "DUO" in nom_ref:
             continue
         if wants_tri and "TRI" not in nom_ref:
             continue
@@ -815,7 +820,7 @@ def calculer_notedim(prospect, state_simulateur, catalogue_pac):
     # Puissances : répliquées à l'identique du front (aucun arrondi intermédiaire ;
     # facteur de sécurité appliqué au chauffage puis ajout de l'ECS).
     p_chauffage = g_retenu * volume * delta_t
-    service = value(state_simulateur, "service", default="chauffage_ecs")
+    service = value(state_simulateur, "service", default="chauffage_seul")
     service_ecs = service in ("chauffage_ecs", "chauffage+ecs")
     p_ecs = min(max(p_chauffage * 0.06, 500), 1000) if service_ecs else 0
     p_totale = p_chauffage + p_ecs

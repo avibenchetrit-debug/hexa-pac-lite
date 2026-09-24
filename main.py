@@ -3756,12 +3756,13 @@ def _load_state_simulateur(numero: str, prospect: dict, catalogue: list[dict]) -
         "iso_toit": devis_value(prospect, "iso_toit", default="isole"),
         "iso_mur": devis_value(prospect, "iso_mur", default="isole"),
         "iso_menuiserie": devis_value(prospect, "iso_menuiserie", default="double"),
-        "service": devis_value(prospect, "service", default="chauffage_ecs"),
+        # Lead jamais simulé : même défaut que le simulateur (DEFAULT_SIM_STATE) -> chauffage seul
+        "service": devis_value(prospect, "service", default="chauffage_seul"),
         "alimentation_electrique": devis_value(prospect, "alimentation_electrique", "phase_electrique", default=""),
     }
     state.update({k: v for k, v in saved.items() if v not in (None, "")})
     if not state["modele_pac_id"] and not state["modele_pac"]:
-        modele = select_default_modele(prospect, catalogue)
+        modele = select_default_modele(prospect, catalogue, state["service"])
         state["modele_pac_id"] = modele.get("ref") or modele.get("id") or ""
         state["modele_pac"] = modele.get("nom") or modele.get("ref") or ""
     return state
