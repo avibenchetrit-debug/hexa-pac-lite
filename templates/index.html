@@ -15059,7 +15059,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     if (!['fioul','gaz'].includes(state.energie_avant)) return false;
     return state.gestion_ecs === 'chaudiere' || state.gestion_ecs === state.energie_avant;
   }
-  function renderBallonBloc(state, bs){
+  function renderBallonBloc(state, bs, partie){
     if (!ballonAutorise(state)) return '';
     const { modeles, filtre } = ballonModelesProposes(state);
     const reco = ballonRecommandation(state);
@@ -15080,10 +15080,13 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
           </div>
           ${inadapte}
           ${reco ? `<div class="sim-note" id="sim-ballon-reco">Recommandé : <b>${reco.typeLabel}</b>${filtre ? ` · <a href="#" id="sim-ballon-voir-tous">voir tous les ballons</a>` : (state.ballon_voir_tous ? ` · <a href="#" id="sim-ballon-voir-reco">voir les ballons recommandés</a>` : '')}</div>` : ''}` : '';
-    return `${alerte}
-          <div class="sim-pnl-line sim-pnl-ballon"><span>Ballon thermodynamique (ECS)</span><select id="sim-ballon" class="sim-model-select"><option value="" ${!state.ballon_ref?'selected':''}>Aucun</option>${modeles.map(b=>`<option value="${b.ref}" ${state.ballon_ref===b.ref?'selected':''}>${b.nom||b.ref}</option>`).join('')}</select></div>${question}
-          ${bs.actif ? `<div class="sim-pnl-line"><span>+ Chauffe-eau thermodynamique (fourni posé)</span><b id="sim-ballon-montant">${eur(bs.totalTTC)}</b></div>
+    // Lot 4 : 'choix' = sélection (section 4), 'couts' = lignes de prix (section 5), sinon les deux
+    const couts = `${bs.actif ? `<div class="sim-pnl-line"><span>+ Chauffe-eau thermodynamique (fourni posé)</span><b id="sim-ballon-montant">${eur(bs.totalTTC)}</b></div>
           <div class="sim-pnl-line sim-pnl-sub"><span>= Sous-total PAC + ballon</span><b id="sim-soustotal">${eur((state.prix_pac||0) + bs.totalTTC)}</b></div>` : ''}`;
+    if (partie === 'couts') return couts;
+    const choix = `${alerte}
+          <div class="sim-pnl-line sim-pnl-ballon"><span>Ballon thermodynamique (ECS)</span><select id="sim-ballon" class="sim-model-select"><option value="" ${!state.ballon_ref?'selected':''}>Aucun</option>${modeles.map(b=>`<option value="${b.ref}" ${state.ballon_ref===b.ref?'selected':''}>${b.nom||b.ref}</option>`).join('')}</select></div>${question}`;
+    return partie === 'choix' ? choix : choix + couts;
   }
 
   async function calcul(){
@@ -15425,202 +15428,245 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     if (seq === undefined || seq === __renderSeq) lastRoi = r;
     const bs = ballonSim(state);
     const sel=(a,b)=>a===b?'selected':'';
-    const anahLabel = LABELS_ANAH[c.categorie] || '—';
-    const ceeLabel = LABELS_CEE[c.categorie] || '—';
-    const catLabel = (anahLabel === '—' && ceeLabel === '—')
-      ? '—'
-      : `${anahLabel} (MPR) · ${ceeLabel} (CEE)`;
     const energieLbl = ENERGIE_LABEL[state.energie_avant] || '—';
-    const zoneValue = state.zone_detail || '';
-
-    // mensualité affichée dans Avant/Après selon option
     const creditLine = state.option==='opt3'
       ? ''
       : `<div class="sa-line"><span>${state.option==='opt1'?(c.finView.libelles.option1||'Crédit Travaux'):(c.finView.libelles.option2||'Éco-PTZ')} <i>${(c.nMois/12)}&nbsp;ans</i></span><b>${eur(c.mensOpt)}/mois</b></div>`;
     const totalApres = state.facture_apres + (state.option==='opt3'?0:c.mensOpt);
     const delta = state.facture_avant - totalApres;
     const phraseRoi = phraseCommerciale(c, r, energieLbl, totalApres, delta);
+    const verrou = !state.iso_deverrouille;
+    const dis = verrou ? 'disabled' : '';
+    // Catégorie AYANT SERVI aux montants (c.categorie), jamais l'état vivant : sinon la pastille
+    // pourrait afficher SUP au-dessus de montants calculés en TMO (test_render_race_simulateur).
+    const anahLabel = LABELS_ANAH[c.categorie] || '';
+    const ceeLabel = LABELS_CEE[c.categorie] || '';
 
+    // Lot 4 : deux colonnes, sections numérotées ; mêmes id qu'avant (patch(), bind(), tests)
     return `
-      <div class="sim-body">
+      <div class="sim-body l4s">
+        <div class="l4s-contexte" id="sim-contexte">${pastillesContexte(anahLabel, ceeLabel)}</div>
+        <div class="l4s-cols">
+        <div class="l4s-col">
 
-        <div class="sim-section-label">Repris de la fiche</div>
-        <div class="sim-context">
-          <div class="sim-ctx-item"><span class="sim-ctx-k">Catégorie</span><span class="sim-ctx-v">${catLabel}</span></div>
-          <div class="sim-ctx-item"><span class="sim-ctx-k">Zone clim.</span><span class="sim-ctx-v"><span class="sim-zone-badge ${zoneValue?'':'is-empty'}">${zoneValue || '—'}</span></span></div>
-          <div class="sim-ctx-item"><span class="sim-ctx-k">Énergie act.</span><span class="sim-ctx-v">${energieLbl && energieLbl!=='—' ? energieLbl.charAt(0).toUpperCase()+energieLbl.slice(1) : '—'}</span></div>
-          <div class="sim-ctx-item">
-            <span class="sim-ctx-k">Surf. chauffée</span>
-            <span class="sim-ctx-v sim-surf-wrap">
-              <input type="number" id="sim-surf-chauffee" value="${state.surface_chauffee != null && state.surface_chauffee !== '' ? Math.round(state.surface_chauffee) : ''}" placeholder="—">
-              <em>m²</em>
-              <button type="button" class="sim-info-btn" id="sim-surf-info" aria-label="Info surface">i</button>
-            </span>
+        <section class="l4s-sec">
+          <h4 class="l4s-titre"><span class="l4s-n">1</span>Ce que fait la PAC</h4>
+          <select id="sim-service" class="l4-cache" aria-hidden="true">
+            <option value="chauffage_seul" ${sel(state.service,'chauffage_seul')}>Chauffage seul</option>
+            <option value="chauffage_ecs" ${sel(state.service,'chauffage_ecs')}>Chauffage + ECS</option>
+          </select>
+          <div class="l4-choix l4s-choix-service" data-sim-for="sim-service">
+            <button type="button" data-valeur="chauffage_seul" class="${state.service!=='chauffage_ecs'?'active':''}">Chauffage seul</button>
+            <button type="button" data-valeur="chauffage_ecs" class="${state.service==='chauffage_ecs'?'active':''}">Chauffage + eau chaude</button>
+          </div>
+          <div class="sim-note" id="sim-service-note">${ballonAutorise(state) ? 'La PAC assure le chauffage. Pour l\'eau chaude : conserver l\'existant ou ajouter un ballon thermodynamique (sans aide MaPrimeRénov\' depuis le 01/09/2026).' : 'La PAC (modèle DUO) assure le chauffage et l\'eau chaude. Aucun ballon à ajouter.'}</div>
+        </section>
+
+        <section class="l4s-sec">
+          <h4 class="l4s-titre"><span class="l4s-n">2</span>Logement <i>(calcul de la puissance)</i></h4>
+          <div class="l4s-ligne">
+            <label class="sim-field l4s-surf"><span>Surface chauffée</span>
+              <span class="sim-surf-wrap"><input type="number" id="sim-surf-chauffee" value="${state.surface_chauffee != null && state.surface_chauffee !== '' ? Math.round(state.surface_chauffee) : ''}" placeholder="—"><em>m²</em>
+              <button type="button" class="sim-info-btn" id="sim-surf-info" aria-label="Info surface">i</button></span>
+            </label>
+            <label class="l4s-verrou"><input type="checkbox" id="sim-iso-travaux" ${state.iso_deverrouille?'checked':''}> Travaux depuis le DPE</label>
           </div>
           <div class="sim-ctx-sub" id="sim-surf-sub">90% de ${state.surface_habitable ?? '—'} m² habitables${state.surface_forcee?' · <b>forcé</b>':''} → tranche ${labelTranche(c.sKey)} · Puissance reco <b id="sim-puissance-reco">${Number(c.dim?.puissance_kw || 0).toFixed(1)} kW</b></div>
           <div class="sim-info-pop" id="sim-info-pop" hidden>
             Surface <b>habitable</b> ≠ surface <b>chauffée</b>. On retire les pièces non chauffées (WC, salle de bain si sèche-serviette <b>électrique</b>). Défaut = 90% de l'habitable, ajustable.
           </div>
-        </div>
-
-        <div class="sim-block">
-          <div class="sim-block-title">ISOLATION DU LOGEMENT</div>
-          <label class="sim-field sim-field--requis"><span>Toit / Comble</span>
-            <select id="iso-toit" name="iso_toit">
-              <option value="tres_bien" ${sel(state.iso_toit,'tres_bien')}>Très bien isolé</option>
-              <option value="bien" ${sel(state.iso_toit,'bien')}>Bien isolé</option>
-              <option value="isole" ${sel(state.iso_toit,'isole')}>Isolé</option>
-              <option value="peu" ${sel(state.iso_toit,'peu')}>Peu isolé</option>
-              <option value="non" ${sel(state.iso_toit,'non')}>Non isolé</option>
-            </select>
-            <span style="display:block;font-size:10px;font-weight:400;color:#8A92A0;line-height:1.3;margin-top:3px;margin-bottom:0;">&lt; 5 ans/neuf = Très bien · 5-15 ans = Bien · +15 ans = Isolé · ancienne/origine = Peu · jamais = Non</span>
-          </label>
-          <label class="sim-field sim-field--requis"><span>Mur</span>
-            <select id="iso-mur" name="iso_mur">
-              <option value="tres_bien" ${sel(state.iso_mur,'tres_bien')}>Très bien isolé</option>
-              <option value="bien" ${sel(state.iso_mur,'bien')}>Bien isolé</option>
-              <option value="isole" ${sel(state.iso_mur,'isole')}>Isolé</option>
-              <option value="peu" ${sel(state.iso_mur,'peu')}>Peu isolé</option>
-              <option value="non" ${sel(state.iso_mur,'non')}>Non isolé</option>
-            </select>
-            <span style="display:block;font-size:10px;font-weight:400;color:#8A92A0;line-height:1.3;margin-top:3px;margin-bottom:0;">&lt; 5 ans/neuf = Très bien · 5-15 ans = Bien · +15 ans = Isolé · ancienne/origine = Peu · brut = Non</span>
-          </label>
-          <label class="sim-field sim-field--requis"><span>Menuiserie</span>
-            <select id="iso-menuiserie" name="iso_menuiserie">
-              <option value="double" ${sel(state.iso_menuiserie,'double')}>Double vitrage</option>
-              <option value="sur_vitrage" ${sel(state.iso_menuiserie,'sur_vitrage')}>Survitrage</option>
-              <option value="simple" ${sel(state.iso_menuiserie,'simple')}>Simple vitrage</option>
-            </select>
-            <span style="display:block;font-size:10px;font-weight:400;color:#8A92A0;line-height:1.3;margin-top:3px;margin-bottom:0;">2 vitres = Double · vitre ajoutée = Survitrage · 1 vitre = Simple</span>
-          </label>
-          <button class="sim-btn-note-dim" type="button" onclick="event.stopPropagation(); window.ouvrirNoteDim(); return false;">📋 Voir la note de dimensionnement</button>
-        </div>
-
-        <div class="sim-section-label">Paramètres PAC</div>
-        <div class="sim-row2">
-
-          <label class="sim-field sim-field--requis"><span>Service</span>
-            <select id="sim-service">
-              <option value="chauffage_seul" ${sel(state.service,'chauffage_seul')}>Chauffage seul</option>
-              <option value="chauffage_ecs" ${sel(state.service,'chauffage_ecs')}>Chauffage + ECS</option>
-            </select>
-          </label>
-        </div>
-        <div class="sim-note" id="sim-service-note">${ballonAutorise(state) ? 'La PAC assure le chauffage. Pour l\'eau chaude : conserver l\'existant ou ajouter un ballon thermodynamique (sans aide MaPrimeRénov\' depuis le 01/09/2026).' : 'La PAC (modèle DUO) assure le chauffage et l\'eau chaude. Aucun ballon à ajouter.'}</div>
-
-        ${renderNiveaux()}
-
-        <!-- COMPTE DE RÉSULTAT -->
-        <div class="sim-section-label">Du prix au reste à charge</div>
-        <div class="sim-pnl">
-          <div class="sim-pnl-line sim-pnl-prix">
-            <span>Prix PAC fourni posé <i>· note de dimensionnement</i></span>
-            <span class="sim-pnl-edit-wrap">
-              <span class="sim-pnl-edit"><input type="text" inputmode="numeric" id="sim-prix" value="${new Intl.NumberFormat('fr-FR').format(state.prix_pac||0)}"><em>€</em></span>
-              <span class="sim-allmodels"${state.show_all_models ? '' : ' hidden'}><select id="sim-modele-select" class="sim-model-select">
-                ${catalogueOptionsOrdonnees(state).map(m => `<option value="${m.id}" ${m.id===state.modele_pac_id?'selected':''}>${m.label} · ${puissanceModele(m)} kW · ${eur(m.prix_ttc)}</option>`).join('')}
-              </select></span>
-              ${state.sous_dimensionnement ? '<span class="sim-warn-badge">⚠ Vérifier</span>' : ''}
-            </span>
+          <div class="l4s-iso${verrou ? ' is-verrou' : ''}">
+            <label class="sim-field"><span>Toit / combles</span>
+              <select id="iso-toit" name="iso_toit" ${dis}>
+                <option value="tres_bien" ${sel(state.iso_toit,'tres_bien')}>Très bien isolé</option>
+                <option value="bien" ${sel(state.iso_toit,'bien')}>Bien isolé</option>
+                <option value="isole" ${sel(state.iso_toit,'isole')}>Isolé</option>
+                <option value="peu" ${sel(state.iso_toit,'peu')}>Peu isolé</option>
+                <option value="non" ${sel(state.iso_toit,'non')}>Non isolé</option>
+              </select></label>
+            <label class="sim-field"><span>Murs</span>
+              <select id="iso-mur" name="iso_mur" ${dis}>
+                <option value="tres_bien" ${sel(state.iso_mur,'tres_bien')}>Très bien isolé</option>
+                <option value="bien" ${sel(state.iso_mur,'bien')}>Bien isolé</option>
+                <option value="isole" ${sel(state.iso_mur,'isole')}>Isolé</option>
+                <option value="peu" ${sel(state.iso_mur,'peu')}>Peu isolé</option>
+                <option value="non" ${sel(state.iso_mur,'non')}>Non isolé</option>
+              </select></label>
+            <label class="sim-field"><span>Fenêtres</span>
+              <select id="iso-menuiserie" name="iso_menuiserie" ${dis}>
+                <option value="double" ${sel(state.iso_menuiserie,'double')}>Double vitrage</option>
+                <option value="sur_vitrage" ${sel(state.iso_menuiserie,'sur_vitrage')}>Survitrage</option>
+                <option value="simple" ${sel(state.iso_menuiserie,'simple')}>Simple vitrage</option>
+              </select></label>
           </div>
-          ${state.selection_alerte ? `<div class="sim-note sim-note--warn" id="sim-selection-alerte">${state.selection_alerte}</div>` : ''}
-${renderBallonBloc(state, bs)}
-          <div class="sim-pnl-sep"></div>
-          <div class="sim-pnl-line sim-pnl-minus"><span>– MaPrimeRénov'${bs.actif ? ' — PAC' : ' (devis)'}</span><b id="sim-mpr">${eurDash(c.mprDevis, c.contextePret)}</b></div>
-          <div class="sim-pnl-line sim-pnl-minus"><span>– Prime CEE (devis)</span><b id="sim-cee">${eurDash(c.ceeDevis, c.contextePret)}</b></div>
-          <div class="sim-pnl-line sim-pnl-sub"><span>= Aides déduites</span><b id="sim-aides">${eurDash(c.aidesDevis, c.contextePret)}</b></div>
-          <div class="sim-pnl-sep sim-pnl-sep--strong"></div>
-          <div class="sim-pnl-line sim-pnl-reste"><span>Reste à charge</span><strong id="sim-reste">${eurDash(c.reste_affiche, c.contextePret)}</strong></div>
+          <div class="l4-aide">Surface chauffée : 90 % de la surface habitable (sans garage ni combles), à corriger si le client chauffe moins de pièces. L'isolation vient du DPE ; ne la changez que si des travaux ont été faits depuis.</div>
+        </section>
+
+        <section class="l4s-sec">
+          <h4 class="l4s-titre"><span class="l4s-n">3</span>PAC proposée</h4>
+          ${renderNiveaux()}
+          <button class="sim-btn-note-dim" type="button" onclick="event.stopPropagation(); window.ouvrirNoteDim(); return false;">📋 Note de dimensionnement</button>
+        </section>
+
+        <section class="l4s-sec">
+          <h4 class="l4s-titre"><span class="l4s-n">4</span>Eau chaude</h4>
+          ${ballonAutorise(state) ? renderBallonBloc(state, bs, 'choix') : '<div class="sim-note" id="sim-ecs-duo">Assurée par la PAC DUO.</div>'}
+        </section>
+
         </div>
+        <div class="l4s-col">
+
+        <section class="l4s-sec">
+          <h4 class="l4s-titre"><span class="l4s-n">5</span>Du prix au reste à charge</h4>
+          <div class="sim-pnl">
+            <div class="sim-pnl-line sim-pnl-prix">
+              <span>Prix PAC fourni posé</span>
+              <span class="sim-pnl-edit-wrap">
+                <span class="sim-pnl-edit"><input type="text" inputmode="numeric" id="sim-prix" value="${new Intl.NumberFormat('fr-FR').format(state.prix_pac||0)}"><em>€</em></span>
+                <span class="sim-allmodels"${state.show_all_models ? '' : ' hidden'}><select id="sim-modele-select" class="sim-model-select">
+                  ${catalogueOptionsOrdonnees(state).map(m => `<option value="${m.id}" ${m.id===state.modele_pac_id?'selected':''}>${m.label} · ${puissanceModele(m)} kW · ${eur(m.prix_ttc)}</option>`).join('')}
+                </select></span>
+                ${state.sous_dimensionnement ? '<span class="sim-warn-badge">⚠ Vérifier</span>' : ''}
+              </span>
+            </div>
+            ${state.selection_alerte ? `<div class="sim-note sim-note--warn" id="sim-selection-alerte">${state.selection_alerte}</div>` : ''}
+            ${renderBallonBloc(state, bs, 'couts')}
+            <div class="sim-pnl-sep"></div>
+            <div class="sim-pnl-line sim-pnl-minus"><span>– MaPrimeRénov'${bs.actif ? ' — PAC' : ' (devis)'}</span><b id="sim-mpr">${eurDash(c.mprDevis, c.contextePret)}</b></div>
+            <div class="sim-pnl-line sim-pnl-minus"><span>– Prime CEE (devis)</span><b id="sim-cee">${eurDash(c.ceeDevis, c.contextePret)}</b></div>
+            <div class="sim-pnl-line sim-pnl-sub"><span>= Aides déduites</span><b id="sim-aides">${eurDash(c.aidesDevis, c.contextePret)}</b></div>
+            <div class="sim-pnl-sep sim-pnl-sep--strong"></div>
+            <div class="sim-pnl-line sim-pnl-reste"><span>Reste à charge</span><strong id="sim-reste">${eurDash(c.reste_affiche, c.contextePret)}</strong></div>
+          </div>
+        </section>
 
         <!-- ZONE DYNAMIQUE : recalculée sans toucher aux champs de saisie -->
         <div id="sim-dynamic">${renderDynamic(c, r, energieLbl, creditLine, totalApres, delta, phraseRoi)}</div>
 
+        </div>
+        </div>
+
+        <div class="l4s-barre" id="sim-barre">
+          <div class="l4s-barre-chiffres">
+            <span>Reste à charge <b id="sim-barre-reste">${eurDash(c.reste_affiche, c.contextePret)}</b></span>
+            <span>Économie mensuelle <b id="sim-barre-eco">${state.eco ? eur(state.eco.avant_mensuel - state.eco.apres_mensuel) + '/mois' : '—'}</b></span>
+          </div>
+          <label class="l4s-case"><input type="checkbox" id="sim-afficher-apercu" ${state.afficher_apercu !== false ? 'checked' : ''}> Économies sur le devis</label>
+          <label class="l4s-case"><input type="checkbox" id="sim-afficher-mention-mpr" ${state.afficher_mention_mpr !== false ? 'checked' : ''}> Mention MaPrimeRénov'</label>
+          <button type="button" id="btn-pre-devis" class="l4s-btn l4s-btn--sec">Pré-devis</button>
+          <button type="button" id="btn-voir-devis" class="l4s-btn">📄 Voir le devis</button>
+        </div>
       </div>`;
+  }
+
+  // Pastilles de contexte (en-tête du simulateur) : énergie + facture + source, émetteurs + zone,
+  // personnes + catégorie — lues dans l'état (lui-même relu depuis la fiche).
+  function pastillesContexte(anahLabel, ceeLabel){
+    const lib = { reel:'réelle', a_confirmer:'à confirmer', audit:'audit', dpe:'DPE', estime:'estimée' };
+    const e = ENERGIE_LABEL[state.energie_avant];
+    const f = Number(state.cout_mensuel_fiche) || 0;
+    const em = document.querySelector('#form-prospect [name="type_emetteurs"]');
+    const emLib = em && em.value ? (em.options[em.selectedIndex] || {}).text || em.value : '';
+    const cat = anahLabel ? anahLabel + (ceeLabel ? ' · ' + ceeLabel + ' (CEE)' : '') : '';
+    const p = [];
+    p.push(`<span class="l4s-pastille">${e ? e.charAt(0).toUpperCase() + e.slice(1) : 'Énergie ?'}${f ? ' · ' + eur(Math.round(f * 12)) + '/an' : ''}${f && lib[state.cout_source] ? ' · ' + lib[state.cout_source] : ''}</span>`);
+    p.push(`<span class="l4s-pastille">${emLib || 'Émetteurs ?'} · zone ${state.zone || '—'}</span>`);
+    p.push(`<span class="l4s-pastille">${state.nombre_personnes ? state.nombre_personnes + ' pers.' : 'Personnes ?'} · ${cat || 'catégorie ?'}</span>`);
+    return p.join('');
+  }
+
+  // Mois nécessaires pour que les économies remboursent un paiement comptant (hausse annuelle
+  // appliquée par année, comme projeter()). null si pas remboursé sur la durée de vie.
+  function moisRentabilite(eco, debourse){
+    if (!eco || !(debourse > 0)) return eco ? 0 : null;
+    let cumul = 0;
+    for (let m = 1; m <= eco.duree_ans * 12; m++){
+      const k = Math.floor((m - 1) / 12);
+      const avant = eco.chauffage_avant * Math.pow(1 + eco.inflation_avant, k) + eco.ecs_actuelle * Math.pow(1 + eco.inflation_ecs_avant, k);
+      const apres = eco.apres_annuel * Math.pow(1 + eco.inflation_apres, k);
+      cumul += (avant - apres) / 12;
+      if (cumul >= debourse) return m;
+    }
+    return null;
   }
 
   // Partie recalculée à chaque frappe/clic (aucun input dedans -> pas de souci de curseur)
   function renderDynamic(c, r, energieLbl, creditLine, totalApres, delta, phraseRoi){
+    const comptant = state.option === 'opt3';
+    const avanceCash = c.sansAttente && c.finMpr !== 'credit';
+    const mois = comptant ? moisRentabilite(state.eco, c.resteAttente) : null;
+    const lib = c.finView.libelles || {};
+    const carteCredit = (opt, nom, taux, duree, mens) => `
+          <button type="button" class="l4s-credit ${state.option===opt?'active':''}" data-opt="${opt}">
+            <span class="l4s-credit-nom">${nom}</span>
+            <span>${String(taux).replace('.',',')} % · ${duree} mois</span>
+            <span>Montant financé <b>${eur(c.base_credit)}</b></span>
+            <span class="l4s-credit-mens"><b>${eur(mens)}</b>/mois</span>
+          </button>`;
     return `
-        <!-- FINANCEMENT : 3 options sur une ligne -->
-        ${c.mprTotal > 0 ? `
-        <div class="sim-section-label">Mode MaPrimeRénov'</div>
-        <div class="sim-opts">
-          <button type="button" class="sim-opt ${c.modeMpr==='sans_attente'?'':'active'}" data-mode-mpr="attente">
-            <span class="sim-opt-tag">Mode</span><span class="sim-opt-name">Attente MPR</span><span class="sim-opt-sub">délai 5 mois · Hexa avance</span>
-          </button>
-          <button type="button" class="sim-opt ${c.modeMpr==='sans_attente'?'active':''}" data-mode-mpr="sans_attente">
-            <span class="sim-opt-tag">Mode</span><span class="sim-opt-name">Sans attente MPR</span><span class="sim-opt-sub">délai 0 mois · démarrage immédiat</span>
-          </button>
-        </div>` : ''}
-        ${c.sansAttente ? `
-        <div class="sim-opts">
-          <button type="button" class="sim-opt ${c.finMpr==='credit'?'':'active'}" data-fin-mpr="cash">
-            <span class="sim-opt-tag">Avance MPR</span><span class="sim-opt-name">MPR payée cash</span><span class="sim-opt-sub">mensualité inchangée</span>
-          </button>
-          <button type="button" class="sim-opt ${c.finMpr==='credit'?'active':''}" data-fin-mpr="credit">
-            <span class="sim-opt-tag">Avance MPR</span><span class="sim-opt-name">MPR financée à crédit</span><span class="sim-opt-sub">mensualité plus élevée</span>
-          </button>
-        </div>` : ''}
-        <div class="sim-section-label">Financement du reste à charge</div>
-        <div class="sim-opts">
-          <button type="button" class="sim-opt ${state.option==='opt1'?'active':''}" data-opt="opt1">
-            <span class="sim-opt-tag">Option 1</span>
-            <span class="sim-opt-name">${c.finView.libelles.option1 || 'Crédit Travaux'}</span>
-            <span class="sim-opt-sub">${String(c.finView.tauxO1Pct).replace('.',',')} % · ${c.finView.dureeO1} mois</span>
-            <span class="sim-opt-amt">${eur(c.mensO1)}<small>/mois</small></span>
-          </button>
-          <button type="button" class="sim-opt ${state.option==='opt2'?'active':''}" data-opt="opt2">
-            <span class="sim-opt-tag">Option 2</span>
-            <span class="sim-opt-name">${c.finView.libelles.option2 || 'Éco-PTZ'}</span>
-            <span class="sim-opt-sub">${String(c.finView.tauxO2Pct).replace('.',',')} % · ${c.finView.dureeO2} mois</span>
-            <span class="sim-opt-amt">${eur(c.mensO2)}<small>/mois</small></span>
-          </button>
-          <button type="button" class="sim-opt ${state.option==='opt3'?'active':''}" data-opt="opt3">
-            <span class="sim-opt-tag">Option 3</span>
-            <span class="sim-opt-name">${c.finView.libelles.option3 || 'Fonds propres'}</span>
-            <span class="sim-opt-sub">comptant</span>
-            <span class="sim-opt-amt">${eur(c.reste_affiche)}<small> 1 fois</small></span>
-          </button>
-        </div>
-        ${state.option==='opt1' && c.finView.mention ? `<div class="sim-note">${c.finView.mention}</div>` : ''}
+        <section class="l4s-sec">
+          <h4 class="l4s-titre"><span class="l4s-n">6</span>Quand démarrer les travaux ?</h4>
+          ${c.mprTotal > 0 ? `
+          <div class="l4-choix">
+            <button type="button" class="${c.modeMpr==='sans_attente'?'':'active'}" data-mode-mpr="attente">Attendre l'accord MPR · ~5 mois</button>
+            <button type="button" class="${c.modeMpr==='sans_attente'?'active':''}" data-mode-mpr="sans_attente">Tout de suite</button>
+          </div>
+          <div class="l4-aide">${c.modeMpr==='sans_attente' ? 'Travaux tout de suite, mais le client avance la prime en attendant qu\'elle lui soit versée.' : 'Le client attend l\'accord de la prime (environ 5 mois) avant les travaux. Il n\'avance rien.'}</div>
+          ${c.sansAttente ? `
+          <div class="l4s-sous">Le client avance la prime MaPrimeRénov' (${eur(c.mprTotal)}) :</div>
+          <div class="l4-choix">
+            <button type="button" class="${c.finMpr==='credit'?'':'active'}" data-fin-mpr="cash">De sa poche</button>
+            <button type="button" class="${c.finMpr==='credit'?'active':''}" data-fin-mpr="credit">Ajoutée au crédit</button>
+          </div>
+          <div class="l4-aide">${c.finMpr==='credit' ? 'Mensualité plus élevée.' : 'Sa mensualité ne change pas.'}</div>` : ''}` : `
+          <div class="sim-note">Pas de prime MaPrimeRénov' pour ce foyer : rien à attendre, rien à avancer.</div>`}
+        </section>
+
+        <section class="l4s-sec">
+          <h4 class="l4s-titre"><span class="l4s-n">7</span>Comment il paie son reste à charge ?</h4>
+          <div class="l4-choix">
+            <button type="button" class="${comptant?'':'active'}" data-paie="credit">À crédit</button>
+            <button type="button" class="${comptant?'active':''}" data-paie="comptant">Comptant · ${eur(c.resteAttente)}</button>
+          </div>
+          ${comptant ? '' : `
+          <div class="l4s-credits">
+            ${carteCredit('opt1', lib.option1 || 'Crédit Travaux', c.finView.tauxO1Pct, c.finView.dureeO1, c.mensO1)}
+            ${carteCredit('opt2', lib.option2 || 'Éco-PTZ', c.finView.tauxO2Pct, c.finView.dureeO2, c.mensO2)}
+          </div>
+          ${state.option==='opt1' && c.finView.mention ? `<div class="sim-note">${c.finView.mention}</div>` : ''}`}
+        </section>
 
         ${!state.eco ? `<div class="sim-note sim-note--warn" id="sim-eco-indisponible">Économies non calculées : renseignez la facture de l'énergie de la chaudière, ou la surface et l'énergie du logement pour l'estimer.</div>` : ''}
         ${state.eco && state.eco.alerte ? `<div class="sim-note sim-note--warn" id="sim-eco-alerte">Résultat inhabituel : vérifiez la facture et l'énergie saisies.</div>` : ''}
-        <!-- AVANT / APRÈS PAC (live) -->
-        <div class="sim-section-label">Avant / Après PAC</div>
-        <div class="sim-aa">
-          <div class="sa-line"><span>Avant — ${energieLbl}${state.eco ? (state.eco.ecs_traitee ? ' <i>(chauffage + eau chaude)</i>' : (state.facture_avant < Math.round(state.eco.facture_annuelle / 12) ? ` <i>(${eur(Math.round(state.eco.facture_annuelle / 12))} déclarés, dont chauffage)</i>` : '')) : ''}</span><b class="muted" id="sim-facture-avant">${state.eco ? eur(state.facture_avant) + '/mois' : '—'}</b></div>
-          <div class="sim-pnl-sep"></div>
-          <div class="sa-line"><span>Après — PAC${state.eco && state.eco.ecs_traitee ? ' <i>(chauffage + eau chaude)</i>' : ''}</span><b id="sim-facture-apres">${state.eco ? eur(state.facture_apres) + '/mois' : '—'}</b></div>
-          ${creditLine}
-          <div class="sim-pnl-sep"></div>
-          <div class="sa-line total"><span>Total après</span><b>${eur(totalApres)}/mois</b></div>
-          <div class="sa-delta ${delta>=0?'win':'warn'}"${state.eco ? '' : ' hidden'}>${delta>=0?`✓ Économie de ${eur(delta)}/mois (${eur(delta*12)}/an) dès maintenant`:`Surcoût de ${eur(Math.abs(delta))}/mois (${eur(Math.abs(delta)*12)}/an) pendant le crédit`}</div>
-        </div>
+        <section class="l4s-sec">
+          <h4 class="l4s-titre">Ce que le client paie chaque mois</h4>
+          <div class="sim-aa">
+            <div class="sa-line"><span>Avant — ${energieLbl}${state.eco ? (state.eco.ecs_traitee ? ' <i>(chauffage + eau chaude)</i>' : (state.facture_avant < Math.round(state.eco.facture_annuelle / 12) ? ` <i>(${eur(Math.round(state.eco.facture_annuelle / 12))} déclarés, dont chauffage)</i>` : '')) : ''}</span><b class="muted" id="sim-facture-avant">${state.eco ? eur(state.facture_avant) + '/mois' : '—'}</b></div>
+            <div class="sim-pnl-sep"></div>
+            <div class="sa-line"><span>Après — PAC${state.eco && state.eco.ecs_traitee ? ' <i>(chauffage + eau chaude)</i>' : ''}</span><b id="sim-facture-apres">${state.eco ? eur(state.facture_apres) + '/mois' : '—'}</b></div>
+            ${creditLine}
+            <div class="sim-pnl-sep"></div>
+            <div class="sa-line total"><span>Total après</span><b>${eur(totalApres)}/mois</b></div>
+            <div class="sa-delta ${delta>=0?'win':'warn'}"${state.eco ? '' : ' hidden'}>${delta>=0?`✓ Économie de ${eur(delta)}/mois (${eur(delta*12)}/an) dès maintenant`:`Surcoût de ${eur(Math.abs(delta))}/mois (${eur(Math.abs(delta)*12)}/an) pendant le crédit`}</div>
+          </div>
+        </section>
 
-        <!-- ROI -->
         <div class="sim-roi">
           <div class="sim-roi-head">
-            ${r.indisponible ? `Économies à calculer` : !r.anneeRentable ? `Rentabilité au-delà de ${r.dureeVie} ans` : r.estCredit ? (delta>=0 ? `Moins cher dès le <b>1er mois</b>` : `Rentable dès la <b>${r.anneeRentable}ᵉ année</b>`) : `Remboursé en <b>${r.anneeRentable} ans</b>`}
+            ${r.indisponible ? `Économies à calculer`
+              : comptant ? (mois ? `Paiement de <b>${eur(c.resteAttente)}</b> · rentabilisé en <b>${mois} mois</b>` : `Paiement de <b>${eur(c.resteAttente)}</b> · rentabilité au-delà de ${r.dureeVie} ans`)
+              : !r.anneeRentable ? `Rentabilité au-delà de ${r.dureeVie} ans`
+              : r.estCredit ? (delta>=0 ? `Moins cher dès le <b>1er mois</b>` : `Rentable dès la <b>${r.anneeRentable}ᵉ année</b>`) : `Remboursé en <b>${r.anneeRentable} ans</b>`}
             <button type="button" class="sim-info-btn" id="sim-roi-info" aria-label="Détail calcul">i</button>
           </div>
+          ${comptant && avanceCash && !r.indisponible ? `<div class="l4s-avance" id="sim-avance-prime">+ avance de ${eur(c.mprTotal)}, rendue par la prime</div>` : ''}
           <div class="sim-roi-phrase">${phraseRoi}</div>
           <div class="sim-roi-big-wrap">${r.anneeRentable?`<span class="sim-roi-big">${eur(r.total20)}</span><span class="sim-roi-big-sub">économisés sur ${r.dureeVie} ans</span>`:''}</div>
           ${state.eco ? `<div class="sim-roi-base" id="sim-roi-base" style="font-size:11px;color:#6B7280;margin-top:4px;">${ligneBase(r)}</div>` : ''}
           <div class="sim-roi-pop" id="sim-roi-pop" hidden>
             ${explicationCalcul(c, r, energieLbl)}
           </div>
-        </div>
-        <label class="sim-apercu-toggle" style="display:flex;align-items:center;gap:8px;margin:10px 0 6px;font-size:13px;cursor:pointer;user-select:none;">
-          <input type="checkbox" id="sim-afficher-apercu" ${state.afficher_apercu !== false ? 'checked' : ''} style="width:16px;height:16px;flex:0 0 auto;cursor:pointer;">
-          <span>Afficher les économies et le ROI sur le devis/pré-devis</span>
-        </label>
-        <label class="sim-apercu-toggle" style="display:flex;align-items:center;gap:8px;margin:10px 0 6px;font-size:13px;cursor:pointer;user-select:none;">
-          <input type="checkbox" id="sim-afficher-mention-mpr" ${state.afficher_mention_mpr !== false ? 'checked' : ''} style="width:16px;height:16px;flex:0 0 auto;cursor:pointer;">
-          <span>Afficher la mention MaPrimeRénov' (option de démarrage) sur le devis/pré-devis</span>
-        </label>
-        <button type="button" id="btn-voir-devis" class="cta-primary-large">📄 Voir le devis</button>`;
+        </div>`;
   }
 
 
@@ -15654,6 +15700,12 @@ ${renderBallonBloc(state, bs)}
     set('sim-cee', eurDash(c.ceeDevis, c.contextePret));
     set('sim-aides', eurDash(c.aidesDevis, c.contextePret));
     set('sim-reste', eurDash(c.reste_affiche, c.contextePret));
+    set('sim-barre-reste', eurDash(c.reste_affiche, c.contextePret));
+    set('sim-barre-eco', state.eco ? eur(state.eco.avant_mensuel - state.eco.apres_mensuel) + '/mois' : '—');
+    const caseApercu = document.getElementById('sim-afficher-apercu');
+    if (caseApercu) caseApercu.checked = state.afficher_apercu !== false;
+    const ctxSim = document.getElementById('sim-contexte');
+    if (ctxSim) ctxSim.innerHTML = pastillesContexte(LABELS_ANAH[c.categorie] || '', LABELS_CEE[c.categorie] || '');
     set('sim-ballon-montant', eur(bs.totalTTC));
     set('sim-soustotal', eur((state.prix_pac||0) + bs.totalTTC));
     const prixInput = document.getElementById('sim-prix');
@@ -15731,16 +15783,36 @@ ${renderBallonBloc(state, bs)}
       patch();
     }));
     // options de financement : refresh complet (pas d'input -> ok), scroll préservé
-    document.querySelectorAll('.sim-opt[data-opt]').forEach(btn=>{
-      btn.addEventListener('click',()=>{ state.option=btn.dataset.opt; scheduleSaveSimulatorState(); refresh(); });
+    // Lot 4 : tous les boutons du simulateur par DÉLÉGATION sur le conteneur -> ils restent actifs
+    // après un patch() (frappe dans le prix), qui réinjecte la zone dynamique.
+    const conteneur = document.getElementById('sim-drawer-content');
+    if (conteneur && !conteneur.dataset.l4Delegue) {
+      conteneur.dataset.l4Delegue = '1';
+      conteneur.addEventListener('click', (e) => {
+        const b = e.target.closest && e.target.closest('button');
+        if (!b || !conteneur.contains(b)) return;
+        if (b.dataset.modeMpr) { state.mode_mpr = b.dataset.modeMpr; }
+        else if (b.dataset.finMpr) { state.financement_mpr = b.dataset.finMpr; }
+        else if (b.dataset.opt) { state.option = b.dataset.opt; }
+        else if (b.dataset.paie) { state.option = b.dataset.paie === 'comptant' ? 'opt3' : (state.option === 'opt3' ? 'opt1' : state.option); }
+        else if (b.id === 'btn-voir-devis') { ouvrirModalDevis(); return; }
+        else if (b.id === 'btn-pre-devis') { ouvrirModalDevis('pre_devis'); return; }
+        else if (b.closest('[data-sim-for="sim-service"]')) {
+          // même effet que l'ancienne liste : change déclenché (recalcul + sauvegarde de l'état)
+          const selService = document.getElementById('sim-service');
+          if (selService) {
+            selService.value = b.dataset.valeur;
+            selService.dispatchEvent(new Event('change', { bubbles: true }));
+          }
+          return;
+        }
+        else return;
+        scheduleSaveSimulatorState(); refresh();
+      });
+    }
+    document.getElementById('sim-iso-travaux')?.addEventListener('change', (e) => {
+      state.iso_deverrouille = !!e.target.checked; refresh();
     });
-    document.querySelectorAll('.sim-opt[data-mode-mpr]').forEach(btn=>{
-      btn.addEventListener('click',()=>{ state.mode_mpr=btn.dataset.modeMpr; scheduleSaveSimulatorState(); refresh(); });
-    });
-    document.querySelectorAll('.sim-opt[data-fin-mpr]').forEach(btn=>{
-      btn.addEventListener('click',()=>{ state.financement_mpr=btn.dataset.finMpr; scheduleSaveSimulatorState(); refresh(); });
-    });
-    document.getElementById('btn-voir-devis')?.addEventListener('click', ouvrirModalDevis);
     if (!window.__apercuToggleDelegated){
       window.__apercuToggleDelegated = true;
       document.addEventListener('change', (e)=>{
@@ -15823,6 +15895,24 @@ ${renderBallonBloc(state, bs)}
     return document.getElementById('sim-drawer')?.classList.contains('is-open');
   }
 
+  // Lot 4 : la session DPE pré-remplit l'isolation (toit, murs, fenêtres). Refusé si l'utilisateur a
+  // déverrouillé (« Travaux depuis le DPE ») ; valeurs inconnues ignorées.
+  window.setIsolationDpe = function(toit, mur, fenetres){
+    if (state.iso_deverrouille) return false;
+    const niveaux = ['tres_bien', 'bien', 'isole', 'peu', 'non'];
+    const vitrages = ['double', 'sur_vitrage', 'simple'];
+    let change = false;
+    if (niveaux.includes(toit)) { state.iso_toit = toit; change = true; }
+    if (niveaux.includes(mur)) { state.iso_mur = mur; change = true; }
+    if (vitrages.includes(fenetres)) { state.iso_menuiserie = fenetres; change = true; }
+    if (!change) return false;
+    state.modele_force = false;
+    syncSimStateToForm();
+    scheduleSaveSimulatorState();
+    if (estOuvert()) refresh();
+    return true;
+  };
+
   // Lot 4 : « Estimation express » de la colonne de droite. Même calcul que le simulateur
   // (état sauvegardé du lead + fiche), sans l'ouvrir ni rien sauvegarder.
   let seqExpress = 0;
@@ -15856,6 +15946,8 @@ ${renderBallonBloc(state, bs)}
 
     state.numero = numero || state.numero;
     lireContexteFiche();
+    // Lot 4 : le simulateur prend la place de la colonne de droite de la fiche
+    const hoteLot4 = (typeof window.hexaLot4Hote === 'function') ? window.hexaLot4Hote() : null;
 
     if (!document.getElementById('sim-drawer')){
       const panel = document.createElement('aside');
@@ -15870,12 +15962,13 @@ ${renderBallonBloc(state, bs)}
             <span class="comments-panel-title-main">SIMULATEUR</span>
             <span class="comments-panel-title-sub" id="sim-drawer-prospect">${state.numero||'—'}</span>
           </div>
+          <button type="button" class="l4-aide-btn" id="sim-aide-btn" onclick="window.hexaReglerAide && window.hexaReglerAide(!document.body.classList.contains('l4-aide-on'))">Aide</button>
           <button type="button" class="comments-panel-close" onclick="window.fermerSimulationsDrawer()" aria-label="Fermer">&times;</button>
         </div>
         <div id="sim-drawer-content"></div>`;
-      leftSlot().appendChild(panel);
-    } else if (document.getElementById('sim-drawer').parentNode !== leftSlot()){
-      leftSlot().appendChild(document.getElementById('sim-drawer'));
+      (hoteLot4 || leftSlot()).appendChild(panel);
+    } else if (document.getElementById('sim-drawer').parentNode !== (hoteLot4 || leftSlot())){
+      (hoteLot4 || leftSlot()).appendChild(document.getElementById('sim-drawer'));
     }
 
     const sub = document.getElementById('sim-drawer-prospect');
@@ -15892,12 +15985,15 @@ ${renderBallonBloc(state, bs)}
     // PAS de fermeture des panneaux droits : gauche et droite cohabitent.
     requestAnimationFrame(()=>{
       document.getElementById('sim-drawer')?.classList.add('is-open');
-      leftSlot().classList.add('is-open');
-      document.body.classList.add('sim-left-open');
+      if (!hoteLot4) {
+        leftSlot().classList.add('is-open');
+        document.body.classList.add('sim-left-open');
+      }
     });
   }
 
   function fermer(){
+    if (typeof window.hexaLot4FermerHote === 'function') window.hexaLot4FermerHote();
     document.getElementById('sim-drawer')?.classList.remove('is-open');
     document.getElementById('hexa-panel-slot-left')?.classList.remove('is-open');
     document.body.classList.remove('sim-left-open');
@@ -15915,6 +16011,7 @@ ${renderBallonBloc(state, bs)}
       if (leftWasOpen){
         requestAnimationFrame(()=>{
           document.getElementById('sim-drawer')?.classList.add('is-open');
+          if (document.body.classList.contains('l4-simu-ouvert')) return;   // Lot 4 : à droite, rien à décaler
           document.getElementById('hexa-panel-slot-left')?.classList.add('is-open');
           document.body.classList.add('sim-left-open');
         });
@@ -15998,7 +16095,7 @@ ${renderBallonBloc(state, bs)}
     wrap.addEventListener('click', (e)=>{ if (e.target === wrap) close(); });
   }
 
-  async function ouvrirModalDevis(){
+  async function ouvrirModalDevis(varianteForcee){
     const numero = state.numero || document.body.dataset.prospectNumero;
     if(!numero) return;
     const validation = await fetch(`/api/devis/${encodeURIComponent(numero)}/validate`, { cache:'no-store' }).then(r=>r.json()).catch(()=>({ok:false, missing:['Validation indisponible']}));
@@ -16026,7 +16123,7 @@ ${renderBallonBloc(state, bs)}
     wrap.id = 'devis-modal-overlay';
     wrap.className = 'devis-modal-overlay';
     const vtOk = document.body.dataset.vtValidee === '1';
-    const _variante = vtOk ? 'devis' : 'pre_devis';
+    const _variante = (varianteForcee === 'pre_devis' || varianteForcee === 'devis') ? varianteForcee : (vtOk ? 'devis' : 'pre_devis');
     const devisUrl = `/api/devis/${encodeURIComponent(numero)}/preview?variante=${_variante}&t=${Date.now()}`;
     const notedimUrl = `/api/notedim/${encodeURIComponent(numero)}/preview?t=${Date.now()}`;
     wrap.innerHTML = `
@@ -21769,12 +21866,29 @@ ${renderBallonBloc(state, bs)}
   function lireAide() { try { const v = localStorage.getItem(cleAide()); return v === null ? true : v === '1'; } catch (_) { return true; } }
   function reglerAide(on) {
     document.body.classList.toggle('l4-aide-on', !!on);
-    const b = q('#l4-aide-btn');
-    if (b) { b.classList.toggle('active', !!on); b.setAttribute('aria-pressed', on ? 'true' : 'false'); b.textContent = on ? 'Aide ✓' : 'Aide'; }
+    ['#l4-aide-btn', '#sim-aide-btn'].forEach(sel => {
+      const b = q(sel);
+      if (b) { b.classList.toggle('active', !!on); b.setAttribute('aria-pressed', on ? 'true' : 'false'); b.textContent = on ? 'Aide ✓' : 'Aide'; }
+    });
     try { localStorage.setItem(cleAide(), on ? '1' : '0'); } catch (_) {}
     ajusterHauteur();
   }
   window.hexaReglerAide = reglerAide;
+
+  // ------------------------------------------------------------------ simulateur à droite (Lot 4b)
+  window.hexaLot4Hote = function () {
+    const g = q('#l4-grille');
+    if (!g || window.innerWidth < 1100) return null;      // petit écran : panneau d'origine
+    document.body.classList.add('l4-simu-ouvert');
+    ouvrirBloc(0);                                          // fiche en résumé : une ligne par bloc
+    ajusterHauteur();
+    return g;
+  };
+  window.hexaLot4FermerHote = function () {
+    if (!document.body.classList.contains('l4-simu-ouvert')) return;
+    document.body.classList.remove('l4-simu-ouvert');
+    ajusterHauteur();
+  };
 
   // ------------------------------------------------------------------ chargement d'un lead / nouvelle fiche
   function apresChargement() {
@@ -21853,6 +21967,51 @@ ${renderBallonBloc(state, bs)}
   body.l4-aide-on .l4-aide { display: block; }
   body.l4-aide-on .l4-aide.l4-masque { display: none !important; }
   .l4-aide--bloc { margin: 0 0 8px; }
+  /* ---- simulateur à droite (Lot 4b) ---- */
+  body.l4-simu-ouvert .l4-grille { grid-template-columns: 360px minmax(0, 1fr); }
+  body.l4-simu-ouvert #l4-side { display: none !important; }
+  body.l4-simu-ouvert .l4-grid { grid-template-columns: minmax(0, 1fr); }
+  body.l4-simu-ouvert .l4-grid > * { grid-column: auto !important; }
+  body.l4-simu-ouvert .l4-resume { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  body.l4-simu-ouvert .l4-tete { flex-wrap: wrap; row-gap: 2px; }
+  body.l4-simu-ouvert .l4-resume { flex-basis: 100%; order: 5; padding-left: 32px; }
+  .l4-grille > #sim-drawer { display: none; position: static !important; width: auto !important; height: var(--l4-h, 70vh) !important;
+    visibility: visible !important; opacity: 1 !important; pointer-events: auto !important; transform: none !important;
+    border: 1px solid #E2E8F0; border-radius: 10px; box-shadow: none; overflow: hidden; min-width: 0; }
+  body.l4-simu-ouvert .l4-grille > #sim-drawer.is-open { display: flex; flex-direction: column; }
+  .l4-grille > #sim-drawer .comments-panel-header { display: flex; align-items: center; gap: 10px; padding: 6px 12px; }
+  .l4-grille > #sim-drawer .comments-panel-title { margin-right: auto; }
+  #sim-drawer-content { min-height: 0; }
+  .l4s { display: flex; flex-direction: column; min-height: 100%; }
+  .l4s-contexte { display: flex; flex-wrap: wrap; gap: 6px; padding: 6px 12px 0; }
+  .l4s-pastille { background: #EFF6FF; color: #1E3A8A; border: 1px solid #BFDBFE; border-radius: 12px; padding: 2px 9px; font-size: 11.5px; font-weight: 600; }
+  .l4s-cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; padding: 8px 12px; flex: 1 1 auto; }
+  .l4s-col { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+  .l4s-sec { border: 1px solid #E2E8F0; border-radius: 9px; padding: 8px 10px; background: #fff; }
+  .l4s-titre { margin: 0 0 6px; font-size: 12.5px; font-weight: 700; color: #002E5A; display: flex; align-items: center; gap: 6px; text-transform: none; letter-spacing: 0; }
+  .l4s-titre i { font-weight: 400; color: #64748B; }
+  .l4s-n { width: 18px; height: 18px; border-radius: 50%; background: #002E5A; color: #fff; font-size: 11px; display: inline-flex; align-items: center; justify-content: center; flex: none; }
+  .l4s-ligne { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
+  .l4s-surf .sim-surf-wrap { display: inline-flex; align-items: center; gap: 4px; }
+  .l4s-surf input { width: 80px; }
+  .l4s-verrou { font-size: 12px; color: #334155; display: inline-flex; align-items: center; gap: 5px; margin-bottom: 6px; }
+  .l4s-iso { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin-top: 6px; }
+  .l4s-iso.is-verrou select { background: #F1F5F9; color: #64748B; }
+  .l4s-sous { font-size: 12px; color: #334155; margin: 8px 0 4px; }
+  .l4s-credits { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+  .l4s-credit { display: flex; flex-direction: column; gap: 2px; text-align: left; border: 1px solid #CBD5E1; border-radius: 8px; background: #fff; padding: 7px 9px; font-size: 11.5px; color: #334155; cursor: pointer; font-family: inherit; }
+  .l4s-credit.active { border-color: #002E5A; box-shadow: 0 0 0 1px #002E5A inset; background: #F8FAFC; }
+  .l4s-credit-nom { font-weight: 700; color: #002E5A; font-size: 12.5px; }
+  .l4s-credit-mens b { font-size: 15px; color: #002E5A; }
+  .l4s-avance { font-size: 12px; color: #B45309; margin: 2px 0 4px; }
+  .l4s-barre { position: sticky; bottom: 0; display: flex; align-items: center; gap: 10px; flex-wrap: nowrap; padding: 6px 12px; white-space: nowrap;
+    background: #fff; border-top: 1px solid #E2E8F0; box-shadow: 0 -4px 12px -8px rgba(0,0,0,.15); z-index: 2; }
+  .l4s-barre-chiffres { display: flex; gap: 12px; margin-right: auto; font-size: 12px; color: #334155; min-width: 0; }
+  .l4s-barre-chiffres b { color: #002E5A; font-size: 14px; }
+  .l4s-case { font-size: 11.5px; display: inline-flex; align-items: center; gap: 4px; color: #334155; }
+  .l4s-btn { border: 0; border-radius: 8px; background: #E2214B; color: #fff; font-weight: 700; padding: 6px 12px; cursor: pointer; font-family: inherit; font-size: 12.5px; flex: none; }
+  .l4s-btn--sec { background: #fff; color: #E2214B; border: 1px solid #E2214B; }
+  .l4s .sim-roi, .l4s .sim-aa { margin: 0; }
   .l4-alerte { background: #FEF3C7; border: 1px solid #F59E0B; color: #8A4B00; border-radius: 8px; padding: 7px 10px; font-size: 12.5px; }
   .l4-side { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
   .l4-carte { background: #fff; border: 1px solid #E2E8F0; border-radius: 10px; padding: 10px 12px; }
