@@ -131,6 +131,43 @@ def test_ballon_resolu_en_chauffage_seul_seulement():
         assert service_devis.resoudre_ballon({"service": service, "ballon_ref": "ballon-1"}, ADMIN) is None
 
 
+ADMIN_TYPES = {"ballon_thermo": {"modeles": [
+    {"ref": "b-compact", "type_installation": "compact"},
+    {"ref": "b-split", "type_installation": "split"},
+    {"ref": "b-sans-type"},
+]}}
+INADAPTE = "Ballon non adapté à l'emplacement indiqué (simulateur)"
+
+
+@pytest.mark.parametrize("ref, emplacement, bloque", [
+    ("b-compact", "piece_non_chauffee", False),   # bon type
+    ("b-split", "piece_non_chauffee", True),      # split forcé dans un garage
+    ("b-compact", "pas_de_place", True),          # compact sans place
+    ("b-split", "pas_de_place", False),
+    ("b-sans-type", "pas_de_place", False),       # type non renseigné en admin : pas de blocage
+])
+def test_validation_devis_bloque_un_ballon_inadapte(ref, emplacement, bloque):
+    state = {"modele_pac_id": "X", "service": "chauffage_seul", "ballon_ref": ref, "ballon_emplacement": emplacement}
+    assert (INADAPTE in service_devis.validate_prospect_for_devis({}, state, ADMIN_TYPES)) is bloque
+
+
+def test_ballon_inadapte_ignore_en_chauffage_ecs():
+    state = {"modele_pac_id": "X", "service": "chauffage_ecs", "ballon_ref": "b-split", "ballon_emplacement": "piece_non_chauffee"}
+    assert INADAPTE not in service_devis.validate_prospect_for_devis({}, state, ADMIN_TYPES)
+
+
+def test_route_validate_bloque_un_ballon_inadapte(client, tmp_path):
+    main._atomic_write_json(main.LEADS_PATH, [{"numero": "PR-00001", "nom": "Dupont", "email": "d@x.fr"}])
+    params = main.load_parametres_admin()
+    params["ballon_thermo"] = dict(params.get("ballon_thermo") or {}, modeles=ADMIN_TYPES["ballon_thermo"]["modeles"])
+    main.save_parametres_admin_atomic(params)
+    main.save_state_simulateur_atomic("PR-00001", {"service": "chauffage_seul", "ballon_ref": "b-split",
+                                                   "ballon_emplacement": "piece_non_chauffee"})
+    assert INADAPTE in client.get("/api/devis/PR-00001/validate").json()["missing"]
+    main.save_state_simulateur_atomic("PR-00001", {"ballon_ref": "b-compact"})
+    assert INADAPTE not in client.get("/api/devis/PR-00001/validate").json()["missing"]
+
+
 def test_validation_devis_exige_l_emplacement_du_ballon():
     base = {"modele_pac_id": "X", "service": "chauffage_seul"}
     manque = "Emplacement du ballon (simulateur)"

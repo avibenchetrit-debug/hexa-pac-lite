@@ -698,7 +698,33 @@ def format_sous_traitant(sous_traitant):
     return "\n".join(line for line in lines if line)
 
 
-def validate_prospect_for_devis(prospect, state_simulateur):
+# Réponse à « Où sera installé le ballon ? » -> type de ballon exigé (miroir de
+# BALLON_EMPLACEMENTS dans templates/index.html).
+BALLON_TYPE_PAR_EMPLACEMENT = {
+    "piece_non_chauffee": "compact",
+    "petite_piece_gaines": "compact_gainable",
+    "pas_de_place": "split",
+}
+
+
+def ballon_inadapte(state_simulateur, admin_params):
+    """Vrai si le ballon retenu n'est pas du type exigé par l'emplacement indiqué.
+    Faux quand une des infos manque (pas de ballon, emplacement ou type non renseigné) :
+    l'emplacement manquant est signalé à part."""
+    if service_avec_ecs(state_simulateur):
+        return False
+    ref = str(value(state_simulateur, "ballon_ref", default="") or "").strip()
+    attendu = BALLON_TYPE_PAR_EMPLACEMENT.get(str(value(state_simulateur, "ballon_emplacement", default="") or ""))
+    if not ref or not attendu:
+        return False
+    bt = (admin_params or {}).get("ballon_thermo") or {}
+    modeles = bt.get("modeles") if isinstance(bt.get("modeles"), list) else []
+    modele = next((m for m in modeles if isinstance(m, dict) and str(m.get("ref", "")).strip() == ref), None)
+    type_modele = str((modele or {}).get("type_installation") or "").strip()
+    return bool(type_modele) and type_modele != attendu
+
+
+def validate_prospect_for_devis(prospect, state_simulateur, admin_params=None):
     missing = []
     checks = [
         ("civilite", "Civilité"),
@@ -745,6 +771,8 @@ def validate_prospect_for_devis(prospect, state_simulateur):
     if (value(state_simulateur, "ballon_ref") and not service_avec_ecs(state_simulateur)
             and not value(state_simulateur, "ballon_emplacement")):
         missing.append("Emplacement du ballon (simulateur)")
+    if ballon_inadapte(state_simulateur, admin_params):
+        missing.append("Ballon non adapté à l'emplacement indiqué (simulateur)")
     return missing
 
 

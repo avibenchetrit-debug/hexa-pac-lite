@@ -3803,7 +3803,7 @@ def _build_devis_context(request: Request, numero: str, version: int | None = No
     state = _load_state_simulateur(numero, prospect, catalogue)
     admin = _admin_payload_with_m3()
 
-    missing = validate_prospect_for_devis(prospect, state)
+    missing = validate_prospect_for_devis(prospect, state, admin)
     if missing:
         return {"request": request, "missing": missing, "numero": numero, "_error_template": "erreur_champs_manquants.html"}
 
@@ -3949,7 +3949,7 @@ def _build_notedim_context(request: Request, numero: str) -> dict:
     prospect = _lead_for_response(prospect)
     catalogue = _read_catalogue_pac()
     state = _load_state_simulateur(numero, prospect, catalogue)
-    missing = validate_prospect_for_devis(prospect, state)
+    missing = validate_prospect_for_devis(prospect, state, load_parametres_admin())
     if missing:
         return {"request": request, "missing": missing, "numero": numero, "_error_template": "erreur_champs_manquants.html"}
     now = datetime.now(PARIS_TZ)
@@ -4148,7 +4148,7 @@ async def validate_devis(numero: str) -> JSONResponse:
         raise HTTPException(status_code=404, detail="Prospect introuvable")
     catalogue = _read_catalogue_pac()
     state = _load_state_simulateur(numero, _lead_for_response(prospect), catalogue)
-    missing = validate_prospect_for_devis(_lead_for_response(prospect), state)
+    missing = validate_prospect_for_devis(_lead_for_response(prospect), state, load_parametres_admin())
     return JSONResponse({"ok": not missing, "missing": missing})
 
 

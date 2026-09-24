@@ -10599,7 +10599,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
   };
 
   // ===== FORMAT TÉLÉPHONE : XX XX XX XX XX =====
-  window.showToast = window.showToast || function(message, type='success') {
+  window.showToast = window.showToast || function(message, type='success', dureeMs=2000) {
     const toast = document.createElement('div');
     toast.className = 'hexa-toast hexa-toast-' + type;
     toast.textContent = message;
@@ -10627,7 +10627,8 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
       toast.style.opacity = '0';
       toast.style.transform = 'translateY(8px)';
       setTimeout(() => toast.remove(), 200);
-    }, 2000);
+    }, dureeMs);
+    return toast;
   };
 
   document.addEventListener('click', (e) => {
@@ -12867,7 +12868,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
       const contenu = document.getElementById('email-template-contenu')?.value || '';
       const auteur = hexaAuteurCourant();
       const manque = contactManquantBrouillon('email');
-      if (manque) { window.showToast ? window.showToast(manque, 'error') : alert(manque); return; }
+      if (manque) { signalerContactManquant(manque); return; }
       const email = (document.querySelector('[name="email"]')?.value || '').trim();
       const r = await fetch(`/api/modeles-email/${currentProspect}/envoyer`, {
         method:'POST',
@@ -12879,6 +12880,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
         alert(err.detail || 'Envoi impossible');
         return;
       }
+      retirerToastContact();
       wrap.remove();
       await chargerHistorique();
     });
@@ -13048,6 +13050,17 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
 
   // Fiche pas encore enregistrée : aucun lead côté serveur, le destinataire est celui
   // saisi dans le formulaire en cours. Renvoie le message d'erreur, ou '' si c'est bon.
+  let toastContactManquant = null;
+  function retirerToastContact() {
+    if (toastContactManquant) toastContactManquant.remove();
+    toastContactManquant = null;
+  }
+  function signalerContactManquant(msg) {
+    retirerToastContact();
+    if (window.showToast) toastContactManquant = window.showToast(msg, 'error', 4000) || null;
+    else alert(msg);
+  }
+
   function contactManquantBrouillon(type) {
     if (!window.hexaEstBrouillon(currentProspect)) return '';
     const champ = (name) => (document.querySelector(`[name="${name}"]`)?.value || '').trim();
@@ -13062,7 +13075,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     if (!contenu) return;
     const manque = contactManquantBrouillon(activeType);
     if (manque) {
-      window.showToast ? window.showToast(manque, 'error') : alert(manque);
+      signalerContactManquant(manque);
       return;
     }
     const btn = document.getElementById('exchanges-submit');
@@ -13084,6 +13097,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
       });
       const data = await resp.json().catch(() => ({}));
       if (!resp.ok) throw new Error(data.msg || data.detail || `HTTP ${resp.status}`);
+      retirerToastContact();
       document.getElementById('exchanges-contenu').value = '';
       document.getElementById('exchanges-objet').value = '';
       document.getElementById('exchanges-template').value = '';
@@ -14917,6 +14931,28 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
   function ballonRecommandation(state){
     return BALLON_EMPLACEMENTS.find(e => e.value === state.ballon_emplacement) || null;
   }
+  function ballonModele(ref){
+    const modeles = Array.isArray(ballonConfig().modeles) ? ballonConfig().modeles : [];
+    return modeles.find(m => m && m.ref === ref) || null;
+  }
+  // Le ballon choisi n'est pas du type recommandé pour l'emplacement (même règle que
+  // validate_prospect_for_devis côté serveur). Faux si l'une des deux infos manque.
+  function ballonInadapte(state){
+    const reco = ballonRecommandation(state);
+    const m = state.ballon_ref ? ballonModele(state.ballon_ref) : null;
+    return !!(reco && m && m.type_installation && m.type_installation !== reco.type);
+  }
+  // Emplacement renseigné : si le ballon choisi n'est pas du bon type, prendre le premier
+  // modèle du type recommandé (s'il en existe un ; sinon on garde le choix).
+  function ballonAlignerSurEmplacement(state){
+    const reco = ballonRecommandation(state);
+    if (!reco || !state.ballon_ref) return;
+    const m = ballonModele(state.ballon_ref);
+    if (m && m.type_installation === reco.type) return;
+    const modeles = Array.isArray(ballonConfig().modeles) ? ballonConfig().modeles : [];
+    const bon = modeles.find(x => x && x.type_installation === reco.type);
+    if (bon) state.ballon_ref = bon.ref;
+  }
   // Modèles proposés : filtrés sur le type recommandé, sauf « voir tous » ou aucun modèle
   // du bon type. Le modèle déjà choisi reste toujours dans la liste. Sans ballon choisi,
   // la question (et son lien « voir tous ») est masquée : on ne filtre pas.
@@ -14941,6 +14977,9 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     const alerte = alerteEcsChaudiere(state)
       ? `<div class="sim-note sim-note--warn" id="sim-alerte-ecs">L'eau chaude est produite par la chaudière qui sera déposée : proposez Chauffage + ECS ou un ballon.</div>`
       : '';
+    const inadapte = ballonInadapte(state)
+      ? `<div class="sim-note sim-note--warn" id="sim-ballon-inadapte">Ce ballon n'est pas adapté à l'emplacement indiqué</div>`
+      : '';
     const question = state.ballon_ref ? `
           <div class="sim-pnl-line sim-pnl-ballon-emplacement">
             <label class="sim-field sim-field--requis" style="width:100%"><span>Où sera installé le ballon ? *</span>
@@ -14950,6 +14989,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
               </select>
             </label>
           </div>
+          ${inadapte}
           ${reco ? `<div class="sim-note" id="sim-ballon-reco">Recommandé : <b>${reco.typeLabel}</b>${filtre ? ` · <a href="#" id="sim-ballon-voir-tous">voir tous les ballons</a>` : (state.ballon_voir_tous ? ` · <a href="#" id="sim-ballon-voir-reco">voir les ballons recommandés</a>` : '')}</div>` : ''}` : '';
     return `${alerte}
           <div class="sim-pnl-line sim-pnl-ballon"><span>Ballon thermodynamique (ECS)</span><select id="sim-ballon" class="sim-model-select"><option value="" ${!state.ballon_ref?'selected':''}>Aucun</option>${modeles.map(b=>`<option value="${b.ref}" ${state.ballon_ref===b.ref?'selected':''}>${b.nom||b.ref}</option>`).join('')}</select></div>${question}
@@ -15352,7 +15392,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
             </select>
           </label>
         </div>
-        <div class="sim-note">${state.service==='chauffage_ecs' ? 'Prime CEE identique avec ou sans ECS — proposer un <b>chauffe-eau thermodynamique</b> en plus pour le ballon.' : 'Chauffage seul par défaut (prime identique). Pour l\'ECS, vendre un chauffe-eau thermodynamique.'}</div>
+        <div class="sim-note" id="sim-service-note">${ballonAutorise(state) ? 'La PAC assure le chauffage. Pour l\'eau chaude : conserver l\'existant ou ajouter un ballon thermodynamique (sans aide MaPrimeRénov\' depuis le 01/09/2026).' : 'La PAC (modèle DUO) assure le chauffage et l\'eau chaude. Aucun ballon à ajouter.'}</div>
 
         ${renderNiveaux()}
 
@@ -15526,7 +15566,7 @@ ${renderBallonBloc(state, bs)}
       if (!ballonAutorise(state)) state.ballon_ref='';
     });
     onIn('sim-ballon',v=>{ state.ballon_ref=v; });
-    onIn('sim-ballon-emplacement',v=>{ state.ballon_emplacement=v; state.ballon_voir_tous=false; });
+    onIn('sim-ballon-emplacement',v=>{ state.ballon_emplacement=v; state.ballon_voir_tous=false; ballonAlignerSurEmplacement(state); });
     const voirBallons=(id,tous)=>document.getElementById(id)?.addEventListener('click',e=>{ e.preventDefault(); state.ballon_voir_tous=tous; refresh(); });
     voirBallons('sim-ballon-voir-tous', true);
     voirBallons('sim-ballon-voir-reco', false);
