@@ -15,6 +15,7 @@ TYPE_EMETTEURS_LABELS = {
     "radiateurs_basse_temp": "Radiateurs basse température",
     "radiateurs_classiques": "Radiateurs classiques (acier récent)",
     "radiateurs_fonte": "Radiateurs fonte (anciens)",
+    "convecteurs_electriques": "Convecteurs électriques",
 }
 
 TEMP_BASE_ZONE = {"H1": -7, "H2": -4, "H3": 0}

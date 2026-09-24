@@ -8186,6 +8186,23 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     const f = fieldByName(name, root);
     if (f) f.remove();
   }
+  // Lot 4 : réserve des champs que la reconstruction retirait (conso, GES, niveaux, anciennetés…).
+  // Ils restent dans le <form> (enregistrés, remplis par le DPE via leur name/id) ; la
+  // présentation Lot 4 les range dans le bloc « Données techniques ».
+  function reserveTechnique(form) {
+    let r = q('#fp-reserve-technique', form);
+    if (!r) {
+      r = document.createElement('div');
+      r.id = 'fp-reserve-technique';
+      r.style.display = 'none';
+      form.appendChild(r);
+    }
+    return r;
+  }
+  function preserveField(name, root, form) {
+    const f = fieldByName(name, root);
+    if (f) reserveTechnique(form).appendChild(f);
+  }
   function wrapInputAsField(input, labelText) {
     if (!input) return null;
     const field = document.createElement('div');
@@ -8325,6 +8342,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
         + '<option value="">—</option>'
         + '<option value="chaudiere">Chaudière</option>'
         + '<option value="independant">Indépendant</option>'
+        + '<option value="autre">Autre</option>'
         + '</select>';
       const alimentationField = document.createElement('div');
       alimentationField.className = 'field';
@@ -8363,6 +8381,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
           <option value="radiateurs_basse_temp">Radiateurs basse température</option>
           <option value="radiateurs_classiques">Radiateurs classiques (acier récent)</option>
           <option value="radiateurs_fonte">Radiateurs fonte (anciens)</option>
+          <option value="convecteurs_electriques">Convecteurs électriques</option>
         </select>`;
       if (coutField) {
         const coutInput = q('[name="cout_energetique_mensuel_eur"]', coutField);
@@ -8381,7 +8400,8 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
         }
       }
 
-      ['conso_kwh_m2', 'emissions_ges', 'nb_niveaux', 'hauteur_batiment'].forEach(name => removeField(name, form));
+      // Lot 4 : mis de côté (plus supprimés) -> bloc « Données techniques »
+      ['conso_kwh_m2', 'emissions_ges', 'nb_niveaux', 'hauteur_batiment', 'prix_m2_estime', 'prix_m2_min'].forEach(name => preserveField(name, form, form));
       q('#btn-infos-complementaires', form)?.remove();
       q('#panel-infos-complementaires', form)?.remove();
       q('.dpe-source-block', blockCarac)?.remove();
@@ -8487,6 +8507,20 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
         }
       });
       qa('input[type="hidden"]', blockChauffage).forEach(inp => hiddenStore.appendChild(inp));
+      // Lot 4 : anciennetés et pièces chauffées mis de côté (plus supprimés) ; les anciennes
+      // clés type_emetteur / gestion_ecs recréées en champs cachés, synchronisés à l'écran
+      // sur type_emetteurs / ecs (voir présentation Lot 4).
+      ['anciennete_chauffage', 'nb_pieces_chauffees', 'anciennete_ecs'].forEach(name => preserveField(name, blockChauffage, form));
+      ['type_emetteur', 'gestion_ecs'].forEach(name => {
+        q(`[name="${name}"]`, blockChauffage)?.closest('.field')?.remove();
+        if (!q(`[name="${name}"]`, form)) {
+          const input = document.createElement('input');
+          input.type = 'hidden';
+          input.name = name;
+          input.id = 'fp-' + name.replace(/_/g, '-');
+          hiddenStore.appendChild(input);
+        }
+      });
       blockChauffage.remove();
     }
 
@@ -14592,6 +14626,8 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
   }
 
   function syncSimStateToForm(){
+    // Lot 4 : l'estimation express (colonne de droite) calcule sans rien écrire dans la fiche
+    if (window.__hexaEstimationExpress) return;
     const form = document.getElementById('form-prospect');
     if (!form) return;
     const set = (name, val) => {
@@ -14659,7 +14695,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     };
   }
   function scheduleSaveSimulatorState(){
-    if (!state.numero) return;
+    if (!state.numero || window.__hexaEstimationExpress) return;
     clearTimeout(simSaveTimeout);
     simSaveTimeout = setTimeout(saveSimulatorState, 1500);
   }
@@ -15786,6 +15822,33 @@ ${renderBallonBloc(state, bs)}
   function estOuvert(){
     return document.getElementById('sim-drawer')?.classList.contains('is-open');
   }
+
+  // Lot 4 : « Estimation express » de la colonne de droite. Même calcul que le simulateur
+  // (état sauvegardé du lead + fiche), sans l'ouvrir ni rien sauvegarder.
+  let seqExpress = 0;
+  window.hexaEstimationExpress = async function(){
+    const numero = String(document.body.dataset.prospectNumero || '').trim();
+    const seq = ++seqExpress;
+    if (!estOuvert()) {
+      if ((state.numero || '') !== numero) {
+        Object.assign(state, { ...DEFAULT_SIM_STATE });
+        state.numero = numero || null;
+        if (numero) { try { await loadSimulatorState(numero); } catch(_) {} }
+      }
+      lireContexteFiche();
+    }
+    window.__hexaEstimationExpress = !estOuvert();   // ni sauvegarde, ni écriture dans la fiche
+    let c;
+    try { c = await calcul(); } finally { window.__hexaEstimationExpress = false; }
+    if (seq !== seqExpress) return null;
+    const eco = state.eco;
+    return {
+      contextePret: !!c.contextePret,
+      aides: c.aidesDevis,
+      reste: c.reste_affiche,
+      economie: eco ? (eco.avant_mensuel - eco.apres_mensuel) : null
+    };
+  };
 
   function ouvrir(numero){
     // Toggle : si déjà ouverte, on referme
@@ -20507,6 +20570,7 @@ ${renderBallonBloc(state, bs)}
     renderFicheStatut(lead);
     renderFicheVt(lead);
     renderFicheRelances(lead);
+    if (typeof window.hexaLot4ApresChargement === 'function') window.hexaLot4ApresChargement();
   }
   async function openFiche(p, opts){
     opts = opts || {};
@@ -20624,6 +20688,7 @@ ${renderBallonBloc(state, bs)}
     document.body.dataset.prospectNumero='';
     window.HexaCurrentProspect = { numero:'', nom_complet:'' };
     if (typeof window.hexaCoutApresChargement === 'function') window.hexaCoutApresChargement();
+    if (typeof window.hexaLot4ApresChargement === 'function') window.hexaLot4ApresChargement();
     // Clé brouillon pour N/E avant le 1er enregistrement (reprise après F5 / retour arrière)
     if (typeof window.hexaDemarrerBrouillon === 'function') window.hexaDemarrerBrouillon(!!opts.skipHistory);
     if (typeof window.syncSimulateurDepuisFiche === 'function') {
@@ -21199,6 +21264,635 @@ ${renderBallonBloc(state, bs)}
   .cout-src--confirmer { background: #F1F5F9; color: #475569; border-color: #CBD5E1; cursor: pointer; }
   .cout-hors-chauffage { font-size: 11px; color: #6B7280; flex-basis: 100%; }
   .field[data-cout-source]:not([data-cout-source=""]) #badge-cout { display: none !important; }
+</style>
+<script>
+/* HEXA — Lot 4a : présentation de la fiche prospect (accordéon, en-tête, colonne de droite, aide).
+   PRÉSENTATION UNIQUEMENT : les champs existants sont DÉPLACÉS (jamais recréés ni renommés) ; leurs
+   name / id / écouteurs sont intacts, les fonctions DPE/audit les retrouvent. Les choix en boutons
+   pilotent les <select> existants (masqués, toujours dans le formulaire). */
+(function () {
+  'use strict';
+  const q = (s, r) => (r || document).querySelector(s);
+  const qa = (s, r) => Array.from((r || document).querySelectorAll(s));
+  const champ = (name) => q(`#form-prospect [name="${name}"]`);
+  const val = (name) => { const e = champ(name); return e ? String(e.value || '').trim() : ''; };
+  const esc = (v) => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const fieldDe = (name) => { const e = champ(name); return e ? (e.closest('.field') || null) : null; };
+
+  // ------------------------------------------------------------------ contenus
+  const BLOCS = [
+    { n: 1, id: 'contact', titre: 'Contact',
+      dire: '« Bonjour, [prénom] d\'Hexa-Rénov\', vous avez demandé des informations sur une pompe à chaleur… »' },
+    { n: 2, id: 'logement', titre: 'Logement',
+      dire: '« Quelle est l\'adresse du logement ? Vous en êtes propriétaire et vous y habitez ? »' },
+    { n: 3, id: 'chauffage', titre: 'Chauffage actuel',
+      dire: '« Vous vous chauffez comment aujourd\'hui ? Et votre eau chaude, c\'est la même chaudière ? »' },
+    { n: 4, id: 'foyer', titre: 'Foyer et revenus',
+      dire: '« Combien êtes-vous dans le foyer ? Votre revenu fiscal de référence est en haut de votre avis d\'impôt. »' },
+    { n: 5, id: 'vt', titre: 'Visite technique', dire: '' },
+    { n: 6, id: 'technique', titre: 'Données techniques', dire: '' }
+  ];
+  const AIDES = {
+    civilite: 'Pour s\'adresser correctement au client sur le devis.',
+    nom: 'Tel qu\'il sera écrit sur le devis. Faites épeler.',
+    telephone: 'Obligatoire pour enregistrer. Le numéro où rappeler.',
+    email: 'Le devis et les relances partent ici. Faites épeler.',
+    source: 'D\'où vient le contact : sert à savoir quelle pub marche.',
+    adresse_chantier: 'Choisissez-la dans la liste : elle remplit seule le DPE, la surface, l\'année et la zone climatique.',
+    usage_bien: 'Occupant : il y habite. Bailleur : il le loue.',
+    situation_propriete: 'Achat en cours : les travaux démarrent après la signature.',
+    date_acquisition: 'Date de signature chez le notaire.',
+    adresse_personne: 'Obligatoire sur le dossier d\'aides quand le propriétaire n\'habite pas le logement.',
+    surface_logement_m2: 'Toute la maison. La surface chauffée se règle dans le simulateur.',
+    annee_construction: 'Plus de 15 ans : éligible à MaPrimeRénov\'.',
+    mode_chauffage: 'Fioul ou gaz : la cible idéale, prime CEE maximale quand on remplace la chaudière.',
+    type_emetteurs: 'Demandez : « Vos radiateurs sont en fonte, en acier, ou électriques ? » Plancher chauffant = PAC plus efficace.',
+    ecs: 'Si la chaudière fait l\'eau chaude, proposez une PAC « chauffage + eau chaude ».',
+    cout_energetique_mensuel_eur: 'Le champ le plus important : toutes les économies en dépendent. Demandez « Combien vous coûte votre fioul sur une année ? ». Tapé à la main, il passe en vert Réel.',
+    alimentation_electrique: 'Écrit sur la facture d\'électricité. Certaines PAC exigent du triphasé.',
+    puissance_compteur: 'Sur la facture (6, 9, 12 kVA). Facultatif.',
+    panneau_solaire: 'Info pour le technicien.',
+    nombre_personnes: 'Toutes les personnes de l\'avis d\'impôt.',
+    rfr: 'Sans lui, pas de montant d\'aides.',
+    categorie: 'Très modeste = aides maximales.',
+    date_visite_technique_date: 'Passage du technicien, une fois le client d\'accord.'
+  };
+  const AIDE_SOUS_CHOIX = 'Demandez de quoi sont faits les radiateurs. Sert au devis.';
+  const AIDE_TECHNIQUE = 'Ne modifiez que si le technicien a relevé une autre valeur.';
+  const AIDE_STATUT = 'Changez le statut après chaque appel. Arrêtez les relances si le client a dit non.';
+  const AIDE_NRP = 'Compte la tentative et programme la relance automatique.';
+
+  // Choix en boutons -> valeurs d'option EXISTANTES du <select>
+  const CHOIX = {
+    civilite: [['Mme', 'Madame', ['Madame', 'Mme']], ['M.', 'Monsieur']],
+    usage_bien: [['Propriétaire occupant', 'proprietaire_occupant'], ['Bailleur', 'bailleur']],
+    situation_propriete: [['Déjà propriétaire', 'proprietaire'], ['Achat en cours', 'acquisition']],
+    type_logement: [['Maison', 'maison'], ['Appartement', 'appartement']],
+    mode_chauffage: [['Fioul', 'fioul'], ['Gaz', 'gaz'], ['Électricité', 'electricite'], ['Bois-granulés', 'bois'], ['PAC', 'pac']],
+    type_emetteurs: [['Radiateurs à eau', 'radiateurs_classiques', ['radiateurs_classiques', 'radiateurs_fonte', 'radiateurs_basse_temp']],
+                     ['Plancher chauffant', 'plancher_chauffant'], ['Convecteurs électriques', 'convecteurs_electriques']],
+    ecs: [['Par la chaudière', 'chaudiere'], ['Ballon électrique', 'independant'], ['Autre', 'autre']],
+    alimentation_electrique: [['Monophasé', 'monophase'], ['Triphasé', 'triphase'], ['Ne sait pas', '', null, 'nsp']]
+  };
+  const SOUS_CHOIX_RADIATEURS = [['Fonte', 'radiateurs_fonte'], ['Acier', 'radiateurs_classiques'], ['Basse température', 'radiateurs_basse_temp']];
+  // ancienne clé cachée type_emetteur, synchronisée à l'écran (valeurs de l'ancien select)
+  const VERS_TYPE_EMETTEUR = { plancher_chauffant: 'plancher_chauffant', radiateurs_classiques: 'radiateur_eau',
+    radiateurs_fonte: 'radiateur_eau', radiateurs_basse_temp: 'radiateur_eau', convecteurs_electriques: 'convecteur_electrique' };
+
+  // Jauge « Prêt pour simulation X/9 »
+  const JAUGE = [['surface_logement_m2', 'surface'], ['code_postal_chantier', 'code postal'], ['type_logement', 'type de logement'],
+    ['mode_chauffage', 'énergie'], ['type_emetteurs', 'émetteurs'], ['alimentation_electrique', 'compteur'],
+    ['rfr', 'revenu fiscal'], ['nombre_personnes', 'personnes'], ['cout_energetique_mensuel_eur', 'facture']];
+
+  // Champs attendus par bloc (pastille « N à remplir »)
+  function requisBloc(n) {
+    if (n === 1) return ['civilite', 'nom', 'prenom', 'telephone', 'email'];
+    if (n === 2) {
+      const r = ['adresse_chantier', 'code_postal_chantier', 'usage_bien', 'situation_propriete', 'type_logement', 'surface_logement_m2', 'annee_construction'];
+      if (val('situation_propriete') === 'acquisition') r.push('date_acquisition');
+      if (val('usage_bien') === 'bailleur') r.push('adresse_personne');
+      return r;
+    }
+    if (n === 3) return ['mode_chauffage', 'type_emetteurs', 'ecs', 'cout_energetique_mensuel_eur', 'alimentation_electrique'];
+    if (n === 4) return ['nombre_personnes', 'rfr'];
+    return [];
+  }
+
+  // ------------------------------------------------------------------ construction
+  let construit = false;
+  let nspCompteur = false;          // « Ne sait pas » cliqué pour le compteur (écran seulement)
+
+  function blocCorps(n) { return q(`#l4-bloc-${n} .l4-grid`); }
+  function placer(n, name, opts) {
+    const f = fieldDe(name);
+    if (!f) return null;
+    blocCorps(n).appendChild(f);
+    if (opts && opts.span) f.classList.add('l4-span' + opts.span);
+    if (opts && opts.cls) f.classList.add(opts.cls);
+    return f;
+  }
+  function placerEl(n, el, opts) {
+    if (!el) return null;
+    blocCorps(n).appendChild(el);
+    if (opts && opts.span) el.classList.add('l4-span' + opts.span);
+    return el;
+  }
+  function ajouterAide(f, texte, cle) {
+    if (!f || !texte || (cle ? q(`:scope > .l4-aide[data-aide="${cle}"]`, f) : q(':scope > .l4-aide', f))) return;
+    const d = document.createElement('div');
+    d.className = 'l4-aide';
+    if (cle) d.dataset.aide = cle;
+    d.textContent = texte;
+    f.appendChild(d);
+  }
+
+  // Remplace l'affichage d'un <select> par des boutons (le select reste dans le DOM, masqué)
+  function boutons(name, liste, extra) {
+    const sel = champ(name);
+    const f = fieldDe(name);
+    if (!sel || !f || q(':scope > .l4-choix', f)) return;
+    sel.classList.add('l4-cache');
+    const g = document.createElement('div');
+    g.className = 'l4-choix';
+    g.dataset.for = name;
+    liste.forEach(([lib, v, egaux, clef]) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = lib;
+      b.dataset.valeur = v;
+      if (egaux) b.dataset.egaux = egaux.join('|');
+      if (clef) b.dataset.clef = clef;
+      b.addEventListener('click', () => choisir(name, v, clef));
+      g.appendChild(b);
+    });
+    const lab = q(':scope > label', f);
+    if (lab) lab.insertAdjacentElement('afterend', g); else f.prepend(g);
+    if (extra) extra(f, g);
+  }
+  function choisir(name, v, clef) {
+    const sel = champ(name);
+    if (!sel) return;
+    if (name === 'alimentation_electrique') nspCompteur = clef === 'nsp';
+    if (name === 'type_emetteurs' && v === 'radiateurs_classiques' && /^radiateurs_/.test(sel.value)) v = sel.value; // garde le sous-choix
+    sel.value = v;
+    sel.dispatchEvent(new Event('input', { bubbles: true }));
+    sel.dispatchEvent(new Event('change', { bubbles: true }));
+    synchroniserClesCachees(name);
+    majTout();
+  }
+  // type_emetteur / gestion_ecs : suivent l'écran seulement quand l'utilisateur change la valeur
+  // (au chargement, rien n'est recopié : un lead existant se réenregistre à l'identique).
+  function synchroniserClesCachees(name) {
+    if (name === 'type_emetteurs') {
+      const h = champ('type_emetteur');
+      if (h) h.value = VERS_TYPE_EMETTEUR[val('type_emetteurs')] || '';
+    }
+    if (name === 'ecs') {
+      const h = champ('gestion_ecs');
+      if (h) h.value = val('ecs');
+    }
+  }
+
+  function construire() {
+    const form = q('#form-prospect');
+    const fs = form && q('fieldset', form);
+    if (!form || !fs || construit) return !!construit;
+    if (form.dataset.layout53Done !== '1' || !champ('type_emetteurs') || !champ('ecs')) return false; // attendre la reconstruction
+    construit = true;
+    document.body.classList.add('l4');
+
+    // --- accordéon (dans le <form> : FormData inchangé)
+    const acc = document.createElement('div');
+    acc.id = 'l4-accordeon';
+    acc.innerHTML = BLOCS.map(b => `
+      <section class="l4-bloc${b.n === 6 ? ' l4-bloc--technique' : ''}" id="l4-bloc-${b.n}" data-bloc="${b.n}">
+        <button type="button" class="l4-tete" aria-expanded="false">
+          <span class="l4-num">${b.n}</span><span class="l4-titre">${b.titre}</span>
+          <span class="l4-resume"></span><span class="l4-etat"></span><span class="l4-chevron" aria-hidden="true">▸</span>
+        </button>
+        <div class="l4-corps">
+          ${b.dire ? `<div class="l4-dire">À dire : ${b.dire}</div>` : ''}
+          ${b.n === 2 ? '<div id="dpe-banner"></div>' : ''}
+          ${b.n === 6 ? `<div class="l4-aide l4-aide--bloc">${AIDE_TECHNIQUE}</div>` : ''}
+          <div class="l4-grid"></div>
+        </div>
+      </section>`).join('');
+    fs.prepend(acc);
+
+    // Bloc 1 Contact
+    placer(1, 'civilite'); placer(1, 'nom'); placer(1, 'prenom');
+    placer(1, 'telephone'); placer(1, 'email'); placer(1, 'source');
+    // Bloc 2 Logement
+    placer(2, 'adresse_chantier', { span: 2 });
+    placer(2, 'code_postal_chantier');
+    placer(2, 'ville_chantier');
+    placer(2, 'usage_bien'); placer(2, 'situation_propriete');
+    placer(2, 'date_acquisition', { cls: 'l4-si-achat' });
+    placer(2, 'adresse_personne', { span: 2, cls: 'l4-si-bailleur' });
+    placer(2, 'type_logement'); placer(2, 'surface_logement_m2'); placer(2, 'annee_construction');
+    // Bloc 3 Chauffage actuel
+    // 3 lignes : énergie + eau chaude / émetteurs + compteur / facture + puissance + panneaux
+    placer(3, 'mode_chauffage', { span: 2 });
+    placer(3, 'ecs');
+    placer(3, 'type_emetteurs', { span: 2 });
+    placer(3, 'alimentation_electrique');
+    const alerte = document.createElement('div');
+    alerte.id = 'l4-alerte-convecteurs';
+    alerte.className = 'l4-alerte l4-span3';
+    alerte.textContent = 'Sans radiateurs à eau, il faut créer un circuit de chauffage. À signaler au technicien.';
+    placerEl(3, alerte);
+    placer(3, 'cout_energetique_mensuel_eur'); placer(3, 'puissance_compteur'); placer(3, 'panneau_solaire');
+    // Bloc 4 Foyer et revenus
+    placer(4, 'nombre_personnes'); placer(4, 'rfr');
+    placer(4, 'categorie');
+    const cee = q('#cat-cee-badge');
+    if (cee && cee.closest('.field') && !cee.closest('.l4-grid')) placerEl(4, cee.closest('.field'));
+    // Bloc 5 Visite technique
+    placer(5, 'date_visite_technique_date', { span: 2 });
+    // Bloc 6 Données techniques : tout le reste
+    placer(6, 'dpe_connu', { span: 3 });              // classe DPE (8 boutons) : toute la largeur
+    ['zone_climatique_chantier', 'altitude', 'hsp', 'nb_niveaux', 'nb_pieces_chauffees', 'hauteur_batiment',
+     'parcelle_cadastrale', 'registre_copro', 'prix_m2_estime', 'prix_m2_min', 'conso_kwh_m2', 'emissions_ges',
+     'anciennete_chauffage', 'anciennete_ecs', 'code_postal_personne', 'ville_personne'].forEach(n => placer(6, n));
+    const meta = q('.dpe-meta-lines');
+    if (meta) placerEl(6, meta, { span: 3 });
+
+    // anciennes cartes vidées : masquées (gardées dans le DOM pour les sélecteurs existants)
+    qa('.card', fs).forEach(c => { if (!c.closest('#l4-accordeon')) c.classList.add('l4-ancienne-carte'); });
+
+    // --- boutons 1 clic
+    Object.keys(CHOIX).forEach(name => boutons(name, CHOIX[name], name === 'type_emetteurs' ? (f, g) => {
+      const s = document.createElement('div');
+      s.className = 'l4-choix l4-sous-choix';
+      s.dataset.for = 'type_emetteurs_sous';
+      SOUS_CHOIX_RADIATEURS.forEach(([lib, v]) => {
+        const b = document.createElement('button');
+        b.type = 'button'; b.textContent = lib; b.dataset.valeur = v;
+        b.addEventListener('click', () => choisir('type_emetteurs', v));
+        s.appendChild(b);
+      });
+      g.insertAdjacentElement('afterend', s);
+      ajouterAide(s, AIDE_SOUS_CHOIX, 'sous-choix');
+      const sa = s.querySelector('.l4-aide'); if (sa) s.insertAdjacentElement('afterend', sa);
+    } : null));
+
+    // --- aides (une ligne bleue sous chaque champ)
+    Object.keys(AIDES).forEach(name => ajouterAide(fieldDe(name), AIDES[name], name));
+    const barre = q('.fiche-statvt-top');
+    if (barre) ajouterAide(barre, AIDE_STATUT, 'statut');
+
+    // --- en-tête : jauge + bouton Aide, barre Statut / VT / Relances
+    const barreProspect = q('#prospect-sticky-bar');
+    const actions = barreProspect && q('.psb-actions', barreProspect);
+    if (barreProspect && !q('#l4-jauge')) {
+      const j = document.createElement('div');
+      j.id = 'l4-jauge';
+      j.className = 'l4-jauge';
+      j.innerHTML = '<span class="l4-jauge-titre">Prêt pour simulation <b id="l4-jauge-score">0/9</b></span><span class="l4-jauge-barre"><i id="l4-jauge-rempli"></i></span><span class="l4-jauge-manque" id="l4-jauge-manque"></span>';
+      const a = document.createElement('button');
+      a.type = 'button'; a.id = 'l4-aide-btn'; a.className = 'l4-aide-btn';
+      a.textContent = 'Aide';
+      a.addEventListener('click', () => reglerAide(!document.body.classList.contains('l4-aide-on')));
+      if (actions) { barreProspect.insertBefore(j, actions); barreProspect.insertBefore(a, actions); }
+      else { barreProspect.appendChild(j); barreProspect.appendChild(a); }
+    }
+
+    // --- grille : fiche (accordéon) + colonne de droite
+    const container = form.parentElement;
+    const grille = document.createElement('div');
+    grille.id = 'l4-grille';
+    grille.className = 'l4-grille';
+    const main = document.createElement('div');
+    main.id = 'l4-main';
+    main.className = 'l4-main';
+    container.insertBefore(grille, form);
+    grille.appendChild(main);
+    main.appendChild(form);
+    const side = document.createElement('aside');
+    side.id = 'l4-side';
+    side.className = 'l4-side';
+    side.innerHTML = `
+      <section class="l4-carte"><h3>Éligibilité en direct</h3><ul class="l4-elig" id="l4-elig"></ul></section>
+      <section class="l4-carte"><h3>Estimation express</h3>
+        <div class="l4-express" id="l4-express">
+          <div><span>Aides</span><b id="l4-exp-aides">—</b></div>
+          <div><span>Reste à charge</span><b id="l4-exp-reste">—</b></div>
+          <div><span>Économie mensuelle</span><b id="l4-exp-eco">—</b></div>
+        </div>
+        <button type="button" class="l4-btn-simu" id="l4-ouvrir-simu">Ouvrir le simulateur</button>
+      </section>
+      <section class="l4-carte" id="l4-fin-appel"><h3>Fin d'appel</h3></section>`;
+    grille.appendChild(side);
+    q('#l4-ouvrir-simu', side).addEventListener('click', () => {
+      if (typeof window.ouvrirSimulationsDrawer === 'function') window.ouvrirSimulationsDrawer(document.body.dataset.prospectNumero || '');
+    });
+    // Fin d'appel : contrôles EXISTANTS du bloc Suivi, déplacés (mêmes id -> même logique)
+    const suivi = q('#card-suivi');
+    const fin = q('#l4-fin-appel', side);
+    if (suivi) {
+      ['#suivi-actif', '.suivi-actions', '.suivi-compteurs', '#suivi-dernier-repondu', '.row-rappel-compact'].forEach(s => {
+        const el = q(s, suivi);
+        if (el) fin.appendChild(el);
+      });
+      const nrp = q('#suivi-nrp', fin);
+      if (nrp) { const d = document.createElement('div'); d.className = 'l4-aide'; d.textContent = AIDE_NRP; nrp.closest('.suivi-actions').insertAdjacentElement('afterend', d); }
+      suivi.classList.add('l4-ancienne-carte');
+    }
+
+    // --- accordéon : un seul bloc ouvert
+    qa('.l4-tete', acc).forEach(t => t.addEventListener('click', () => {
+      const b = t.closest('.l4-bloc');
+      ouvrirBloc(b.classList.contains('is-open') ? 0 : Number(b.dataset.bloc));
+    }));
+
+    reglerAide(lireAide());
+    ['input', 'change'].forEach(ev => document.addEventListener(ev, (e) => {
+      if (e.target && e.target.closest && e.target.closest('#form-prospect')) {
+        if (e.isTrusted && e.target.name) synchroniserClesCachees(e.target.name);
+        if (e.target.name === 'alimentation_electrique' && e.target.value) nspCompteur = false;
+        planifierMaj();
+      }
+    }));
+    window.addEventListener('resize', ajusterHauteur);
+    setInterval(() => { if (document.visibilityState === 'visible') majTout(); }, 1200);
+    apresChargement();
+    return true;
+  }
+
+  // ------------------------------------------------------------------ état / affichage
+  function ouvrirBloc(n) {
+    qa('.l4-bloc').forEach(b => {
+      const ouvert = Number(b.dataset.bloc) === n;
+      b.classList.toggle('is-open', ouvert);
+      q('.l4-tete', b).setAttribute('aria-expanded', ouvert ? 'true' : 'false');
+    });
+    ajusterHauteur();
+  }
+  window.hexaOuvrirBlocFiche = ouvrirBloc;
+
+  function manquants(n) { return requisBloc(n).filter(name => !val(name)); }
+  function etatBloc(n) {
+    if (n === 6) return ['auto', 'Auto'];
+    if (n === 5) {
+      const d = val('date_visite_technique');
+      return /^\d{4}-\d{2}-\d{2}$/.test(d) ? ['complet', 'Complet'] : ['plustard', 'Plus tard'];
+    }
+    const m = manquants(n).length;
+    return m ? ['manque', `${m} à remplir`] : ['complet', 'Complet'];
+  }
+  function texteOption(name) {
+    const e = champ(name);
+    if (!e) return '';
+    if (e.tagName === 'SELECT') { const o = e.options[e.selectedIndex]; return o && o.value ? o.text.trim() : ''; }
+    return String(e.value || '').trim();
+  }
+  function resume(n) {
+    const p = [];
+    const add = (x) => { if (x) p.push(x); };
+    if (n === 1) { add([val('civilite') === 'Monsieur' ? 'M.' : (val('civilite') ? 'Mme' : ''), val('prenom'), val('nom')].filter(Boolean).join(' ')); add(val('telephone')); add(val('email')); add(texteOption('source')); }
+    if (n === 2) {
+      add([val('adresse_chantier'), val('code_postal_chantier')].filter(Boolean).join(', '));
+      add({ proprietaire_occupant: 'Occupant', bailleur: 'Bailleur' }[val('usage_bien')]);
+      add({ acquisition: 'Achat en cours' }[val('situation_propriete')]);
+      add({ maison: 'Maison', appartement: 'Appartement' }[val('type_logement')]);
+      if (val('surface_logement_m2')) add(val('surface_logement_m2') + ' m²');
+      add(val('annee_construction'));
+    }
+    if (n === 3) {
+      add(texteOption('mode_chauffage'));
+      add(texteOption('type_emetteurs'));
+      add({ chaudiere: 'ECS chaudière', independant: 'Ballon électrique', autre: 'ECS autre' }[val('ecs')]);
+      const m = Number(val('cout_energetique_mensuel_eur')) || 0;
+      if (m) add(`${Math.round(m * 12).toLocaleString('fr-FR')} €/an`);
+      add(texteOption('alimentation_electrique'));
+    }
+    if (n === 4) {
+      if (val('nombre_personnes')) add(val('nombre_personnes') + ' pers.');
+      if (val('rfr')) add('RFR ' + val('rfr'));
+      const cat = (q('#cat-anah-badge') || {}).textContent || '';
+      if (cat.trim() && cat.trim() !== '—') add(cat.trim());
+    }
+    if (n === 5) { const d = val('date_visite_technique'); add(/^\d{4}-\d{2}-\d{2}$/.test(d) ? d.split('-').reverse().join('/') : 'À déterminer'); }
+    if (n === 6) {
+      const z = val('zone_climatique_chantier'); if (z) add('Zone ' + z);
+      if (val('dpe_connu')) add('DPE ' + val('dpe_connu'));
+      if (val('altitude')) add(val('altitude') + ' m');
+      if (val('hsp')) add('HSP ' + val('hsp'));
+    }
+    return p.join(' · ');
+  }
+
+  function majChoix() {
+    qa('.l4-choix[data-for]').forEach(g => {
+      const name = g.dataset.for === 'type_emetteurs_sous' ? 'type_emetteurs' : g.dataset.for;
+      const v = val(name);
+      qa('button', g).forEach(b => {
+        const egaux = b.dataset.egaux ? b.dataset.egaux.split('|') : [b.dataset.valeur];
+        let actif = b.dataset.clef === 'nsp' ? (nspCompteur && !v) : (v !== '' && egaux.includes(v));
+        b.classList.toggle('active', actif);
+      });
+    });
+    const sous = q('.l4-sous-choix');
+    if (sous) sous.style.display = /^radiateurs_/.test(val('type_emetteurs')) ? '' : 'none';
+    const sa = q('.l4-aide[data-aide="sous-choix"]');
+    if (sa) sa.classList.toggle('l4-masque', !/^radiateurs_/.test(val('type_emetteurs')));
+    const al = q('#l4-alerte-convecteurs');
+    if (al) al.style.display = val('type_emetteurs') === 'convecteurs_electriques' ? '' : 'none';
+    qa('.l4-si-achat').forEach(f => f.classList.toggle('l4-masque', val('situation_propriete') !== 'acquisition'));
+    qa('.l4-si-bailleur').forEach(f => f.classList.toggle('l4-masque', val('usage_bien') !== 'bailleur'));
+  }
+
+  function majBlocs() {
+    qa('.l4-bloc').forEach(b => {
+      const n = Number(b.dataset.bloc);
+      const [cls, txt] = etatBloc(n);
+      const e = q('.l4-etat', b);
+      e.className = 'l4-etat l4-etat--' + cls;
+      e.textContent = txt;
+      const r = resume(n);
+      q('.l4-resume', b).textContent = r;
+      q('.l4-resume', b).title = r;
+    });
+  }
+
+  function majJauge() {
+    const manque = JAUGE.filter(([name]) => !val(name));
+    const score = JAUGE.length - manque.length;
+    const s = q('#l4-jauge-score'); if (s) s.textContent = `${score}/${JAUGE.length}`;
+    const r = q('#l4-jauge-rempli'); if (r) r.style.width = Math.round(score / JAUGE.length * 100) + '%';
+    const m = q('#l4-jauge-manque'); if (m) m.textContent = manque.length ? 'Manque : ' + manque.map(x => x[1]).join(', ') : 'Complet';
+    const j = q('#l4-jauge'); if (j) j.classList.toggle('l4-jauge--ok', !manque.length);
+  }
+
+  function ligneElig(lib, etat, valeur) {
+    const ic = { ok: '✓', warn: '!', vide: '…' }[etat];
+    return `<li class="l4-elig--${etat}"><span class="l4-elig-ic">${ic}</span><span class="l4-elig-lib">${esc(lib)}</span><span class="l4-elig-val">${esc(valeur || '')}</span></li>`;
+  }
+  function majEligibilite() {
+    const ul = q('#l4-elig'); if (!ul) return;
+    const u = val('usage_bien'), t = val('type_logement'), e = val('mode_chauffage'), em = val('type_emetteurs');
+    const an = parseInt((val('annee_construction').match(/(1[5-9]\d\d|20\d\d)/g) || []).pop(), 10);
+    const age = an ? new Date().getFullYear() - an : null;
+    const cat = val('categorie');
+    const L = [];
+    L.push(!u ? ligneElig('Propriétaire', 'vide') : ligneElig('Propriétaire', 'ok', u === 'bailleur' ? 'Bailleur' : 'Occupant'));
+    L.push(!t ? ligneElig('Maison individuelle', 'vide') : ligneElig('Maison individuelle', t === 'maison' ? 'ok' : 'warn', t === 'maison' ? 'Maison' : 'Appartement'));
+    L.push(!e ? ligneElig('Chauffage à remplacer', 'vide') : ligneElig('Chauffage à remplacer', e === 'pac' ? 'warn' : 'ok', e === 'pac' ? 'Déjà une PAC' : texteOption('mode_chauffage')));
+    L.push(!em ? ligneElig('Circuit à eau', 'vide') : ligneElig('Circuit à eau', em === 'convecteurs_electriques' ? 'warn' : 'ok', em === 'convecteurs_electriques' ? 'À créer' : (em === 'plancher_chauffant' ? 'Plancher' : 'Radiateurs')));
+    L.push(age == null ? ligneElig('Logement de plus de 15 ans', 'vide') : ligneElig('Logement de plus de 15 ans', age >= 15 ? 'ok' : 'warn', an + ' (' + age + ' ans)'));
+    const libCat = { tres_modeste: 'Très modeste', modeste: 'Modeste', intermediaire: 'Intermédiaire', superieur: 'Supérieur' }[cat];
+    L.push(!cat ? ligneElig('Catégorie de revenus', 'vide') : ligneElig('Catégorie de revenus', cat === 'superieur' ? 'warn' : 'ok', libCat || cat));
+    ul.innerHTML = L.join('');
+  }
+
+  let minuterieExpress = null, seqExpress = 0;
+  function planifierExpress() {
+    clearTimeout(minuterieExpress);
+    minuterieExpress = setTimeout(async () => {
+      const seq = ++seqExpress;
+      const f = (n) => (n == null || !isFinite(n)) ? '—' : Math.round(n).toLocaleString('fr-FR') + ' €';
+      let r = null;
+      try { if (typeof window.hexaEstimationExpress === 'function') r = await window.hexaEstimationExpress(); } catch (_) { r = null; }
+      if (seq !== seqExpress) return;
+      q('#l4-exp-aides').textContent = r && r.contextePret ? f(r.aides) : '—';
+      q('#l4-exp-reste').textContent = r && r.contextePret ? f(r.reste) : '—';
+      q('#l4-exp-eco').textContent = r && r.economie != null ? Math.round(r.economie).toLocaleString('fr-FR') + ' €/mois' : '—';
+    }, 700);
+  }
+
+  let minuterieMaj = null;
+  function planifierMaj() { clearTimeout(minuterieMaj); minuterieMaj = setTimeout(() => { majTout(); planifierExpress(); }, 150); }
+  function majTout() {
+    if (!construit) return;
+    majChoix(); majBlocs(); majJauge(); majEligibilite();
+  }
+
+  // Hauteur : la grille occupe la hauteur disponible, le bloc ouvert défile à l'intérieur
+  function ajusterHauteur() {
+    const g = q('#l4-grille');
+    if (!g) return;
+    if (window.innerWidth < 1100) { g.style.removeProperty('--l4-h'); return; }
+    const barre = q('#form-actions-bar');
+    const hb = barre ? barre.getBoundingClientRect().height : 0;
+    let dispo = Math.max(300, Math.floor(window.innerHeight - g.getBoundingClientRect().top - window.scrollY - hb - 10));
+    g.style.setProperty('--l4-h', dispo + 'px');
+    // marges et barres réelles : on retire ce qui dépasse encore (la page ne doit pas défiler)
+    const deborde = document.documentElement.scrollHeight - window.innerHeight;
+    if (deborde > 0) {
+      dispo = Math.max(300, dispo - deborde);
+      g.style.setProperty('--l4-h', dispo + 'px');
+    }
+  }
+
+  // ------------------------------------------------------------------ aide mémorisée par utilisateur
+  function cleAide() { return 'hexa_l4_aide_' + ((window.HEXA_SESSION && window.HEXA_SESSION.user) || 'defaut'); }
+  function lireAide() { try { const v = localStorage.getItem(cleAide()); return v === null ? true : v === '1'; } catch (_) { return true; } }
+  function reglerAide(on) {
+    document.body.classList.toggle('l4-aide-on', !!on);
+    const b = q('#l4-aide-btn');
+    if (b) { b.classList.toggle('active', !!on); b.setAttribute('aria-pressed', on ? 'true' : 'false'); b.textContent = on ? 'Aide ✓' : 'Aide'; }
+    try { localStorage.setItem(cleAide(), on ? '1' : '0'); } catch (_) {}
+    ajusterHauteur();
+  }
+  window.hexaReglerAide = reglerAide;
+
+  // ------------------------------------------------------------------ chargement d'un lead / nouvelle fiche
+  function apresChargement() {
+    if (!construit) return;
+    nspCompteur = false;
+    // la session (utilisateur) est connue ici : relire la préférence d'aide de CET utilisateur
+    document.body.classList.toggle('l4-aide-on', lireAide());
+    const ba = q('#l4-aide-btn');
+    if (ba) { const on = document.body.classList.contains('l4-aide-on'); ba.classList.toggle('active', on); ba.setAttribute('aria-pressed', on ? 'true' : 'false'); ba.textContent = on ? 'Aide ✓' : 'Aide'; }
+    majTout();
+    const incomplet = [1, 2, 3, 4].find(n => manquants(n).length > 0) || 0;
+    ouvrirBloc(incomplet);
+    planifierExpress();
+    setTimeout(ajusterHauteur, 300);    // après le rendu du statut / des relances
+  }
+  window.hexaLot4ApresChargement = function () { setTimeout(apresChargement, 0); };
+
+  function demarrer() { if (!construire()) setTimeout(demarrer, 250); }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => setTimeout(demarrer, 0));
+  else setTimeout(demarrer, 0);
+})();
+</script>
+<style id="hexa-lot4-fiche">
+  body.l4 .container { max-width: 1340px !important; width: auto !important; margin: 0 auto; padding: 0 12px; }
+  body.l4 .prospect-shell-sticky { margin-bottom: 4px; }
+  body.l4 .psb-badges { display: none !important; }
+  body.l4 .prospect-sticky-bar { display: flex; align-items: center; gap: 12px; flex-wrap: nowrap; padding-top: 6px; padding-bottom: 6px; }
+  .l4-jauge { display: flex; align-items: center; gap: 8px; margin-left: auto; min-width: 0; font-size: 12px; color: #334155; }
+  .l4-jauge-titre b { color: #002E5A; }
+  .l4-jauge-barre { width: 90px; height: 6px; background: #E2E8F0; border-radius: 4px; overflow: hidden; flex: none; }
+  .l4-jauge-barre i { display: block; height: 100%; background: #F59E0B; }
+  .l4-jauge--ok .l4-jauge-barre i { background: #0D6B3B; }
+  .l4-jauge-manque { color: #B45309; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 260px; }
+  .l4-jauge--ok .l4-jauge-manque { color: #0D6B3B; }
+  .l4-aide-btn { border: 1px solid #93C5FD; background: #fff; color: #1D4ED8; border-radius: 8px; padding: 4px 10px; font-size: 12px; font-weight: 700; cursor: pointer; font-family: inherit; flex: none; }
+  .l4-aide-btn.active { background: #EFF6FF; }
+  body.l4 .fiche-statvt-top { display: flex; align-items: center; gap: 22px; flex-wrap: wrap; padding: 2px 4px 6px; margin: 0; }
+  body.l4 .fiche-statvt-top > div { margin: 0 !important; align-items: center !important; }
+  body.l4 .fiche-statvt-top > .l4-aide { flex-basis: 100%; }
+  .l4-grille { display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: 12px; align-items: start; }
+  .l4-main { min-width: 0; }
+  body.l4 #form-prospect { margin: 0; }
+  body.l4 #form-prospect fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
+  .l4-ancienne-carte { display: none !important; }
+  #l4-accordeon { display: flex; flex-direction: column; gap: 6px; }
+  .l4-bloc { background: #fff; border: 1px solid #E2E8F0; border-radius: 10px; min-height: 0; }
+  .l4-bloc--technique { background: #F8FAFC; }
+  .l4-tete { width: 100%; display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: none; border: 0; cursor: pointer; text-align: left; font: inherit; }
+  .l4-num { width: 22px; height: 22px; border-radius: 50%; background: #002E5A; color: #fff; font-size: 12px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; flex: none; }
+  .l4-bloc--technique .l4-num { background: #94A3B8; }
+  .l4-titre { font-weight: 700; color: #002E5A; font-size: 14px; flex: none; }
+  .l4-resume { flex: 1; min-width: 0; color: #64748B; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .l4-etat { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 10px; flex: none; }
+  .l4-etat--complet { background: #E8F5EC; color: #0D6B3B; }
+  .l4-etat--manque { background: #FEF3C7; color: #B45309; }
+  .l4-etat--plustard { background: #F1F5F9; color: #64748B; }
+  .l4-etat--auto { background: #EFF6FF; color: #1D4ED8; }
+  .l4-chevron { color: #94A3B8; flex: none; transition: transform .15s; }
+  .l4-bloc.is-open .l4-chevron { transform: rotate(90deg); }
+  .l4-corps { display: none; padding: 0 12px 6px; }
+  .l4-bloc.is-open .l4-corps { display: block; }
+  .l4-dire { font-style: italic; color: #475569; font-size: 12.5px; margin: 0 0 8px; }
+  .l4-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px 14px; align-items: start; }
+  .l4-grid > .field, .l4-grid > * { margin: 0 !important; min-width: 0; }
+  .l4-span2 { grid-column: span 2; }
+  .l4-span3 { grid-column: 1 / -1; }
+  .l4-masque { display: none !important; }
+  .l4-cache { display: none !important; }
+  .l4-choix { display: flex; flex-wrap: wrap; gap: 4px; }
+  .l4-choix button { border: 1px solid #CBD5E1; background: #fff; color: #1E293B; border-radius: 7px; padding: 6px 10px; font-size: 12.5px; cursor: pointer; font-family: inherit; line-height: 1.2; }
+  .l4-choix button:hover { border-color: #002E5A; }
+  .l4-choix button.active { background: #002E5A; border-color: #002E5A; color: #fff; }
+  .l4-sous-choix { margin-top: 5px; }
+  .l4-sous-choix button { padding: 3px 8px; font-size: 11.5px; }
+  .l4-aide { display: none; color: #1D4ED8; font-size: 11px; line-height: 1.35; margin-top: 3px; }
+  body.l4-aide-on .l4-aide { display: block; }
+  body.l4-aide-on .l4-aide.l4-masque { display: none !important; }
+  .l4-aide--bloc { margin: 0 0 8px; }
+  .l4-alerte { background: #FEF3C7; border: 1px solid #F59E0B; color: #8A4B00; border-radius: 8px; padding: 7px 10px; font-size: 12.5px; }
+  .l4-side { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+  .l4-carte { background: #fff; border: 1px solid #E2E8F0; border-radius: 10px; padding: 10px 12px; }
+  .l4-carte h3 { margin: 0 0 6px; font-size: 13px; color: #002E5A; text-transform: none; }
+  .l4-elig { list-style: none; margin: 0; padding: 0; font-size: 12.5px; }
+  .l4-elig li { display: flex; align-items: center; gap: 7px; padding: 3px 0; }
+  .l4-elig-ic { width: 17px; height: 17px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex: none; }
+  .l4-elig--ok .l4-elig-ic { background: #E8F5EC; color: #0D6B3B; }
+  .l4-elig--warn .l4-elig-ic { background: #FEF3C7; color: #B45309; }
+  .l4-elig--vide .l4-elig-ic { background: #F1F5F9; color: #94A3B8; }
+  .l4-elig-lib { flex: 1; color: #334155; }
+  .l4-elig-val { color: #64748B; font-size: 12px; }
+  .l4-express > div { display: flex; justify-content: space-between; font-size: 12.5px; padding: 2px 0; color: #334155; }
+  .l4-express b { color: #002E5A; }
+  .l4-btn-simu { margin-top: 8px; width: 100%; border: 0; border-radius: 8px; background: #E2214B; color: #fff; font-weight: 700; padding: 8px; cursor: pointer; font-family: inherit; }
+  #l4-fin-appel .suivi-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+  #l4-fin-appel .row-rappel-compact { display: grid !important; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 6px; }
+  #l4-fin-appel .row-rappel-compact .field { margin: 0 !important; }
+  #l4-fin-appel .row-rappel-compact #suivi-rap-poser { grid-column: 1 / -1; }
+  #l4-fin-appel .suivi-actif { font-size: 12px; margin-bottom: 6px; }
+  /* 1366×768 : la grille prend la hauteur disponible ; le bloc ouvert et la colonne de droite défilent à l'intérieur */
+  @media (min-width: 1100px) {
+    .l4-grille { height: var(--l4-h, auto); }
+    .l4-main, .l4-side { height: 100%; min-height: 0; }
+    .l4-side { overflow: auto; }
+    .l4-main #form-prospect, .l4-main #form-prospect fieldset { height: 100%; }
+    #l4-accordeon { height: 100%; min-height: 0; }
+    .l4-bloc { flex: none; }
+    .l4-bloc.is-open { flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; }
+    .l4-bloc.is-open .l4-corps { flex: 1 1 auto; min-height: 0; overflow: auto; }
+    body.l4 .form-actions { margin-top: 0 !important; padding-top: 5px !important; padding-bottom: 5px !important; }
+    body.l4 .form-actions-anchor { margin-top: 4px !important; }
+    body.l4 #form-actions-bar .btn-save { height: 36px !important; min-height: 0 !important; padding-top: 0 !important; padding-bottom: 0 !important; font-size: 14px !important; line-height: 36px !important; }
+    body.l4 .l4-dire { margin-bottom: 5px; }
+    body.l4 .fiche-statvt-top { padding: 0 4px 2px !important; row-gap: 2px; }
+    body.l4 .fiche-rel-row, body.l4 #fiche-relances-slot { flex-wrap: nowrap !important; align-items: center; }
+    body.l4 .fiche-rel-seqs { display: inline-flex; margin-left: 6px; font-size: 11px; }
+    .l4-tete { padding-top: 6px; padding-bottom: 6px; }
+    #l4-accordeon { gap: 5px; }
+  }
 </style>
 </body>
 </html>
