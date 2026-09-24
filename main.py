@@ -3946,16 +3946,11 @@ def _build_devis_context(request: Request, numero: str, version: int | None = No
     _mpr_total = float_value(calculs.get("montant_mpr")) + float_value(calculs.get("montant_mpr_ballon"))
     _reste_net = float_value(calculs["reste_a_charge"])  # = resteAttente (ballon deja inclus cote back)
     _sans_attente = (_mode_mpr == "sans_attente") and (_mpr_total > 0)
-    # Même règle que le simulateur (Lot 4) : le reste à charge affiché est TOUJOURS le vrai reste à
-    # charge ; en « tout de suite », l'avance de la prime figure sur une ligne à part et n'entre
-    # dans le montant financé que si elle est ajoutée au crédit.
-    _base_credit = _reste_net + _mpr_total if (_sans_attente and _fin_mpr == "credit") else _reste_net
-    context["reste_a_charge"] = money(_reste_net)
+    _reste_affiche = _reste_net + _mpr_total if _sans_attente else _reste_net
+    _base_credit = _reste_affiche if (_sans_attente and _fin_mpr == "credit") else _reste_net
+    context["reste_a_charge"] = money(_reste_affiche)
     context["mode_mpr"] = "sans_attente" if _sans_attente else "attente"
     context["montant_mpr_affiche"] = f"{round(_mpr_total):,}".replace(",", " ")
-    context["avance_mpr"] = money(_mpr_total) if _sans_attente else ""
-    context["avance_mpr_poche"] = _sans_attente and _fin_mpr != "credit"   # avancée de sa poche (non financée)
-    context["montant_finance"] = money(_base_credit)
     context["afficher_mention_mpr"] = state.get("afficher_mention_mpr") is not False
     # financement choisi dans le simulateur (opt1 Crédit Travaux par défaut, comme le simulateur)
     context["financement_devis"] = calculer_financement_devis(_base_credit, admin, str(state.get("option") or "opt1").strip())

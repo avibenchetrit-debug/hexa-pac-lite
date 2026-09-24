@@ -14633,9 +14633,14 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     state.sous_dimensionnement = !!selection.sous_dimensionnement;
   }
 
-  function syncSimStateToForm(){
+  // Lot 5 : le simulateur est monté dès l'ouverture d'une fiche. Il ne recopie ses choix dans les
+  // champs cachés de la fiche qu'après une action de l'utilisateur dans le simulateur (ou quand
+  // l'appel le force) : ouvrir puis réenregistrer un lead laisse son JSON identique.
+  let simTouche = false;
+  function syncSimStateToForm(force){
     // Lot 4 : l'estimation express (colonne de droite) calcule sans rien écrire dans la fiche
     if (window.__hexaEstimationExpress) return;
+    if (!force && !simTouche && document.getElementById('p-hotes')) return;
     const form = document.getElementById('form-prospect');
     if (!form) return;
     const set = (name, val) => {
@@ -14653,7 +14658,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
   function syncCurrentProspectToSimulatorState(){
     lireContexteFiche();
     state.modele_force = false;
-    syncSimStateToForm();
+    syncSimStateToForm(true);
     scheduleSaveSimulatorState();
     if (estOuvert()) refresh();
   }
@@ -15110,7 +15115,9 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
   }
 
   async function calcul(){
-    if (Object.keys(GRILLE).length === 0 || !CATALOGUE_PAC.length) { await chargerBaremes(); }
+    // Lot 5 : le simulateur est monté dès l'ouverture de la fiche ; attendre AUSSI la configuration admin
+    // (sinon la formule CEE retombe sur un secours hors de portée : « defaultFormuleBarTh171 is not defined »)
+    if (Object.keys(GRILLE).length === 0 || !CATALOGUE_PAC.length || !M3_CONFIG) { await chargerBaremes(); }
     const dim = syncDimensionnement();
     const eco = economiesSim();
     state.eco = eco;
@@ -15383,13 +15390,12 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
       const marquesHtml = n.marques.map(function(mo){
         const avHtml = (Array.isArray(mo.avantages) ? mo.avantages : []).filter(function(a){ return a && String(a).trim(); }).map(function(a){ return '<span class="sim-av-chip">✓ ' + esc(a) + '</span>'; }).join('');
         const rows = mo.modeles.map(function(m){
-          const reste = resteAChargePourPrix(m.prix_ttc);
           const sel = (m.id === selId);
           return '<div class="sim-mod-row' + (sel ? ' selected' : '') + '" data-modele-id="' + esc(m.id) + '">'
             + '<span class="sim-mod-radio">' + (sel ? '●' : '○') + '</span>'
             + '<span class="sim-mod-nom">' + esc(m.label || m.nom) + '</span>'
             + '<span class="sim-mod-kw">' + (Math.round(puissanceModele(m)*10)/10) + ' kW</span>'
-            + '<span class="sim-mod-reste">' + eur(reste) + '<small class="sim-mod-reste-lib">reste à charge</small></span>'   // Lot 4c : pas le prix
+            + '<span class="sim-mod-reste">' + eur(m.prix_ttc) + '<small class="sim-mod-reste-lib">prix TTC posé</small></span>'   // Lot 5 : le prix, pas le reste à charge
             + '</div>';
         }).join('');
         return '<div class="sim-marque-block">'
@@ -15413,6 +15419,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     state.prix_pac = Math.round(selected.prix_ttc || 0);
     state.modele_force = true;
     state.sous_dimensionnement = false;
+    simTouche = true;
     if (typeof scheduleSaveSimulatorState === 'function') scheduleSaveSimulatorState();
     refresh();
   }
@@ -15465,47 +15472,27 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     const anahLabel = LABELS_ANAH[c.categorie] || '';
     const ceeLabel = LABELS_CEE[c.categorie] || '';
 
-    // Lot 4c : étapes à gauche (une à la fois), UN récapitulatif à droite ; mêmes id qu'avant
-    const ok = etapesOk(c);
-    const cur = etapeCourante(ok);
-    const cache = n => cur === n ? '' : ' hidden';
-    return `
-      <div class="sim-body l4s">
-        <div class="l4s-contexte" id="sim-contexte">${pastillesContexte(anahLabel, ceeLabel)}</div>
-        <div class="l4s-zones">
-        <div class="l4s-zone-etapes">
-          <nav class="l4s-etapes" id="sim-etapes">${barreEtapes(ok, cur)}</nav>
-          <div class="l4s-etape-corps">
-
-          <section class="l4s-etape" data-etape="1"${cache(1)}>
-            <h4 class="l4s-titre">Ce que fait la PAC</h4>
-            <select id="sim-service" class="l4-cache" aria-hidden="true">
-              <option value="chauffage_seul" ${sel(state.service,'chauffage_seul')}>Chauffage seul</option>
-              <option value="chauffage_ecs" ${sel(state.service,'chauffage_ecs')}>Chauffage + ECS</option>
-            </select>
-            <div class="l4-choix l4s-choix-service" data-sim-for="sim-service">
-              <button type="button" data-valeur="chauffage_seul" class="${state.service!=='chauffage_ecs'?'active':''}">Chauffage seul</button>
-              <button type="button" data-valeur="chauffage_ecs" class="${state.service==='chauffage_ecs'?'active':''}">Chauffage + eau chaude</button>
-            </div>
-            <div class="sim-note" id="sim-service-note">${ballonAutorise(state) ? 'La PAC assure le chauffage. Pour l\'eau chaude : conserver l\'existant ou ajouter un ballon thermodynamique (sans aide MaPrimeRénov\' depuis le 01/09/2026).' : 'La PAC (modèle DUO) assure le chauffage et l\'eau chaude. Aucun ballon à ajouter.'}</div>
-          </section>
-
-          <section class="l4s-etape" data-etape="2"${cache(2)}>
-            <h4 class="l4s-titre">Logement <i>(calcul de la puissance)</i></h4>
+    // Lot 5 : le simulateur est rendu en morceaux, chacun dans son étape du parcours ; mêmes id
+    dernierCalcul = c;
+    const kw = Number(c.dim?.puissance_kw || 0).toFixed(1);
+    const badgeDpe = isoDpe ? ' <em class="p-badge-dpe">DPE</em>' : '';
+    const iso = `
+          <div class="p-encadre" id="sim-iso-encadre">
+            <h4 class="p-encadre-titre">Isolation du logement <i>(sert à calculer la puissance de la PAC)</i></h4>
             <div class="l4s-ligne">
               <label class="sim-field l4s-surf"><span>Surface chauffée</span>
                 <span class="sim-surf-wrap"><input type="number" id="sim-surf-chauffee" value="${state.surface_chauffee != null && state.surface_chauffee !== '' ? Math.round(state.surface_chauffee) : ''}" placeholder="—"><em>m²</em>
                 <button type="button" class="sim-info-btn" id="sim-surf-info" aria-label="Info surface">i</button></span>
               </label>
-              ${isoDpe ? `<label class="l4s-verrou"><input type="checkbox" id="sim-iso-travaux" ${state.iso_deverrouille?'checked':''}> Travaux depuis le DPE</label>`
+              ${isoDpe ? `<label class="l4s-verrou"><input type="checkbox" id="sim-iso-travaux" ${state.iso_deverrouille?'checked':''}> Travaux faits depuis le DPE</label>`
                 : `<span class="l4s-a-verifier" id="sim-iso-a-verifier" title="Isolation non reçue du DPE : à confirmer avec le client">Isolation à vérifier</span>`}
             </div>
-            <div class="sim-ctx-sub" id="sim-surf-sub">90% de ${state.surface_habitable ?? '—'} m² habitables${state.surface_forcee?' · <b>forcé</b>':''} → tranche ${labelTranche(c.sKey)} · Puissance reco <b id="sim-puissance-reco">${Number(c.dim?.puissance_kw || 0).toFixed(1)} kW</b></div>
+            <div class="sim-ctx-sub" id="sim-surf-sub">${sousLigneSurface(c)}</div>
             <div class="sim-info-pop" id="sim-info-pop" hidden>
               Surface <b>habitable</b> ≠ surface <b>chauffée</b>. On retire les pièces non chauffées (WC, salle de bain si sèche-serviette <b>électrique</b>). Défaut = 90% de l'habitable, ajustable.
             </div>
             <div class="l4s-iso${verrou ? ' is-verrou' : ''}">
-              <label class="sim-field"><span>Toit / combles</span>
+              <label class="sim-field"><span>Toit / combles${badgeDpe}</span>
                 <select id="iso-toit" name="iso_toit" ${dis}>
                   <option value="tres_bien" ${sel(state.iso_toit,'tres_bien')}>Très bien isolé</option>
                   <option value="bien" ${sel(state.iso_toit,'bien')}>Bien isolé</option>
@@ -15513,7 +15500,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
                   <option value="peu" ${sel(state.iso_toit,'peu')}>Peu isolé</option>
                   <option value="non" ${sel(state.iso_toit,'non')}>Non isolé</option>
                 </select></label>
-              <label class="sim-field"><span>Murs</span>
+              <label class="sim-field"><span>Murs${badgeDpe}</span>
                 <select id="iso-mur" name="iso_mur" ${dis}>
                   <option value="tres_bien" ${sel(state.iso_mur,'tres_bien')}>Très bien isolé</option>
                   <option value="bien" ${sel(state.iso_mur,'bien')}>Bien isolé</option>
@@ -15521,7 +15508,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
                   <option value="peu" ${sel(state.iso_mur,'peu')}>Peu isolé</option>
                   <option value="non" ${sel(state.iso_mur,'non')}>Non isolé</option>
                 </select></label>
-              <label class="sim-field"><span>Fenêtres</span>
+              <label class="sim-field"><span>Fenêtres${badgeDpe}</span>
                 <select id="iso-menuiserie" name="iso_menuiserie" ${dis}>
                   <option value="double" ${sel(state.iso_menuiserie,'double')}>Double vitrage</option>
                   <option value="sur_vitrage" ${sel(state.iso_menuiserie,'sur_vitrage')}>Survitrage</option>
@@ -15529,72 +15516,54 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
                 </select></label>
             </div>
             <div class="l4-aide">Surface chauffée : 90 % de la surface habitable (sans garage ni combles), à corriger si le client chauffe moins de pièces. ${isoDpe ? 'L\'isolation vient du DPE ; ne la changez que si des travaux ont été faits depuis.' : 'Pas de DPE reçu : demandez au client l\'état du toit, des murs et des fenêtres.'}</div>
-          </section>
-
-          <section class="l4s-etape" data-etape="3"${cache(3)}>
-            <h4 class="l4s-titre">PAC proposée</h4>
-            ${renderNiveaux()}
-            <span class="sim-allmodels"${state.show_all_models ? '' : ' hidden'}><select id="sim-modele-select" class="sim-model-select">
-              ${catalogueOptionsOrdonnees(state).map(m => `<option value="${m.id}" ${m.id===state.modele_pac_id?'selected':''}>${m.label} · ${puissanceModele(m)} kW · ${eur(m.prix_ttc)}</option>`).join('')}
-            </select></span>
-            ${state.selection_alerte ? `<div class="sim-note sim-note--warn" id="sim-selection-alerte">${state.selection_alerte}</div>` : ''}
-            <button class="sim-btn-note-dim" type="button" onclick="event.stopPropagation(); window.ouvrirNoteDim(); return false;">📋 Note de dimensionnement</button>
-          </section>
-
-          <section class="l4s-etape" data-etape="4"${cache(4)}>
-            <h4 class="l4s-titre">Eau chaude</h4>
-            ${ballonAutorise(state) ? renderBallonBloc(state, bs, 'choix') : '<div class="sim-note" id="sim-ecs-duo">Assurée par la PAC DUO.</div>'}
-          </section>
-
-          <section class="l4s-etape" data-etape="5"${cache(5)}>
-            <div id="sim-fin">${renderFinancement(c)}</div>
-          </section>
-          <div class="l4s-arguments l4-aide" id="sim-arguments">${renderArguments(c, r, energieLbl, phraseRoi)}</div>
-
+          </div>`;
+    const besoin = `
+          <select id="sim-service" class="l4-cache" aria-hidden="true">
+            <option value="chauffage_seul" ${sel(state.service,'chauffage_seul')}>Chauffage seul</option>
+            <option value="chauffage_ecs" ${sel(state.service,'chauffage_ecs')}>Chauffage + ECS</option>
+          </select>
+          <div class="l4-choix p-cartes-besoin" data-sim-for="sim-service">
+            <button type="button" data-valeur="chauffage_seul" class="p-carte-choix ${state.service!=='chauffage_ecs'?'active':''}"><b>Chauffage seul</b><span>La PAC chauffe la maison ; l'eau chaude reste à part.</span></button>
+            <button type="button" data-valeur="chauffage_ecs" class="p-carte-choix ${state.service==='chauffage_ecs'?'active':''}"><b>Chauffage + eau chaude</b><span>Une PAC DUO fait le chauffage et l'eau chaude.</span></button>
           </div>
-          <div class="l4s-etapes-nav">
-            <button type="button" class="l4s-nav-btn l4s-nav-btn--prec" data-etape-nav="prec"${cur === 1 ? ' disabled' : ''}>← Précédente</button>
-            <button type="button" class="l4s-nav-btn" data-etape-nav="suiv"${cur === 5 ? ' disabled' : ''}>Étape suivante →</button>
+          <div class="sim-note" id="sim-service-note">${ballonAutorise(state) ? 'La PAC assure le chauffage. Pour l\'eau chaude : conserver l\'existant ou ajouter un ballon thermodynamique (sans aide MaPrimeRénov\' depuis le 01/09/2026).' : 'La PAC (modèle DUO) assure le chauffage et l\'eau chaude. Aucun ballon à ajouter.'}</div>
+          <div class="p-sous-titre">Eau chaude</div>
+          ${ballonAutorise(state) ? renderBallonBloc(state, bs, 'choix') : '<div class="sim-note" id="sim-ecs-duo">Assurée par la PAC DUO.</div>'}`;
+    const pac = `
+          <div class="p-puissance">Puissance nécessaire calculée : <b id="sim-puissance-reco">${kw} kW</b></div>
+          ${renderNiveaux()}
+          <span class="sim-allmodels"${state.show_all_models ? '' : ' hidden'}><select id="sim-modele-select" class="sim-model-select">
+            ${catalogueOptionsOrdonnees(state).map(m => `<option value="${m.id}" ${m.id===state.modele_pac_id?'selected':''}>${m.label} · ${puissanceModele(m)} kW · ${eur(m.prix_ttc)}</option>`).join('')}
+          </select></span>
+          ${state.selection_alerte ? `<div class="sim-note sim-note--warn" id="sim-selection-alerte">${state.selection_alerte}</div>` : ''}
+          <div class="p-prix-choisi">
+            <span>Prix TTC posé du modèle choisi <i>(modifiable)</i></span>
+            <span class="sim-pnl-edit"><input type="text" inputmode="numeric" id="sim-prix" value="${new Intl.NumberFormat('fr-FR').format(state.prix_pac||0)}"><em>€</em></span>
+            ${state.sous_dimensionnement ? '<span class="sim-warn-badge">⚠ Vérifier</span>' : ''}
           </div>
-        </div>
-
-        <aside class="l4s-recap" id="sim-recap">
-          <div class="sim-pnl">
-            <div class="sim-pnl-line sim-pnl-prix">
-              <span>Prix PAC fourni posé</span>
-              <span class="sim-pnl-edit-wrap">
-                <span class="sim-pnl-edit"><input type="text" inputmode="numeric" id="sim-prix" value="${new Intl.NumberFormat('fr-FR').format(state.prix_pac||0)}"><em>€</em></span>
-                ${state.sous_dimensionnement ? '<span class="sim-warn-badge">⚠ Vérifier</span>' : ''}
-              </span>
-            </div>
-            ${renderBallonBloc(state, bs, 'couts')}
-            <div class="sim-pnl-line sim-pnl-minus"><span>– MaPrimeRénov'${bs.actif ? ' — PAC' : ''}</span><b id="sim-mpr">${eurDash(c.mprDevis, c.contextePret)}</b></div>
-            <div class="sim-pnl-line sim-pnl-minus"><span>– Prime CEE</span><b id="sim-cee">${eurDash(c.ceeDevis, c.contextePret)}</b></div>
-            <div class="sim-pnl-line sim-pnl-sub"><span>= Aides déduites</span><b id="sim-aides">${eurDash(c.aidesDevis, c.contextePret)}</b></div>
-            <div class="sim-pnl-line sim-pnl-reste"><span>Reste à charge</span><strong id="sim-reste">${eurDash(c.resteAttente, c.contextePret)}</strong></div>
-            <div class="l4s-avance-ligne" id="sim-avance-ligne"${c.sansAttente ? '' : ' hidden'}>Avance de la prime MaPrimeRénov' : <b id="sim-avance-montant">${eur(c.mprTotal)}</b> <i>(remboursée au versement de la prime, après les travaux)</i></div>
-          </div>
-          <!-- ZONE DYNAMIQUE : recalculée sans toucher aux champs de saisie -->
+          <button class="sim-btn-note-dim" type="button" onclick="event.stopPropagation(); window.ouvrirNoteDim(); return false;">📋 Note de dimensionnement</button>`;
+    const fin = `<div id="sim-fin">${renderFinancement(c)}</div>`;
+    const resultat = `
+          <div class="l4s-contexte" id="sim-contexte">${pastillesContexte(anahLabel, ceeLabel)}</div>
           <div id="sim-dynamic">${renderDynamic(c, r, energieLbl, creditLine, totalApres, delta, phraseRoi)}</div>
-        </aside>
-        </div>
-
-        <div class="l4s-barre" id="sim-barre">
-          <div class="l4s-barre-chiffres">
-            <span>Reste à charge <b id="sim-barre-reste">${eurDash(c.resteAttente, c.contextePret)}</b></span>
-            <span><span id="sim-barre-eco-lib">${barreEco(delta).lib}</span> <b id="sim-barre-eco">${barreEco(delta).val}</b></span>
+          <div class="p-resultat-actions">
+            <button type="button" class="p-btn-sec" id="sim-arguments-btn" aria-expanded="${state.arguments_ouverts ? 'true' : 'false'}">Arguments pour le client</button>
+            <label class="l4s-case"><input type="checkbox" id="sim-afficher-apercu" ${state.afficher_apercu !== false ? 'checked' : ''}> Économies sur le devis</label>
+            <label class="l4s-case"><input type="checkbox" id="sim-afficher-mention-mpr" ${state.afficher_mention_mpr !== false ? 'checked' : ''}> Mention MaPrimeRénov'</label>
+            <button type="button" id="btn-pre-devis" class="l4s-btn l4s-btn--sec">Pré-devis</button>
+            <button type="button" id="btn-voir-devis" class="l4s-btn">📄 Voir le devis</button>
           </div>
-          <label class="l4s-case"><input type="checkbox" id="sim-afficher-apercu" ${state.afficher_apercu !== false ? 'checked' : ''}> Économies sur le devis</label>
-          <label class="l4s-case"><input type="checkbox" id="sim-afficher-mention-mpr" ${state.afficher_mention_mpr !== false ? 'checked' : ''}> Mention MaPrimeRénov'</label>
-          <button type="button" id="btn-pre-devis" class="l4s-btn l4s-btn--sec">Pré-devis</button>
-          <button type="button" id="btn-voir-devis" class="l4s-btn">📄 Voir le devis</button>
-        </div>
-      </div>`;
+          <div class="l4s-arguments${state.arguments_ouverts ? ' is-open' : ''}" id="sim-arguments">${renderArguments(c, r, energieLbl, phraseRoi)}</div>`;
+    return { iso, besoin, pac, fin, resultat };
   }
 
-  // Lot 4c : étapes du simulateur. Une étape est complète quand ce qu'elle demande est renseigné
-  // (l'étape 4 se coche seule en chauffage + eau chaude : la PAC DUO fait l'eau chaude).
-  const ETAPES = ['Besoin', 'Logement', 'PAC', 'Eau chaude', 'Financement'];
+  // Lot 5 : sous-ligne de la surface chauffée (la puissance est rappelée à l'étape PAC)
+  function sousLigneSurface(c){
+    return `90% de ${state.surface_habitable ?? '—'} m² habitables${state.surface_forcee?' · <b>forcé</b>':''} → tranche ${labelTranche(c.sKey)}`;
+  }
+
+  // Complétude des parties simulateur : [besoin, surface chauffée, PAC, eau chaude, financement]
+  let dernierCalcul = null;
   function etapesOk(c){
     const ecsOk = !ballonAutorise(state)
       || (!alerteEcsChaudiere(state) && (!state.ballon_ref || (!!state.ballon_emplacement && !ballonInadapte(state))));
@@ -15605,17 +15574,6 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
       ecsOk,
       ['opt1', 'opt2', 'opt3'].includes(state.option) && !!c.contextePret
     ];
-  }
-  // À l'ouverture : la première étape incomplète (toutes complètes : la première)
-  function etapeCourante(ok){
-    if (!state.etape_courante) {
-      const i = ok.indexOf(false);
-      state.etape_courante = i >= 0 ? i + 1 : 1;
-    }
-    return state.etape_courante;
-  }
-  function barreEtapes(ok, cur){
-    return ETAPES.map((lib, i) => `<button type="button" class="l4s-etape-btn${cur === i + 1 ? ' is-courante' : ''}${ok[i] ? ' is-ok' : ''}" data-etape="${i + 1}" aria-current="${cur === i + 1 ? 'step' : 'false'}"><span class="l4s-etape-n">${ok[i] ? '✓' : i + 1}</span>${lib}</button>`).join('<span class="l4s-etape-sep">·</span>');
   }
 
   // Barre du bas : exactement le chiffre du corps (« Économie de X €/mois dès maintenant »,
@@ -15663,77 +15621,126 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     return null;
   }
 
-  // Étape 5 : quand démarrer, puis comment il paie (aucun input -> recalculable sans souci de curseur)
-  function renderFinancement(c){
-    const comptant = state.option === 'opt3';
+  // Lot 5 — étape 7 : les combinaisons de paiement. Chacune pilote les réglages existants
+  // (mode_mpr, financement_mpr, option) ; ses montants suivent la formule de calcul() (même seuil,
+  // mêmes barèmes, même pmt) pour la base qu'elle finance.
+  function combinaisonsFinancement(c){
+    const fin = M3_CONFIG?.params_financement || defaultParamsFinancement();
     const lib = c.finView.libelles || {};
-    const carteCredit = (opt, nom, taux, duree, mens) => `
-          <button type="button" class="l4s-credit ${state.option===opt?'active':''}" data-opt="${opt}">
-            <span class="l4s-credit-nom">${nom}</span>
-            <span>${String(taux).replace('.',',')} % · ${duree} mois</span>
-            <span>Montant financé <b>${eur(c.base_credit)}</b></span>
-            <span class="l4s-credit-mens"><b>${eur(mens)}</b>/mois</span>
-          </button>`;
+    const nomCt = lib.option1 || 'Crédit Travaux', nomPtz = lib.option2 || 'Éco-PTZ';
+    const bareme = (opt, base) => {
+      if (opt === 'opt2') return { taux: Number(fin.eco_ptz?.taux_pct) || 0, duree: Number(fin.eco_ptz?.duree_mois) || 0 };
+      const b = base < (Number(fin.seuil_rac_eur) || 0) ? (fin.credit_travaux?.sous_seuil || {}) : (fin.credit_travaux?.sur_seuil || {});
+      return { taux: Number(b.taux_pct) || 0, duree: Number(b.duree_mois) || 0 };
+    };
+    const credit = (opt, base) => { const b = bareme(opt, base);
+      return { opt, nom: opt === 'opt1' ? nomCt : nomPtz, base, taux: b.taux, duree: b.duree, mens: pmt(b.taux / 100, b.duree, base) }; };
+    const R = c.resteAttente, M = c.mprTotal;
+    const attente = [
+      { id: 'att-comptant', titre: 'Comptant', mode: 'attente', opt: 'opt3', comptant: R, credit: null },
+      { id: 'att-credit-travaux', titre: nomCt, mode: 'attente', opt: 'opt1', comptant: 0, credit: credit('opt1', R) },
+      { id: 'att-eco-ptz', titre: nomPtz, mode: 'attente', opt: 'opt2', comptant: 0, credit: credit('opt2', R) }
+    ];
+    const sansAttente = [
+      { id: 'sa-tout-comptant', titre: 'Tout comptant', mode: 'sans_attente', fin: 'cash', opt: 'opt3', comptant: R + M, credit: null },
+      { id: 'sa-avance-eco-ptz', titre: `Avance comptant + ${nomPtz}`, mode: 'sans_attente', fin: 'cash', opt: 'opt2', comptant: M, credit: credit('opt2', R) },
+      { id: 'sa-avance-credit-travaux', titre: `Avance comptant + ${nomCt.toLowerCase()}`, mode: 'sans_attente', fin: 'cash', opt: 'opt1', comptant: M, credit: credit('opt1', R) },
+      { id: 'sa-tout-credit-travaux', titre: `Tout en ${nomCt.toLowerCase()}`, mode: 'sans_attente', fin: 'credit', opt: 'opt1', comptant: 0, credit: credit('opt1', R + M) }
+    ];
+    return c.sansAttente || (state.mode_mpr === 'sans_attente' && M > 0) ? sansAttente : attente;
+  }
+  function combinaisonActive(k, c){
+    if (state.option !== k.opt) return false;
+    if (k.mode === 'attente') return !c.sansAttente;
+    return c.sansAttente && (state.financement_mpr || 'cash') === k.fin;
+  }
+  function libelleCombinaison(c){
+    const k = combinaisonsFinancement(c).find(x => combinaisonActive(x, c));
+    return k ? k.titre : (state.option === 'opt3' ? 'Comptant' : ((c.finView.libelles || {})[state.option === 'opt2' ? 'option2' : 'option1'] || 'Crédit'));
+  }
+  function renderFinancement(c){
+    const cartes = combinaisonsFinancement(c).map(k => `
+          <button type="button" class="p-carte-fin${combinaisonActive(k, c) ? ' active' : ''}" data-combi="${k.id}" data-mode="${k.mode}"${k.fin ? ` data-fin="${k.fin}"` : ''} data-opt="${k.opt}">
+            <span class="p-carte-fin-titre">${k.titre}</span>
+            ${k.comptant > 0 ? `<span class="p-carte-fin-ligne">Comptant <b>${eur(k.comptant)}</b></span>` : ''}
+            ${k.credit ? `<span class="p-carte-fin-ligne">${k.credit.nom} <b>${eur(k.credit.base)}</b> <i>${String(k.credit.taux).replace('.', ',')} % · ${k.credit.duree} mois</i></span>` : ''}
+            <span class="p-carte-fin-mens">${k.credit ? `<b>${eur(k.credit.mens)}</b>/mois` : 'Paiement unique'}</span>
+          </button>`).join('');
     return `
           <div class="l4s-sec">
-            <h4 class="l4s-titre">Quand démarrer les travaux ?</h4>
+            <h4 class="l4s-titre">Le client attend-il l'accord MaPrimeRénov' (environ 5 mois) ?</h4>
             ${c.mprTotal > 0 ? `
-            <div class="l4-choix">
-              <button type="button" class="${c.modeMpr==='sans_attente'?'':'active'}" data-mode-mpr="attente">Attendre l'accord MPR · ~5 mois</button>
-              <button type="button" class="${c.modeMpr==='sans_attente'?'active':''}" data-mode-mpr="sans_attente">Tout de suite</button>
+            <div class="l4-choix p-choix-attente">
+              <button type="button" class="${c.modeMpr==='sans_attente'?'':'active'}" data-mode-mpr="attente">Oui, il attend</button>
+              <button type="button" class="${c.modeMpr==='sans_attente'?'active':''}" data-mode-mpr="sans_attente">Non, travaux tout de suite</button>
             </div>
-            <div class="l4-aide">${c.modeMpr==='sans_attente' ? 'Travaux tout de suite, mais le client avance la prime en attendant qu\'elle lui soit versée.' : 'Le client attend l\'accord de la prime (environ 5 mois) avant les travaux. Il n\'avance rien.'}</div>
-            ${c.sansAttente ? `
-            <div class="l4s-sous">Le client avance la prime MaPrimeRénov' (${eur(c.mprTotal)}) :</div>
-            <div class="l4-choix">
-              <button type="button" class="${c.finMpr==='credit'?'':'active'}" data-fin-mpr="cash">De sa poche</button>
-              <button type="button" class="${c.finMpr==='credit'?'active':''}" data-fin-mpr="credit">Ajoutée au crédit</button>
-            </div>
-            <div class="l4-aide">${c.finMpr==='credit' ? 'Mensualité plus élevée.' : 'Sa mensualité ne change pas.'}</div>` : ''}` : `
+            <div class="l4-aide">${c.modeMpr==='sans_attente' ? 'Travaux tout de suite, mais le client avance la prime en attendant qu\'elle lui soit versée.' : 'Le client attend l\'accord de la prime (environ 5 mois) avant les travaux. Il n\'avance rien.'}</div>` : `
             <div class="sim-note">Pas de prime MaPrimeRénov' pour ce foyer : rien à attendre, rien à avancer.</div>`}
           </div>
           <div class="l4s-sec">
-            <h4 class="l4s-titre">Comment il paie son reste à charge ?</h4>
-            <div class="l4-choix">
-              <button type="button" class="${comptant?'':'active'}" data-paie="credit">À crédit</button>
-              <button type="button" class="${comptant?'active':''}" data-paie="comptant">Comptant · ${eur(c.resteAttente)}</button>
-            </div>
-            ${comptant ? '' : `
-            <div class="l4s-credits">
-              ${carteCredit('opt1', lib.option1 || 'Crédit Travaux', c.finView.tauxO1Pct, c.finView.dureeO1, c.mensO1)}
-              ${carteCredit('opt2', lib.option2 || 'Éco-PTZ', c.finView.tauxO2Pct, c.finView.dureeO2, c.mensO2)}
-            </div>
-            ${state.option==='opt1' && c.finView.mention ? `<div class="sim-note">${c.finView.mention}</div>` : ''}`}
+            <h4 class="l4s-titre">Comment paie-t-il ?</h4>
+            <div class="p-cartes-fin">${cartes}</div>
+            ${state.option==='opt1' && c.finView.mention ? `<div class="sim-note">${c.finView.mention}</div>` : ''}
           </div>`;
   }
 
-  // Récapitulatif (droite, sans défilement) : financement choisi, aujourd'hui → demain, économie,
-  // total sur la durée, base. Les arguments détaillés ne s'affichent qu'avec l'aide.
+  // Lot 5 — étape 8 : ce que le client paie (gauche) et quand il paie (droite)
   function renderDynamic(c, r, energieLbl, creditLine, totalApres, delta, phraseRoi){
     const comptant = state.option === 'opt3';
-    const avanceCash = c.sansAttente && c.finMpr !== 'credit';
-    const mois = comptant ? moisRentabilite(state.eco, c.resteAttente) : null;
+    const sans = c.sansAttente;
+    const bsR = ballonSim(state);
     const lib = c.finView.libelles || {};
-    const produit = state.option === 'opt1' ? (lib.option1 || 'Crédit Travaux') : (lib.option2 || 'Éco-PTZ');
+    const produit = state.option === 'opt2' ? (lib.option2 || 'Éco-PTZ') : (lib.option1 || 'Crédit Travaux');
+    const taux = state.option === 'opt2' ? c.finView.tauxO2Pct : c.finView.tauxO1Pct;
+    const total = sans ? c.resteAttente + c.mprTotal : c.resteAttente;           // = reste_affiche de calcul()
+    const finance = comptant ? 0 : c.base_credit;
+    const cash = Math.max(0, total - finance);
+    const coutFinal = cash + (comptant ? 0 : c.mensOpt * c.nMois) - (sans ? c.mprTotal : 0);
+    const mois = comptant ? moisRentabilite(state.eco, c.resteAttente) : null;
     const declare = state.eco && !state.eco.ecs_traitee && state.facture_avant < Math.round(state.eco.facture_annuelle / 12)
       ? ` <i>(${eur(Math.round(state.eco.facture_annuelle / 12))} déclarés, dont chauffage)</i>` : '';
+    const d = (v) => eurDash(v, c.contextePret);
     return `
-        ${!state.eco ? `<div class="sim-note sim-note--warn" id="sim-eco-indisponible">Économies non calculées : renseignez la facture de l'énergie de la chaudière, ou la surface et l'énergie du logement pour l'estimer.</div>` : ''}
-        ${state.eco && state.eco.alerte ? `<div class="sim-note sim-note--warn" id="sim-eco-alerte">Résultat inhabituel : vérifiez la facture et l'énergie saisies.</div>` : ''}
-        <div class="l4s-recap-fin" id="sim-recap-fin">${comptant
-          ? `<span>Financement</span><b>Comptant</b>`
-          : `<span>${produit}</span><b>${eur(c.base_credit)} financés · ${eur(c.mensOpt)}/mois</b>`}</div>
-        <div class="sim-aa">
-          <div class="sa-line"><span>Aujourd'hui — ${energieLbl}${state.eco && state.eco.ecs_traitee ? ' <i>(chauffage + eau chaude)</i>' : declare}</span><b class="muted" id="sim-facture-avant">${state.eco ? eur(state.facture_avant) + '/mois' : '—'}</b></div>
-          <div class="sa-line total"><span>Demain</span><b>${state.eco ? eur(totalApres) + '/mois' : '—'}</b></div>
-          <div class="l4s-demain-detail">électricité <span id="sim-facture-apres">${state.eco ? eur(state.facture_apres) + '/mois' : '—'}</span>${comptant ? '' : ` + ${produit} ${eur(c.mensOpt)}/mois`}</div>
-          <div class="sa-delta ${delta>=0?'win':'warn'}"${state.eco ? '' : ' hidden'}>${delta>=0?`✓ Économie de ${eur(delta)}/mois (${eur(delta*12)}/an) dès maintenant`:`Surcoût de ${eur(Math.abs(delta))}/mois (${eur(Math.abs(delta)*12)}/an) pendant le crédit`}</div>
-        </div>
-        <div class="sim-roi">
-          ${comptant && !r.indisponible ? `<div class="sim-roi-head">${mois ? `Paiement de <b>${eur(c.resteAttente)}</b> · rentabilisé en <b>${mois} mois</b>` : `Paiement de <b>${eur(c.resteAttente)}</b> · rentabilité au-delà de ${r.dureeVie} ans`}</div>` : ''}
-          ${comptant && avanceCash && !r.indisponible ? `<div class="l4s-avance" id="sim-avance-prime">+ avance de ${eur(c.mprTotal)}, rendue par la prime</div>` : ''}
-          <div class="sim-roi-big-wrap">${r.anneeRentable?`<span class="sim-roi-big">${eur(r.total20)}</span><span class="sim-roi-big-sub">économisés sur ${r.dureeVie} ans</span>`:''}</div>
-          ${state.eco ? `<div class="sim-roi-base" id="sim-roi-base">${ligneBase(r)}</div>` : ''}
+        <div class="p-resultat">
+          <section class="p-res-col">
+            <h4 class="p-res-titre">Ce que le client paie — <span id="sim-config">${libelleCombinaison(c)}</span></h4>
+            <div class="sim-pnl">
+              <div class="sim-pnl-line"><span>Prix TTC posé${bsR.actif ? ' <i>(PAC)</i>' : ''}</span><b id="sim-prix-ttc">${eur(state.prix_pac || 0)}</b></div>
+              ${renderBallonBloc(state, bsR, 'couts')}
+              <div class="sim-pnl-line sim-pnl-minus"><span>– Prime CEE</span><b id="sim-cee">${d(c.ceeDevis)}</b></div>
+              ${sans
+                ? `<div class="sim-pnl-line p-mpr-avancee"><span>MaPrimeRénov' <i>non déduite, avancée par le client</i></span><b id="sim-mpr">${d(c.mprDevis)}</b></div>`
+                : `<div class="sim-pnl-line sim-pnl-minus"><span>– MaPrimeRénov' <i>déduite</i></span><b id="sim-mpr">${d(c.mprDevis)}</b></div>`}
+              <div class="sim-pnl-line p-aides"><span>Aides (CEE + MaPrimeRénov')</span><b id="sim-aides">${d(c.aidesDevis)}</b></div>
+              <div class="p-total"><span>Total à régler par le client</span><strong id="sim-total-regler">${d(total)}</strong></div>
+              <div class="p-ventilation">dont <b id="sim-reste">${d(c.resteAttente)}</b> de reste à charge${sans ? ` + <b id="sim-avance-montant">${eur(c.mprTotal)}</b> d'avance MaPrimeRénov'` : ''}</div>
+              <div class="sim-pnl-line"><span>Payé comptant</span><b id="sim-paye-comptant">${d(cash)}</b></div>
+              ${finance > 0 ? `<div class="sim-pnl-line"><span>Financé par ${produit}</span><b id="sim-finance">${d(finance)}</b></div>` : ''}
+            </div>
+          </section>
+          <section class="p-res-col">
+            <h4 class="p-res-titre">Quand il paie</h4>
+            <div class="p-quand">
+              <div class="p-quand-ligne p-acompte"><span>À la signature <i>acompte 30 %</i></span><b id="sim-acompte">${d(total * 0.3)}</b></div>
+              <div class="p-quand-ligne"><span>Avant la fin du chantier <i>solde 70 %</i></span><b id="sim-solde">${d(total * 0.7)}</b></div>
+              ${comptant ? '' : `<div class="p-quand-ligne"><span>Chaque mois <i>${produit} · ${String(taux).replace('.', ',')} % · ${c.nMois} mois${state.option === 'opt1' && c.finView.mention ? ' · ' + c.finView.mention.toLowerCase() : ''}</i></span><b id="sim-mensualite">${eur(c.mensOpt)}/mois</b></div>`}
+              ${sans ? `<div class="p-quand-ligne p-mpr-retour"><span>Après les travaux <i>MaPrimeRénov' versée au client</i></span><b id="sim-mpr-apres">+ ${eur(c.mprTotal)}</b></div>` : ''}
+            </div>
+            <div class="p-cout-final"><span>Coût final pour le client <i>(intérêts compris)</i></span><b id="sim-cout-final">${d(coutFinal)}</b></div>
+            ${!state.eco ? `<div class="sim-note sim-note--warn" id="sim-eco-indisponible">Économies non calculées : renseignez la facture de l'énergie de la chaudière, ou la surface et l'énergie du logement pour l'estimer.</div>` : ''}
+            ${state.eco && state.eco.alerte ? `<div class="sim-note sim-note--warn" id="sim-eco-alerte">Résultat inhabituel : vérifiez la facture et l'énergie saisies.</div>` : ''}
+            <div class="sim-aa">
+              <div class="sa-line"><span>Aujourd'hui — ${energieLbl}${state.eco && state.eco.ecs_traitee ? ' <i>(chauffage + eau chaude)</i>' : declare}</span><b class="muted" id="sim-facture-avant">${state.eco ? eur(state.facture_avant) + '/mois' : '—'}</b></div>
+              <div class="sa-line total"><span>Demain</span><b>${state.eco ? eur(totalApres) + '/mois' : '—'}</b></div>
+              <div class="l4s-demain-detail">électricité <span id="sim-facture-apres">${state.eco ? eur(state.facture_apres) + '/mois' : '—'}</span>${comptant ? '' : ` + ${produit} ${eur(c.mensOpt)}/mois`}</div>
+              <div class="sa-delta ${delta>=0?'win':'warn'}"${state.eco ? '' : ' hidden'}>${delta>=0?`✓ Économie de ${eur(delta)}/mois (${eur(delta*12)}/an) dès maintenant`:`Surcoût de ${eur(Math.abs(delta))}/mois (${eur(Math.abs(delta)*12)}/an) pendant le crédit`}</div>
+            </div>
+            <div class="sim-roi">
+              ${comptant && !r.indisponible ? `<div class="sim-roi-head">${mois ? `Paiement de <b>${eur(c.resteAttente)}</b> · rentabilisé en <b>${mois} mois</b>` : `Paiement de <b>${eur(c.resteAttente)}</b> · rentabilité au-delà de ${r.dureeVie} ans`}</div>` : ''}
+              <div class="sim-roi-big-wrap">${r.anneeRentable?`<span class="sim-roi-big">${eur(r.total20)}</span><span class="sim-roi-big-sub">économisés sur ${r.dureeVie} ans</span>`:''}</div>
+              ${state.eco ? `<div class="sim-roi-base" id="sim-roi-base">${ligneBase(r)}</div>` : ''}
+            </div>
+          </section>
         </div>`;
   }
 
@@ -15768,7 +15775,10 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     const phraseRoi = phraseCommerciale(c, r, energieLbl, totalApres, delta);
     // sous-ligne surface
     const sub = document.getElementById('sim-surf-sub');
-    if (sub) sub.innerHTML = `90% de ${state.surface_habitable ?? '—'} m² habitables${state.surface_forcee?' · <b>forcé</b>':''} → tranche ${labelTranche(c.sKey)} · Puissance reco <b id="sim-puissance-reco">${Number(c.dim?.puissance_kw || 0).toFixed(1)} kW</b>`;
+    if (sub) sub.innerHTML = sousLigneSurface(c);
+    const pr = document.getElementById('sim-puissance-reco');
+    if (pr) pr.textContent = Number(c.dim?.puissance_kw || 0).toFixed(1) + ' kW';
+    dernierCalcul = c;
     // cellules compte de résultat
     const set=(id,val)=>{ const el=document.getElementById(id); if(el) el.textContent=val; };
     set('sim-mpr', eurDash(c.mprDevis, c.contextePret));
@@ -15791,9 +15801,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     if (prixInput && document.activeElement !== prixInput) {
       prixInput.value = new Intl.NumberFormat('fr-FR').format(state.prix_pac||0);
     }
-    // Lot 4c : coches des étapes et étape 5 (mensualités) suivent aussi la frappe
-    const nav = document.getElementById('sim-etapes');
-    if (nav) nav.innerHTML = barreEtapes(etapesOk(c), state.etape_courante || 1);
+    // Lot 5 : l'étape 7 (montants des cartes) suit aussi la frappe dans le prix
     const fin = document.getElementById('sim-fin');
     if (fin) fin.innerHTML = renderFinancement(c);
     const args = document.getElementById('sim-arguments');
@@ -15809,11 +15817,12 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     // zone dynamique (financement + avant/après + ROI) : aucun input dedans
     const dyn = document.getElementById('sim-dynamic');
     if (dyn) dyn.innerHTML = renderDynamic(c, r, energieLbl, creditLine, totalApres, delta, phraseRoi);
+    if (typeof window.hexaParcoursMaj === 'function') window.hexaParcoursMaj();
   }
 
   function bind(){
     const onIn=(id,fn)=>{ const el=document.getElementById(id); if(!el)return;
-      const ev=el.tagName==='SELECT'?'change':'input'; el.addEventListener(ev,e=>{fn(e.target.value); scheduleSaveSimulatorState(); refresh();}); };
+      const ev=el.tagName==='SELECT'?'change':'input'; el.addEventListener(ev,e=>{simTouche=true; fn(e.target.value); scheduleSaveSimulatorState(); refresh();}); };
     onIn('sim-service',v=>{
       state.service=v; state.modele_force=false;
       // Chauffage + ECS : la PAC fait l'eau chaude, le ballon sort du calcul et du devis.
@@ -15832,6 +15841,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     const prix=document.getElementById('sim-prix');
     if (prix){
       prix.addEventListener('input',e=>{
+        simTouche = true;
         const clean=String(e.target.value).replace(/[^\d]/g,'');
         state.prix_pac=parseInt(clean,10)||0;
         state.user_modified_price = true;
@@ -15846,6 +15856,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     const modelSelect = document.getElementById('sim-modele-select');
     if (modelSelect){
       modelSelect.addEventListener('change', e => {
+        simTouche = true;
         const selected = CATALOGUE_PAC.find(m => m.id === e.target.value);
         if (!selected) return;
         state.modele_pac_id = selected.id;
@@ -15861,6 +15872,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     // Surface chauffée forçable : PATCH seulement (curseur intact)
     const sc=document.getElementById('sim-surf-chauffee');
     if (sc) ['input','change'].forEach(evt => sc.addEventListener(evt,e=>{
+      simTouche = true;
       const raw=e.target.value;
       if (raw==='') { state.surface_forcee=false; state.surface_chauffee = state.surface_habitable!=null?state.surface_habitable*0.9:null; }
       else { const v=parseFloat(raw); if(!isNaN(v)){ const cur=Number(state.surface_chauffee); if(!(Number.isFinite(cur)&&v===Math.round(cur))){ state.surface_chauffee=v; state.surface_forcee=true; } } }
@@ -15871,19 +15883,22 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     // options de financement : refresh complet (pas d'input -> ok), scroll préservé
     // Lot 4 : tous les boutons du simulateur par DÉLÉGATION sur le conteneur -> ils restent actifs
     // après un patch() (frappe dans le prix), qui réinjecte la zone dynamique.
-    const conteneur = document.getElementById('sim-drawer-content');
+    // Lot 5 : les morceaux du simulateur sont dans les étapes du parcours (#p-hotes)
+    const conteneur = document.getElementById('p-hotes') || document.getElementById('sim-drawer-content');
     if (conteneur && !conteneur.dataset.l4Delegue) {
       conteneur.dataset.l4Delegue = '1';
       conteneur.addEventListener('click', (e) => {
         const b = e.target.closest && e.target.closest('button');
         if (!b || !conteneur.contains(b)) return;
-        // Lot 4c : étapes (affichage seulement : rien n'est enregistré)
-        if (b.dataset.etape) { state.etape_courante = Number(b.dataset.etape); refresh(); return; }
-        if (b.dataset.etapeNav) {
-          const n = (state.etape_courante || 1) + (b.dataset.etapeNav === 'suiv' ? 1 : -1);
-          state.etape_courante = Math.min(ETAPES.length, Math.max(1, n)); refresh(); return;
+        if (b.id === 'sim-arguments-btn') {
+          state.arguments_ouverts = !state.arguments_ouverts;
+          document.getElementById('sim-arguments')?.classList.toggle('is-open', !!state.arguments_ouverts);
+          b.setAttribute('aria-expanded', state.arguments_ouverts ? 'true' : 'false');
+          return;
         }
-        if (b.dataset.modeMpr) { state.mode_mpr = b.dataset.modeMpr; }
+        if (b.id !== 'btn-voir-devis' && b.id !== 'btn-pre-devis') simTouche = true;
+        if (b.dataset.combi) { state.mode_mpr = b.dataset.mode; if (b.dataset.fin) state.financement_mpr = b.dataset.fin; state.option = b.dataset.opt; }
+        else if (b.dataset.modeMpr) { state.mode_mpr = b.dataset.modeMpr; }
         else if (b.dataset.finMpr) { state.financement_mpr = b.dataset.finMpr; }
         else if (b.dataset.opt) { state.option = b.dataset.opt; }
         else if (b.dataset.paie) { state.option = b.dataset.paie === 'comptant' ? 'opt3' : (state.option === 'opt3' ? 'opt1' : state.option); }
@@ -15903,6 +15918,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
       });
     }
     document.getElementById('sim-iso-travaux')?.addEventListener('change', (e) => {
+      simTouche = true;
       state.iso_deverrouille = !!e.target.checked; refresh();
     });
     if (!window.__apercuToggleDelegated){
@@ -15937,13 +15953,16 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     });
   }
 
+  // Lot 5 : chaque morceau dans son étape du parcours (#p-sim-2, 5, 6, 7, 8) ; sans parcours (petit
+  // écran, autre page), l'ensemble va dans le panneau d'origine.
+  const HOTES_SIM = { iso: 'p-sim-2', besoin: 'p-sim-5', pac: 'p-sim-6', fin: 'p-sim-7', resultat: 'p-sim-8' };
   async function refresh(){
     const seq = ++__renderSeq;
     const content=document.getElementById('sim-drawer-content');
-    const body=document.querySelector('.sim-body');
-    if(!content) return;
+    const parcours = !!document.getElementById('p-hotes');
+    if(!parcours && !content) return;
     // 1) Sauvegarder scroll + focus + caret AVANT réinjection
-    const defil = document.querySelector('.l4s-etape-corps') || body;
+    const defil = document.getElementById('p-corps') || document.querySelector('.sim-body');
     const scrollTop = defil ? defil.scrollTop : 0;
     const active = document.activeElement;
     const focusId = active && active.id ? active.id : null;
@@ -15952,12 +15971,17 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
       caretStart=active.selectionStart; caretEnd=active.selectionEnd;
     }
     // 2) Réinjecter (sauf si un rendu plus recent a demarre entre-temps)
-    const html = await render(seq);
+    const parts = await render(seq);
     if (seq !== __renderSeq) return;
-    content.innerHTML=html;
+    if (parcours) {
+      Object.keys(HOTES_SIM).forEach(k => { const h = document.getElementById(HOTES_SIM[k]); if (h) h.innerHTML = parts[k]; });
+    } else {
+      // un seul bloc (chaîne) ou les morceaux réunis dans le panneau d'origine
+      content.innerHTML = typeof parts === 'string' ? parts : `<div class="sim-body l4s">${Object.values(parts).join('')}</div>`;
+    }
     bind();
     // 3) Restaurer scroll
-    const body2=document.querySelector('.l4s-etape-corps') || document.querySelector('.sim-body');
+    const body2 = document.getElementById('p-corps') || document.querySelector('.sim-body');
     if (body2) body2.scrollTop = scrollTop;
     // 4) Restaurer focus + caret
     if (focusId){
@@ -15969,6 +15993,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
         }
       }
     }
+    if (typeof window !== 'undefined' && typeof window.hexaParcoursMaj === 'function') window.hexaParcoursMaj();
   }
 
 
@@ -15985,8 +16010,48 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
   }
 
   function estOuvert(){
-    return document.getElementById('sim-drawer')?.classList.contains('is-open');
+    // Lot 5 : dans le parcours, le simulateur est monté en permanence (étapes 2, 5 à 8)
+    return document.body.classList.contains('l5-sim-actif') || !!document.getElementById('sim-drawer')?.classList.contains('is-open');
   }
+
+  // Lot 5 : monte le simulateur dans le parcours pour le lead chargé (ou une nouvelle fiche)
+  let seqMontage = 0, simMonte = false;
+  window.hexaSimMonter = async function(numero, opts){
+    const n = numero || null;
+    const seq = ++seqMontage;
+    // même lead réaffiché (après enregistrement ; un brouillon qui reçoit son numéro le garde) :
+    // pas de relecture de l'état enregistré, qui pourrait écraser un choix pas encore sauvegardé
+    if (simMonte && opts && opts.garder && ((state.numero || null) === n || (state.numero == null && n))) {
+      state.numero = n;
+      lireContexteFiche();
+      await refresh();
+      return;
+    }
+    simMonte = true;
+    if ((state.numero || null) !== n) {
+      dernierCalcul = null;
+      Object.assign(state, { ...DEFAULT_SIM_STATE });
+      state.numero = n;
+      state.modele_force = false;
+      state.user_modified_price = false;
+      state.selection_alerte = null;
+    }
+    simTouche = false;
+    document.body.classList.add('l5-sim-actif');
+    lireContexteFiche();
+    try { await Promise.all([chargerBaremes(), n ? loadSimulatorState(n) : null]); } catch (_) {}
+    if (seq !== seqMontage) return;
+    lireContexteFiche();
+    syncDimensionnement();
+    await refresh();
+  };
+  // Complétude des parties simulateur (dernier calcul) : [besoin, surface chauffée, PAC, eau chaude, financement]
+  window.hexaSimEtapesOk = function(){ return dernierCalcul ? etapesOk(dernierCalcul) : null; };
+  // réglages de financement en cours (tests, raccourcis) : mêmes clés que l'état enregistré
+  window.hexaSimReglages = function(){
+    return { mode_mpr: state.mode_mpr || 'attente', financement_mpr: state.financement_mpr || 'cash', option: state.option || 'opt1',
+             prime: !!(dernierCalcul && dernierCalcul.mprTotal > 0), sans_attente: !!(dernierCalcul && dernierCalcul.sansAttente) };
+  };
 
   // Lot 4 : la session DPE pré-remplit l'isolation (toit, murs, fenêtres). Refusé si l'utilisateur a
   // déverrouillé (« Travaux depuis le DPE ») ; valeurs inconnues ignorées.
@@ -16001,7 +16066,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     if (!change) return false;
     state.iso_source = 'dpe';   // valeurs reçues du DPE : l'isolation se verrouille
     state.modele_force = false;
-    syncSimStateToForm();
+    syncSimStateToForm(true);
     scheduleSaveSimulatorState();
     if (estOuvert()) refresh();
     return true;
@@ -16011,10 +16076,12 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
   // (état sauvegardé du lead + fiche), sans l'ouvrir ni rien sauvegarder.
   let seqExpress = 0;
   // Lot 4c : aller à une étape (tests, raccourcis) ; renvoie la promesse du rendu
-  window.hexaSimEtape = function(n){ state.etape_courante = Math.min(ETAPES.length, Math.max(1, Number(n) || 1)); return refresh(); };
-  window.hexaSimEtapesEtat = function(){
-    return Array.from(document.querySelectorAll('#sim-etapes .l4s-etape-btn')).map(b => ({ etape: Number(b.dataset.etape),
-      ok: b.classList.contains('is-ok'), courante: b.classList.contains('is-courante') }));
+  // (Lot 4c) étapes du simulateur -> étapes du parcours : 1 Besoin → 5, 2 Logement → 2, 3 PAC → 6,
+  // 4 Eau chaude → 5, 5 Financement → 7
+  window.hexaSimEtape = function(n){
+    const m = { 1: 5, 2: 2, 3: 6, 4: 5, 5: 7 }[Number(n)] || 5;
+    if (typeof window.hexaParcoursEtape === 'function') window.hexaParcoursEtape(m);
+    return Promise.resolve();
   };
   window.hexaEstimationExpress = async function(){
     const numero = String(document.body.dataset.prospectNumero || '').trim();
@@ -16044,11 +16111,12 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
   };
 
   function ouvrir(numero){
+    // Lot 5 : dans le parcours, « ouvrir le simulateur » = aller à l'étape 5 (Besoin)
+    if (document.getElementById('p-hotes') && typeof window.hexaParcoursEtape === 'function') { window.hexaParcoursEtape(5); return; }
     // Toggle : si déjà ouverte, on referme
     if (estOuvert()){ fermer(); return; }
 
     state.numero = numero || state.numero;
-    state.etape_courante = 0;          // Lot 4c : on arrive sur la première étape incomplète
     lireContexteFiche();
     // Lot 4 : le simulateur prend la place de la colonne de droite de la fiche
     const hoteLot4 = (typeof window.hexaLot4Hote === 'function') ? window.hexaLot4Hote() : null;
@@ -21543,6 +21611,19 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     categorie: 'Très modeste = aides maximales.',
     date_visite_technique_date: 'Passage du technicien, une fois le client d\'accord.'
   };
+  // Lot 5 : parcours en 8 étapes. blocs = sections de la fiche (dans le <form>) affichées à l'étape ;
+  // hote = morceau du simulateur (#p-sim-N, hors du <form>).
+  const ETAPES_P = [
+    { n: 1, titre: 'Contact', blocs: [1], dire: BLOCS[0].dire },
+    { n: 2, titre: 'Logement', blocs: [2], hote: true, dire: BLOCS[1].dire },
+    { n: 3, titre: 'Chauffage', blocs: [3], dire: BLOCS[2].dire },
+    { n: 4, titre: 'Foyer', blocs: [4], dire: BLOCS[3].dire },
+    { n: 5, titre: 'Besoin', blocs: [], hote: true, dire: '« Voulez-vous que la pompe à chaleur fasse aussi votre eau chaude ? »' },
+    { n: 6, titre: 'PAC', blocs: [], hote: true, dire: '' },
+    { n: 7, titre: 'Financement', blocs: [], hote: true, dire: '« Voulez-vous démarrer tout de suite, ou attendre l\'accord de MaPrimeRénov\' ? »' },
+    { n: 8, titre: 'Résultat', blocs: [5], hote: true, dire: '' }
+  ];
+  const ETAPE_DU_BLOC = { 1: 1, 2: 2, 3: 3, 4: 4, 5: 8, 6: 2 };   // bloc 6 = données techniques (étape 2, dépliable)
   const AIDE_SOUS_CHOIX = 'Demandez de quoi sont faits les radiateurs. Sert au devis.';
   const AIDE_TECHNIQUE = 'Ne modifiez que si le technicien a relevé une autre valeur.';
   const AIDE_STATUT = 'Changez le statut après chaque appel. Arrêtez les relances si le client a dit non.';
@@ -21702,6 +21783,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     placer(2, 'code_postal_personne', { cls: 'l4-si-bailleur' });   // requis pour le devis si bailleur
     placer(2, 'ville_personne', { cls: 'l4-si-bailleur' });
     placer(2, 'type_logement'); placer(2, 'surface_logement_m2'); placer(2, 'annee_construction');
+    placer(2, 'hsp');                                  // Lot 5 : requise pour le devis -> visible à l'étape 2
     // Bloc 3 Chauffage actuel
     // 3 lignes : énergie + eau chaude / émetteurs + compteur / facture + puissance + panneaux
     placer(3, 'mode_chauffage', { span: 2 });
@@ -21723,7 +21805,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     placer(5, 'date_visite_technique_date', { span: 2 });
     // Bloc 6 Données techniques : tout le reste
     placer(6, 'dpe_connu', { span: 3 });              // classe DPE (8 boutons) : toute la largeur
-    ['zone_climatique_chantier', 'altitude', 'hsp', 'nb_niveaux', 'nb_pieces_chauffees', 'hauteur_batiment',
+    ['zone_climatique_chantier', 'altitude', 'nb_niveaux', 'nb_pieces_chauffees', 'hauteur_batiment',
      'parcelle_cadastrale', 'registre_copro', 'prix_m2_estime', 'prix_m2_min', 'conso_kwh_m2', 'emissions_ges',
      'anciennete_chauffage', 'anciennete_ecs'].forEach(n => placer(6, n));
     const meta = q('.dpe-meta-lines');
@@ -21769,7 +21851,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     const legende = document.createElement('div');
     legende.className = 'l4-legende';
     legende.innerHTML = '<span class="l4-etoile">*</span> requis pour la simulation · <span class="l4-pastille-devis">devis</span> = requis pour le devis';
-    acc.prepend(legende);
+    acc.prepend(legende);                      // déplacée dans l'en-tête de la carte (Lot 5)
     // l'ancien orange (liste différente, jamais recalculé au chargement d'un lead) est remplacé
     window.majRequisSimu = majRequis;
     const barre = q('.fiche-statvt-top');
@@ -21803,21 +21885,65 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
       a.type = 'button'; a.id = 'l4-aide-btn'; a.className = 'l4-aide-btn';
       a.textContent = 'Aide';
       a.addEventListener('click', () => reglerAide(!document.body.classList.contains('l4-aide-on')));
-      if (actions) { barreProspect.insertBefore(j, actions); barreProspect.insertBefore(a, actions); }
-      else { barreProspect.appendChild(j); barreProspect.appendChild(a); }
+      // Lot 5 : « Fin d'appel » toujours visible ; ouvre les contrôles existants (mêmes id, même logique)
+      const fa = document.createElement('div');
+      fa.className = 'p-fin-appel';
+      fa.innerHTML = '<button type="button" class="p-fin-appel-btn" id="p-fin-appel-btn" aria-expanded="false">Fin d\'appel</button><div class="p-fin-appel-pop" id="p-fin-appel-pop" hidden></div>';
+      q('#p-fin-appel-btn', fa).addEventListener('click', (e) => {
+        e.stopPropagation();
+        const pop = q('#p-fin-appel-pop'); pop.hidden = !pop.hidden;
+        e.currentTarget.setAttribute('aria-expanded', pop.hidden ? 'false' : 'true');
+      });
+      document.addEventListener('click', (e) => {
+        const pop = q('#p-fin-appel-pop');
+        if (pop && !pop.hidden && !(e.target.closest && e.target.closest('.p-fin-appel'))) { pop.hidden = true; q('#p-fin-appel-btn').setAttribute('aria-expanded', 'false'); }
+      });
+      if (actions) { barreProspect.insertBefore(j, actions); barreProspect.insertBefore(a, actions); barreProspect.insertBefore(fa, actions); }
+      else { barreProspect.appendChild(j); barreProspect.appendChild(a); barreProspect.appendChild(fa); }
     }
 
-    // --- grille : fiche (accordéon) + colonne de droite
+    // --- Lot 5 : parcours (barre d'étapes, carte d'une étape, navigation). Le <form> est déplacé dans
+    // la carte ; les morceaux du simulateur suivent, HORS du <form> (#p-hotes).
+    document.body.classList.add('l5');
     const container = form.parentElement;
     const grille = document.createElement('div');
     grille.id = 'l4-grille';
-    grille.className = 'l4-grille';
+    grille.className = 'l4-grille l5-grille';
     const main = document.createElement('div');
     main.id = 'l4-main';
     main.className = 'l4-main';
     container.insertBefore(grille, form);
     grille.appendChild(main);
-    main.appendChild(form);
+    main.innerHTML = `
+      <nav class="p-etapes" id="p-etapes" aria-label="Étapes"></nav>
+      <section class="p-carte" id="p-carte">
+        <header class="p-carte-tete">
+          <div class="p-carte-ligne"><span class="p-carte-num" id="p-num">ÉTAPE 1 SUR 8</span><span class="p-carte-legende" id="p-legende"></span></div>
+          <h2 class="p-carte-titre" id="p-titre"></h2>
+          <div class="p-dire" id="p-dire"></div>
+        </header>
+        <div class="p-corps" id="p-corps" data-etape="1"></div>
+      </section>
+      <div class="p-nav">
+        <button type="button" class="p-nav-btn p-nav-btn--prec" id="p-prec">← Précédent</button>
+        <button type="button" class="p-lien-tech" id="p-lien-tech" aria-expanded="false" hidden>Données techniques (auto)</button>
+        <button type="button" class="p-nav-btn" id="p-suiv">Suivant →</button>
+      </div>`;
+    const corps = q('#p-corps', main);
+    corps.appendChild(form);
+    const hotes = document.createElement('div');
+    hotes.id = 'p-hotes';
+    hotes.className = 'l4s';
+    hotes.innerHTML = ETAPES_P.filter(e => e.hote).map(e => `<div class="p-hote" id="p-sim-${e.n}" data-p-etape="${e.n}" hidden></div>`).join('');
+    corps.appendChild(hotes);
+    q('#p-legende', main).appendChild(legende);
+    q('#p-prec', main).addEventListener('click', () => allerEtape(etapeCourante - 1));
+    q('#p-suiv', main).addEventListener('click', () => allerEtape(etapeCourante + 1));
+    q('#p-lien-tech', main).addEventListener('click', () => { techOuvert = !techOuvert; allerEtape(2); });
+    q('#p-etapes', main).addEventListener('click', (e) => {
+      const b = e.target.closest && e.target.closest('[data-p-etape]');
+      if (b) allerEtape(Number(b.dataset.pEtape));
+    });
     const side = document.createElement('aside');
     side.id = 'l4-side';
     side.className = 'l4-side';
@@ -21832,7 +21958,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
         <button type="button" class="l4-btn-simu" id="l4-ouvrir-simu">Ouvrir le simulateur</button>
       </section>
       <section class="l4-carte" id="l4-fin-appel"><h3>Fin d'appel</h3></section>`;
-    grille.appendChild(side);
+    grille.appendChild(side);                  // Lot 5 : masquée (pas de chiffre financier avant l'étape 8)
     q('#l4-ouvrir-simu', side).addEventListener('click', () => {
       if (typeof window.ouvrirSimulationsDrawer === 'function') window.ouvrirSimulationsDrawer(document.body.dataset.prospectNumero || '');
     });
@@ -21848,6 +21974,8 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
       if (nrp) { const d = document.createElement('div'); d.className = 'l4-aide'; d.textContent = AIDE_NRP; nrp.closest('.suivi-actions').insertAdjacentElement('afterend', d); }
       suivi.classList.add('l4-ancienne-carte');
     }
+    const pop = q('#p-fin-appel-pop');
+    if (pop && fin) pop.appendChild(fin);      // Lot 5 : contrôles de fin d'appel dans le bandeau
 
     // --- accordéon : un seul bloc ouvert
     qa('.l4-tete', acc).forEach(t => t.addEventListener('click', () => {
@@ -21858,6 +21986,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     reglerAide(lireAide());
     ['input', 'change'].forEach(ev => document.addEventListener(ev, (e) => {
       if (e.target && e.target.closest && e.target.closest('#form-prospect')) {
+        if (e.isTrusted) activite = true;             // Lot 5 : saisie réelle dans la fiche
         if (e.isTrusted && e.target.name) synchroniserClesCachees(e.target.name);
         if (e.target.name === 'alimentation_electrique' && e.target.value) nspCompteur = false;
         planifierMaj();
@@ -21870,15 +21999,81 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
   }
 
   // ------------------------------------------------------------------ état / affichage
-  function ouvrirBloc(n) {
+  // Lot 5 : une seule étape affichée. (Ancienne API : ouvrir le bloc N = aller à son étape.)
+  let etapeCourante = 1, techOuvert = false;
+  function allerEtape(n, opts) {
+    n = Math.min(ETAPES_P.length, Math.max(1, Number(n) || 1));
+    const change = n !== etapeCourante;
+    etapeCourante = n;
+    const E = ETAPES_P[n - 1];
     qa('.l4-bloc').forEach(b => {
-      const ouvert = Number(b.dataset.bloc) === n;
-      b.classList.toggle('is-open', ouvert);
-      q('.l4-tete', b).setAttribute('aria-expanded', ouvert ? 'true' : 'false');
+      const k = Number(b.dataset.bloc);
+      const vis = E.blocs.includes(k) || (k === 6 && n === 2 && techOuvert);
+      b.classList.toggle('is-open', vis);
+      const t = q('.l4-tete', b); if (t) t.setAttribute('aria-expanded', vis ? 'true' : 'false');
     });
+    qa('.p-hote').forEach(h => { h.hidden = Number(h.dataset.pEtape) !== n; });
+    const corps = q('#p-corps');
+    if (corps) { corps.dataset.etape = String(n); if (change && !(opts && opts.garderDefilement)) corps.scrollTop = 0; }
+    const t = q('#p-num'); if (t) t.textContent = `ÉTAPE ${n} SUR ${ETAPES_P.length}`;
+    const ti = q('#p-titre'); if (ti) ti.textContent = E.titre;
+    const di = q('#p-dire'); if (di) { di.textContent = E.dire ? 'À dire : ' + E.dire : ''; di.hidden = !E.dire; }
+    const lt = q('#p-lien-tech'); if (lt) { lt.hidden = n !== 2; lt.setAttribute('aria-expanded', techOuvert ? 'true' : 'false'); lt.textContent = techOuvert ? 'Masquer les données techniques' : 'Données techniques (auto)'; }
+    const pr = q('#p-prec'); if (pr) pr.disabled = n === 1;
+    const su = q('#p-suiv'); if (su) su.disabled = n === ETAPES_P.length;
+    majEtapes();
     ajusterHauteur();
   }
+  function ouvrirBloc(n) {
+    if (!n) return;
+    if (n === 6) techOuvert = true;
+    allerEtape(ETAPE_DU_BLOC[n] || 1);
+  }
   window.hexaOuvrirBlocFiche = ouvrirBloc;
+  window.hexaParcoursEtape = allerEtape;
+  window.hexaParcoursEtapeCourante = () => etapeCourante;
+  // étape qui contient un élément (fiche : bloc ; simulateur : #p-sim-N) ; « tech » : données techniques
+  function etapeDe(el) {
+    if (!el || !el.closest) return null;
+    const h = el.closest('.p-hote'); if (h) return { etape: Number(h.dataset.pEtape), tech: false };
+    const b = el.closest('.l4-bloc'); if (b) { const k = Number(b.dataset.bloc); return { etape: ETAPE_DU_BLOC[k] || 0, tech: k === 6 }; }
+    return null;
+  }
+  // affiche l'étape d'un élément (tests, « Manque : ») ; renvoie true si l'affichage a changé
+  window.hexaParcoursMontrer = function (el) {
+    const d = etapeDe(el);
+    if (!d || !d.etape) return false;
+    const avant = etapeCourante + '|' + techOuvert;
+    if (d.tech) techOuvert = true;
+    if (d.etape !== etapeCourante || (d.tech && avant.endsWith('false'))) allerEtape(d.etape);
+    return avant !== etapeCourante + '|' + techOuvert;
+  };
+
+  // ------------------------------------------------------------------ états des étapes
+  function manquantsEtape(n) { return requisTous().filter(name => (ETAPE_DU_BLOC[blocDe(name)] || 0) === n && !val(name)); }
+  function etatEtape(n) {
+    const so = typeof window.hexaSimEtapesOk === 'function' ? window.hexaSimEtapesOk() : null;
+    if (n <= 4) {
+      if (manquantsEtape(n).length) return 'manque';
+      if (n === 2 && so && !so[1]) return 'manque';        // surface chauffée
+      return 'ok';
+    }
+    if (n === 8) return [1, 2, 3, 4, 5, 6, 7].every(k => etatEtape(k) === 'ok') ? 'ok' : 'neutre';
+    if (!so) return 'neutre';
+    if (n === 5) return so[0] && so[3] ? 'ok' : 'manque';
+    if (n === 6) return so[2] ? 'ok' : 'manque';
+    return so[4] ? 'ok' : 'manque';
+  }
+  function majEtapes() {
+    const nav = q('#p-etapes'); if (!nav) return;
+    nav.innerHTML = ETAPES_P.map(E => {
+      const et = etatEtape(E.n);
+      const cls = 'p-etape' + (E.n === etapeCourante ? ' is-courante' : '') + (et === 'ok' ? ' is-ok' : et === 'manque' ? ' is-manque' : '');
+      return `<button type="button" class="${cls}" data-p-etape="${E.n}" data-etat="${et}" aria-current="${E.n === etapeCourante ? 'step' : 'false'}"><span class="p-etape-n">${et === 'ok' ? '✓' : E.n}</span><span class="p-etape-lib">${E.titre}</span></button>`;
+    }).join('');
+  }
+  window.hexaParcoursMaj = majEtapes;
+  window.hexaParcoursEtats = () => ETAPES_P.map(E => ({ etape: E.n, etat: etatEtape(E.n), courante: E.n === etapeCourante }));
 
   function manquants(n) { return requisBloc(n).filter(name => !val(name)); }
   function etatBloc(n) {
@@ -22003,7 +22198,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     const f = fieldDe(name);
     const n = blocDe(name);
     if (!f || !n) return;
-    ouvrirBloc(n);
+    ouvrirBloc(n);                                   // Lot 5 : va à l'étape du champ
     const cible = qa('input:not([type=hidden]):not([disabled]), select:not(.l4-cache):not([disabled]), textarea, .l4-choix button', f)
       .find(e => e.offsetParent !== null);
     if (cible) { cible.focus({ preventScroll: true }); cible.scrollIntoView({ block: 'nearest' }); }
@@ -22050,6 +22245,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
 
   let minuterieExpress = null, seqExpress = 0;
   function planifierExpress() {
+    if (document.body.classList.contains('l5')) return;     // Lot 5 : colonne de droite masquée
     clearTimeout(minuterieExpress);
     minuterieExpress = setTimeout(async () => {
       const seq = ++seqExpress;
@@ -22069,7 +22265,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
   function planifierMaj() { clearTimeout(minuterieMaj); minuterieMaj = setTimeout(() => { majTout(); planifierExpress(); }, 150); }
   function majTout() {
     if (!construit) return;
-    majChoix(); majBlocs(); majJauge(); majEligibilite(); majRequis();
+    majChoix(); majBlocs(); majJauge(); majEligibilite(); majRequis(); majEtapes();
   }
 
   // Hauteur : la grille occupe la hauteur disponible, le bloc ouvert défile à l'intérieur
@@ -22097,7 +22293,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     document.body.classList.toggle('l4-aide-on', !!on);
     ['#l4-aide-btn', '#sim-aide-btn'].forEach(sel => {
       const b = q(sel);
-      if (b) { b.classList.toggle('active', !!on); b.setAttribute('aria-pressed', on ? 'true' : 'false'); b.textContent = on ? 'Aide ✓' : 'Aide'; }
+      if (b) { b.classList.toggle('active', !!on); b.setAttribute('aria-pressed', on ? 'true' : 'false'); b.textContent = (on ? '☑' : '☐') + ' Aide'; }
     });
     try { localStorage.setItem(cleAide(), on ? '1' : '0'); } catch (_) {}
     ajusterHauteur();
@@ -22127,13 +22323,26 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     // la session (utilisateur) est connue ici : relire la préférence d'aide de CET utilisateur
     document.body.classList.toggle('l4-aide-on', lireAide());
     const ba = q('#l4-aide-btn');
-    if (ba) { const on = document.body.classList.contains('l4-aide-on'); ba.classList.toggle('active', on); ba.setAttribute('aria-pressed', on ? 'true' : 'false'); ba.textContent = on ? 'Aide ✓' : 'Aide'; }
+    if (ba) { const on = document.body.classList.contains('l4-aide-on'); ba.classList.toggle('active', on); ba.setAttribute('aria-pressed', on ? 'true' : 'false'); ba.textContent = (on ? '☑' : '☐') + ' Aide'; }
     majTout();
-    const incomplet = [1, 2, 3, 4, 6].find(n => manquants(n).length > 0) || 0;
-    ouvrirBloc(incomplet);
-    planifierExpress();
+    // Lot 5 : nouveau lead -> étape 1 ; lead ouvert -> première étape incomplète. Réaffichage du même
+    // lead (après enregistrement, y compris un brouillon qui reçoit son numéro) : on reste sur l'étape.
+    const numero = String(document.body.dataset.prospectNumero || '').trim();
+    // brouillon qui vient d'être enregistré : même fiche seulement si l'utilisateur y a saisi quelque chose
+    const memeLead = numero === dernierNumero || (dernierNumero === '' && !!numero && activite);
+    if (!memeLead) activite = false;
+    dernierNumero = numero;
+    const fiche = [1, 2, 3, 4].find(n => manquantsEtape(n).length > 0);
+    if (!memeLead) { techOuvert = false; allerEtape(numero ? (fiche || etapeCourante) : 1); }
+    else allerEtape(etapeCourante, { garderDefilement: true });
+    const monte = typeof window.hexaSimMonter === 'function' ? window.hexaSimMonter(numero || null, { garder: memeLead }) : Promise.resolve();
+    Promise.resolve(monte).then(() => {
+      if (memeLead || !numero || fiche) { majEtapes(); return; }
+      allerEtape([2, 5, 6, 7].find(n => etatEtape(n) !== 'ok') || 8);
+    });
     setTimeout(ajusterHauteur, 300);    // après le rendu du statut / des relances
   }
+  let dernierNumero = null, activite = false;
   window.hexaLot4ApresChargement = function () { setTimeout(apresChargement, 0); };
 
   function demarrer() { if (!construire()) setTimeout(demarrer, 250); }
@@ -22407,6 +22616,143 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     .l4-tete { padding-top: 6px; padding-bottom: 6px; }
     #l4-accordeon { gap: 5px; }
   }
+</style>
+<style id="hexa-lot5-parcours">
+  /* ================= Lot 5 — parcours guidé en 8 étapes ================= */
+  body.l5 #l4-side { display: none !important; }
+  body.l5 .l4-grille { display: block; height: var(--l4-h, auto); }
+  body.l5 #l4-main { display: flex; flex-direction: column; gap: 8px; height: 100%; min-height: 0; }
+  /* barre d'étapes */
+  .p-etapes { display: flex; gap: 6px; flex: none; }
+  .p-etape { flex: 1 1 0; min-width: 0; display: flex; align-items: center; justify-content: center; gap: 7px; height: 40px;
+    border: 1px solid #CBD5E1; border-radius: 10px; background: #fff; color: #334155; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; padding: 0 8px; }
+  .p-etape:hover { border-color: #002E5A; }
+  .p-etape-n { width: 22px; height: 22px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; flex: none;
+    font-size: 12px; background: #E2E8F0; color: #334155; }
+  .p-etape-lib { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .p-etape.is-ok .p-etape-n { background: #16A34A; color: #fff; }
+  .p-etape.is-ok { border-color: #86EFAC; background: #F0FDF4; }
+  .p-etape.is-manque { border-color: #F59E0B; background: #FFF7ED; }
+  .p-etape.is-manque .p-etape-n { background: #F59E0B; color: #fff; }
+  .p-etape.is-courante { background: #002E5A; border-color: #002E5A; color: #fff; }
+  .p-etape.is-courante .p-etape-n { background: #fff; color: #002E5A; }
+  .p-etape.is-courante.is-ok .p-etape-n { background: #16A34A; color: #fff; }
+  .p-etape.is-courante.is-manque .p-etape-n { background: #F59E0B; color: #fff; }
+  /* carte de l'étape */
+  .p-carte { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; background: #fff; border: 1px solid #E2E8F0;
+    border-radius: 12px; box-shadow: 0 1px 3px rgba(15, 23, 42, .06); }
+  .p-carte-tete { flex: none; padding: 12px 20px 8px; border-bottom: 1px solid #EEF2F6; }
+  .p-carte-ligne { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .p-carte-num { font-size: 11px; font-weight: 800; letter-spacing: .1em; color: #E2214B; }
+  .p-carte-legende .l4-legende { margin: 0; text-align: right; }
+  .p-carte-titre { margin: 2px 0 0; font-size: 21px; font-weight: 800; color: #002E5A; text-transform: none; letter-spacing: 0; }
+  .p-dire { margin-top: 4px; font-size: 13px; font-style: italic; color: #475569; }
+  .p-dire[hidden] { display: none; }
+  .p-corps { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 12px 20px 16px; display: flex; flex-direction: column; gap: 12px; }
+  .p-corps > #form-prospect { order: 1; }
+  .p-corps > #p-hotes { order: 2; }
+  .p-corps[data-etape="8"] > #form-prospect { order: 3; }         /* date de visite technique sous le résultat */
+  /* navigation */
+  .p-nav { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .p-nav-btn { min-width: 150px; height: 42px; border: 1px solid #002E5A; background: #002E5A; color: #fff; border-radius: 10px;
+    font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; }
+  .p-nav-btn--prec { background: #fff; color: #002E5A; }
+  .p-nav-btn:disabled { opacity: .35; cursor: default; }
+  .p-lien-tech { border: 0; background: none; color: #475569; font: inherit; font-size: 12.5px; text-decoration: underline; cursor: pointer; }
+  .p-lien-tech[hidden] { display: none; }
+  /* fiche dans la carte : plus d'accordéon */
+  body.l5 .l4-tete, body.l5 .l4-dire, body.l5 #l4-accordeon > .l4-legende { display: none !important; }
+  body.l5 #l4-accordeon { display: block; height: auto !important; }
+  body.l5 .l4-main #form-prospect, body.l5 .l4-main #form-prospect fieldset { height: auto !important; }
+  body.l5 .l4-bloc { border: 0; background: none; border-radius: 0; }
+  body.l5 .l4-bloc:not(.is-open) { display: none !important; }
+  body.l5 .l4-bloc.is-open { display: block !important; }
+  body.l5 .l4-bloc.is-open .l4-corps { display: block !important; padding: 0 !important; overflow: visible !important; }
+  body.l5 .l4-bloc--technique.is-open { margin-top: 14px; padding-top: 12px; border-top: 1px dashed #CBD5E1; }
+  body.l5 .l4-bloc--technique.is-open .l4-corps::before { content: 'Données techniques (auto)'; display: block; font-size: 13px; font-weight: 800; color: #002E5A; margin-bottom: 8px; }
+  /* champs : 44 px, grands boutons de choix */
+  body.l5 .l4-grid { gap: 10px 18px; }
+  body.l5 .l4-grid > .field > input:not([type=hidden]):not([type=checkbox]):not([type=radio]),
+  body.l5 .l4-grid > .field > select:not(.l4-cache),
+  body.l5 .l4-grid > .field > div > input:not([type=hidden]):not([type=checkbox]):not([type=radio]),
+  body.l5 .l4-grid > .field > div > select,
+  body.l5 .l4-grid > .field > div:has(> input:not([type=hidden]):not([type=checkbox]):not([type=radio])),
+  body.l5 .l4-grid > .field > .field-auto { height: 44px !important; min-height: 44px !important; font-size: 15px; }
+  body.l5 .l4-grid > .field > div:has(> input:not([type=hidden])) > span:not(.field-badge-slot) { height: 44px !important; }
+  body.l5 .l4-grid > .field > .l4-choix > button { height: 44px; padding: 0 16px; font-size: 14px; }
+  body.l5 .l4-grid > .field > .l4-choix.l4-sous-choix > button { height: 30px; padding: 0 12px; font-size: 12.5px; }
+  body.l5 .l4-grid > .field > .toggle-pill .pill { height: 44px; }
+  /* bandeau : Fin d'appel */
+  .p-fin-appel { position: relative; flex: none; }
+  .p-fin-appel-btn { border: 1px solid #E2214B; background: #fff; color: #E2214B; border-radius: 8px; padding: 4px 10px; font: inherit;
+    font-size: 12px; font-weight: 700; cursor: pointer; }
+  .p-fin-appel-btn[aria-expanded="true"] { background: #FFF1F3; }
+  .p-fin-appel-pop { position: absolute; right: 0; top: calc(100% + 8px); z-index: 70; width: 340px; background: #fff; border: 1px solid #E2E8F0;
+    border-radius: 10px; box-shadow: 0 12px 30px rgba(0, 0, 0, .15); padding: 10px 12px; }
+  .p-fin-appel-pop[hidden] { display: none; }
+  .p-fin-appel-pop .l4-carte { border: 0; padding: 0; }
+  /* morceaux du simulateur */
+  .p-hote[hidden] { display: none !important; }
+  .p-encadre { border: 1px solid #CBD5E1; border-radius: 10px; padding: 12px 14px; background: #F8FAFC; }
+  .p-encadre-titre { margin: 0 0 8px; font-size: 14px; font-weight: 800; color: #002E5A; text-transform: none; letter-spacing: 0; }
+  .p-encadre-titre i { font-weight: 500; color: #64748B; }
+  .p-badge-dpe { font-style: normal; font-size: 9.5px; font-weight: 800; background: #E6F4ED; color: #0D6B3B; border: 1px solid #A7F3D0; border-radius: 6px; padding: 0 5px; margin-left: 4px; }
+  #p-hotes .l4s-iso select, #p-hotes .l4s-surf input { height: 44px; font-size: 15px; }
+  .p-cartes-besoin { display: grid !important; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 8px; }
+  #p-hotes .p-carte-choix { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; height: auto; min-height: 84px; padding: 14px 16px;
+    border-radius: 12px; text-align: left; border: 1px solid #B4BDC9; font: inherit; cursor: pointer; }
+  #p-hotes .p-carte-choix b { font-size: 17px; }
+  #p-hotes .p-carte-choix span { font-size: 13px; font-weight: 400; opacity: .85; }
+  #p-hotes .p-carte-choix.active { background: #002E5A; border-color: #002E5A; color: #fff; }
+  .p-sous-titre { margin: 12px 0 6px; font-size: 14px; font-weight: 800; color: #002E5A; }
+  .p-puissance { font-size: 14px; color: #334155; margin-bottom: 8px; }
+  .p-puissance b { color: #002E5A; font-size: 16px; }
+  .p-prix-choisi { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 10px 0; padding: 10px 12px; border: 1px solid #E2E8F0; border-radius: 10px; font-weight: 700; color: #002E5A; }
+  .p-prix-choisi i { font-weight: 400; color: #64748B; }
+  .p-prix-choisi input { height: 40px; width: 120px; font-size: 16px; }
+  #p-hotes .l4-choix.p-choix-attente > button { height: 44px; padding: 0 18px; font-size: 14px; font-weight: 700; }
+  .p-cartes-fin { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; }
+  .p-carte-fin { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 12px 14px; border-radius: 12px; border: 1px solid #B4BDC9;
+    background: #F3F5F8; color: #1E293B; font: inherit; text-align: left; cursor: pointer; min-height: 110px; }
+  .p-carte-fin:hover { border-color: #002E5A; }
+  .p-carte-fin.active { background: #002E5A; border-color: #002E5A; color: #fff; }
+  .p-carte-fin-titre { font-size: 15px; font-weight: 800; }
+  .p-carte-fin-ligne { font-size: 12.5px; }
+  .p-carte-fin-ligne i { font-style: normal; opacity: .75; }
+  .p-carte-fin-mens { margin-top: auto; font-size: 13px; }
+  .p-carte-fin-mens b { font-size: 18px; }
+  /* étape 8 : résultat */
+  .p-resultat { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .p-res-col { border: 1px solid #E2E8F0; border-radius: 12px; padding: 12px 14px; min-width: 0; }
+  .p-res-titre { margin: 0 0 8px; font-size: 14px; font-weight: 800; color: #002E5A; text-transform: none; letter-spacing: 0; }
+  #p-hotes .sim-pnl { border: 0; padding: 0; background: none; }
+  #p-hotes .sim-pnl-line { min-height: 26px; font-size: 13px; }
+  .p-mpr-avancee span, .p-mpr-avancee b { color: #B45309 !important; }
+  .p-aides span, .p-aides b { color: #64748B !important; font-weight: 500 !important; font-size: 12px; }
+  .p-total { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-top: 6px; padding-top: 8px; border-top: 2px solid #002E5A; }
+  .p-total span { font-size: 13px; font-weight: 800; color: #002E5A; text-transform: uppercase; letter-spacing: .03em; }
+  .p-total strong { font-size: 28px; font-weight: 800; color: #002E5A; white-space: nowrap; }
+  .p-ventilation { font-size: 12.5px; color: #475569; margin: 2px 0 8px; }
+  .p-quand-ligne { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; padding: 6px 0; border-bottom: 1px solid #F1F5F9; font-size: 13px; }
+  .p-quand-ligne i { display: block; font-style: normal; font-size: 11.5px; color: #64748B; }
+  .p-quand-ligne b { color: #002E5A; white-space: nowrap; font-size: 15px; }
+  .p-acompte { background: #FEF3C7; border-radius: 8px; padding: 6px 8px; border-bottom: 0; }
+  .p-mpr-retour b { color: #0D6B3B; }
+  .p-cout-final { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin: 10px 0; padding: 8px 10px; border: 1px solid #002E5A; border-radius: 8px; font-weight: 700; color: #002E5A; }
+  .p-cout-final i { font-weight: 400; font-style: normal; color: #64748B; }
+  .p-cout-final b { font-size: 17px; }
+  #p-hotes .sim-aa { border: 0; padding: 0; background: none; }
+  #p-hotes .sim-roi { margin: 6px 0 0; padding: 0; border: 0; background: none; text-align: center; }
+  #p-hotes .sim-roi-big { display: inline; font-size: 20px; }
+  #p-hotes .sim-roi-big-sub { display: inline; margin-left: 6px; }
+  #p-hotes .sim-roi-base { font-size: 10.5px; color: #6B7280; margin-top: 2px; }
+  #p-hotes .l4s-contexte { padding: 0 0 8px; }
+  .p-resultat-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 12px; }
+  .p-btn-sec { border: 1px solid #002E5A; background: #fff; color: #002E5A; border-radius: 8px; padding: 7px 12px; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+  .p-btn-sec[aria-expanded="true"] { background: #EFF6FF; }
+  .p-resultat-actions .l4s-btn { height: 38px; padding: 0 16px; font-size: 13.5px; }
+  #p-hotes .l4s-arguments { display: none !important; margin-top: 12px; }
+  #p-hotes .l4s-arguments.is-open { display: block !important; }
 </style>
 </body>
 </html>
