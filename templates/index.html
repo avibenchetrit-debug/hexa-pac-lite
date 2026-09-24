@@ -12809,8 +12809,11 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     document.getElementById('exchanges-template')?.addEventListener('change', (e) => {
       const id = e.target.value;
       const tpl = templatesForType(activeType).find(t => t.id === id);
-      if (tpl) document.getElementById('exchanges-contenu').value = templateText(tpl);
+      if (tpl) { document.getElementById('exchanges-contenu').value = templateText(tpl); messageEnCours = true; }
     });
+    ['exchanges-contenu', 'exchanges-objet'].forEach(id => document.getElementById(id)?.addEventListener('input', (e) => {
+      messageEnCours = !!(document.getElementById('exchanges-contenu').value.trim() || document.getElementById('exchanges-objet').value.trim());
+    }));
     document.getElementById('exchanges-submit')?.addEventListener('click', () => window.enregistrerEchange());
     document.querySelectorAll('[data-email-template]').forEach(btn => {
       btn.addEventListener('click', () => ouvrirModeleEmail(Number(btn.dataset.emailTemplate || 0)));
@@ -12886,6 +12889,18 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     });
   }
 
+  // Vrai dès que l'utilisateur a saisi un message (au clavier ou via un modèle) qui
+  // n'est pas encore enregistré : setActiveType ne doit plus l'effacer. Sans ça, la
+  // réponse de chargerHistorique (qui rappelle setActiveType) vidait le texte tapé
+  // pendant le chargement du panneau.
+  let messageEnCours = false;
+
+  function viderMessage() {
+    document.getElementById('exchanges-contenu').value = '';
+    document.getElementById('exchanges-objet').value = '';
+    messageEnCours = false;
+  }
+
   function setActiveType(type) {
     activeType = type;
     const panel = document.getElementById('exchanges-panel');
@@ -12905,8 +12920,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
         `<option value="${escapeHtml(t.id)}">${escapeHtml(t.label)}</option>`).join('');
       sel.innerHTML = '<option value="">— Choisir un modèle —</option>' + opts;
     }
-    document.getElementById('exchanges-contenu').value = '';
-    document.getElementById('exchanges-objet').value = '';
+    if (!messageEnCours) viderMessage();
   }
 
   function setAllHistoryExpanded(expanded) {
@@ -13031,6 +13045,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
       document.body.classList.add('panel-is-open');
     }
     const type = (canal || 'sms').toLowerCase();
+    messageEnCours = false;
     setActiveType(['sms', 'whatsapp', 'email'].includes(type) ? type : 'sms');
     await chargerHistorique();
     setTimeout(() => document.getElementById('exchanges-contenu')?.focus({ preventScroll: true }), 300);
@@ -13098,8 +13113,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
       const data = await resp.json().catch(() => ({}));
       if (!resp.ok) throw new Error(data.msg || data.detail || `HTTP ${resp.status}`);
       retirerToastContact();
-      document.getElementById('exchanges-contenu').value = '';
-      document.getElementById('exchanges-objet').value = '';
+      viderMessage();
       document.getElementById('exchanges-template').value = '';
       await chargerHistorique();
     } catch (err) {
