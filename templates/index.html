@@ -7552,13 +7552,16 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
   
 <div class="prospect-shell-sticky">
   <div class="prospect-sticky-bar prospect-sticky-header" id="prospect-sticky-bar">
+    <div class="psb-identite">
     <div class="psb-main">
       <span id="psb-numero" class="prospect-sticky-numero psb-numero">—</span>
       <span id="psb-nom" class="prospect-sticky-nom psb-name prospect-nom">—</span>
     </div>
     <div class="prospect-sticky-contact psb-contact">
-      <span id="psb-tel" class="prospect-sticky-tel">—</span>
-      <span id="psb-email" class="prospect-sticky-email">—</span>
+      <span class="psb-item"><span id="psb-tel" class="prospect-sticky-tel">—</span><button type="button" class="copy-icon psb-copy" data-copy-target="telephone-input" data-copy-label="Téléphone" title="Copier le téléphone" aria-label="Copier le téléphone">📋</button></span>
+      <span class="psb-item"><span id="psb-email" class="prospect-sticky-email">—</span><button type="button" class="copy-icon psb-copy" data-copy-target="email-input" data-copy-label="Email" title="Copier l'email" aria-label="Copier l'email">📋</button></span>
+      <span id="psb-lieu" class="psb-lieu"></span>
+    </div>
     </div>
     <div class="prospect-sticky-badges psb-badges">
       <span id="psb-badge-usage" class="psb-badge" style="display:none"></span>
@@ -20549,7 +20552,19 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     const nomBanner = nom ? nom.toUpperCase() : '';
     nomEl.textContent = (prenomBanner || nomBanner) ? ((prenomBanner || '—') + ' ' + (nomBanner || '—')) : '—';
     telEl.textContent = tel || '—';
-    emailEl.textContent = email || '—';
+    // identité jamais tronquée ; seul l'email au-delà de 34 caractères, adresse complète au survol
+    const EMAIL_MAX = 34;
+    const emailCourt = email.length > EMAIL_MAX ? email.slice(0, EMAIL_MAX - 1) + '…' : email;
+    if (emailEl.textContent !== (emailCourt || '—')) emailEl.textContent = emailCourt || '—';
+    emailEl.title = email;
+    const lieuEl = document.getElementById('psb-lieu');
+    if (lieuEl) {
+      const villeSel = document.querySelector('[name="ville_chantier"]');
+      const ville = (villeSel?.value || '').trim();
+      const lieu = [cp, ville].filter(Boolean).join(' ');
+      if (lieuEl.textContent !== lieu) lieuEl.textContent = lieu;
+      lieuEl.hidden = !lieu;
+    }
 
     const usageMap = {
       proprietaire_occupant: { label:'PROPRIÉTAIRE OCCUPANT', bg:'#FDE8EC', fg:'#B01830' },
@@ -21864,26 +21879,34 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
       const j = document.createElement('div');
       j.id = 'l4-jauge';
       j.className = 'l4-jauge';
-      j.innerHTML = '<span class="l4-jauge-titre">Simulation <b id="l4-jauge-score">0/9</b></span><span class="l4-jauge-barre"><i id="l4-jauge-rempli"></i></span>'
-        + '<span class="l4-jauge-titre" id="l4-devis-compteur">· Devis <b id="l4-devis-score">0/0</b></span><span class="l4-jauge-manque" id="l4-jauge-manque"></span>'
-        + '<button type="button" class="l4-manque-plus" id="l4-manque-plus" aria-expanded="false" hidden></button><div class="l4-manque-liste" id="l4-manque-liste" hidden></div>';
+      // pastille compacte « Simu X/9 · Devis Y/Z » ; « Manque : … » (cliquable) au survol ou au clic de la pastille
+      j.innerHTML = '<button type="button" class="l4-jauge-pastille" id="l4-jauge-pastille" aria-expanded="false" aria-controls="l4-jauge-pop">'
+        + '<span class="l4-jauge-titre">Simu <b id="l4-jauge-score">0/9</b></span>'
+        + '<span class="l4-jauge-titre" id="l4-devis-compteur">· Devis <b id="l4-devis-score">0/0</b></span></button>'
+        + '<div class="l4-jauge-pop" id="l4-jauge-pop"><div class="l4-jauge-pop-ligne"><span class="l4-jauge-manque" id="l4-jauge-manque"></span>'
+        + '<button type="button" class="l4-manque-plus" id="l4-manque-plus" aria-expanded="false" hidden></button></div><div class="l4-manque-liste" id="l4-manque-liste" hidden></div></div>';
+      const reglerPop = (ouvert) => { j.classList.toggle('l4-jauge--ouvert', ouvert); q('#l4-jauge-pastille', j).setAttribute('aria-expanded', ouvert ? 'true' : 'false'); };
       j.addEventListener('click', (e) => {
         const liste = q('#l4-manque-liste', j), plus = q('#l4-manque-plus', j);
+        if (e.target.closest && e.target.closest('#l4-jauge-pastille')) { reglerPop(!j.classList.contains('l4-jauge--ouvert')); return; }
         if (e.target.closest && e.target.closest('#l4-manque-plus')) {
           liste.hidden = !liste.hidden;
           plus.setAttribute('aria-expanded', liste.hidden ? 'false' : 'true');
           return;
         }
         const b = e.target.closest && e.target.closest('[data-champ]');
-        if (b) { liste.hidden = true; plus.setAttribute('aria-expanded', 'false'); allerAuChamp(b.dataset.champ); }
+        if (b) { liste.hidden = true; plus.setAttribute('aria-expanded', 'false'); reglerPop(false); allerAuChamp(b.dataset.champ); }
       });
       document.addEventListener('click', (e) => {
+        if (e.target.closest && e.target.closest('#l4-jauge')) return;
         const liste = q('#l4-manque-liste');
-        if (liste && !liste.hidden && !(e.target.closest && e.target.closest('#l4-jauge'))) { liste.hidden = true; q('#l4-manque-plus').setAttribute('aria-expanded', 'false'); }
+        if (liste && !liste.hidden) { liste.hidden = true; q('#l4-manque-plus').setAttribute('aria-expanded', 'false'); }
+        if (j.classList.contains('l4-jauge--ouvert')) reglerPop(false);
       });
       const a = document.createElement('button');
       a.type = 'button'; a.id = 'l4-aide-btn'; a.className = 'l4-aide-btn';
-      a.textContent = 'Aide';
+      a.textContent = '?';
+      a.title = 'Aide'; a.setAttribute('aria-label', 'Aide');
       a.addEventListener('click', () => reglerAide(!document.body.classList.contains('l4-aide-on')));
       // Lot 5 : « Fin d'appel » toujours visible ; ouvre les contrôles existants (mêmes id, même logique)
       const fa = document.createElement('div');
@@ -22294,6 +22317,8 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
   function majTout() {
     if (!construit) return;
     majChoix(); majBlocs(); majJauge(); majEligibilite(); majRequis(); majEtapes(); majSuivi();
+    // identité relue aussi ici : la ville est posée sans événement après le chargement des communes
+    if (typeof window.updateIdentityBanner === 'function') window.updateIdentityBanner();
   }
   // Lot 5c : statut actuel affiché dans le bouton « Suivi : … »
   function majSuivi() {
@@ -22324,11 +22349,16 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
   // ------------------------------------------------------------------ aide mémorisée par utilisateur
   function cleAide() { return 'hexa_l4_aide_' + ((window.HEXA_SESSION && window.HEXA_SESSION.user) || 'defaut'); }
   function lireAide() { try { const v = localStorage.getItem(cleAide()); return v === null ? true : v === '1'; } catch (_) { return true; } }
+  // bandeau : « ? » seul, libellé en infobulle ; simulateur : case + « Aide »
+  function libelleAide(b, on) {
+    if (b.id === 'l4-aide-btn') { b.textContent = '?'; b.title = on ? 'Aide affichée — cliquer pour la masquer' : 'Afficher l\'aide'; }
+    else b.textContent = (on ? '☑' : '☐') + ' Aide';
+  }
   function reglerAide(on) {
     document.body.classList.toggle('l4-aide-on', !!on);
     ['#l4-aide-btn', '#sim-aide-btn'].forEach(sel => {
       const b = q(sel);
-      if (b) { b.classList.toggle('active', !!on); b.setAttribute('aria-pressed', on ? 'true' : 'false'); b.textContent = (on ? '☑' : '☐') + ' Aide'; }
+      if (b) { b.classList.toggle('active', !!on); b.setAttribute('aria-pressed', on ? 'true' : 'false'); libelleAide(b, on); }
     });
     try { localStorage.setItem(cleAide(), on ? '1' : '0'); } catch (_) {}
     ajusterHauteur();
@@ -22358,7 +22388,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     // la session (utilisateur) est connue ici : relire la préférence d'aide de CET utilisateur
     document.body.classList.toggle('l4-aide-on', lireAide());
     const ba = q('#l4-aide-btn');
-    if (ba) { const on = document.body.classList.contains('l4-aide-on'); ba.classList.toggle('active', on); ba.setAttribute('aria-pressed', on ? 'true' : 'false'); ba.textContent = (on ? '☑' : '☐') + ' Aide'; }
+    if (ba) { const on = document.body.classList.contains('l4-aide-on'); ba.classList.toggle('active', on); ba.setAttribute('aria-pressed', on ? 'true' : 'false'); libelleAide(ba, on); }
     majTout();
     // Lot 5 : nouveau lead -> étape 1 ; lead ouvert -> première étape incomplète. Réaffichage du même
     // lead (après enregistrement, y compris un brouillon qui reçoit son numéro) : on reste sur l'étape.
@@ -22815,15 +22845,37 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
   body.l5 .l4-grille { margin-top: 20px; }
   /* les panneaux du bandeau (Suivi du dossier, Fin d'appel) dépassent sous le bandeau : il ne doit pas les rogner */
   body.l5 .prospect-sticky-bar { overflow: visible !important; }
-  /* avec « Suivi » et « Fin d'appel » dans le bandeau : la jauge garde sa place (« Manque : » cliquable),
-     un nom ou un e-mail trop long se tronque avec « … » */
-  body.l5 .prospect-sticky-bar .psb-main { flex: 0 1 auto; min-width: 190px; overflow: hidden; }
-  body.l5 .prospect-sticky-bar .psb-name { max-width: 200px; min-width: 0; }
-  body.l5 .prospect-sticky-bar .psb-contact { flex: 0 1 auto; min-width: 120px; overflow: hidden; }
-  body.l5 .prospect-sticky-bar .psb-contact > .prospect-sticky-tel { flex: none; white-space: nowrap; }   /* le téléphone ne se tronque jamais */
-  body.l5 .prospect-sticky-bar .psb-contact > .prospect-sticky-email { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  body.l5 .prospect-sticky-bar .l4-jauge { flex: 0 1 auto; min-width: 380px; }
-  body.l5 .prospect-sticky-bar .l4-jauge-barre { width: 36px; }
+  /* identité prioritaire, jamais tronquée (seul l'email > 34 caractères, raccourci en JS) : une ligne si la place
+     suffit, sinon deux (ligne 1 : PR + NOM Prénom ; ligne 2 : tél · email · CP ville) ; le reste du bandeau se compacte */
+  body.l5 .prospect-sticky-bar .psb-identite { flex: 1 1 auto; display: flex; flex-wrap: wrap; align-items: center; column-gap: 14px; row-gap: 1px; }
+  body.l5 .prospect-sticky-bar .psb-main { flex: none; overflow: visible; gap: 8px; }
+  body.l5 .prospect-sticky-bar .psb-main::after { display: none; }
+  body.l5 .prospect-sticky-bar .psb-name { max-width: none; overflow: visible; text-overflow: clip; font-size: 14px; line-height: 20px; }
+  body.l5 .prospect-sticky-bar .psb-contact { flex: none; overflow: visible; gap: 10px; }
+  body.l5 .prospect-sticky-bar .psb-item { display: inline-flex; align-items: center; gap: 3px; white-space: nowrap; }
+  body.l5 .prospect-sticky-bar .psb-contact .prospect-sticky-tel,
+  body.l5 .prospect-sticky-bar .psb-contact .prospect-sticky-email,
+  body.l5 .prospect-sticky-bar .psb-lieu { white-space: nowrap; overflow: visible; font-size: 12px; line-height: 18px; }
+  body.l5 .prospect-sticky-bar .psb-lieu { font-weight: 600; color: #334155; }
+  body.l5 .prospect-sticky-bar .psb-lieu[hidden] { display: none; }
+  .prospect-sticky-bar .copy-icon.psb-copy { position: static; transform: none; padding: 0 3px; font-size: 10px; line-height: 16px; border-radius: 4px; }
+  .prospect-sticky-bar .copy-icon.psb-copy:active { transform: scale(0.95); }
+  /* jauge : pastille compacte, verte si tout est complet, orange sinon ; « Manque : … » dans son panneau */
+  body.l5 .prospect-sticky-bar .l4-jauge { flex: none; min-width: 0; margin-left: auto; }
+  .l4-jauge-pastille { border: 1px solid #F59E0B; background: #FFF7ED; color: #B45309; border-radius: 999px; padding: 3px 10px; font: inherit;
+    font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap; display: inline-flex; gap: 4px; }
+  .l4-jauge-pastille b { color: inherit; }
+  .l4-jauge--complet .l4-jauge-pastille { border-color: #A6E0BD; background: #E6F4ED; color: #0D6B3B; }
+  .l4-jauge-pop { display: none; position: absolute; top: calc(100% + 8px); right: 0; z-index: 70; background: #fff; border: 1px solid #E2E8F0;
+    border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,.12); padding: 8px 10px; min-width: 220px; max-width: 420px; }
+  .l4-jauge-pop::before { content: ''; position: absolute; left: 0; right: 0; top: -10px; height: 10px; }   /* passage souris pastille -> panneau */
+  .l4-jauge:hover .l4-jauge-pop, .l4-jauge--ouvert .l4-jauge-pop { display: block; }
+  .l4-jauge-pop-ligne { display: flex; align-items: center; gap: 8px; }
+  .l4-jauge-pop .l4-jauge-manque { max-width: 360px; }
+  .l4-jauge-pop .l4-manque-liste { position: static; box-shadow: none; border: 0; border-top: 1px solid #F1F5F9; border-radius: 0; margin-top: 6px; padding: 4px 0 0; min-width: 0; }
+  /* Aide : « ? » seul, état actif plein */
+  body.l5 .prospect-sticky-bar .l4-aide-btn { width: 26px; height: 26px; padding: 0; border-radius: 50%; font-size: 13px; line-height: 24px; text-align: center; }
+  body.l5 .prospect-sticky-bar .l4-aide-btn.active { background: #1D4ED8; border-color: #1D4ED8; color: #fff; }
 </style>
 </body>
 </html>
