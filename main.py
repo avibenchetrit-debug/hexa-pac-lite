@@ -1989,10 +1989,21 @@ def _pick_best(lines, date_field):
     return first   # mode texte : deja trie par date decroissante
 
 
+def _date_heure_fr(iso) -> str:
+    """« 29/09/2025 à 10h12 » (heure de Paris) depuis un horodatage ISO ; la valeur brute sinon."""
+    try:
+        d = datetime.fromisoformat(str(iso))
+        if d.tzinfo is not None:
+            d = d.astimezone(PARIS_TZ)
+        return d.strftime("%d/%m/%Y à %Hh%M")
+    except (TypeError, ValueError):
+        return str(iso or "")
+
+
 def _doc_status(label, rec, date):
     num = rec.get("numero_dpe") or rec.get("n_audit") or ""
     adr = rec.get("adresse_ban") or ""
-    txt = f"{label} trouvé (n°{num} du {date}"
+    txt = f"{label} trouvé (n°{num} du {_format_date_fr(date)}"
     if adr:
         txt += f" — {adr}"
     return txt + ")"
@@ -3384,6 +3395,37 @@ async def save_params_financement(request: Request):
     return {"success": True}
 
 
+# Lot 6b : reprise des années de construction à 8 chiffres. Une période du DPE (« 1948-1974 ») était écrite dans le
+# champ année, qui ne garde que les chiffres : « 19481974 ». Dry-run par défaut ; appliquer = année vidée (à
+# redemander au client), la période est conservée dans periode_construction.
+def _reprise_annee(appliquer: bool) -> list:
+    leads = _read_leads()
+    touches = []
+    for lead in leads:
+        brut = str(lead.get("annee_construction") or "")
+        m = re.fullmatch(r"(\d{4})(\d{4})", re.sub(r"\s", "", brut))
+        if not m or int(m.group(1)) > int(m.group(2)):
+            continue
+        periode = f"{m.group(1)}-{m.group(2)}"
+        touches.append({"numero": lead.get("numero"), "nom": f"{lead.get('nom') or ''} {lead.get('prenom') or ''}".strip(),
+                        "avant": brut, "apres": "", "periode": periode})
+        if appliquer:
+            lead["annee_construction"] = ""
+            lead["periode_construction"] = periode
+    if appliquer and touches:
+        _atomic_write_json(LEADS_PATH, leads)
+    return touches
+
+
+@app.post("/api/admin/reprise-annee")
+async def reprise_annee(request: Request):
+    _require_admin(request)
+    payload = await _read_request_payload(request)
+    appliquer = str(payload.get("appliquer") or "").lower() in ("1", "true", "oui")
+    touches = _reprise_annee(appliquer)
+    return {"appliquer": appliquer, "nombre": len(touches), "leads": touches}
+
+
 # Lot 6 : script d'appel (Admin → Script d'appel). Lecture libre (fiche), écriture admin.
 def _script_appel() -> dict:
     s = load_parametres_admin().get("script_appel")
@@ -4001,11 +4043,8 @@ def _build_devis_context(request: Request, numero: str, version: int | None = No
     cp_chantier = devis_value(prospect, "cp_chantier", "code_postal_chantier", "cp", default="")
     ville_chantier = devis_value(prospect, "ville", "ville_chantier", default="")
     date_visite = devis_value(prospect, "date_visite_technique", default="À déterminer")
-    if date_visite != "À déterminer" and re.fullmatch(r"\d{4}-\d{2}-\d{2}", str(date_visite)):
-        try:
-            date_visite = datetime.strptime(str(date_visite), "%Y-%m-%d").strftime("%d/%m/%Y")
-        except ValueError:
-            pass
+    if date_visite != "À déterminer" and re.match(r"\d{4}-\d{2}-\d{2}", str(date_visite)):
+        date_visite = _format_date_fr(date_visite)
     sous_traitant_context = dict(sous_traitant or {})
     if sous_traitant_context:
         sous_traitant_context["rge_validite"] = (
@@ -5015,7 +5054,7 @@ async def _send_devis(numero: str, payload: dict, request: Request) -> dict:
     auteur = str(payload.get("auteur") or "Anonyme")
     notes = _read_notes()
     notes.setdefault(numero, []).append(
-        {"texte": f"{'Pré-devis' if variante == 'pre_devis' else 'Devis'} v{version} envoyé le {now} à {email_to} par {auteur}", "date": _now_paris_iso(), "auteur": auteur}
+        {"texte": f"{'Pré-devis' if variante == 'pre_devis' else 'Devis'} v{version} envoyé le {_date_heure_fr(now)} à {email_to} par {auteur}", "date": _now_paris_iso(), "auteur": auteur}
     )
     _atomic_write_json(NOTES_PATH, notes)
 
