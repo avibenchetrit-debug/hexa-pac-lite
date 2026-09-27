@@ -905,6 +905,7 @@ def load_state_simulateur(numero: str) -> dict:
 
 
 def save_state_simulateur_atomic(numero: str, payload: dict) -> dict:
+    _refuser_si_fige(numero)                           # Lot 6c : simulateur en lecture seule
     incoming = payload if isinstance(payload, dict) else {}
     state = load_state_simulateur(numero)
     state.update(incoming)
@@ -945,6 +946,7 @@ def _normalize_lead_payload(payload: dict) -> dict:
         else:
             normalized[k] = str(value)
 
+    normalized.pop("dossier_fige", None)      # Lot 6c : indicateur de lecture seule (réponse GET), jamais stocké
     if "statut" in normalized:
         normalized["statut"] = _normalize_statut(normalized.get("statut"))
     if "categorie" in normalized:
@@ -956,6 +958,28 @@ def _normalize_lead_payload(payload: dict) -> dict:
         normalized["date_visite_technique"] = normalized["date_visite_technique_date"]
     _apply_field_aliases(normalized)
     return normalized
+
+
+# Lot 6c : verrou « dossier facturé ». Installation finie ou facture émise : la fiche et le simulateur passent en
+# lecture seule, aucun recalcul ni reprise ne touche le lead, le devis affiché est celui archivé à l'envoi.
+DOSSIER_FIGE_MESSAGE = "Dossier facturé — montants figés"
+
+
+def _dossier_fige(numero, lead: dict | None = None) -> bool:
+    numero = str(numero or "").strip()
+    if not numero:
+        return False
+    if lead is None:
+        lead = next((x for x in _read_leads() if isinstance(x, dict) and str(x.get("numero", "")).strip() == numero), {})
+    if str((lead or {}).get("statut") or "").strip() == "installation_finie":
+        return True
+    factures = _read_json(FACTURES_META_PATH, {})
+    return bool(isinstance(factures, dict) and factures.get(numero))
+
+
+def _refuser_si_fige(numero, lead: dict | None = None) -> None:
+    if _dossier_fige(numero, lead):
+        raise HTTPException(status_code=423, detail=DOSSIER_FIGE_MESSAGE)
 
 
 def _upsert_lead(payload: dict, forced_numero: str | None = None) -> tuple[dict, bool]:
@@ -976,6 +1000,8 @@ def _upsert_lead(payload: dict, forced_numero: str | None = None) -> tuple[dict,
 
     if not existing:
         existing = {"numero": numero, "date": now}
+    elif index is not None:
+        _refuser_si_fige(numero, existing)            # Lot 6c : fiche en lecture seule
 
     merged = dict(existing)
     merged.update(payload)
@@ -1428,6 +1454,9 @@ def _migrate_leads_schema():
     migrated = []
     for lead in leads:
         if not isinstance(lead, dict):
+            migrated.append(lead)
+            continue
+        if _dossier_fige(lead.get("numero"), lead):   # Lot 6c : dossier facturé, jamais réécrit
             migrated.append(lead)
             continue
         item = dict(lead)
@@ -2385,6 +2414,7 @@ def get_lead(numero: str) -> JSONResponse:
             data = _lead_for_response(lead)
             data["compteurs"] = _compteurs_canal(wanted)
             data["dernier_repondu"] = _dernier_repondu(wanted)
+            data["dossier_fige"] = _dossier_fige(wanted, lead)
             return JSONResponse(data)
     raise HTTPException(status_code=404, detail="Prospect introuvable")
 
@@ -3402,6 +3432,8 @@ def _reprise_annee(appliquer: bool) -> list:
     leads = _read_leads()
     touches = []
     for lead in leads:
+        if _dossier_fige(lead.get("numero"), lead):   # Lot 6c : dossier facturé, jamais repris
+            continue
         brut = str(lead.get("annee_construction") or "")
         m = re.fullmatch(r"(\d{4})(\d{4})", re.sub(r"\s", "", brut))
         if not m or int(m.group(1)) > int(m.group(2)):
@@ -4399,7 +4431,19 @@ async def devis_preview(numero: str, request: Request, variante: str | None = No
         _lead = _find_lead(numero)
         variante = "devis" if (_lead and _lead.get("vt_validee")) else "pre_devis"
     avec_sous_traitant = (variante == "devis")
+    archive = _devis_archive_fige(numero, variante)
+    if archive and archive.get("html_file") and os.path.exists(archive["html_file"]):
+        return HTMLResponse(_read_text(archive["html_file"]))
     return _render_template_response(request, "devis_pac.html", _build_devis_context(request, numero, avec_sous_traitant=avec_sous_traitant))
+
+
+def _devis_archive_fige(numero: str, variante: str) -> dict | None:
+    """Lot 6c : dossier facturé -> dernier devis envoyé (archivé) de la variante demandée, sinon le dernier envoyé."""
+    if not _dossier_fige(numero):
+        return None
+    items = [x for x in (_sent_devis_items(numero) or []) if isinstance(x, dict)]
+    meme = [x for x in items if (x.get("variante") or "devis") == variante]
+    return (meme or items or [None])[-1]
 
 
 @app.get("/api/notedim/{numero}/preview", response_class=HTMLResponse)
@@ -4414,6 +4458,9 @@ async def devis_pdf(numero: str, request: Request, variante: str | None = None):
         _lead = _find_lead(numero)
         variante = "devis" if (_lead and _lead.get("vt_validee")) else "pre_devis"
     avec_sous_traitant = (variante == "devis")
+    archive = _devis_archive_fige(numero, variante)
+    if archive and archive.get("file") and os.path.exists(archive["file"]):
+        return FileResponse(archive["file"], media_type="application/pdf", filename=os.path.basename(archive["file"]))
     # Aperçu : rendu + stream éphémère. NE fige AUCUNE version (seul _send_devis fige).
     pdf_bytes = _html_to_pdf_playwright(_render_devis_html(request, numero, avec_sous_traitant=avec_sous_traitant), request)
     fname = "Devis" if variante == "devis" else "Pre-devis"
@@ -4990,6 +5037,7 @@ async def _send_devis(numero: str, payload: dict, request: Request) -> dict:
     prospect = _find_lead(numero)
     if not prospect:
         raise HTTPException(status_code=404, detail="Prospect introuvable")
+    _refuser_si_fige(numero, prospect)                # Lot 6c : le devis envoyé reste celui archivé
     email_to = str(payload.get("destinataire") or prospect.get("email") or "").strip()
     if not email_to:
         raise HTTPException(status_code=400, detail="Email prospect manquant")

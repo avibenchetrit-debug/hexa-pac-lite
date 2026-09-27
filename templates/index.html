@@ -14434,14 +14434,31 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
   // Lot 6b : température de base de la zone OFFICIELLE du département du CP (table du serveur, source unique) :
   // H1 −7 °C, H2 −4 °C, H3 0 °C. Les sous-zones et la zone écrite dans le DPE ne servent plus au calcul.
   function temperatureExterieureBase(state){
+    // Lot 6c : table d'avant (sous-zone du département) remise telle quelle ; la zone CEE officielle ne sert qu'à la prime
     const cp = String(state.cp_chantier || '').replace(/\D/g, '').slice(0, 5);
     let info;
     if (cp && Object.prototype.hasOwnProperty.call(TEMP_BASE_CP, cp)) {
-      info = { temperature: TEMP_BASE_CP[cp], source: 'cp', zone: zoneReglementaireFromCp(cp) };
-    } else if (cp) {
-      const z = zoneReglementaireFromCp(cp);
-      info = { temperature: TEMP_BASE_ZONE[z] != null ? TEMP_BASE_ZONE[z] : -7, source: 'departement', zone: z };
+      info = { temperature: TEMP_BASE_CP[cp], source: 'cp', zone: state.zone_detail || state.zone || '' };
     } else {
+      const dept = cp.startsWith('97') || cp.startsWith('976') ? cp.slice(0, 3) : cp.slice(0, 2);
+      if (dept && DEPT_SOUS_ZONE[dept]) {
+      const z = DEPT_SOUS_ZONE[dept];
+        info = { temperature: TEMP_BASE_SOUS_ZONE[z], source: 'departement', zone: z };
+      }
+    }
+    if (!info) {
+      const zDetail = normaliserZone(state.zone_detail);
+      if (zDetail && TEMP_BASE_SOUS_ZONE[zDetail] != null) {
+        info = { temperature: TEMP_BASE_SOUS_ZONE[zDetail], source: 'zone', zone: zDetail };
+      }
+    }
+    if (!info) {
+      const z = zonePrincipale(state.zone);
+      if (z && TEMP_BASE_ZONE[z] != null) {
+        info = { temperature: TEMP_BASE_ZONE[z], source: 'zone', zone: z };
+      }
+    }
+    if (!info) {
       info = { temperature: -7, source: 'defaut', zone: 'H1' };
     }
     const altitude = state.altitude == null || state.altitude === '' ? null : Number(state.altitude);
@@ -14714,7 +14731,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     return simSaveEnCours;
   }
   async function enregistrerEtatSimulateur(){
-    if (!state.numero) return true;
+    if (!state.numero || window.__hexaDossierFige) return true;      // Lot 6c : dossier facturé, rien n'est réécrit
     try {
       const res = await fetch(`/api/simulateur/${encodeURIComponent(state.numero)}/state`, {
         method:'POST',
@@ -21002,7 +21019,11 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
   async function fetchProspect(numero){
     const response = await fetch('/api/leads/' + encodeURIComponent(numero), { cache:'no-store' });
     if(!response.ok) throw new Error('HTTP ' + response.status);
-    return response.json();
+    const data = await response.json();
+    // Lot 6c : dossier facturé -> fiche et simulateur en lecture seule
+    window.__hexaDossierFige = !!(data && data.dossier_fige);
+    if (typeof window.hexaAppliquerVerrou === 'function') setTimeout(window.hexaAppliquerVerrou, 0);
+    return data;
   }
   function suiviAssigneLabel(key){
     const k = String(key||'').toLowerCase();
@@ -22822,6 +22843,59 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
   else setTimeout(demarrer, 0);
 })();
 </script>
+<script id="hexa-lot6c-verrou-js">
+/* Lot 6c : verrou « Dossier facturé — montants figés ». Installation finie ou facture émise : tout champ et tout
+   choix de la carte (fiche + simulateur) est désactivé ; restent la navigation, les panneaux et « Voir le devis »
+   (qui affiche le devis archivé). Le serveur refuse de toute façon l'écriture (423). */
+(function(){
+  const LIBRES = '#p-prec, #p-suiv, #p-lien-tech, .p6-barre .p6-btn, [data-p-etape]';
+  let obs = null, attente = false;
+  function figer(){
+    attente = false;
+    const carte = document.getElementById('p-carte');
+    if (!carte || !window.__hexaDossierFige) return;
+    carte.querySelectorAll('input, select, textarea, button').forEach(el => {
+      if (el.matches(LIBRES) || el.disabled) return;
+      el.disabled = true;
+      el.dataset.p6Fige = '1';
+    });
+    // le bandeau prend la place de la légende « Encadré jaune » : en-tête des étapes 1-5 et de l'étape 6
+    document.querySelectorAll('.p-carte-tete, .p6-tete6').forEach(tete => {
+      if (tete.querySelector('.p6-fige-bandeau')) return;
+      const b = document.createElement('span');
+      b.className = 'p6-fige-bandeau';
+      b.setAttribute('role', 'status');
+      b.textContent = '🔒 Dossier facturé — montants figés';
+      tete.appendChild(b);
+    });
+  }
+  window.hexaAppliquerVerrou = function(){
+    const fige = !!window.__hexaDossierFige;
+    document.body.classList.toggle('p6-fige', fige);
+    const carte = document.getElementById('p-carte');
+    if (!fige) {
+      if (obs) { obs.disconnect(); obs = null; }
+      document.querySelectorAll('.p6-fige-bandeau').forEach(b => b.remove());
+      document.querySelectorAll('[data-p6-fige]').forEach(el => { el.disabled = false; delete el.dataset.p6Fige; });
+      return;
+    }
+    figer();
+    if (!obs && carte) {
+      obs = new MutationObserver(() => { if (!attente) { attente = true; requestAnimationFrame(figer); } });
+      obs.observe(carte, { childList: true, subtree: true });
+    }
+  };
+})();
+</script>
+<style id="hexa-lot6c-verrou">
+  .p6-fige-bandeau { display: none; flex: none; margin-left: auto; height: 24px; line-height: 22px; padding: 0 12px; border-radius: 12px;
+    background: #FEF3C7; color: #92400E; border: 1px solid #F59E0B; font-size: 12px; font-weight: 800; white-space: nowrap; }
+  body.p6-fige .p6-fige-bandeau { display: inline-flex; align-items: center; }
+  body.p6-fige .p6-legende, body.l6.p6-fige #p-sim-6 .p6-legende { display: none !important; }
+  body.p6-fige .p6-dpe-lien { pointer-events: none; opacity: .45; }
+  body.p6-fige #btn-save, body.p6-fige #form-actions-bar { display: none !important; }
+  body.p6-fige #p-carte [data-p6-fige] { cursor: not-allowed; }
+</style>
 <script id="hexa-lot6-parcours-js">
 /* HEXA — Lot 6 : parcours télépro en 6 étapes (maquette docs/maquette-parcours-v2.html).
    PRÉSENTATION UNIQUEMENT : les champs de la fiche sont DÉPLACÉS dans des sections (jamais recréés ni

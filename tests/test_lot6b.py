@@ -55,11 +55,7 @@ def test_zone_du_dpe_jamais_utilisee():
     r1 = sd.calculer_cee_bar_th_171(base, {}, admin)
     r2 = sd.calculer_cee_bar_th_171(dict(base, zone_climatique_chantier="H1a", zone_climatique="H1"), {}, admin)
     assert r1["details"]["zone"] == r2["details"]["zone"] == "H3" and r1["montant"] == r2["montant"]
-    # puissance : température de base de la zone officielle, pas de la sous-zone du DPE
-    t = sd._temperature_base_notedim(dict(LEAD, zone_climatique_chantier="H1a"))
-    assert t["zone"] == "H2" and t["temperature"] == -4
-    assert sd._temperature_base_notedim({"cp_chantier": "75002"})["temperature"] == -7
-    assert sd._temperature_base_notedim({"cp_chantier": "06000"})["temperature"] == 0
+    # Lot 6c : la puissance garde la table d'avant (sous-zone du département) — voir tests/test_lot6c.py
 
 
 # ---------------------------------------------------------------- 10. délégataire CEE selon le choix de démarrage
