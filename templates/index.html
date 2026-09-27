@@ -14909,7 +14909,35 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     return capital*i/(1-Math.pow(1+i,-nMois));
   }
 
-  function calculerCeeBarTh171(state, formule, m3Config) {
+  // Lot 6b : délégataire CEE selon le choix de démarrage (même règle que le serveur, choisir_delegataire) :
+  // attente de l'accord MaPrimeRénov' -> délégataire « attente » (PICOTY) ; tout de suite ou foyer sans
+  // MaPrimeRénov' -> délégataire « tout de suite » (ACE) ; tarif vide -> repli sur « attente » + alerte.
+  const USAGE_PAR_NOM = { PICOTY: 'attente', ACE: 'tout_de_suite' };
+  function usageDelegataire(d){
+    const u = String((d && d.usage) || '').trim();
+    if (u === 'attente' || u === 'tout_de_suite') return u;
+    return USAGE_PAR_NOM[String((d && d.nom) || '').trim().toUpperCase()] || '';
+  }
+  function tarifDelegataire(d, categorie){
+    const v = d ? d[categorie === 'tres_modeste' ? 'mwh_precaire' : 'mwh_classique'] : null;
+    if (v === null || v === undefined || v === '') return null;
+    const n = Number(String(v).replace(',', '.'));
+    return n > 0 ? n : null;
+  }
+  function choisirDelegataire(delegataires, mode, categorie){
+    const liste = (Array.isArray(delegataires) ? delegataires : []).filter(d => d && typeof d === 'object');
+    const ancien = liste.find(d => d.actif) || liste[0] || null;
+    const d = liste.find(x => usageDelegataire(x) === mode) || null;
+    if (mode === 'tout_de_suite' && (!d || tarifDelegataire(d, categorie) === null)) {
+      const repli = liste.find(x => usageDelegataire(x) === 'attente') || ancien;
+      return { d: repli, alerte: `Tarif CEE du délégataire ${(d && d.nom) || 'tout de suite'} non renseigné dans l'Admin : prime calculée avec ${(repli && repli.nom) || '—'}.` };
+    }
+    return { d: d || ancien, alerte: null };
+  }
+  // « attente » si le client attend l'accord et a droit à MaPrimeRénov', sinon « tout_de_suite »
+  function modeCee(st, mprBrut){ return (st.mode_mpr === 'sans_attente' || !(mprBrut > 0)) ? 'tout_de_suite' : 'attente'; }
+
+  function calculerCeeBarTh171(state, formule, m3Config, mode) {
     let typeLogement = state.type_logement || '';
     if (typeLogement.toLowerCase().includes('maison')) typeLogement = 'Maison';
     else if (typeLogement.toLowerCase().includes('appart')) typeLogement = 'Appartement';
@@ -14938,7 +14966,8 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
 
     const kwhc = Number(ligneBase.montant_kwhc || 0) * Number(ligneSurface.facteur || 0) * Number(ligneZone.facteur || 0);
     const mwhc = kwhc / 1000;
-    const delegataire = (m3Config.delegataires || []).find(d => d.actif);
+    const choix = choisirDelegataire(m3Config.delegataires, mode || 'attente', categorie);
+    const delegataire = choix.d;
     if (!delegataire) return { montant: 0, erreur: 'Aucun délégataire actif' };
     const prixUnitaire = categorie === 'tres_modeste'
       ? Number(delegataire.mwh_precaire || 0)
@@ -14946,7 +14975,8 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     const bonif = m3Config.bonification_cee || {};
     const mult = bonif.actif ? Number(bonif.multiplicateur || 1) : 1;
     const montant = Math.round(mwhc * prixUnitaire * mult * 100) / 100;
-    return { montant, erreur: null, details: { typeLogement, etas, surface, zone, categorie, kwhc, mwhc, prixUnitaire, mult } };
+    return { montant, erreur: null, delegataire: delegataire.nom || '', alerte: choix.alerte,
+             details: { typeLogement, etas, surface, zone, categorie, kwhc, mwhc, prixUnitaire, mult } };
   }
 
   // OBSOLÈTE — remplacé par calculerEconomies / services/economies.py (Lot 2).
@@ -15133,29 +15163,33 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     if (M3_CONFIG?.forfaits_mpr && state.categorie in M3_CONFIG.forfaits_mpr) {
       mprDevis = Number(M3_CONFIG.forfaits_mpr[state.categorie]) || 0;
     }
-    const resultCee = calculerCeeBarTh171(state, M3_CONFIG?.formule_bar_th_171 || defaultFormuleBarTh171(), M3_CONFIG || {});
+    const modeCeeCourant = modeCee(state, (state.categorie === 'superieur') ? 0 : mprDevis);
+    const formuleCee = M3_CONFIG?.formule_bar_th_171 || defaultFormuleBarTh171();
+    const resultCee = calculerCeeBarTh171(state, formuleCee, M3_CONFIG || {}, modeCeeCourant);
     ceeBrut = resultCee.montant || 0;
     const plafonds = M3_CONFIG?.plafonds_reglementaires || {};
     const plafondEligible = Number(plafonds.plafond_eligible_ttc) || 12000;
     const plafondsPct = plafonds.plafonds_aides_pct || {};
     const baseEligible = Math.min(state.prix_pac || 0, plafondEligible);
-    let mprFinal = mprDevis;
-    let ceeDevis = ceeBrut;
-    let ceeConserveCalcule = 0;
     const categoriePlafond = state.categorie || 'modeste';
-    if (categoriePlafond === 'superieur') {
-      mprFinal = 0;
-      ceeDevis = ceeBrut;
-    } else {
+    // écrêtement réglementaire (inchangé) : MPR gardée, CEE réduite au plafond
+    const ecreter = (mprBase, cee) => {
+      if (categoriePlafond === 'superieur') return { mpr: 0, cee, conserve: 0 };
       const plafondPct = Number(plafondsPct[categoriePlafond] ?? 0) / 100;
       const plafondAides = baseEligible * plafondPct;
-      const totalBrut = mprDevis + ceeBrut;
-      if (plafondPct > 0 && totalBrut > plafondAides) {
-        mprFinal = mprDevis;
-        ceeDevis = Math.max(plafondAides - mprFinal, 0);
-        ceeConserveCalcule = Math.round((ceeBrut - ceeDevis) * 100) / 100;
+      if (plafondPct > 0 && mprBase + cee > plafondAides) {
+        const c2 = Math.max(plafondAides - mprBase, 0);
+        return { mpr: mprBase, cee: c2, conserve: Math.round((cee - c2) * 100) / 100 };
       }
-    }
+      return { mpr: mprBase, cee, conserve: 0 };
+    };
+    const ec = ecreter(mprDevis, ceeBrut);
+    let mprFinal = ec.mpr;
+    let ceeDevis = ec.cee;
+    let ceeConserveCalcule = ec.conserve;
+    // étape 4 : scénario « tout de suite » (délégataire ACE), le maximum
+    const resultCeeMax = calculerCeeBarTh171(state, formuleCee, M3_CONFIG || {}, 'tout_de_suite');
+    const ecMax = ecreter(mprDevis, resultCeeMax.montant || 0);
     mprDevis = mprFinal;
     const ceeConserve = ceeConserveCalcule;
     const aidesDevis  = ceeDevis + mprDevis;
@@ -15215,6 +15249,9 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
              resteAttente, mprTotal, reste_affiche, base_credit,
              mensOptNet, nMoisNet, modeMpr, finMpr, sansAttente,
              contextePret,
+             // Lot 6b : délégataire CEE de ce calcul et scénario « tout de suite » (étape 4)
+             delegataireCee: resultCee.delegataire || '', alerteDelegataire: resultCee.alerte || null, modeCee: modeCeeCourant,
+             ceeMax: ecMax.cee, aidesMax: ecMax.cee + ecMax.mpr,
              // Categorie AYANT SERVI a ces montants : le bandeau l'affiche telle quelle, sinon un
              // state modifie pendant l'await afficherait SUP au-dessus de chiffres calcules en TMO.
              categorie: state.categorie,
@@ -15332,7 +15369,8 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     const contextePret = !!state.categorie && !!state.zone;
     let mprBase = contextePret && node && node.mpr_devis && node.mpr_devis[state.zone] ? (node.mpr_devis[state.zone][state.categorie] || 0) : 0;
     if (M3_CONFIG && M3_CONFIG.forfaits_mpr && (state.categorie in M3_CONFIG.forfaits_mpr)) mprBase = Number(M3_CONFIG.forfaits_mpr[state.categorie]) || 0;
-    const ceeBrut = (calculerCeeBarTh171(state, (M3_CONFIG && M3_CONFIG.formule_bar_th_171) || defaultFormuleBarTh171(), M3_CONFIG || {}).montant) || 0;
+    const ceeBrut = (calculerCeeBarTh171(state, (M3_CONFIG && M3_CONFIG.formule_bar_th_171) || defaultFormuleBarTh171(), M3_CONFIG || {},
+      modeCee(state, state.categorie === 'superieur' ? 0 : mprBase)).montant) || 0;
     const plafonds = (M3_CONFIG && M3_CONFIG.plafonds_reglementaires) || {};
     const plafondEligible = Number(plafonds.plafond_eligible_ttc) || 12000;
     const plafondsPct = plafonds.plafonds_aides_pct || {};
@@ -15751,7 +15789,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
           <div class="p6-aides p6-aides--vide" id="p6-aides"><span class="p6-sec p6-sec--vert">2 · LES AIDES AUXQUELLES LE CLIENT A DROIT</span>
             <div class="p6-aide">Renseignez le nombre de personnes et le revenu fiscal (et la surface à l'étape Logement) : les aides se calculent toutes seules.</div></div>`;
     }
-    const mpr = c.mprDevis, cee = c.ceeDevis, tot = c.aidesDevis;
+    const mpr = c.mprDevis, cee = c.ceeMax, tot = c.aidesMax;      // Lot 6b : scénario « tout de suite » (maximum)
     const dire = mpr > 0
       ? `« Compte tenu de votre situation, vous avez droit à ${eur(tot)} d'aides : ${eur(mpr)} de MaPrimeRénov' et ${eur(cee)} de prime CEE. »`
       : `« Compte tenu de votre situation, vous avez droit à ${eur(cee)} de prime CEE. »`;
@@ -15765,6 +15803,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
               <div class="p6-aides-l"><b>Prime CEE</b><span id="p6-aides-cee">${eur(cee)}</span></div>
             </div>
             <div class="p6-adire">À dire : ${dire}</div>
+            <div class="p6-aide">Prime CEE selon le choix de démarrage (attente de l'accord MaPrimeRénov' ou travaux tout de suite) : montant maximum affiché, confirmé à l'étape Proposition.</div>
           </div>
           ${c.categorie === 'superieur' ? `<div class="p6-alerte" id="p6-alerte-sup"><b>POINT D'ATTENTION :</b> revenus supérieurs : pas de MaPrimeRénov' pour une PAC air-eau, seule la prime CEE s'applique. Le projet reste possible.</div>` : ''}`;
   }
@@ -15830,7 +15869,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     const avecMpr = c.mprDevis > 0 || !c.contextePret;
     let compte = ligneCalc('', 'Prix de la PAC posée', 'fournie et installée, TTC', eur(state.prix_pac || 0), '', 'sim-prix-ttc');
     if (bsR.actif) compte += ligneCalc('+', 'Ballon thermodynamique', 'option, sans aide', eur(bsR.totalTTC), '', 'sim-ballon-montant');
-    compte += ligneCalc('−', 'Prime CEE', 'déduite par Hexa-Rénov\'', d(c.ceeDevis), '', 'sim-cee');
+    compte += ligneCalc('−', 'Prime CEE', 'déduite par Hexa-Rénov\'' + (c.delegataireCee ? ' · ' + c.delegataireCee : ''), d(c.ceeDevis), '', 'sim-cee');
     if (avecMpr) compte += ligneCalc('−', 'MaPrimeRénov\'', sans ? 'aide de l\'État, avancée par le client' : 'aide de l\'État', d(c.mprDevis), '', 'sim-mpr');
     compte += ligneCalc('=', 'Reste à charge', 'ce que la PAC coûte vraiment', d(c.resteAttente), 'tot', 'sim-reste');
     let flux = '';
@@ -15860,6 +15899,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
       ? ` <i>(${eur(Math.round(state.eco.facture_annuelle / 12))} déclarés, dont chauffage)</i>` : '';
     return `
         <div class="p6-blk"><h4>① CE QUE ÇA COÛTE <span>· le calcul du reste à charge</span></h4>${compte}</div>
+        ${c.alerteDelegataire ? `<div class="p6-alerte" id="p6-alerte-delegataire">${c.alerteDelegataire}</div>` : ''}
         <div class="p6-blk p-quand"><h4>② QUI PAIE, ET QUAND <span>· pour le client : − ce qu'il paie, + ce qu'il récupère</span></h4>${flux}</div>
         <div class="sim-roi p6-roi"><div class="p6-g p6-g3 p6-tuiles">
           <div class="p6-tuile${tEco[3]}"><span>${tEco[0]}</span><b id="p6-tuile-eco">${tEco[1]}</b><i>${tEco[2]}</i></div>
@@ -17667,6 +17707,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
           <input type="text" class="adm-del-nom" value="${adminEscape(d.nom || '')}" placeholder="Nom">
           <input type="text" inputmode="decimal" class="adm-del-precaire" value="${adminEscape(d.mwh_precaire ?? '')}" placeholder="MWh précaire">
           <input type="text" inputmode="decimal" class="adm-del-classique" value="${adminEscape(d.mwh_classique ?? '')}" placeholder="MWh classique">
+          <select class="adm-del-usage" title="Délégataire utilisé quand le client…"><option value="">— utilisé quand —</option><option value="attente" ${(d.usage || ({PICOTY:'attente',ACE:'tout_de_suite'})[String(d.nom||'').toUpperCase()]) === 'attente' ? 'selected' : ''}>attente MPR</option><option value="tout_de_suite" ${(d.usage || ({PICOTY:'attente',ACE:'tout_de_suite'})[String(d.nom||'').toUpperCase()]) === 'tout_de_suite' ? 'selected' : ''}>tout de suite</option></select>
           <button type="button" class="adm-btn adm-btn-danger adm-del-remove">Supprimer</button>
         </div>`).join('')}
       </div>
@@ -17723,6 +17764,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
             <input type="text" class="adm-del-nom" value="${adminEscape(d.nom || '')}" placeholder="Nom">
             <input type="text" inputmode="decimal" class="adm-del-precaire" value="${adminEscape(d.mwh_precaire ?? '')}" placeholder="MWh précaire">
             <input type="text" inputmode="decimal" class="adm-del-classique" value="${adminEscape(d.mwh_classique ?? '')}" placeholder="MWh classique">
+          <select class="adm-del-usage" title="Délégataire utilisé quand le client…"><option value="">— utilisé quand —</option><option value="attente" ${(d.usage || ({PICOTY:'attente',ACE:'tout_de_suite'})[String(d.nom||'').toUpperCase()]) === 'attente' ? 'selected' : ''}>attente MPR</option><option value="tout_de_suite" ${(d.usage || ({PICOTY:'attente',ACE:'tout_de_suite'})[String(d.nom||'').toUpperCase()]) === 'tout_de_suite' ? 'selected' : ''}>tout de suite</option></select>
             <button type="button" class="adm-btn adm-btn-danger adm-del-remove">Supprimer</button>
           </div>`).join('')}
         </div>
@@ -19118,9 +19160,11 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     document.getElementById('adm-save-delegataires')?.addEventListener('click', async ()=>{
       const delegataires = Array.from(document.querySelectorAll('.adm-delegataire-row')).map((row)=>({
         nom: row.querySelector('.adm-del-nom')?.value || '',
-        mwh_precaire: Number(String(row.querySelector('.adm-del-precaire')?.value || '').replace(',','.')) || 0,
-        mwh_classique: Number(String(row.querySelector('.adm-del-classique')?.value || '').replace(',','.')) || 0,
-        actif: !!row.querySelector('.adm-del-actif')?.checked
+        // Lot 6b : tarif vide = vide (repli sur le délégataire « attente » tant qu'il n'est pas renseigné)
+        mwh_precaire: String(row.querySelector('.adm-del-precaire')?.value || '').trim() === '' ? '' : (Number(String(row.querySelector('.adm-del-precaire').value).replace(',','.')) || 0),
+        mwh_classique: String(row.querySelector('.adm-del-classique')?.value || '').trim() === '' ? '' : (Number(String(row.querySelector('.adm-del-classique').value).replace(',','.')) || 0),
+        actif: !!row.querySelector('.adm-del-actif')?.checked,
+        usage: row.querySelector('.adm-del-usage')?.value || ''
       }));
       const r = await fetch('/api/admin/m3', { method:'POST', headers: window.adminHeaders(), body: JSON.stringify({ delegataires }) });
       if (r.ok) { M3_ADMIN.delegataires = delegataires; adminToast('✓ Paramètres enregistrés', '#0D6B3B'); window.dispatchEvent(new CustomEvent('hexa-config-changed')); }
@@ -19143,9 +19187,11 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
       document.querySelectorAll('.adm-m3-mpr').forEach(input=>{ forfaits_mpr[input.dataset.cat] = Number(String(input.value).replace(/\s/g,'').replace(',','.')) || 0; });
       const delegataires = Array.from(document.querySelectorAll('.adm-delegataire-row')).map((row,i)=>({
         nom: row.querySelector('.adm-del-nom')?.value || '',
-        mwh_precaire: Number(String(row.querySelector('.adm-del-precaire')?.value || '').replace(',','.')) || 0,
-        mwh_classique: Number(String(row.querySelector('.adm-del-classique')?.value || '').replace(',','.')) || 0,
-        actif: !!row.querySelector('.adm-del-actif')?.checked
+        // Lot 6b : tarif vide = vide (repli sur le délégataire « attente » tant qu'il n'est pas renseigné)
+        mwh_precaire: String(row.querySelector('.adm-del-precaire')?.value || '').trim() === '' ? '' : (Number(String(row.querySelector('.adm-del-precaire').value).replace(',','.')) || 0),
+        mwh_classique: String(row.querySelector('.adm-del-classique')?.value || '').trim() === '' ? '' : (Number(String(row.querySelector('.adm-del-classique').value).replace(',','.')) || 0),
+        actif: !!row.querySelector('.adm-del-actif')?.checked,
+        usage: row.querySelector('.adm-del-usage')?.value || ''
       }));
       const modeles_email = Array.from(document.querySelectorAll('[data-email-i]')).map((card,i)=>({
         id: 'modele_' + (i+1),

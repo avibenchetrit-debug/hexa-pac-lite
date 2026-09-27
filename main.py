@@ -47,6 +47,9 @@ from services.service_devis import (
     calculer_financement_devis,
     calculer_notedim,
     calculer_zone_climatique,
+    choisir_delegataire,
+    mode_cee,
+    usage_delegataire,
     find_modele,
     format_devis_amounts,
     format_sous_traitant,
@@ -851,7 +854,20 @@ def _read_echanges():
 
 def _read_delegataires():
     delegataires = _read_json(DELEGATAIRES_PATH, DEFAULT_DELEGATAIRES)
-    return delegataires if isinstance(delegataires, list) else DEFAULT_DELEGATAIRES
+    delegataires = delegataires if isinstance(delegataires, list) else DEFAULT_DELEGATAIRES
+    # Lot 6b : « utilisé quand » (attente MPR / tout de suite) ; ancien fichier : déduit du nom (PICOTY / ACE).
+    # Pas de délégataire « tout de suite » : ACE ajouté (non enregistré) avec des tarifs vides -> repli sur PICOTY.
+    out = []
+    for d in delegataires:
+        if not isinstance(d, dict):
+            continue
+        d = dict(d)
+        if not d.get("usage") and usage_delegataire(d):
+            d["usage"] = usage_delegataire(d)
+        out.append(d)
+    if not any(usage_delegataire(d) == "tout_de_suite" for d in out):
+        out.append({"nom": "ACE", "mwh_precaire": "", "mwh_classique": "", "actif": False, "usage": "tout_de_suite"})
+    return out
 
 
 def _read_modeles_email():
@@ -1746,7 +1762,9 @@ def _devis_context(numero: str) -> dict:
         forfaits = {}
     categorie = str(lead.get("categorie") or "modeste")
     mpr = _float_value(forfaits.get(categorie), {"tres_modeste": 5000, "modeste": 4000, "intermediaire": 3000, "superieur": 0}.get(categorie, 4000))
-    delegataire = _active_delegataire()
+    # Lot 6b : délégataire selon le choix de démarrage (même règle que le devis)
+    _st = load_state_simulateur(numero) or {}
+    delegataire = choisir_delegataire(_read_delegataires(), mode_cee(lead, _st, {"forfaits_mpr": forfaits}), categorie)[0] or _active_delegataire()
     mwh = max(_float_value(lead.get("surface_logement_m2"), 90) / 10, 1)
     cee_unitaire = _float_value(delegataire.get("mwh_precaire" if categorie == "tres_modeste" else "mwh_classique"), 7.2)
     cee = round(mwh * cee_unitaire * 10, 2)

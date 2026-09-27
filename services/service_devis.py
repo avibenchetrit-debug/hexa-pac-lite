@@ -278,7 +278,52 @@ def calculer_mpr_ballon(prospect, admin_params):
     return 0
 
 
-def calculer_cee_bar_th_171(prospect, state_simulateur, admin_params):
+# Lot 6b : délégataire CEE selon le choix de démarrage (règle métier). Client qui ATTEND l'accord MaPrimeRénov'
+# -> délégataire réglé « attente » (PICOTY, qui préfinance la prime) ; travaux TOUT DE SUITE ou foyer sans
+# MaPrimeRénov' -> délégataire réglé « tout de suite » (ACE). Tarif du délégataire « tout de suite » vide -> repli sur
+# celui de l'attente, avec une alerte. Réglage absent (ancien fichier) : PICOTY = attente, ACE = tout de suite.
+# Précaire = Très modestes, classique pour tous les autres (inchangé). Même règle dans la page (choisirDelegataire).
+USAGES_DELEGATAIRE = ("attente", "tout_de_suite")
+_USAGE_PAR_NOM = {"PICOTY": "attente", "ACE": "tout_de_suite"}
+
+
+def usage_delegataire(d):
+    u = str((d or {}).get("usage") or "").strip()
+    if u in USAGES_DELEGATAIRE:
+        return u
+    return _USAGE_PAR_NOM.get(str((d or {}).get("nom") or "").strip().upper(), "")
+
+
+def tarif_delegataire(d, categorie):
+    """Tarif €/MWh cumac du délégataire pour la catégorie (précaire = Très modestes), None si vide."""
+    v = (d or {}).get("mwh_precaire" if categorie == "tres_modeste" else "mwh_classique")
+    if v in (None, ""):
+        return None
+    f = float_value(v, 0)
+    return f if f > 0 else None
+
+
+def mode_cee(prospect, state_simulateur, admin_params):
+    """« attente » si le client attend l'accord MaPrimeRénov' et a droit à une prime ; sinon « tout_de_suite »."""
+    categorie = value(prospect, "categorie_revenu", "categorie", default="modeste")
+    mpr = 0 if categorie == "superieur" else calculer_mpr(prospect, state_simulateur, admin_params)
+    mode_mpr = str(value(state_simulateur, "mode_mpr", default="attente") or "attente")
+    return "tout_de_suite" if (mode_mpr == "sans_attente" or mpr <= 0) else "attente"
+
+
+def choisir_delegataire(delegataires, mode, categorie):
+    """(délégataire, alerte) pour le mode « attente » / « tout_de_suite »."""
+    liste = [d for d in (delegataires or []) if isinstance(d, dict)]
+    ancien = next((d for d in liste if d.get("actif")), liste[0] if liste else None)
+    d = next((x for x in liste if usage_delegataire(x) == mode), None)
+    if mode == "tout_de_suite" and (d is None or tarif_delegataire(d, categorie) is None):
+        repli = next((x for x in liste if usage_delegataire(x) == "attente"), None) or ancien
+        nom = (d or {}).get("nom") or "tout de suite"
+        return repli, f"Tarif CEE du délégataire {nom} non renseigné dans l'Admin : prime calculée avec {(repli or {}).get('nom', '—')}."
+    return (d or ancien), None
+
+
+def calculer_cee_bar_th_171(prospect, state_simulateur, admin_params, mode=None):
     """Calcule le montant CEE selon la formule officielle BAR-TH-171."""
     formule = (admin_params or {}).get("formule_bar_th_171", {})
     type_logement = value(prospect, "type_logement", "type", default="")
@@ -336,8 +381,8 @@ def calculer_cee_bar_th_171(prospect, state_simulateur, admin_params):
     kwhc = montant_base * facteur_surface * facteur_zone
     mwhc = kwhc / 1000
 
-    delegataires = (admin_params or {}).get("delegataires") or []
-    delegataire = next((d for d in delegataires if d.get("actif")), None)
+    mode = mode or mode_cee(prospect, state_simulateur, admin_params)
+    delegataire, alerte_delegataire = choisir_delegataire((admin_params or {}).get("delegataires") or [], mode, categorie)
     if not delegataire:
         return {"montant": 0, "erreur": "Aucun délégataire CEE actif", "details": {}}
 
@@ -368,6 +413,9 @@ def calculer_cee_bar_th_171(prospect, state_simulateur, admin_params):
             "mwhc": round(mwhc, 2),
             "prix_unitaire": prix_unitaire,
             "type_prix": type_prix,
+            "delegataire": delegataire.get("nom", ""),
+            "mode": mode,
+            "alerte_delegataire": alerte_delegataire,
             "bonification": multiplicateur,
         },
     }
