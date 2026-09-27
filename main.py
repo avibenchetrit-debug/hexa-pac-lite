@@ -1769,7 +1769,7 @@ def _devis_context(numero: str) -> dict:
         "service": service,
         "phase": "Triphasé" if wants_tri else "Monophasé",
         "surface_chauffee": surface_chauffee,
-        "zone": lead.get("zone_climatique") or lead.get("zone_climatique_chantier") or "",
+        "zone": calculer_zone_climatique(lead.get("code_postal_chantier") or lead.get("cp_chantier") or ""),
         "delegataire": delegataire.get("nom", "PICOTY"),
         "categorie": categorie,
     }
@@ -3941,8 +3941,8 @@ def _economies_devis(prospect: dict, state: dict, modele_obj, admin: dict, zone_
     if annuel <= 0:
         surface = float_value(devis_value(state, "surface_chauffee", default="")) or (
             float_value(devis_value(prospect, "surface_habitable", "surface_logement_m2", default="")) * 0.9)
-        # zone de l'état simulateur, sinon celle du département du CP (jamais H2 par défaut)
-        annuel = estimer_facture_annuelle(surface, devis_value(state, "zone", default="") or _zone_depuis_cp(prospect) or zone_contexte,
+        # zone officielle du département du CP (jamais celle du DPE, jamais H2 par défaut)
+        annuel = estimer_facture_annuelle(surface, _zone_depuis_cp(prospect) or zone_contexte,
                                           devis_value(prospect, "annee_construction", default=""),
                                           energie, ecs_chaudiere, personnes, params) or 0
         source = "estime"

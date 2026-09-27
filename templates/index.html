@@ -14426,34 +14426,20 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
   function zoneReglementaireFromCp(cp){
     const s = String(cp || '').trim();
     const dept = s.startsWith('97') ? s.slice(0, 3) : s.slice(0, 2).toUpperCase();
-    return (DEPT_ZONE_BACKEND && DEPT_ZONE_BACKEND[dept]) || 'H1';
+    return (DEPT_ZONE_BACKEND && DEPT_ZONE_BACKEND[dept]) || 'H1';   // Corse : « 20 » (table officielle)
   }
 
+  // Lot 6b : température de base de la zone OFFICIELLE du département du CP (table du serveur, source unique) :
+  // H1 −7 °C, H2 −4 °C, H3 0 °C. Les sous-zones et la zone écrite dans le DPE ne servent plus au calcul.
   function temperatureExterieureBase(state){
     const cp = String(state.cp_chantier || '').replace(/\D/g, '').slice(0, 5);
     let info;
     if (cp && Object.prototype.hasOwnProperty.call(TEMP_BASE_CP, cp)) {
-      info = { temperature: TEMP_BASE_CP[cp], source: 'cp', zone: state.zone_detail || state.zone || '' };
+      info = { temperature: TEMP_BASE_CP[cp], source: 'cp', zone: zoneReglementaireFromCp(cp) };
+    } else if (cp) {
+      const z = zoneReglementaireFromCp(cp);
+      info = { temperature: TEMP_BASE_ZONE[z] != null ? TEMP_BASE_ZONE[z] : -7, source: 'departement', zone: z };
     } else {
-      const dept = cp.startsWith('97') || cp.startsWith('976') ? cp.slice(0, 3) : cp.slice(0, 2);
-      if (dept && DEPT_SOUS_ZONE[dept]) {
-      const z = DEPT_SOUS_ZONE[dept];
-        info = { temperature: TEMP_BASE_SOUS_ZONE[z], source: 'departement', zone: z };
-      }
-    }
-    if (!info) {
-      const zDetail = normaliserZone(state.zone_detail);
-      if (zDetail && TEMP_BASE_SOUS_ZONE[zDetail] != null) {
-        info = { temperature: TEMP_BASE_SOUS_ZONE[zDetail], source: 'zone', zone: zDetail };
-      }
-    }
-    if (!info) {
-      const z = zonePrincipale(state.zone);
-      if (z && TEMP_BASE_ZONE[z] != null) {
-        info = { temperature: TEMP_BASE_ZONE[z], source: 'zone', zone: z };
-      }
-    }
-    if (!info) {
       info = { temperature: -7, source: 'defaut', zone: 'H1' };
     }
     const altitude = state.altitude == null || state.altitude === '' ? null : Number(state.altitude);
