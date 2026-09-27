@@ -226,6 +226,50 @@ DEFAULT_PARAMS_FINANCEMENT = {
     },
 }
 
+# Lot 6 : script d'appel de l'« Accompagnateur d'appel » (une entrée par étape du parcours).
+# Stocké dans la config admin (parametres_admin.json, clé script_appel), jamais dans le lead.
+# Encarts : condition "" (toujours), "qN=R" (réponse R à la question N, à partir de 1), "dpe" (DPE ou audit
+# connu), "dpe_classe=F,G", "energie=fioul,gaz", "ecs_chaudiere", "categorie=superieur", "service=chauffage_seul".
+# Textes : [Civilité Nom], [prénom de l'utilisateur], [prénom du client], [nom du client], [année du DPE],
+# [date du DPE], [classe DPE] sont remplacés à l'affichage.
+DEFAULT_SCRIPT_APPEL = {
+    "etapes": {
+        "1": {
+            "titre": "Prise de contact",
+            "intro": "Bonjour [Civilité Nom], [prénom de l'utilisateur] de la société Hexa-Rénov'. Je vous contacte car "
+                     "nous avons reçu de votre part une demande pour un projet d'installation de pompe à chaleur air-eau.",
+            "questions": [
+                {"texte": "Êtes-vous bien à l'origine de cette demande ?",
+                 "reponses": [{"libelle": "Oui", "consigne": "", "alerte": False},
+                              {"libelle": "Non", "consigne": "S'excuser et clôturer : Fin d'appel → statut « Erreur ».", "alerte": True}]},
+                {"texte": "Avez-vous un moment pour mieux comprendre votre projet ?",
+                 "reponses": [{"libelle": "Oui", "consigne": "", "alerte": False},
+                              {"libelle": "Non, rappeler", "consigne": "« Quand puis-je vous rappeler ? » → Fin d'appel → programmer le rappel.", "alerte": True}]},
+                {"texte": "Où en êtes-vous dans votre projet ?",
+                 "reponses": [{"libelle": "Découverte", "consigne": "", "alerte": False},
+                              {"libelle": "Sait ce qu'il veut", "consigne": "", "alerte": False}]},
+            ],
+            "encarts": [
+                {"titre": "À EXPLIQUER :", "texte": "", "condition": "q3=1"},
+                {"titre": "À DEMANDER :", "texte": "", "condition": "q3=2"},
+            ],
+        },
+        "2": {
+            "titre": "Le logement", "intro": "", "questions": [],
+            "encarts": [
+                {"titre": "À VÉRIFIER (DPE du [date du DPE]) :",
+                 "texte": "« Depuis [année du DPE], avez-vous fait des travaux d'isolation : toit, murs ou fenêtres ? » "
+                          "→ répondre dans le bloc 4.",
+                 "condition": "dpe"},
+            ],
+        },
+        "3": {"titre": "Le chauffage", "intro": "", "questions": [], "encarts": []},
+        "4": {"titre": "Le foyer", "intro": "", "questions": [], "encarts": []},
+        "5": {"titre": "Le besoin", "intro": "", "questions": [], "encarts": []},
+        "6": {"titre": "La proposition", "intro": "", "questions": [], "encarts": []},
+    }
+}
+
 DEFAULT_PARAMETRES_ADMIN = {
     "relances": {"max": 6, "niveaux_jours": [3, 7, 14, 30, 60, 90]},
     "relances_nrp": {"max": 4, "niveaux_jours": [2, 6, 12, 21]},
@@ -3206,6 +3250,7 @@ def get_admin_m3() -> JSONResponse:
             "params_financement": load_parametres_admin().get("params_financement", DEFAULT_PARAMS_FINANCEMENT),
             "marques": load_parametres_admin().get("marques", DEFAULT_MARQUES),
             "ballon_thermo": load_parametres_admin().get("ballon_thermo", {}),
+            "script_appel": _script_appel(),
         }
     )
 
@@ -3319,6 +3364,56 @@ async def save_params_financement(request: Request):
     params["params_financement"] = payload
     save_parametres_admin_atomic(params)
     return {"success": True}
+
+
+# Lot 6 : script d'appel (Admin → Script d'appel). Lecture libre (fiche), écriture admin.
+def _script_appel() -> dict:
+    s = load_parametres_admin().get("script_appel")
+    if not isinstance(s, dict) or not isinstance(s.get("etapes"), dict):
+        return json.loads(json.dumps(DEFAULT_SCRIPT_APPEL))
+    etapes = {}
+    for n in ("1", "2", "3", "4", "5", "6"):
+        e = s["etapes"].get(n)
+        etapes[n] = e if isinstance(e, dict) else json.loads(json.dumps(DEFAULT_SCRIPT_APPEL["etapes"][n]))
+    return {"etapes": etapes}
+
+
+def _nettoyer_script_appel(payload) -> dict:
+    """Garde la forme attendue (textes, questions, réponses, encarts) ; ignore le reste."""
+    txt = lambda v, n=2000: str(v or "").strip()[:n]
+    src = payload.get("etapes") if isinstance(payload, dict) else None
+    src = src if isinstance(src, dict) else {}
+    etapes = {}
+    for n in ("1", "2", "3", "4", "5", "6"):
+        e = src.get(n) if isinstance(src.get(n), dict) else {}
+        questions = []
+        for q in (e.get("questions") or [])[:12]:
+            if not isinstance(q, dict) or not txt(q.get("texte")):
+                continue
+            reponses = [{"libelle": txt(r.get("libelle"), 60), "consigne": txt(r.get("consigne")), "alerte": bool(r.get("alerte"))}
+                        for r in (q.get("reponses") or [])[:4] if isinstance(r, dict) and txt(r.get("libelle"), 60)]
+            questions.append({"texte": txt(q.get("texte")), "reponses": reponses})
+        encarts = [{"titre": txt(c.get("titre"), 120), "texte": txt(c.get("texte")), "condition": txt(c.get("condition"), 120)}
+                   for c in (e.get("encarts") or [])[:12] if isinstance(c, dict) and (txt(c.get("titre"), 120) or txt(c.get("texte")))]
+        etapes[n] = {"titre": txt(e.get("titre"), 80) or DEFAULT_SCRIPT_APPEL["etapes"][n]["titre"],
+                     "intro": txt(e.get("intro")), "questions": questions, "encarts": encarts}
+    return {"etapes": etapes}
+
+
+@app.get("/api/script-appel")
+async def get_script_appel():
+    return _script_appel()
+
+
+@app.post("/api/admin/script-appel")
+async def save_script_appel(request: Request):
+    _require_admin(request)
+    payload = await _read_request_payload(request)
+    script = _nettoyer_script_appel(payload)
+    params = load_parametres_admin()
+    params["script_appel"] = script
+    save_parametres_admin_atomic(params)
+    return {"success": True, "script_appel": script}
 
 
 @app.get("/api/admin/relances")
