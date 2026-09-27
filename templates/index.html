@@ -24226,8 +24226,8 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
   body.l6 .p6-sep { display: none; }
   body.l6 .p6-sec { padding-top: 7px; border-top: 1px solid #E3E7EC; font-size: 11px; line-height: 14px; }
   body.l6 .l4-corps > .p6-sec:first-of-type, body.l6 #p-sim-5 > .p6-sec:first-of-type, body.l6 #p-sim-6a > .p6-sec:first-child { border-top: 0; padding-top: 0; }
-  body.l6 .l4-grid > .field > label { height: 16px !important; line-height: 16px !important; margin: 0 0 3px !important; }
-  .p6-lab { height: 16px; margin: 0 0 3px; }
+  body.l6 .l4-grid > .field > label { height: 18px !important; line-height: 18px !important; margin: 0 0 1px !important; }
+  .p6-lab { height: 18px; margin: 0 0 1px; }
   body.l6 .p6-aide { font-size: 11.5px; line-height: 1.3; }
   /* aide activée : une ligne par champ, tronquée (le texte complet en infobulle) */
   body.l6.l4-aide-on .l4-grid > .field > .l4-aide, body.l6.l4-aide-on .p6-sous > .l4-aide { white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
@@ -24351,6 +24351,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
   body.l6[data-p6-etape="2"] .p-corps, body.l6[data-p6-etape="2"] .l4-bloc.is-open .l4-corps,
   body.l6[data-p6-etape="2"] #p-hotes > .p-hote:not([hidden]) { gap: 6px; }
   body.l6[data-p6-etape="2"] .p6-g { row-gap: 6px; }
+   body.l6[data-p6-etape="2"] .p-corps { padding-top: 7px; padding-bottom: 7px; }   /* libellés 18 px : 6 px regagnés ici */
   body.l6[data-p6-etape="2"] #p6-lien-tech-hote { margin-top: -22px; }
   body.l6 #l4-bloc-5 { display: none !important; }
   body.l6.p6-suivi-ouvert #l4-bloc-5.l4-bloc { display: block !important; position: fixed; z-index: 1700; background: #fff; margin: 0; padding: 0; border: 0; }
