@@ -1,0 +1,405 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Hexa-Rénov' · Parcours télépro V2 (test)</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+--navy:#0A2A4F;--red:#D7263D;--green:#1F6B43;--greenbg:#E6F4EC;--blue:#1D4F8C;--bluebg:#EAF2FC;--orange:#E08A2E;--orangebg:#FFF4E5;--line:#DDE1E7;--grey:#5A6675;--txt:#16202C;--bg:#EEF0F3;--field:#F3F5F8;--fieldb:#B4BDC9}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{font-family:'Plus Jakarta Sans','Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--txt);font-size:14px;zoom:.9}
+button{font-family:inherit;cursor:pointer}
+.app{height:calc(100vh / .9);min-height:680px;display:flex;flex-direction:column}
+.top{height:46px;flex-shrink:0;display:flex;align-items:center;gap:12px;padding:0 20px;background:#fff;border-bottom:1px solid var(--line)}
+.logo{font-weight:800;font-size:17px;color:var(--navy)}
+.sp{flex:1}
+.btn-s{height:32px;padding:0 12px;border-radius:8px;font-size:12px;font-weight:700;border:1px solid var(--navy);background:#fff;color:var(--navy)}
+.btn-s.red{border-color:var(--red);color:var(--red)}
+.btn-s.fill{border:0;background:var(--red);color:#fff}
+.ident{flex-shrink:0;display:flex;align-items:center;gap:16px;padding:9px 20px;background:#fff;border-bottom:1px solid var(--line)}
+.pr{padding:3px 8px;background:var(--bg);border-radius:6px;font-size:12px;font-weight:700;color:#3A4656}
+.name{font-size:18px;font-weight:800;color:var(--navy)}
+.sub{display:flex;gap:14px;font-size:13px;color:#2E3A48;margin-top:2px}
+.copy{height:22px;padding:0 6px;border:1px solid #C9CFD8;background:#fff;border-radius:5px;font-size:11px;margin-left:4px}
+.pill{height:32px;padding:0 12px;border-radius:16px;border:1px solid #F0C4A4;background:#FFF4EC;color:#8A4200;font-size:12px;font-weight:700}
+.q{width:32px;height:32px;border-radius:16px;border:0;background:var(--blue);color:#fff;font-weight:800}
+.ned{width:32px;height:32px;border-radius:8px;font-weight:800}
+.nav{flex-shrink:0;display:flex;gap:8px;padding:16px 20px 10px}
+.nav button{flex:1;display:flex;align-items:center;justify-content:center;gap:8px;height:42px;border-radius:10px;font-size:14px;font-weight:600;background:#fff;color:#3A4656;border:1px solid var(--line)}
+.nav button .d{width:22px;height:22px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;background:#E3E7EC;color:var(--navy)}
+.nav button.done{color:var(--green)} .nav button.done .d{background:var(--green);color:#fff}
+.nav button.cur{background:var(--navy);color:#fff;border-color:var(--navy);font-weight:800} .nav button.cur .d{background:#fff;color:var(--navy)}
+.body{flex:1;display:flex;gap:14px;margin:0 20px 14px;min-height:0}
+.card{flex:1;display:flex;flex-direction:column;background:#fff;border:1px solid var(--line);border-radius:12px;min-width:0;min-height:0;overflow:hidden}
+.ch{padding:12px 22px 8px;border-bottom:1px solid #EEF0F3}
+.kicker{font-size:12px;font-weight:800;color:var(--red);letter-spacing:.8px}
+.title{font-size:21px;font-weight:800;color:var(--navy)}
+.cb{flex:1;padding:16px 26px;overflow-y:auto;display:flex;flex-direction:column;gap:16px;min-height:0}
+.cf{flex-shrink:0;display:flex;align-items:center;padding:10px 22px;border-top:1px solid var(--line)}
+.prev{height:44px;padding:0 20px;border-radius:8px;border:1px solid var(--navy);background:#fff;color:var(--navy);font-size:15px;font-weight:700}
+.next{height:44px;padding:0 28px;border-radius:8px;border:0;background:var(--navy);color:#fff;font-size:16px;font-weight:800}
+.sec{font-size:12px;font-weight:800;color:var(--grey);letter-spacing:.6px}
+.sec.blue{color:var(--blue)}
+.sep{height:1px;background:#E3E7EC;flex-shrink:0}
+.segs{align-items:stretch}
+.pcard{height:100%}
+.cat{padding:6px 12px;border-radius:14px;font-size:12px;font-weight:800;border:2px solid transparent;opacity:.35}
+.cat.on{opacity:1;border-color:#0A2A4F}
+.opt{display:flex;flex-direction:column;gap:6px;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:#FAFBFC}
+.opt.on{border:2px solid var(--green);background:#F2F8F4}
+.blk{display:flex;flex-direction:column;gap:8px;padding:12px 14px;border:1px solid var(--line);border-radius:10px;background:#fff}
+.k{display:inline-flex;align-items:center;height:18px;padding:0 6px;border-radius:9px;font-size:10px;font-weight:800;letter-spacing:.2px}
+.k.a{background:#1F6B43;color:#fff}.k.p{background:#E08A2E;color:#16202C}.k.e{background:#1D4F8C;color:#fff}
+.imp .in,.imp .segs{box-shadow:0 0 0 4px #FFE08A;border-radius:8px}
+.imp .lab{color:#6B4E00}
+.legend{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:9px 14px;background:#FFFBEA;border:1px solid #F0D98A;border-radius:10px;font-size:12px;font-weight:700;color:#3A4656}
+.legend .hl{display:inline-block;flex-shrink:0;width:26px;height:16px;border-radius:4px;box-shadow:0 0 0 4px #FFE08A;background:#fff;border:1px solid #B4BDC9;vertical-align:middle}
+.blk h4{margin:0 0 2px;font-size:11px;font-weight:800;color:var(--grey);letter-spacing:.6px}
+.g{display:grid;gap:16px 20px;align-items:start}
+.g2{grid-template-columns:repeat(2,minmax(0,1fr))}.g3{grid-template-columns:repeat(3,minmax(0,1fr))}.g4{grid-template-columns:repeat(4,minmax(0,1fr))}.g5{grid-template-columns:repeat(5,minmax(0,1fr))}
+.f{display:flex;flex-direction:column;gap:5px;min-width:0}
+.lab{height:18px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:13px;font-weight:700;color:#2E3A48;display:flex;align-items:center;gap:6px}
+.req{color:var(--red)}
+.tag{padding:0 6px;border-radius:8px;background:var(--bluebg);color:var(--blue);font-size:10px;font-weight:800}
+.in{height:42px;display:flex;align-items:center;padding:0 12px;border:1px solid var(--fieldb);border-radius:8px;background:#fff;font-size:15px;font-weight:700;color:var(--navy);white-space:nowrap;overflow:hidden}
+.in.dpe{border-color:#9DBBE0;background:#F5F9FE}
+.in.empty{background:var(--orangebg);border:2px solid var(--orange);color:#8A94A3;font-weight:500}
+.in.sel{justify-content:space-between;background:var(--field);color:var(--txt);font-weight:600}
+.segs{display:grid;gap:8px}
+.seg{height:42px;border-radius:8px;font-size:14px;font-weight:600;border:1px solid var(--fieldb);background:var(--field);color:var(--txt);white-space:nowrap;padding:0 8px}
+.seg.on{border:0;background:var(--navy);color:#fff;font-weight:700}
+.aide{font-size:12px;color:var(--blue)}
+.alert{padding:9px 12px;background:var(--orangebg);border:1px solid var(--orange);border-radius:8px;font-size:13px;color:#6B3500}
+.ok{padding:9px 12px;background:var(--greenbg);border-radius:8px;font-size:14px;color:var(--green);font-weight:700}
+.box{padding:12px 14px;border-radius:10px}
+.aside{width:390px;flex-shrink:0;display:flex;flex-direction:column;background:var(--navy);color:#fff;border-radius:12px;overflow:hidden}
+.aside.mini{width:44px;align-items:center;padding-top:12px;cursor:pointer}
+.ah{padding:12px 16px 8px;border-bottom:1px solid #22426A}
+.ak{font-size:11px;font-weight:800;color:#9FB4CE;letter-spacing:.8px}
+.at{font-size:16px;font-weight:800}
+.ab{flex:1;padding:12px 16px;display:flex;flex-direction:column;gap:12px;overflow-y:auto}
+.quote{padding:10px 12px;background:#16365E;border-left:3px solid var(--red);border-radius:6px;font-size:14px;line-height:1.5}
+.aq{font-size:14px;font-weight:700}
+.ab .row{display:flex;gap:6px;margin-top:5px}
+.ab .row button{height:34px;padding:0 14px;border-radius:8px;font-size:13px;font-weight:700;border:1px solid #4A6A92;background:transparent;color:#fff}
+.ab .row button.on{border:0;background:#fff;color:var(--navy)}
+.ab .row button.warn{border:0;background:var(--orange);color:var(--txt)}
+.wbox{padding:10px 12px;background:#fff;color:var(--txt);border-radius:8px;font-size:13px;line-height:1.5}
+.af{padding:9px 16px;border-top:1px solid #22426A;font-size:12px;color:#9FB4CE}
+.pcard{display:flex;flex-direction:column;align-items:flex-start;gap:1px;padding:7px 10px;border-radius:10px;text-align:left;color:var(--txt);border:1px solid var(--fieldb);background:var(--field)}
+.pcard.on{border:3px solid var(--navy);background:#F5F9FE}
+.calc{display:flex;align-items:center;gap:10px;padding:8px 14px;border-radius:8px}
+.calc .s{width:14px;flex-shrink:0;font-size:15px;font-weight:800}
+.calc .l{flex:1;display:flex;flex-direction:column;min-width:0}
+.calc .l b{font-size:12px;white-space:nowrap}
+.calc .l i{font-style:normal;font-size:10px;color:var(--grey);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.calc .v{font-size:13px;font-weight:800;white-space:nowrap}
+.tile{display:flex;flex-direction:column;gap:1px;padding:6px 10px;border-radius:8px}
+.dire{display:flex;flex-direction:column;gap:4px;padding:10px 14px;background:#FFF8E1;border:2px solid #E0A800;border-radius:10px}
+.dire div{font-size:15px;line-height:1.3}
+.dire strong{color:var(--navy);font-weight:800}
+.chk{display:flex;align-items:flex-start;gap:10px;padding:9px 12px;background:#F7F8FA;border:1px solid var(--line);border-radius:10px;cursor:pointer}
+.chk input{width:20px;height:20px;margin-top:1px}
+.dpe{display:flex;align-items:center;gap:14px;padding:10px 14px;background:var(--bluebg);border:1px solid #9DBBE0;border-radius:10px}
+.dpe .cl{width:42px;height:42px;border-radius:8px;background:#B3261E;color:#fff;font-size:24px;font-weight:800;display:flex;align-items:center;justify-content:center}
+.demo{font-size:11px;font-weight:700;color:#8A94A3}
+.tbtn{height:42px;padding:0 10px;border-radius:8px;font-size:12px;font-weight:700;border:1px dashed var(--fieldb);background:#fff;color:var(--grey)}
+.tbtn.on{border:0;background:var(--grey);color:#fff}
+.stepper{display:flex;gap:6px}.stepper button{width:42px;height:42px;border-radius:8px;border:1px solid var(--fieldb);background:var(--field);font-size:20px;font-weight:800}
+.stepper .in{flex:1;justify-content:center;font-size:18px}
+</style>
+</head>
+<body>
+<div class="app" id="app"></div>
+<script>
+const S = {
+  step: 1,
+  s1: { q1: '', q2: '', q3: 'dec' },
+  s2: { usage: 'occ', situation: 'deja', travaux: 'non' },
+  s3: { e: 'Fioul', em: 'Radiateurs à eau', mat: 'Acier', ecs: 'La chaudière', cpt: 'Monophasé', u: 'an', connait: 'oui', reel: 4800 },
+  s4: { nb: 3, rfr: 30000 },
+  s5: { svc: 'seul', ballon: false, emp: 'Pièce non chauffée > 15 m²' },
+  s6: { pac: 1, mpr: 'att', pay: 'cash', split: false },
+  aside: true, _asideTouched: false
+};
+const LABELS = ['Contact', 'Logement', 'Chauffage', 'Foyer', 'Besoin', 'Proposition'];
+const nb = (x, d) => x.toLocaleString('fr-FR', { minimumFractionDigits: d ? 2 : 0, maximumFractionDigits: d ? 2 : 0 }).replace(/[\u202f\u2009]/g, '\u00a0');
+const fr = (x) => nb(x, x % 1 !== 0) + '\u00a0€';
+const e0 = (x) => nb(Math.round(x), false) + '\u00a0€';
+const esc = (t) => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+const T = (t) => ' <span class="tag">' + t + '</span>';
+const R = ' <span class="req">*</span>';
+const SEP = '<div class="sep"></div>';
+const KA = '', KP = '', KE = '';
+const LEGEND = '<div class="legend"><span class="hl"></span><span>Encadré jaune = <b>ce champ change le prix pour le client</b> (aides, reste à charge ou économies). Vérifiez-le deux fois.</span></div>';
+function fieldI(lab, val, cls, tags) { return '<div class="f imp"><div class="lab">' + lab + (tags || '') + '</div><div class="in ' + (cls || '') + '">' + val + '</div></div>'; }
+
+function seg(key, sub, list, cols, labels) {
+  return '<div class="segs" style="grid-template-columns:repeat(' + (cols || list.length) + ',minmax(0,1fr))">' +
+    list.map((v, i) => '<button class="seg' + (String(S[key][sub]) === String(v) ? ' on' : '') + '" data-set="' + key + '.' + sub + '" data-val="' + esc(v) + '">' + esc(labels ? labels[i] : v) + '</button>').join('') + '</div>';
+}
+function field(lab, val, cls, tags) {
+  return '<div class="f"><div class="lab">' + lab + (tags || '') + '</div><div class="in ' + (cls || '') + '">' + val + '</div></div>';
+}
+function aside(n, title, inner) {
+  if (!S.aside) return '<div class="aside mini" data-act="aside" title="Ouvrir l\'accompagnateur"><span style="font-size:16px">◂</span><span style="writing-mode:vertical-rl;transform:rotate(180deg);font-size:12px;font-weight:800;letter-spacing:1px;margin-top:10px">ACCOMPAGNATEUR D\'APPEL</span></div>';
+  return '<div class="aside"><div class="ah" style="display:flex;justify-content:space-between;align-items:flex-start"><div><div class="ak">ACCOMPAGNATEUR D\'APPEL · ÉTAPE ' + n + '</div><div class="at">' + title + '</div></div><button data-act="aside" title="Replier" style="background:transparent;border:1px solid #4A6A92;color:#fff;border-radius:6px;height:26px;width:26px">▸</button></div><div class="ab" data-scroll="aside">' + inner + '</div><div class="af">Textes modifiables dans Admin → Script d\'appel.</div></div>';
+}
+const ph = (list) => list.map((q) => '<div class="aq">' + q + '</div>').join('');
+const card = (n, title, inner, prev, next) => '<div class="card"><div class="ch"><div class="kicker">ÉTAPE ' + n + ' SUR 6</div><div class="title">' + title + '</div></div><div class="cb" data-scroll="cb' + n + '">' + (n > 1 ? LEGEND : '') + inner + '</div><div class="cf">' +
+  (prev ? '<button class="prev" data-go="' + (n - 1) + '">← ' + prev + '</button>' : '<button class="prev" disabled style="opacity:.4">← Précédent</button>') + '<div class="sp"></div>' +
+  (next ? '<button class="next" data-go="' + (n + 1) + '">Suivant : ' + next + ' →</button>' : '') + '</div></div>';
+
+/* ---------- ÉTAPE 1 ---------- */
+function step1() {
+  const a = S.s1;
+  const b = (k, v, lab, warn) => '<button class="' + (a[k] === v ? (warn ? 'warn' : 'on') : '') + '" data-set="s1.' + k + '" data-val="' + v + '">' + lab + '</button>';
+  const inner = '<div class="g g2">' +
+    '<div class="f"><div class="lab">Civilité' + T('devis') + '</div><div class="segs" style="grid-template-columns:1fr 1fr"><button class="seg on">Mme</button><button class="seg">M.</button></div></div>' +
+    field('Nom' + T('devis'), 'LEFEBVRE-DUCHEMIN') + field('Prénom' + T('devis'), 'Marine') + field('Téléphone' + T('devis'), '06 35 27 43 07') +
+    field('E-mail' + T('devis'), 'marine.lefebvre@orange.fr') + field('Provenance', 'Facebook ▾', 'sel') + '</div>';
+  let side = '<div class="quote">« Bonjour Madame Lefebvre-Duchemin, [votre prénom] de la société Hexa-Rénov\'. Je vous contacte car nous avons reçu de votre part une demande pour un projet d\'installation de pompe à chaleur air-eau. »</div>' +
+    '<div><div class="aq">1. Êtes-vous bien à l\'origine de cette demande ?</div><div class="row">' + b('q1', 'oui', 'Oui') + b('q1', 'non', 'Non', true) + '</div>' + (a.q1 === 'non' ? '<div style="font-size:12px;color:#FFC9A8;margin-top:4px">S\'excuser et clôturer : Fin d\'appel → statut « Erreur ».</div>' : '') + '</div>' +
+    '<div><div class="aq">2. Avez-vous un moment pour mieux comprendre votre projet ?</div><div class="row">' + b('q2', 'oui', 'Oui') + b('q2', 'non', 'Non, rappeler', true) + '</div>' + (a.q2 === 'non' ? '<div style="font-size:12px;color:#FFC9A8;margin-top:4px">« Quand puis-je vous rappeler ? » → Fin d\'appel → programmer le rappel.</div>' : '') + '</div>' +
+    '<div><div class="aq">3. Où en êtes-vous dans votre projet ?</div><div class="row">' + b('q3', 'dec', 'Découverte') + b('q3', 'pre', 'Sait ce qu\'il veut') + '</div></div>';
+  side += a.q3 === 'dec' ? '<div class="wbox"><b style="color:var(--red)">À EXPLIQUER :</b> [votre texte]</div>' : '<div class="wbox"><b style="color:var(--red)">À DEMANDER :</b> [votre texte]</div>';
+  return card(1, 'Contact', inner, null, 'Logement') + aside(1, 'Prise de contact', side);
+}
+
+/* ---------- ÉTAPE 2 ---------- */
+function step2() {
+  const a = S.s2; const tr = a.travaux === 'oui';
+  const iso = (lab, v) => field(lab, tr ? v + ' ▾' : v, tr ? 'empty' : 'dpe', tr ? '' : T('DPE'));
+  const inner =
+    '<div class="sec">1 · ADRESSE</div><div class="g g3"><div style="grid-column:span 2">' + field('Adresse du logement' + T('devis'), '12 rue de l\'Église') + '</div>' + field('Code postal · Ville' + T('devis') + KA + KP, '53000 Laval') + '</div>' +
+    '<div class="dpe"><div class="cl">G</div><div style="flex:1"><div style="font-size:15px;font-weight:800;color:var(--navy)">DPE officiel trouvé pour ce logement</div><div style="font-size:13px;color:var(--blue)">N° <b>2253E1234567X</b> · établi le <b>12/03/2022</b> · valide · conso 462 kWh/m²/an</div></div><a href="#" data-act="noop" style="font-size:12px;font-weight:700;color:var(--blue)">Pas le bon logement ?</a></div>' +
+    SEP + '<div class="sec blue">2 · LE LOGEMENT — PRÉ-REMPLI PAR LE DPE, À CONFIRMER AVEC LE CLIENT</div><div class="g" style="grid-template-columns:1.3fr 1fr 1fr 1fr">' +
+    '<div class="f"><div class="lab">Type' + T('devis') + KA + '</div><div class="segs" style="grid-template-columns:1fr 1fr"><button class="seg on">Maison</button><button class="seg">Appart.</button></div></div>' +
+    field('Surface habitable', '103 m²', 'dpe', T('DPE')) + fieldI('Surface chauffée', '93 m²', '', KA + KP) + field('Année', '1948', 'dpe', T('DPE') + KA) + '</div>' +
+    '<div class="g" style="grid-template-columns:1.3fr 1fr 2fr">' + field('Hauteur plafond', '2,5 m', 'dpe', T('DPE') + KP) + '<div></div>' + field('Valeur estimée du bien', '190 000 €', 'dpe', T('auto') + KE) + '</div>' +
+    '<div class="aide">Surface chauffée : 90 % de la surface habitable par défaut (sans garage ni combles) — à corriger si le client chauffe moins de pièces. Valeur du bien : estimation automatique, sert au calcul du retour sur investissement.</div>' +
+    SEP + '<div class="sec">3 · SITUATION DU CLIENT</div><div class="g g3">' +
+    '<div class="f"><div class="lab">Le client est' + KA + '</div>' + seg('s2', 'usage', ['occ', 'bail'], 2, ['Occupant', 'Bailleur']) + '</div>' +
+    '<div class="f"><div class="lab">Situation</div>' + seg('s2', 'situation', ['deja', 'achat'], 2, ['Propriétaire', 'Achat en cours']) + '</div>' +
+    (a.situation === 'achat' ? '<div class="f"><div class="lab" style="color:#6B3500">Date d\'acquisition prévue</div><div class="in empty">jj/mm/aaaa</div></div>' : '') + '</div>' +
+    (a.usage === 'bail' ? '<div class="g" style="grid-template-columns:2fr 1fr;padding:10px;background:var(--orangebg);border:1px solid var(--orange);border-radius:8px"><div class="f"><div class="lab" style="color:#6B3500">↳ Adresse du propriétaire' + T('devis') + '</div><div class="in empty">à saisir</div></div><div class="f"><div class="lab" style="color:#6B3500">↳ CP · Ville du propriétaire</div><div class="in empty">à saisir</div></div></div>' : '') +
+    SEP + '<div class="sec">4 · ISOLATION ' + KP + '</div>' +
+    '<div class="g" style="grid-template-columns:1.6fr 1fr 1fr 1fr">' +
+    '<div class="f"><div class="lab">Travaux d\'isolation depuis le DPE ?</div>' + seg('s2', 'travaux', ['non', 'oui'], 2, ['Non', 'Oui']) + '</div>' +
+    iso('Toit / combles', 'Bien isolé') + iso('Murs', 'Non isolé') + iso('Fenêtres', 'Simple vitrage') + '</div>' +
+    '<div class="aide">' + (tr ? 'Le client a fait des travaux : demandez l\'état actuel du toit, des murs et des fenêtres, et corrigez.' : 'Pré-rempli d\'après le DPE du 12/03/2022. Si le client n\'a rien fait depuis, rien à changer.') + '</div>' +
+    '<a href="#" data-act="noop" style="font-size:13px;font-weight:700;color:var(--blue)">▸ Données techniques automatiques (zone, altitude, niveaux, parcelle, copropriété…)</a>';
+  const side = '<div class="quote">[Votre texte d\'introduction de l\'étape]</div>' + ph(['[Question — adresse du logement]', '[Question — vous êtes propriétaire et vous y habitez ?]']) +
+    '<div class="wbox"><b style="color:var(--red)">À VÉRIFIER (DPE du 12/03/2022) :</b> « Depuis 2022, avez-vous fait des travaux d\'isolation : toit, murs ou fenêtres ? » → répondre dans le bloc 4.</div>' +
+    '<div class="wbox"><b style="color:var(--red)">DPE classé G :</b> [votre argument]</div>';
+  return card(2, 'Logement', inner, 'Contact', 'Chauffage') + aside(2, 'Le logement', side);
+}
+
+/* ---------- ÉTAPE 3 ---------- */
+function facture() {
+  const a = S.s3;
+  const theo = 4150, estim = 3900;
+  if (a.connait === 'oui') return { v: a.reel, src: 'Réel', txt: 'donnée par le client' };
+  return { v: theo, src: 'Théorique DPE', txt: 'le client ne connaît pas sa facture : on retient le DPE (sinon l\'estimation du CRM)' };
+}
+function step3() {
+  const a = S.s3; const elec = a.e === 'Électricité'; const an = a.u === 'an'; const f = facture();
+  const lbl = elec ? 'Facture d\'électricité totale' : 'Facture de ' + (a.e === 'Gaz' ? 'gaz' : a.e === 'Fioul' ? 'fioul' : 'chauffage');
+  const kn = a.connait === 'oui';
+  const inner =
+    '<div class="sec">1 · COMMENT LE CLIENT SE CHAUFFE</div>' +
+    '<div class="f imp"><div class="lab">Énergie de chauffage' + R + T('DPE') + KA + KE + '</div>' + seg('s3', 'e', ['Fioul', 'Gaz', 'Électricité', 'Bois / granulés', 'PAC']) + '</div>' +
+    '<div class="g" style="grid-template-columns:3fr 2fr"><div class="f"><div class="lab">Radiateurs / émetteurs' + R + KP + KA + '</div>' + seg('s3', 'em', ['Radiateurs à eau', 'Plancher chauffant', 'Convecteurs élec.']) +
+    (a.em === 'Convecteurs élec.' ? '<div class="alert">Sans radiateurs à eau, il faut créer un circuit de chauffage : à signaler au technicien.</div>' : '') + '</div>' +
+    (a.em === 'Radiateurs à eau' ? '<div class="f"><div class="lab">Les radiateurs sont en</div>' + seg('s3', 'mat', ['Fonte', 'Acier', 'Basse temp.']) + '</div>' : '<div></div>') + '</div>' +
+    '<div class="f" style="max-width:62%"><div class="lab">L\'eau chaude est faite par' + KE + '</div>' + seg('s3', 'ecs', ['La chaudière', 'Un ballon électrique', 'Autre']) + '</div>' +
+    SEP + '<div class="sec">2 · CE QU\'IL PAIE AUJOURD\'HUI' + KE + '</div>' +
+    '<div class="g" style="grid-template-columns:1.2fr 2fr"><div class="f"><div class="lab">Le client connaît sa facture ' + (elec ? 'd\'électricité' : 'de ' + (a.e === 'Gaz' ? 'gaz' : 'fioul')) + ' ?</div>' + seg('s3', 'connait', ['oui', 'non'], 2, ['Oui', 'Non']) + '</div>' +
+    (kn ? '<div class="f"><div class="lab">' + lbl + ' (réelle)' + R + '</div><div style="display:flex;gap:6px"><div class="in" style="flex:1;font-size:16px;font-weight:800">' + (an ? e0(a.reel) : e0(a.reel / 12)) + '</div><div style="display:flex;border:1px solid var(--fieldb);border-radius:8px;overflow:hidden"><button class="seg' + (an ? ' on' : '') + '" style="border-radius:0;border:0" data-set="s3.u" data-val="an">€/an</button><button class="seg' + (an ? '' : ' on') + '" style="border-radius:0;border:0" data-set="s3.u" data-val="mois">€/mois</button></div></div></div>'
+        : '<div class="g g2" style="gap:8px"><div class="opt on"><span style="font-size:12px;font-weight:700;color:var(--green)">Théorique DPE · retenu</span><span style="font-size:17px;font-weight:800;color:var(--navy)">4 150 €/an</span></div><div class="opt"><span style="font-size:12px;font-weight:700;color:var(--grey)">Estimation CRM (si pas de DPE)</span><span style="font-size:17px;font-weight:800;color:var(--grey)">3 900 €/an</span><span style="font-size:11px;color:var(--grey)">103 m² · fioul · 3 personnes</span></div></div>') + '</div>' +
+    '<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--greenbg);border-radius:8px;font-size:13px"><b style="color:var(--green)">Montant retenu pour le calcul :</b><b style="font-size:15px;color:var(--navy)">' + e0(f.v) + '/an</b><span style="padding:1px 8px;border-radius:10px;background:#fff;color:var(--green);font-weight:800;font-size:11px">' + f.src + '</span>' + (elec ? '<span style="color:var(--grey)">~44 €/mois hors chauffage retirés</span>' : '') + '</div>' +
+    '<div class="aide">Priorité : facture réelle du client › DPE / audit › estimation du CRM. Le calcul n\'est jamais bloqué.</div>' +
+    SEP + '<div class="sec">3 · COMPTEUR ÉLECTRIQUE</div><div class="g g3"><div class="f" style="grid-column:span 2"><div class="lab">Type de compteur' + R + T('devis') + '</div>' + seg('s3', 'cpt', ['Monophasé', 'Triphasé', 'Ne sait pas']) + '</div>' + field('Puissance du compteur', '9 kVA <span>▾</span>', 'sel') + '</div>';
+  const side = '<div class="quote">[Votre texte d\'introduction de l\'étape]</div>' + ph(['[Question — comment vous chauffez-vous ?]', '[Question — vos radiateurs sont en quoi ?]', '[Question — et votre eau chaude ?]', '[Question — connaissez-vous votre facture annuelle ?]']) + '<div class="wbox"><b style="color:var(--red)">Si fioul ou gaz :</b> [votre argument]</div>';
+  return card(3, 'Chauffage actuel', inner, 'Logement', 'Foyer') + aside(3, 'Le chauffage', side);
+}
+
+/* ---------- ÉTAPE 4 ---------- */
+const PLAF = { TMO: [17173, 25115, 30206, 35285, 40388], MO: [22015, 32197, 38719, 45234, 51775], INT: [30844, 45340, 54592, 63844, 73098] };
+const CATS = {
+  TMO: { lab: 'Très modestes', bg: '#DCE8FB', fg: '#1D4F8C', mpr: 5000, cee: 5800, pct: 0.9, ceeLab: 'Grand précaire' },
+  MO: { lab: 'Modestes', bg: '#FFF1B8', fg: '#7A5A00', mpr: 4000, cee: 5000, pct: 0.75, ceeLab: 'Précaire' },
+  INT: { lab: 'Intermédiaires', bg: '#EADCF8', fg: '#5B2A86', mpr: 3000, cee: 3000, pct: 0.6, ceeLab: 'Classique' },
+  SUP: { lab: 'Supérieurs', bg: '#FBDCE8', fg: '#8A1F4B', mpr: 0, cee: 3000, pct: 1, ceeLab: 'Classique' }
+};
+function cat() {
+  const i = Math.min(S.s4.nb, 5) - 1; const extra = Math.max(0, S.s4.nb - 5);
+  const lim = (k) => PLAF[k][i] + extra * (k === 'TMO' ? 5094 : k === 'MO' ? 6525 : 9254);
+  const r = S.s4.rfr;
+  return r <= lim('TMO') ? 'TMO' : r <= lim('MO') ? 'MO' : r <= lim('INT') ? 'INT' : 'SUP';
+}
+function step4() {
+  const a = S.s4; const k = cat(); const c = CATS[k]; const tot = c.mpr + c.cee;
+  const chips = Object.keys(CATS).map((x) => '<span class="cat' + (x === k ? ' on' : '') + '" style="background:' + CATS[x].bg + ';color:' + CATS[x].fg + '">' + CATS[x].lab + '</span>').join('');
+  const inner =
+    '<div class="sec">1 · LE FOYER</div><div class="g g3"><div class="f imp"><div class="lab">Personnes au foyer' + R + KA + KE + '</div><div class="stepper"><button data-act="nb-">−</button><div class="in">' + a.nb + '</div><button data-act="nb+">+</button></div></div>' +
+    '<div class="f"><div class="lab">Revenu fiscal de référence' + R + KA + '</div><input data-num="s4.rfr" value="' + nb(a.rfr) + '" inputmode="numeric" style="box-shadow:0 0 0 4px #FFE08A;height:42px;padding:0 12px;border:1px solid var(--fieldb);border-radius:8px;font:inherit;font-size:16px;font-weight:800;color:var(--navy)"></div>' +
+    '<div class="aide" style="align-self:end;padding-bottom:6px">Où le trouver : <b>dernier avis d\'impôt</b>, tout en bas de la <b>1re page</b>, en gras.</div></div>' +
+    '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span style="font-size:12px;font-weight:700;color:var(--grey)">Catégorie (calculée automatiquement) :</span>' + chips + '</div>' +
+    SEP + '<div class="box" style="background:#F2F8F4;border:2px solid var(--green);display:flex;flex-direction:column;gap:10px"><div style="display:flex;justify-content:space-between;align-items:center"><span class="sec" style="color:var(--green)">2 · LES AIDES AUXQUELLES LE CLIENT A DROIT</span><span style="padding:3px 10px;border-radius:12px;background:' + c.bg + ';color:' + c.fg + ';font-size:12px;font-weight:800">Revenus ' + c.lab.toLowerCase() + ' · CEE ' + c.ceeLab + '</span></div>' +
+    '<div style="display:flex;align-items:baseline;gap:12px"><span style="font-size:15px;font-weight:700">Jusqu\'à</span><span style="font-size:36px;font-weight:800;color:var(--green);line-height:1">' + e0(tot) + '</span><span style="font-size:15px;font-weight:700">d\'aides pour une PAC air-eau</span></div>' +
+    '<div class="g g2"><div style="display:flex;justify-content:space-between;align-items:center;padding:9px 14px;background:#fff;border-radius:8px"><b>MaPrimeRénov\'</b><span style="font-size:19px;font-weight:800;color:var(--navy)">' + e0(c.mpr) + '</span></div><div style="display:flex;justify-content:space-between;align-items:center;padding:9px 14px;background:#fff;border-radius:8px"><b>Prime CEE</b><span style="font-size:19px;font-weight:800;color:var(--navy)">' + e0(c.cee) + '</span></div></div>' +
+    '<div style="padding:9px 14px;background:#fff;border-left:4px solid var(--green);border-radius:6px;font-size:14px;font-style:italic">À dire : « Compte tenu de votre situation, vous avez droit à ' + e0(tot) + ' d\'aides : ' + e0(c.mpr) + ' de MaPrimeRénov\' et ' + e0(c.cee) + ' de prime CEE. »</div>' +
+    '<div style="font-size:11px;color:var(--grey)">Maquette : montants d\'exemple. Dans l\'app : calcul existant du CRM (barèmes de l\'admin ; CEE selon catégorie, surface chauffée et zone).</div></div>' +
+    (k === 'SUP' ? '<div class="alert"><b>POINT D\'ATTENTION :</b> revenus supérieurs : pas de MaPrimeRénov\' pour une PAC air-eau, seule la prime CEE s\'applique. Le projet reste possible.</div>' : '');
+  const side = '<div class="quote">[Votre texte d\'introduction de l\'étape]</div>' + ph(['[Question — combien êtes-vous dans le foyer ?]', '[Question — votre revenu fiscal de référence ?]']) + '<div class="wbox"><b style="color:var(--red)">Si le client hésite :</b> [votre texte]</div>';
+  return card(4, 'Foyer et revenus', inner, 'Chauffage', 'Besoin') + aside(4, 'Le foyer', side);
+}
+
+/* ---------- ÉTAPE 5 ---------- */
+const EMP = { 'Pièce non chauffée > 15 m²': 'Compact', 'Petite pièce + gaines': 'Compact gainable', 'Pas de place, mur extérieur': 'Split' };
+function step5() {
+  const a = S.s5; const ecsChaud = S.s3.ecs === 'La chaudière';
+  const cardv = (v, t, d) => '<button class="pcard' + (a.svc === v ? ' on' : '') + '" data-set="s5.svc" data-val="' + v + '" style="padding:16px;gap:6px;min-height:96px"><span style="font-size:17px;font-weight:800">' + t + '</span><span style="font-size:13px;color:#3A4656">' + d + '</span></button>';
+  let inner = '<div class="sec">1 · QUE DOIT FAIRE LA POMPE À CHALEUR ?' + KE + '</div><div class="g g2" style="align-items:stretch">' +
+    cardv('seul', 'Chauffage seul', 'La PAC chauffe la maison. L\'eau chaude reste à prévoir à part.') +
+    cardv('duo', 'Chauffage + eau chaude', 'Modèle DUO : il fait aussi l\'eau chaude. Même aides, prix plus élevé (≈ +1 500 €).') + '</div>';
+  if (a.svc === 'seul') {
+    if (ecsChaud) inner += '<div class="alert">L\'eau chaude est faite par la chaudière qui va être déposée : il faudra une solution (PAC DUO ou ballon).</div>';
+    inner += SEP + '<div class="sec">2 · BALLON THERMODYNAMIQUE' + KE + ' <span style="font-weight:600;color:#8A94A3">· option, sans aide MaPrimeRénov\' · prix du catalogue admin</span></div><div class="g g3"><div class="f"><div class="lab">Ajouter un ballon ?</div><div class="segs" style="grid-template-columns:1fr 1fr"><button class="seg' + (!a.ballon ? ' on' : '') + '" data-set="s5.ballon" data-val="0">Non</button><button class="seg' + (a.ballon ? ' on' : '') + '" data-set="s5.ballon" data-val="1">Oui · 2 110 €</button></div></div>' +
+      (a.ballon ? '<div class="f" style="grid-column:span 2"><div class="lab">Où sera-t-il installé ?' + R + '</div>' + seg('s5', 'emp', Object.keys(EMP)) + '<div class="aide">Type recommandé : <b>' + EMP[a.emp] + '</b>.</div></div>' : '') + '</div>';
+  } else inner += '<div class="ok">L\'eau chaude est assurée par la PAC DUO. Rien à ajouter.</div>';
+  const side = '<div class="quote">[Votre texte d\'introduction de l\'étape]</div>' + ph(['[Question — voulez-vous que la PAC fasse aussi l\'eau chaude ?]']) + '<div class="wbox"><b style="color:var(--red)">Si la chaudière fait l\'eau chaude :</b> [votre argument]</div>';
+  return card(5, 'Besoin du client', inner, 'Foyer', 'Proposition') + aside(5, 'Le besoin', side);
+}
+
+/* ---------- ÉTAPE 6 ---------- */
+function step6() {
+  const a = S.s6; const duo = S.s5.svc === 'duo'; const C = CATS[cat()];
+  const P = [
+    { g: 'ESSENTIEL', n: duo ? 'Ariston Nimbus Duo 14' : 'Ariston Nimbus 14', pn: duo ? 14490 : 12990, c: '#5A6675' },
+    { g: 'RECOMMANDÉ', n: duo ? 'Atlantic Alféa Excellia S Duo 14' : 'Atlantic Alféa Excellia S 14', pn: duo ? 16584 : 15084, c: '#D7263D' },
+    { g: 'CONFORT +', n: duo ? 'Daikin Altherma 3 Duo 14' : 'Daikin Altherma 3 14', pn: duo ? 18990 : 17490, c: '#5A6675' }
+  ];
+  const ballonN = (!duo && S.s5.ballon) ? 2110 : 0;
+  const prixN = P[a.pac].pn;
+  const plafond = Math.round(C.pct * Math.min(prixN, 12000));
+  const mpr = Math.min(C.mpr, Math.max(0, plafond - C.cee)); const cee = C.pct === 1 ? C.cee : Math.min(C.cee, plafond);
+  const rac = prixN + ballonN - cee - mpr;
+  const sans = a.mpr === 'sans' && mpr > 0;
+  const total = sans ? rac + mpr : rac;
+  const pay = a.pay, split = sans && pay !== 'cash' && a.split;
+  const finance = pay === 'cash' ? 0 : (split ? rac : total);
+  const cashPart = total - finance;
+  const r = pay === 'ct' ? 0.059 : 0, n = pay === 'ct' ? 156 : (pay === 'ptz' ? 180 : 0);
+  const m = finance ? Math.round((r === 0 ? finance / n : finance * (r / 12) / (1 - Math.pow(1 + r / 12, -n))) * 100) / 100 : 0;
+  const coutN = cashPart + m * n - (sans ? mpr : 0);
+  const avant = facture().v / 12, apres = 135;
+  const eco = Math.round(avant - (apres + m));
+  let eco20 = 0; for (let y = 0; y < 20; y++) eco20 += avant * 12 * Math.pow(1.04, y) - apres * 12 * Math.pow(1.03, y); eco20 -= coutN;
+  const ctPart = pay === 'ct' ? finance : 0, ptzPart = pay === 'ptz' ? finance : 0;
+  const clientPays = total - ctPart;
+  const sig = Math.round(clientPays * 30) / 100, sol = Math.round((clientPays - sig) * 100) / 100;
+  const via = ptzPart > 0 ? (cashPart > 0 ? 'poche + Éco-PTZ' : 'avec son Éco-PTZ') : 'de sa poche';
+  const prod = pay === 'ct' ? 'crédit travaux' : 'Éco-PTZ';
+  const net = cashPart - (sans ? mpr : 0);
+  const row = (sign, lab, exp, val, kind) => {
+    const tot = kind === 'tot', fin = kind === 'fin';
+    const bg = fin ? '#0A2A4F' : (tot ? '#DCE6F2' : (sign === '−' ? '#E6F4EC' : (sign === '+' ? '#FDECEC' : '#F4F6F9')));
+    const fg = fin ? '#FFFFFF' : (sign === '−' ? '#1F6B43' : (sign === '+' ? '#B3261E' : '#0A2A4F'));
+    const v = (sign === '−' || sign === '+') ? sign + ' ' + val : val;
+    return '<div class="calc" style="background:' + bg + '"><span class="l"><b style="color:' + (fin ? '#fff' : '#16202C') + ';font-weight:' + (tot || fin ? 800 : 700) + '">' + lab + '</b><i style="' + (fin ? 'color:#C9D6E8' : '') + '">' + exp + '</i></span><span class="v" style="color:' + fg + ';font-size:' + (fin ? '22px' : tot ? '19px' : (kind === 'key' ? '17px' : '14px')) + '">' + v + '</span></div>';
+  };
+  let compte = row('', 'Prix de la PAC posée', 'fournie et installée, TTC', e0(prixN));
+  if (ballonN) compte += row('+', 'Ballon thermodynamique', 'option, sans aide', e0(ballonN));
+  compte += row('−', 'Prime CEE', 'déduite par Hexa-Rénov\'', e0(cee));
+  if (mpr) compte += row('−', 'MaPrimeRénov\'', 'aide de l\'État', e0(mpr));
+  compte += row('=', 'Reste à charge', 'ce que la PAC coûte vraiment', e0(rac), 'tot');
+  let flux = '';
+  if (sans) flux += row('', 'Total à régler', 'reste à charge + avance MaPrimeRénov\' (' + e0(mpr) + ')', e0(total), 'tot');
+  if (clientPays > 0) flux += row('−', 'Client · à la signature', 'acompte 30 % (' + via + ')', e0(sig), 'key') + row('−', 'Client · avant fin de chantier', 'solde 70 % (' + via + ')', e0(sol));
+  if (ctPart > 0) flux += row('', 'Banque · à la fin des travaux', 'crédit affecté versé à Hexa-Rénov\'', e0(ctPart));
+  if (m) flux += row('−', 'Le client rembourse', prod + ' · ' + (n / 12) + ' ans', fr(m) + '/mois');
+  if (sans) flux += row('+', 'Il récupère', 'MaPrimeRénov\' sur son compte bancaire', e0(mpr));
+  flux += row('', 'Coût final pour le client', pay === 'ct' ? 'intérêts du crédit compris' : 'sans intérêts', e0(coutN), 'fin');
+
+  const B = (t) => '<strong>' + t + '</strong>';
+  const L = [];
+  L.push(sans ? B('Travaux tout de suite') + '.' : (mpr ? 'Il ' + B('attend MaPrimeRénov\'') + ' (environ 5 mois).' : 'Travaux dès l\'accord.'));
+  if (pay === 'cash') L.push('Il paie ' + B(e0(total)) + ' ' + B('comptant') + '.');
+  else if (pay === 'ptz') L.push('Sa banque lui prête ' + B(e0(finance)) + ' en ' + B('Éco-PTZ') + ' : il rembourse ' + B(fr(m) + '/mois') + ' pendant ' + B((n / 12) + ' ans') + '.');
+  else L.push('La banque paie ' + B(e0(finance)) + ' en ' + B('crédit') + ' : il rembourse ' + B(fr(m) + '/mois') + ' pendant ' + B((n / 12) + ' ans') + '.');
+  if (clientPays > 0) L.push('Il verse ' + B(e0(sig)) + ' à la signature, puis ' + B(e0(sol)) + ' avant la fin du chantier.');
+  if (sans) L.push(B(e0(mpr)) + ' versés sur ' + B('son compte bancaire') + ' après les travaux.');
+  L.push('Coût final : ' + B(e0(coutN)) + ' · Économie : ' + B(eco + ' €/mois'));
+
+  const pcard = (x, i) => '<button class="pcard' + (a.pac === i ? ' on' : '') + '" data-set="s6.pac" data-val="' + i + '"><span style="font-size:11px;font-weight:800;color:' + x.c + '">' + x.g + '</span><span style="font-size:13px;font-weight:800">' + x.n + '</span><span style="font-size:15px;font-weight:800;color:var(--navy)">' + e0(x.pn) + ' TTC</span></button>';
+  const payc = (k, t, s) => '<button class="pcard' + (pay === k ? ' on' : '') + '" data-set="s6.pay" data-val="' + k + '"><span style="font-size:14px;font-weight:800">' + t + '</span><span style="font-size:11px;color:#3A4656">' + s + '</span></button>';
+  const left = '<div data-scroll="l6" style="width:54%;flex-shrink:0;display:flex;flex-direction:column;gap:12px;padding:14px 20px;border-right:1px solid #EEF0F3;overflow-y:auto">' +
+    '<div style="display:flex;align-items:baseline;gap:10px"><span class="kicker">ÉTAPE 6 SUR 6</span><span style="font-size:20px;font-weight:800;color:var(--navy)">Proposition</span></div>' +
+    LEGEND + '<div class="sec">1 · LA POMPE À CHALEUR' + KA + KE + ' <span style="font-weight:600;color:#8A94A3">· puissance nécessaire 13,2 kW' + (duo ? ' · modèles DUO' : '') + '</span></div><div class="g g3" style="gap:8px;align-items:stretch">' + P.map(pcard).join('') + '</div>' + SEP +
+    '<div class="sec">2 · LE CLIENT ATTEND-IL L\'ACCORD MAPRIMERÉNOV\' (~5 MOIS) ?' + KA + '</div>' + (mpr ? '<div class="g g2" style="gap:8px"><button class="seg' + (!sans ? ' on' : '') + '" data-set="s6.mpr" data-val="att">Oui, il attend</button><button class="seg' + (sans ? ' on' : '') + '" data-set="s6.mpr" data-val="sans">Non, travaux tout de suite</button></div>' : '<div class="aide">Pas de MaPrimeRénov\' pour ce foyer : question sans objet.</div>') + SEP +
+    '<div class="sec">3 · COMMENT PAIE-T-IL SES ' + e0(total).toUpperCase() + ' ?' + KE + '</div><div class="g g3" style="gap:8px;align-items:stretch">' + payc('cash', 'Comptant', 'il paie tout lui-même') + payc('ct', 'Crédit travaux', '5,9 % · 13 ans') + payc('ptz', 'Éco-PTZ', '0 % · 15 ans') + '</div>' +
+    (sans && pay !== 'cash' ? '<label class="chk"><input type="checkbox" data-toggle="s6.split"' + (a.split ? ' checked' : '') + '><span style="display:flex;flex-direction:column;gap:2px"><span style="font-size:14px;font-weight:800">Il paie l\'avance MaPrimeRénov\' (' + e0(mpr) + ') comptant</span><span style="font-size:12px;color:var(--grey)">et ne finance que son reste à charge (' + e0(rac) + '). Mensualité plus basse.</span></span></label>' : '') +
+    '<div class="dire"><span class="sec" style="color:#7A5A00">À DIRE AU CLIENT</span>' + L.map((x) => '<div>• ' + x + '</div>').join('') + '</div></div>';
+  const right = '<div style="flex:1;display:flex;flex-direction:column;min-width:0;background:#FAFBFC"><div data-scroll="r6" style="flex:1;display:flex;flex-direction:column;gap:8px;padding:10px 14px;overflow-y:auto">' +
+    '<div class="blk"><h4>① CE QUE ÇA COÛTE <span style="font-weight:600;color:#8A94A3;letter-spacing:0">· le calcul du reste à charge</span></h4>' + compte + '</div>' +
+    '<div class="blk"><h4>② QUI PAIE, ET QUAND <span style="font-weight:600;color:#8A94A3;letter-spacing:0">· pour le client : − ce qu\'il paie, + ce qu\'il récupère</span></h4>' + flux + '</div>' +
+    '<div class="g g3" style="gap:6px"><div class="tile" style="background:var(--greenbg)"><span style="font-size:11px;font-weight:700;color:var(--green)">Économie</span><span style="font-size:15px;font-weight:800;color:var(--green)">' + eco + ' €/mois</span><span style="font-size:10px;color:#3A4656">' + e0(avant) + ' → ' + e0(avant - eco) + '/mois</span></div>' +
+    '<div class="tile" style="background:var(--greenbg)"><span style="font-size:11px;font-weight:700;color:var(--green)">Sur 20 ans</span><span style="font-size:15px;font-weight:800;color:var(--green)">' + e0(eco20) + '</span><span style="font-size:10px;color:#3A4656">économisés</span></div>' +
+    '<div class="tile" style="background:var(--navy)"><span style="font-size:11px;font-weight:700;color:#9FB4CE">Rentabilité</span><span style="font-size:14px;font-weight:800;color:#fff">' + (net > 0 ? 'en ' + Math.ceil(net / (avant - apres)) + ' mois' : 'dès le 1er mois') + '</span><span style="font-size:10px;color:#9FB4CE">' + (net > 0 ? 'pour récupérer ' + e0(net) : 'moins cher qu\'aujourd\'hui') + '</span></div></div>' +
+    '<div style="font-size:10px;color:#8A94A3">Maquette : prix, aides, économies et rentabilité = exemples. Dans l\'app, calculs existants du CRM.</div>' +
+    '</div><div style="flex-shrink:0;display:grid;grid-template-columns:auto auto 1fr auto auto;gap:8px;align-items:center;padding:10px 14px;border-top:1px solid var(--line);background:#fff"><button class="prev" data-go="5" style="height:40px;font-size:13px;white-space:nowrap;padding:0 14px">← Besoin</button><button class="btn-s" style="border-color:var(--blue);color:var(--blue);height:40px;white-space:nowrap">Arguments</button><span></span><button class="btn-s red" style="height:40px;white-space:nowrap;padding:0 16px">Pré-devis</button><button class="btn-s fill" style="height:40px;white-space:nowrap;padding:0 18px">Voir le devis</button></div></div>';
+  return '<div class="card" style="flex-direction:row">' + left + right + '</div>' + aside(6, 'La proposition', '<div class="quote">[Votre texte de présentation de l\'offre]</div>' + ph(['[Objection — « c\'est trop cher »]', '[Objection — « je dois réfléchir »]']));
+}
+
+/* ---------- RENDU (sans rechargement, position conservée) ---------- */
+function render() {
+  const keep = {}; document.querySelectorAll('[data-scroll]').forEach((el) => { keep[el.dataset.scroll] = el.scrollTop; });
+  const active = document.activeElement && document.activeElement.dataset ? document.activeElement.dataset.num : null;
+  const st = S.step;
+  if (st === 6 && !S._asideTouched) S.aside = false;
+  if (st !== 6 && !S._asideTouched) S.aside = true;
+  const nav = LABELS.map((l, i) => { const n = i + 1; const cls = n === st ? 'cur' : (n < st ? 'done' : ''); return '<button class="' + cls + '" data-go="' + n + '"><span class="d">' + (n < st ? '✓' : n) + '</span>' + l + '</button>'; }).join('');
+  const views = [step1, step2, step3, step4, step5, step6];
+  document.getElementById('app').innerHTML =
+    '<div class="top"><span class="logo">Hexa-Rénov\'</span><span class="sp"></span><span style="font-size:11px;font-weight:700;color:#8A94A3;margin-right:8px">MAQUETTE DE TEST — rien n\'est enregistré</span><button class="btn-s">Script d\'appel</button><button class="btn-s fill">+ Nouveau</button></div>' +
+    '<div class="ident"><div><div style="display:flex;align-items:center;gap:10px"><span class="pr">PR-000177</span><span class="name">Mme Marine LEFEBVRE-DUCHEMIN</span></div><div class="sub"><span style="font-weight:700">06 35 27 43 07<button class="copy">copier</button></span><span>marine.lefebvre@orange.fr<button class="copy">copier</button></span><span style="font-weight:700">53000 Laval</span></div></div><span class="sp"></span>' +
+    '<button class="pill">Simu 7/9 · Devis 12/15 ▾</button><button class="q" title="Aide">?</button><button class="btn-s" style="border-color:#C9CFD8;color:var(--txt)">Suivi : Nouveau ▾</button><button class="btn-s red">Fin d\'appel</button>' +
+    '<button class="ned" style="border:1px solid #E7C95B;background:#FFF7D6;color:#6B5300">N</button><button class="ned" style="border:1px solid #9DBBE0;background:#EAF2FC;color:#1D4F8C">E</button><button class="ned" style="border:1px solid #9CCFB2;background:#E8F5EE;color:#1F6B43">D</button></div>' +
+    '<div class="nav">' + nav + '</div><div class="body">' + views[st - 1]() + '</div>';
+  document.querySelectorAll('[data-scroll]').forEach((el) => { if (keep[el.dataset.scroll] != null) el.scrollTop = keep[el.dataset.scroll]; });
+  if (active) { const el = document.querySelector('[data-num="' + active + '"]'); if (el) { el.focus(); const l = el.value.length; el.setSelectionRange(l, l); } }
+}
+document.addEventListener('click', (ev) => {
+  const t = ev.target.closest('[data-go],[data-set],[data-act]');
+  if (!t) return;
+  ev.preventDefault();
+  if (t.dataset.go) { S.step = +t.dataset.go; render(); document.querySelectorAll('[data-scroll]').forEach((el) => { if (el.dataset.scroll.startsWith('cb') || el.dataset.scroll.endsWith('6')) el.scrollTop = 0; }); return; }
+  if (t.dataset.set) {
+    const [k, sub] = t.dataset.set.split('.'); let v = t.dataset.val;
+    if (k === 's5' && sub === 'ballon') v = v === '1';
+    if (k === 's6' && sub === 'pac') v = +v;
+    S[k][sub] = v; render(); return;
+  }
+  const act = t.dataset.act;
+  if (act === 'aside') { S.aside = !S.aside; S._asideTouched = true; render(); }
+  if (act === 'nb-') { S.s4.nb = Math.max(1, S.s4.nb - 1); render(); }
+  if (act === 'nb+') { S.s4.nb += 1; render(); }
+});
+document.addEventListener('change', (ev) => {
+  const t = ev.target;
+  if (t.dataset && t.dataset.toggle) { const [k, sub] = t.dataset.toggle.split('.'); S[k][sub] = t.checked; render(); }
+});
+document.addEventListener('input', (ev) => {
+  const t = ev.target;
+  if (t.dataset && t.dataset.num) { const [k, sub] = t.dataset.num.split('.'); S[k][sub] = +String(t.value).replace(/\D/g, '') || 0; render(); }
+});
+render();
+
+</script>
+</body>
+</html>

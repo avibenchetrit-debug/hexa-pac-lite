@@ -14376,8 +14376,10 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
 
   // Format € avec séparateur de milliers (espace insécable)
   function eur(n){
-    return new Intl.NumberFormat('fr-FR',{style:'currency',currency:'EUR',maximumFractionDigits:0}).format(Math.round(n||0));
+    return new Intl.NumberFormat('fr-FR',{style:'currency',currency:'EUR',maximumFractionDigits:0}).format(Math.round(n||0)).replace(/[\u202f\u2009]/g, '\u00a0');
   }
+  // Lot 6 : nombre « 15 084 » (espace insécable normale U+00A0 ; U+202F n'est pas rendue par la police)
+  function nbFr(n){ return new Intl.NumberFormat('fr-FR').format(n || 0).replace(/[\u202f\u2009]/g, '\u00a0'); }
   function eurDash(n, enabled = true){
     return enabled ? eur(n) : '— €';
   }
@@ -15045,6 +15047,8 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     { value:'petite_piece_gaines', label:'Petite pièce mais gaines possibles vers l\'extérieur', type:'compact_gainable', typeLabel:'COMPACT GAINABLE' },
     { value:'pas_de_place', label:'Pas de place adaptée, mur donnant sur l\'extérieur', type:'split', typeLabel:'SPLIT' }
   ];
+  const EMPLACEMENT_COURT = { piece_non_chauffee: 'Pièce non chauffée > 15 m²', petite_piece_gaines: 'Petite pièce + gaines',
+                              pas_de_place: 'Pas de place, mur extérieur' };
   function ballonRecommandation(state){
     return BALLON_EMPLACEMENTS.find(e => e.value === state.ballon_emplacement) || null;
   }
@@ -15475,89 +15479,141 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     const anahLabel = LABELS_ANAH[c.categorie] || '';
     const ceeLabel = LABELS_CEE[c.categorie] || '';
 
-    // Lot 5 : le simulateur est rendu en morceaux, chacun dans son étape du parcours ; mêmes id
+    // Lot 6 : le simulateur est rendu en morceaux, chacun à sa place dans le parcours en 6 étapes ; mêmes id.
+    // Présentation seulement : tous les montants viennent de calcul() / roi() / echeancier().
     dernierCalcul = c;
-    const kw = Number(c.dim?.puissance_kw || 0).toFixed(1);
-    const badgeDpe = isoDpe ? ' <em class="p-badge-dpe">DPE</em>' : '';
-    const iso = `
-          <div class="p-encadre" id="sim-iso-encadre">
-            <h4 class="p-encadre-titre">Isolation du logement <i>(sert à calculer la puissance de la PAC)</i></h4>
-            <div class="l4s-ligne">
-              <label class="sim-field l4s-surf"><span>Surface chauffée</span>
-                <span class="sim-surf-wrap"><input type="number" id="sim-surf-chauffee" value="${state.surface_chauffee != null && state.surface_chauffee !== '' ? Math.round(state.surface_chauffee) : ''}" placeholder="—"><em>m²</em>
-                <button type="button" class="sim-info-btn" id="sim-surf-info" aria-label="Info surface">i</button></span>
-              </label>
-              ${isoDpe ? `<label class="l4s-verrou"><input type="checkbox" id="sim-iso-travaux" ${state.iso_deverrouille?'checked':''}> Travaux faits depuis le DPE</label>`
-                : `<span class="l4s-a-verifier" id="sim-iso-a-verifier" title="Isolation non reçue du DPE : à confirmer avec le client">Isolation à vérifier</span>`}
-            </div>
-            <div class="sim-ctx-sub" id="sim-surf-sub">${sousLigneSurface(c)}</div>
-            <div class="sim-info-pop" id="sim-info-pop" hidden>
-              Surface <b>habitable</b> ≠ surface <b>chauffée</b>. On retire les pièces non chauffées (WC, salle de bain si sèche-serviette <b>électrique</b>). Défaut = 90% de l'habitable, ajustable.
-            </div>
-            <div class="l4s-iso${verrou ? ' is-verrou' : ''}">
-              <label class="sim-field"><span>Toit / combles${badgeDpe}</span>
-                <select id="iso-toit" name="iso_toit" ${dis}>
-                  <option value="tres_bien" ${sel(state.iso_toit,'tres_bien')}>Très bien isolé</option>
-                  <option value="bien" ${sel(state.iso_toit,'bien')}>Bien isolé</option>
-                  <option value="isole" ${sel(state.iso_toit,'isole')}>Isolé</option>
-                  <option value="peu" ${sel(state.iso_toit,'peu')}>Peu isolé</option>
-                  <option value="non" ${sel(state.iso_toit,'non')}>Non isolé</option>
-                </select></label>
-              <label class="sim-field"><span>Murs${badgeDpe}</span>
-                <select id="iso-mur" name="iso_mur" ${dis}>
-                  <option value="tres_bien" ${sel(state.iso_mur,'tres_bien')}>Très bien isolé</option>
-                  <option value="bien" ${sel(state.iso_mur,'bien')}>Bien isolé</option>
-                  <option value="isole" ${sel(state.iso_mur,'isole')}>Isolé</option>
-                  <option value="peu" ${sel(state.iso_mur,'peu')}>Peu isolé</option>
-                  <option value="non" ${sel(state.iso_mur,'non')}>Non isolé</option>
-                </select></label>
-              <label class="sim-field"><span>Fenêtres${badgeDpe}</span>
-                <select id="iso-menuiserie" name="iso_menuiserie" ${dis}>
-                  <option value="double" ${sel(state.iso_menuiserie,'double')}>Double vitrage</option>
-                  <option value="sur_vitrage" ${sel(state.iso_menuiserie,'sur_vitrage')}>Survitrage</option>
-                  <option value="simple" ${sel(state.iso_menuiserie,'simple')}>Simple vitrage</option>
-                </select></label>
-            </div>
-            <div class="l4-aide">Surface chauffée : 90 % de la surface habitable (sans garage ni combles), à corriger si le client chauffe moins de pièces. ${isoDpe ? 'L\'isolation vient du DPE ; ne la changez que si des travaux ont été faits depuis.' : 'Pas de DPE reçu : demandez au client l\'état du toit, des murs et des fenêtres.'}</div>
+    const kw = Number(c.dim?.puissance_kw || 0).toFixed(1).replace('.', ',');
+    const escA = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    const opts = (liste, v) => liste.map(([val, lib]) => `<option value="${val}" ${sel(v, val)}>${lib}</option>`).join('');
+    const NIV_ISO = [['tres_bien', 'Très bien isolé'], ['bien', 'Bien isolé'], ['isole', 'Isolé'], ['peu', 'Peu isolé'], ['non', 'Non isolé']];
+    const VITRAGES = [['double', 'Double vitrage'], ['sur_vitrage', 'Survitrage'], ['simple', 'Simple vitrage']];
+
+    // --- étape 2 : surface chauffée (dans la grille « Le logement » de la fiche ; saisie sans name)
+    const scVal = state.surface_chauffee != null && state.surface_chauffee !== '' ? Math.round(state.surface_chauffee) : '';
+    const surface = `
+          <label class="p6-lab" for="sim-surf-chauffee"><span>Surface chauffée</span></label>
+          <div class="p6-unite"><input type="number" id="sim-surf-chauffee" value="${scVal}" placeholder="—"><em>m²</em>
+            <button type="button" class="sim-info-btn" id="sim-surf-info" aria-label="Info surface">i</button></div>
+          <div class="sim-ctx-sub" id="sim-surf-sub" hidden>${sousLigneSurface(c)}</div>
+          <div class="sim-info-pop" id="sim-info-pop" hidden>
+            Surface <b>habitable</b> ≠ surface <b>chauffée</b>. On retire les pièces non chauffées (WC, salle de bain si sèche-serviette <b>électrique</b>). Défaut = 90% de l'habitable, ajustable.
           </div>`;
+
+    // --- étape 2, bloc 4 : isolation (« Travaux d'isolation depuis le DPE ? » remplace la case à cocher)
+    const travaux = !!state.iso_deverrouille;
+    const dateDpe = typeof window.hexaL6DateDpe === 'function' ? window.hexaL6DateDpe() : '';
+    const isoSel = (id, name, lib, liste, v) => `
+            <div class="p6-f"><label class="p6-lab" for="${id}"><span>${lib}</span>${verrou ? '<span class="p6-tag">DPE</span>' : ''}</label>
+              <select id="${id}" name="${name}" class="p6-in${verrou ? ' p6-in--dpe' : (isoDpe ? ' p6-in--travaux' : '')}" ${dis}>${opts(liste, v)}</select></div>`;
+    const iso = `
+          <div class="p6-sep"></div>
+          <div class="p6-sec">4 · ISOLATION</div>
+          <div class="p6-g p6-g-iso" id="sim-iso-encadre">
+            <div class="p6-f">${isoDpe ? `
+              <div class="p6-lab"><span>Travaux d'isolation depuis le DPE ?</span></div>
+              <div class="p6-segs p6-segs-2"><button type="button" class="p6-seg${travaux ? '' : ' on'}" data-iso-travaux="non">Non</button><button type="button" class="p6-seg${travaux ? ' on' : ''}" data-iso-travaux="oui">Oui</button></div>
+              <input type="checkbox" id="sim-iso-travaux" class="l4-cache" tabindex="-1" aria-hidden="true" ${travaux ? 'checked' : ''}>` : `
+              <div class="p6-lab"><span>Isolation du logement</span></div>
+              <div class="p6-in p6-in--vide" id="sim-iso-a-verifier" title="Isolation non reçue du DPE : à confirmer avec le client">Isolation à vérifier</div>`}
+            </div>
+            ${isoSel('iso-toit', 'iso_toit', 'Toit / combles', NIV_ISO, state.iso_toit)}
+            ${isoSel('iso-mur', 'iso_mur', 'Murs', NIV_ISO, state.iso_mur)}
+            ${isoSel('iso-menuiserie', 'iso_menuiserie', 'Fenêtres', VITRAGES, state.iso_menuiserie)}
+          </div>
+          <div class="p6-aide">${!isoDpe ? 'Pas de DPE reçu : demandez au client l\'état du toit, des murs et des fenêtres.'
+            : (travaux ? 'Le client a fait des travaux : demandez l\'état actuel du toit, des murs et des fenêtres, et corrigez.'
+              : `Pré-rempli d'après le DPE${dateDpe ? ' du ' + dateDpe : ''}. Si le client n'a rien fait depuis, rien à changer.`)}</div>`;
+
+    // --- étape 5 : besoin + ballon (logique Lot 1 : modèle aligné sur l'emplacement)
+    const ecsDuo = !ballonAutorise(state);
+    const ballons = Array.isArray(ballonConfig().modeles) ? ballonConfig().modeles.filter(Boolean) : [];
+    const recoB = ballonRecommandation(state);
+    const ballonDefaut = state.ballon_ref
+      || (recoB && (ballons.find(m => m.type_installation === recoB.type) || {}).ref)
+      || (ballons[0] || {}).ref || '';
+    const prixOui = ballonDefaut ? ballonSim(Object.assign({}, state, { ballon_ref: ballonDefaut })).totalTTC : 0;
+    const avecBallon = !ecsDuo && !!state.ballon_ref;
+    const { modeles: ballonsProposes, filtre } = ballonModelesProposes(state);
+    const typeCourt = (t) => t ? t.charAt(0) + t.slice(1).toLowerCase() : '';
+    const selectBallon = (cls) => `<select id="sim-ballon" class="${cls}"><option value="" ${!state.ballon_ref ? 'selected' : ''}>Aucun</option>${ballonsProposes.map(b => `<option value="${escA(b.ref)}" ${state.ballon_ref === b.ref ? 'selected' : ''}>${escA(b.nom || b.ref)}</option>`).join('')}</select>`;
     const besoin = `
           <select id="sim-service" class="l4-cache" aria-hidden="true">
-            <option value="chauffage_seul" ${sel(state.service,'chauffage_seul')}>Chauffage seul</option>
-            <option value="chauffage_ecs" ${sel(state.service,'chauffage_ecs')}>Chauffage + ECS</option>
+            <option value="chauffage_seul" ${sel(state.service, 'chauffage_seul')}>Chauffage seul</option>
+            <option value="chauffage_ecs" ${sel(state.service, 'chauffage_ecs')}>Chauffage + ECS</option>
           </select>
-          <div class="l4-choix p-cartes-besoin" data-sim-for="sim-service">
-            <button type="button" data-valeur="chauffage_seul" class="p-carte-choix ${state.service!=='chauffage_ecs'?'active':''}"><b>Chauffage seul</b><span>La PAC chauffe la maison ; l'eau chaude reste à part.</span></button>
-            <button type="button" data-valeur="chauffage_ecs" class="p-carte-choix ${state.service==='chauffage_ecs'?'active':''}"><b>Chauffage + eau chaude</b><span>Une PAC DUO fait le chauffage et l'eau chaude.</span></button>
+          <div class="p6-sec">1 · QUE DOIT FAIRE LA POMPE À CHALEUR ?</div>
+          <div class="l4-choix p6-g p6-g2 p-cartes-besoin" data-sim-for="sim-service">
+            <button type="button" data-valeur="chauffage_seul" class="p-carte-choix p6-carte-choix ${state.service !== 'chauffage_ecs' ? 'active' : ''}"><b>Chauffage seul</b><span>La PAC chauffe la maison. L'eau chaude reste à prévoir à part.</span></button>
+            <button type="button" data-valeur="chauffage_ecs" class="p-carte-choix p6-carte-choix ${state.service === 'chauffage_ecs' ? 'active' : ''}"><b>Chauffage + eau chaude</b><span>Modèle DUO : il fait aussi l'eau chaude. Même aides, prix plus élevé.</span></button>
           </div>
-          <div class="sim-note" id="sim-service-note">${ballonAutorise(state) ? 'La PAC assure le chauffage. Pour l\'eau chaude : conserver l\'existant ou ajouter un ballon thermodynamique (sans aide MaPrimeRénov\' depuis le 01/09/2026).' : 'La PAC (modèle DUO) assure le chauffage et l\'eau chaude. Aucun ballon à ajouter.'}</div>
-          <div class="p-sous-titre">Eau chaude</div>
-          ${ballonAutorise(state) ? renderBallonBloc(state, bs, 'choix') : '<div class="sim-note" id="sim-ecs-duo">Assurée par la PAC DUO.</div>'}`;
+          <div class="sim-note l4-cache" id="sim-service-note">${ecsDuo ? 'La PAC (modèle DUO) assure le chauffage et l\'eau chaude. Aucun ballon à ajouter.' : 'La PAC assure le chauffage. Pour l\'eau chaude : conserver l\'existant ou ajouter un ballon thermodynamique (sans aide MaPrimeRénov\' depuis le 01/09/2026).'}</div>
+          ${ecsDuo ? `<div class="p6-ok" id="sim-ecs-duo">L'eau chaude est assurée par la PAC DUO. Rien à ajouter.</div>` : `
+          ${alerteEcsChaudiere(state) ? `<div class="p6-alerte" id="sim-alerte-ecs">L'eau chaude est faite par la chaudière qui va être déposée : il faudra une solution (PAC DUO ou ballon).</div>` : ''}
+          <div class="p6-sep"></div>
+          <div class="p6-sec">2 · BALLON THERMODYNAMIQUE <span class="p6-sec-sub">· option, sans aide MaPrimeRénov' · prix du catalogue admin</span></div>
+          <div class="p6-g p6-g3">
+            <div class="p6-f"><div class="p6-lab"><span>Ajouter un ballon ?</span></div>
+              <div class="p6-segs p6-segs-2"><button type="button" class="p6-seg${avecBallon ? '' : ' on'}" data-ballon6="non">Non</button><button type="button" class="p6-seg${avecBallon ? ' on' : ''}" data-ballon6="oui"${ballonDefaut ? '' : ' disabled'}>Oui${prixOui ? ' · ' + eur(avecBallon ? bs.totalTTC : prixOui) : ''}</button></div></div>
+            ${avecBallon ? `
+            <div class="p6-f p6-span2"><div class="p6-lab"><span>Où sera installé le ballon ?</span><span class="l4-etoile">*</span></div>
+              <div class="p6-segs p6-segs-3">${BALLON_EMPLACEMENTS.map(e => `<button type="button" class="p6-seg${state.ballon_emplacement === e.value ? ' on' : ''}" data-emplacement6="${e.value}" title="${escA(e.label)}">${EMPLACEMENT_COURT[e.value] || e.label}</button>`).join('')}</div>
+              <select id="sim-ballon-emplacement" class="l4-cache" aria-hidden="true" tabindex="-1">
+                <option value="" ${!state.ballon_emplacement ? 'selected' : ''}>— Choisir —</option>
+                ${BALLON_EMPLACEMENTS.map(e => `<option value="${e.value}" ${state.ballon_emplacement === e.value ? 'selected' : ''}>${e.label}</option>`).join('')}
+              </select>
+              ${recoB ? `<div class="p6-aide" id="sim-ballon-reco">Type recommandé : <b>${recoB.typeLabel}</b>${filtre ? ' · <a href="#" id="sim-ballon-voir-tous">voir tous les ballons</a>' : (state.ballon_voir_tous ? ' · <a href="#" id="sim-ballon-voir-reco">voir les ballons recommandés</a>' : '')}</div>` : ''}
+              ${ballonInadapte(state) ? `<div class="p6-alerte" id="sim-ballon-inadapte">Ce ballon n'est pas adapté à l'emplacement indiqué</div>` : ''}
+            </div>
+            <div class="p6-f"><div class="p6-lab"><span>Modèle de ballon</span></div>${selectBallon('p6-in')}</div>` : selectBallon('l4-cache')}
+          </div>`}`;
+
+    // --- étape 6, gauche : les 3 gammes (modèle et prix TTC du catalogue)
+    const niv = (typeof selectionnerParNiveau === 'function') ? selectionnerParNiveau(Number(state.puissance_requise_kw) || 0, state) : { ok: false, niveaux: [] };
+    const COUL_GAMME = { recommande: '#D7263D' };
+    const cartesPac = (window.HEXA_NIVEAUX || []).map(nd => {
+      const n = (niv.niveaux || []).find(x => x.key === nd.key);
+      if (!n) return `<button type="button" class="p6-pcard p6-pcard--vide" disabled><span class="p6-pgam">${escA(nd.label.toUpperCase())}</span><span class="p6-pmod">Aucun modèle à cette puissance</span></button>`;
+      const tous = [];
+      n.marques.forEach(mo => mo.modeles.forEach(m => tous.push(m)));
+      const choisi = tous.find(m => m.id === state.modele_pac_id);
+      const m = choisi || meilleurModeleMarque(tous, Number(state.puissance_requise_kw) || 0);
+      return `<button type="button" class="p6-pcard sim-mod-row${choisi ? ' on' : ''}" data-modele-id="${escA(m.id)}" data-pac-niv="${nd.key}">`
+        + `<span class="p6-pgam" style="color:${COUL_GAMME[nd.key] || '#5A6675'}">${escA(nd.label.toUpperCase())}</span>`
+        + `<span class="p6-pmod">${escA(m.label || m.nom)}</span><span class="p6-pprix">${eur(m.prix_ttc)} TTC</span></button>`;
+    }).join('');
     const pac = `
-          <div class="p-puissance">Puissance nécessaire calculée : <b id="sim-puissance-reco">${kw} kW</b></div>
-          ${renderNiveaux()}
-          <span class="sim-allmodels"${state.show_all_models ? '' : ' hidden'}><select id="sim-modele-select" class="sim-model-select">
-            ${catalogueOptionsOrdonnees(state).map(m => `<option value="${m.id}" ${m.id===state.modele_pac_id?'selected':''}>${m.label} · ${puissanceModele(m)} kW · ${eur(m.prix_ttc)}</option>`).join('')}
-          </select></span>
-          ${state.selection_alerte ? `<div class="sim-note sim-note--warn" id="sim-selection-alerte">${state.selection_alerte}</div>` : ''}
-          <div class="p-prix-choisi">
-            <span>Prix TTC posé du modèle choisi <i>(modifiable)</i></span>
-            <span class="sim-pnl-edit"><input type="text" inputmode="numeric" id="sim-prix" value="${new Intl.NumberFormat('fr-FR').format(state.prix_pac||0)}"><em>€</em></span>
+          <div class="p6-sec">1 · LA POMPE À CHALEUR <span class="p6-sec-sub">· puissance nécessaire <b id="sim-puissance-reco">${kw} kW</b>${ecsDuo ? ' · modèles DUO' : ''}</span></div>
+          ${niv.ok ? `<div class="p6-g p6-g3 p6-pacs p6-imp">${cartesPac}</div>`
+            : `<div class="p6-alerte">Aucune PAC bien dimensionnée pour ${kw} kW : ajustez l'isolation ou la surface, ou <a href="#" class="sim-voir-tous">voir tous les modèles</a>.</div>`}
+          <div class="p6-pac-ligne">
+            <span class="p6-pac-lib">Prix TTC posé <i>(modifiable)</i></span>
+            <span class="sim-pnl-edit"><input type="text" inputmode="numeric" id="sim-prix" value="${nbFr(state.prix_pac || 0)}"><em>€</em></span>
             ${state.sous_dimensionnement ? '<span class="sim-warn-badge">⚠ Vérifier</span>' : ''}
+            <a href="#" class="sim-voir-tous">Tous les modèles</a>
+            <button class="sim-btn-note-dim" type="button" onclick="event.stopPropagation(); window.ouvrirNoteDim(); return false;">Note de dimensionnement</button>
           </div>
-          <button class="sim-btn-note-dim" type="button" onclick="event.stopPropagation(); window.ouvrirNoteDim(); return false;">📋 Note de dimensionnement</button>`;
+          <span class="sim-allmodels"${state.show_all_models ? '' : ' hidden'}><select id="sim-modele-select" class="sim-model-select p6-in">
+            ${catalogueOptionsOrdonnees(state).map(m => `<option value="${m.id}" ${m.id === state.modele_pac_id ? 'selected' : ''}>${m.label} · ${puissanceModele(m)} kW · ${eur(m.prix_ttc)}</option>`).join('')}
+          </select></span>
+          ${state.selection_alerte ? `<div class="sim-note sim-note--warn" id="sim-selection-alerte">${state.selection_alerte}</div>` : ''}`;
     const fin = `<div id="sim-fin">${renderFinancement(c)}</div>`;
+
+    // --- étape 6, droite : ① ce que ça coûte, ② qui paie et quand, tuiles ; barre de boutons
     const resultat = `
-          <div class="l4s-contexte" id="sim-contexte">${pastillesContexte(anahLabel, ceeLabel)}</div>
           <div id="sim-dynamic">${renderDynamic(c, r, energieLbl, creditLine, totalApres, delta, phraseRoi)}</div>
-          <div class="p-resultat-actions">
-            <button type="button" class="p-btn-sec" id="sim-arguments-btn" aria-expanded="${state.arguments_ouverts ? 'true' : 'false'}">Arguments pour le client</button>
+          <div class="l4s-arguments${state.arguments_ouverts ? ' is-open' : ''}" id="sim-arguments">${renderArguments(c, r, energieLbl, phraseRoi)}</div>
+          <div class="l4-cache" aria-hidden="true"><div class="l4s-contexte" id="sim-contexte">${pastillesContexte(anahLabel, ceeLabel)}</div></div>`;
+    const barre = `
+          <button type="button" class="p6-btn p6-btn--prec" data-p6-go="5">← Besoin</button>
+          <button type="button" class="p6-btn p6-btn--bleu" id="sim-arguments-btn" aria-expanded="${state.arguments_ouverts ? 'true' : 'false'}">Arguments</button>
+          <span class="p6-cases">
             <label class="l4s-case"><input type="checkbox" id="sim-afficher-apercu" ${state.afficher_apercu !== false ? 'checked' : ''}> Économies sur le devis</label>
             <label class="l4s-case"><input type="checkbox" id="sim-afficher-mention-mpr" ${state.afficher_mention_mpr !== false ? 'checked' : ''}> Mention MaPrimeRénov'</label>
-            <button type="button" id="btn-pre-devis" class="l4s-btn l4s-btn--sec">Pré-devis</button>
-            <button type="button" id="btn-voir-devis" class="l4s-btn">📄 Voir le devis</button>
-          </div>
-          <div class="l4s-arguments${state.arguments_ouverts ? ' is-open' : ''}" id="sim-arguments">${renderArguments(c, r, energieLbl, phraseRoi)}</div>`;
-    return { iso, besoin, pac, fin, resultat };
+          </span>
+          <button type="button" id="btn-pre-devis" class="p6-btn p6-btn--rouge">Pré-devis</button>
+          <button type="button" id="btn-voir-devis" class="p6-btn p6-btn--plein">Voir le devis</button>`;
+    const aides = renderAides(c);
+    return { surface, iso, aides, besoin, pac, fin, resultat, barre };
   }
 
   // Lot 5 : sous-ligne de la surface chauffée (la puissance est rappelée à l'étape PAC)
@@ -15661,89 +15717,186 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     const k = combinaisonsFinancement(c).find(x => combinaisonActive(x, c));
     return k ? k.titre : (state.option === 'opt3' ? 'Comptant' : ((c.finView.libelles || {})[state.option === 'opt2' ? 'option2' : 'option1'] || 'Crédit'));
   }
-  function renderFinancement(c){
-    const cartes = combinaisonsFinancement(c).map(k => `
-          <button type="button" class="p-carte-fin${combinaisonActive(k, c) ? ' active' : ''}" data-combi="${k.id}" data-mode="${k.mode}"${k.fin ? ` data-fin="${k.fin}"` : ''} data-opt="${k.opt}">
-            <span class="p-carte-fin-titre">${k.titre}</span>
-            ${k.comptant > 0 ? `<span class="p-carte-fin-ligne">Comptant <b>${eur(k.comptant)}</b></span>` : ''}
-            ${k.credit ? `<span class="p-carte-fin-ligne">${k.credit.nom} <b>${eur(k.credit.base)}</b> <i>${String(k.credit.taux).replace('.', ',')} % · ${k.credit.duree} mois</i></span>` : ''}
-            <span class="p-carte-fin-mens">${k.credit ? `<b>${eur(k.credit.mens)}</b>/mois` : 'Paiement unique'}</span>
-          </button>`).join('');
-    return `
-          <div class="l4s-sec">
-            <h4 class="l4s-titre">Le client attend-il l'accord MaPrimeRénov' (environ 5 mois) ?</h4>
-            ${c.mprTotal > 0 ? `
-            <div class="l4-choix p-choix-attente">
-              <button type="button" class="${c.modeMpr==='sans_attente'?'':'active'}" data-mode-mpr="attente">Oui, il attend</button>
-              <button type="button" class="${c.modeMpr==='sans_attente'?'active':''}" data-mode-mpr="sans_attente">Non, travaux tout de suite</button>
+  // Lot 6 — barème affiché sur une carte de paiement (taux · durée) : mêmes barèmes que calcul()
+  function baremeAffiche(opt, base){
+    const fin = M3_CONFIG?.params_financement || defaultParamsFinancement();
+    if (opt === 'opt2') return { taux: Number(fin.eco_ptz?.taux_pct) || 0, duree: Number(fin.eco_ptz?.duree_mois) || 0 };
+    const b = base < (Number(fin.seuil_rac_eur) || 0) ? (fin.credit_travaux?.sous_seuil || {}) : (fin.credit_travaux?.sur_seuil || {});
+    return { taux: Number(b.taux_pct) || 0, duree: Number(b.duree_mois) || 0 };
+  }
+  const ansTxt = (mois) => { const a = (Number(mois) || 0) / 12; return (Number.isInteger(a) ? a : String(Math.round(a * 10) / 10).replace('.', ',')) + ' ans'; };
+
+  // Lot 6 — ÉCHÉANCIER d'affichage (seul calcul ajouté) : qui paie, et quand. Montants en euros entiers.
+  //  - total à régler = reste à charge (+ avance MaPrimeRénov' si travaux tout de suite)   [= reste_affiche]
+  //  - crédit travaux (crédit affecté) : versé par la banque à Hexa-Rénov' à la fin des travaux
+  //  - le reste (comptant ET Éco-PTZ, que le client reçoit et paie sur factures) : acompte 30 % à la
+  //    signature, solde 70 % avant la fin du chantier
+  // Chaque euro n'est payé qu'une fois : acompte + solde + banque = total à régler.
+  function echeancier(c){
+    const sans = !!c.sansAttente, opt = state.option;
+    const total = sans ? c.resteAttente + c.mprTotal : c.resteAttente;
+    const finance = opt === 'opt3' ? 0 : c.base_credit;
+    const cash = Math.max(0, total - finance);
+    const ct = opt === 'opt1' ? finance : 0;
+    const ptz = opt === 'opt2' ? finance : 0;
+    const totalE = Math.round(total), ctE = Math.round(ct);
+    const clientE = totalE - ctE;
+    const acompte = Math.round(clientE * 0.3), solde = clientE - acompte;
+    const mens = opt === 'opt3' ? 0 : c.mensOpt;
+    const coutFinal = cash + (opt === 'opt3' ? 0 : c.mensOpt * c.nMois) - (sans ? c.mprTotal : 0);   // = renderDynamic (Lot 5)
+    return { sans, option: opt, total, finance, cash, ct, ptz, totalE, ctE, clientE, acompte, solde, mens, nMois: c.nMois,
+             coutFinal, mpr: c.mprTotal, reste: c.resteAttente };
+  }
+  window.hexaSimEcheancier = function(){ return dernierCalcul ? echeancier(dernierCalcul) : null; };
+
+  // Lot 6 — étape 4 : les aides du foyer (calcul existant : forfait MaPrimeRénov' + CEE BAR-TH-171 selon la
+  // catégorie, la surface chauffée et la zone, plafonnées pour la PAC en cours ; ce sont les montants du devis)
+  const CAT_L6 = {
+    tres_modeste: { lib: 'Très modestes', bg: '#DCE8FB', fg: '#1D4F8C' },
+    modeste: { lib: 'Modestes', bg: '#FFF1B8', fg: '#7A5A00' },
+    intermediaire: { lib: 'Intermédiaires', bg: '#EADCF8', fg: '#5B2A86' },
+    superieur: { lib: 'Supérieurs', bg: '#FBDCE8', fg: '#8A1F4B' }
+  };
+  window.HEXA_CATEGORIES_L6 = CAT_L6;
+  function renderAides(c){
+    const k = CAT_L6[c.categorie];
+    if (!c.contextePret || !k) {
+      return `<div class="p6-sep"></div>
+          <div class="p6-aides p6-aides--vide" id="p6-aides"><span class="p6-sec p6-sec--vert">2 · LES AIDES AUXQUELLES LE CLIENT A DROIT</span>
+            <div class="p6-aide">Renseignez le nombre de personnes et le revenu fiscal (et la surface à l'étape Logement) : les aides se calculent toutes seules.</div></div>`;
+    }
+    const mpr = c.mprDevis, cee = c.ceeDevis, tot = c.aidesDevis;
+    const dire = mpr > 0
+      ? `« Compte tenu de votre situation, vous avez droit à ${eur(tot)} d'aides : ${eur(mpr)} de MaPrimeRénov' et ${eur(cee)} de prime CEE. »`
+      : `« Compte tenu de votre situation, vous avez droit à ${eur(cee)} de prime CEE. »`;
+    return `<div class="p6-sep"></div>
+          <div class="p6-aides" id="p6-aides">
+            <div class="p6-aides-tete"><span class="p6-sec p6-sec--vert">2 · LES AIDES AUXQUELLES LE CLIENT A DROIT</span>
+              <span class="p6-pill" style="background:${k.bg};color:${k.fg}">Revenus ${k.lib.toLowerCase()} · CEE ${LABELS_CEE[c.categorie] || ''}</span></div>
+            <div class="p6-aides-total"><span>Jusqu'à</span><strong id="p6-aides-total">${eur(tot)}</strong><span>d'aides pour une PAC air-eau</span></div>
+            <div class="p6-g p6-g2 p6-aides-lignes">
+              <div class="p6-aides-l"><b>MaPrimeRénov'</b><span id="p6-aides-mpr">${eur(mpr)}</span></div>
+              <div class="p6-aides-l"><b>Prime CEE</b><span id="p6-aides-cee">${eur(cee)}</span></div>
             </div>
-            <div class="l4-aide">${c.modeMpr==='sans_attente' ? 'Travaux tout de suite, mais le client avance la prime en attendant qu\'elle lui soit versée.' : 'Le client attend l\'accord de la prime (environ 5 mois) avant les travaux. Il n\'avance rien.'}</div>` : `
-            <div class="sim-note">Pas de prime MaPrimeRénov' pour ce foyer : rien à attendre, rien à avancer.</div>`}
+            <div class="p6-adire">À dire : ${dire}</div>
           </div>
-          <div class="l4s-sec">
-            <h4 class="l4s-titre">Comment paie-t-il ?</h4>
-            <div class="p-cartes-fin">${cartes}</div>
-            ${state.option==='opt1' && c.finView.mention ? `<div class="sim-note">${c.finView.mention}</div>` : ''}
-          </div>`;
+          ${c.categorie === 'superieur' ? `<div class="p6-alerte" id="p6-alerte-sup"><b>POINT D'ATTENTION :</b> revenus supérieurs : pas de MaPrimeRénov' pour une PAC air-eau, seule la prime CEE s'applique. Le projet reste possible.</div>` : ''}`;
   }
 
-  // Lot 5 — étape 8 : ce que le client paie (gauche) et quand il paie (droite)
+  // Lot 6 — étape 6, gauche : attente MaPrimeRénov', paiement, « À dire au client ». Les choix pilotent les
+  // réglages existants : mode_mpr, option (opt3 comptant · opt1 crédit travaux · opt2 Éco-PTZ), financement_mpr.
+  function renderFinancement(c){
+    const lib = c.finView.libelles || {};
+    const nomCt = lib.option1 || 'Crédit Travaux', nomPtz = lib.option2 || 'Éco-PTZ';
+    const sans = c.sansAttente, M = c.mprTotal, R = c.resteAttente;
+    const e = echeancier(c);
+    const baseCarte = (sans && (state.financement_mpr || 'cash') === 'credit') ? R + M : R;
+    const pct = (t) => String(t).replace('.', ',') + ' %';
+    const bCt = baremeAffiche('opt1', baseCarte), bPtz = baremeAffiche('opt2', baseCarte);
+    const carte = (opt, titre, sous) => `<button type="button" class="p6-pcard p6-pay${state.option === opt ? ' on' : ''}" data-paie6="${opt}"><b>${titre}</b><span>${sous}</span></button>`;
+    const totalApres = state.facture_apres + (state.option === 'opt3' ? 0 : c.mensOpt);
+    const delta = state.facture_avant - totalApres;
+    const B = (t) => `<strong>${t}</strong>`;
+    const L = [];
+    L.push(sans ? B('Travaux tout de suite') + '.' : (M > 0 ? 'Il ' + B('attend MaPrimeRénov\'') + ' (environ 5 mois).' : 'Travaux dès l\'accord.'));
+    if (state.option === 'opt3') L.push('Il paie ' + B(eur(e.total)) + ' ' + B('comptant') + '.');
+    else if (state.option === 'opt2') L.push('Sa banque lui prête ' + B(eur(e.finance)) + ' en ' + B(nomPtz) + ' : il rembourse ' + B(eur(e.mens) + '/mois') + ' pendant ' + B(ansTxt(c.nMois)) + '.');
+    else L.push('La banque paie ' + B(eur(e.finance)) + ' en ' + B('crédit') + ' : il rembourse ' + B(eur(e.mens) + '/mois') + ' pendant ' + B(ansTxt(c.nMois)) + '.');
+    if (e.clientE > 0) L.push('Il verse ' + B(eur(e.acompte)) + ' à la signature, puis ' + B(eur(e.solde)) + ' avant la fin du chantier.');
+    if (sans) L.push(B(eur(M)) + ' versés sur ' + B('son compte bancaire') + ' après les travaux.');
+    const ecoTxt = !state.eco ? '' : (delta >= 0 ? ' · Économie : ' + B(eur(delta) + '/mois') : ' · Surcoût : ' + B(eur(Math.abs(delta)) + '/mois') + ' pendant le crédit');
+    L.push('Coût final : ' + B(eur(e.coutFinal)) + ecoTxt);
+    return `
+          ${M > 0 ? `<div class="p6-sep"></div>
+          <div class="p6-sec">2 · LE CLIENT ATTEND-IL L'ACCORD MAPRIMERÉNOV' (~5 MOIS) ?</div>
+          <div class="p6-g p6-g2 p-choix-attente">
+            <button type="button" class="p6-seg${sans ? '' : ' on active'}" data-mode-mpr="attente">Oui, il attend</button>
+            <button type="button" class="p6-seg${sans ? ' on active' : ''}" data-mode-mpr="sans_attente">Non, travaux tout de suite</button>
+          </div>
+          <div class="l4-aide">${sans ? 'Travaux tout de suite, mais le client avance la prime en attendant qu\'elle lui soit versée.' : 'Le client attend l\'accord de la prime (environ 5 mois) avant les travaux. Il n\'avance rien.'}</div>` : ''}
+          <div class="p6-sep"></div>
+          <div class="p6-sec">${M > 0 ? 3 : 2} · COMMENT PAIE-T-IL SES ${eur(e.total).toUpperCase()} ?</div>
+          <div class="p6-g p6-g3 p6-pays">${carte('opt3', 'Comptant', 'il paie tout lui-même')}${carte('opt1', nomCt, pct(bCt.taux) + ' · ' + ansTxt(bCt.duree))}${carte('opt2', nomPtz, pct(bPtz.taux) + ' · ' + ansTxt(bPtz.duree))}</div>
+          ${sans && state.option !== 'opt3' ? `<label class="p6-chk"><input type="checkbox" id="p6-avance-comptant" ${(state.financement_mpr || 'cash') === 'cash' ? 'checked' : ''}><span><b>Il paie l'avance MaPrimeRénov' (${eur(M)}) comptant</b><i>et ne finance que son reste à charge (${eur(R)}). Mensualité plus basse.</i></span></label>` : ''}
+          <div class="p6-dire" id="p6-dire"><span class="p6-sec">À DIRE AU CLIENT</span>${L.map(x => `<div>• ${x}</div>`).join('')}</div>`;
+  }
+
+  // Lot 6 — une ligne des blocs ① et ② : signe (+ ajouté · − déduit / payé), libellé, explication, montant
+  function ligneCalc(signe, lib, expl, val, genre, id){
+    const cls = 'p6-calc' + (genre === 'fin' ? ' p6-calc--fin' : genre === 'tot' ? ' p6-calc--tot'
+      : signe === '−' ? ' p6-calc--moins' : signe === '+' ? ' p6-calc--plus' : '') + (genre === 'cle' ? ' p6-calc--cle' : '');
+    const s = (signe === '−' || signe === '+') ? signe + '\u00a0' : '';
+    const v = id ? (signe === '+' ? `<span id="${id}">${s}${val}</span>` : `${s}<span id="${id}">${val}</span>`) : s + val;
+    return `<div class="${cls}"><span class="p6-calc-l"><b>${lib}</b><i>${expl}</i></span><span class="p6-calc-v">${v}</span></div>`;
+  }
+
+  // Lot 6 — étape 6, droite : ① ce que ça coûte, ② qui paie et quand, tuiles Économie / durée / Rentabilité
   function renderDynamic(c, r, energieLbl, creditLine, totalApres, delta, phraseRoi){
+    const e = echeancier(c);
+    const sans = c.sansAttente, M = c.mprTotal;
     const comptant = state.option === 'opt3';
-    const sans = c.sansAttente;
     const bsR = ballonSim(state);
     const lib = c.finView.libelles || {};
     const produit = state.option === 'opt2' ? (lib.option2 || 'Éco-PTZ') : (lib.option1 || 'Crédit Travaux');
     const taux = state.option === 'opt2' ? c.finView.tauxO2Pct : c.finView.tauxO1Pct;
-    const total = sans ? c.resteAttente + c.mprTotal : c.resteAttente;           // = reste_affiche de calcul()
-    const finance = comptant ? 0 : c.base_credit;
-    const cash = Math.max(0, total - finance);
-    const coutFinal = cash + (comptant ? 0 : c.mensOpt * c.nMois) - (sans ? c.mprTotal : 0);
+    const d = (v) => eurDash(v, c.contextePret);
+    const via = e.ptz > 0 ? (e.cash > 0 ? 'poche + ' + produit : 'avec son ' + produit) : 'de sa poche';
+    const avecMpr = c.mprDevis > 0 || !c.contextePret;
+    let compte = ligneCalc('', 'Prix de la PAC posée', 'fournie et installée, TTC', eur(state.prix_pac || 0), '', 'sim-prix-ttc');
+    if (bsR.actif) compte += ligneCalc('+', 'Ballon thermodynamique', 'option, sans aide', eur(bsR.totalTTC), '', 'sim-ballon-montant');
+    compte += ligneCalc('−', 'Prime CEE', 'déduite par Hexa-Rénov\'', d(c.ceeDevis), '', 'sim-cee');
+    if (avecMpr) compte += ligneCalc('−', 'MaPrimeRénov\'', sans ? 'aide de l\'État, avancée par le client' : 'aide de l\'État', d(c.mprDevis), '', 'sim-mpr');
+    compte += ligneCalc('=', 'Reste à charge', 'ce que la PAC coûte vraiment', d(c.resteAttente), 'tot', 'sim-reste');
+    let flux = '';
+    if (sans) flux += ligneCalc('', 'Total à régler', `<span class="p-ventilation">dont ${d(c.resteAttente)} de reste à charge + ${eur(M)} d'avance MaPrimeRénov'</span>`, d(e.total), 'tot', 'sim-total-regler');
+    if (e.clientE > 0) flux += ligneCalc('−', 'Client · à la signature', `acompte 30 % (${via})`, d(e.acompte), 'cle', 'sim-acompte')
+      + ligneCalc('−', 'Client · avant fin de chantier', `solde 70 % (${via})`, d(e.solde), '', 'sim-solde');
+    if (e.ctE > 0) flux += ligneCalc('', 'Banque · à la fin des travaux', 'crédit affecté versé à Hexa-Rénov\'', d(e.ctE), '', 'sim-banque');
+    if (!comptant) flux += ligneCalc('−', 'Le client rembourse', `${produit} · ${String(taux).replace('.', ',')} % · ${c.nMois} mois${state.option === 'opt1' && c.finView.mention ? ' · ' + c.finView.mention.toLowerCase() : ''}`, eur(c.mensOpt) + '/mois', '', 'sim-mensualite');
+    if (sans) flux += ligneCalc('+', 'Il récupère', 'MaPrimeRénov\' sur son compte bancaire', eur(M), '', 'sim-mpr-apres');
+    flux += ligneCalc('', 'Coût final pour le client', !comptant && Number(taux) > 0 ? 'intérêts du crédit compris' : 'sans intérêts', d(e.coutFinal), 'fin', 'sim-cout-final');
+
+    // tuiles (économie mensuelle, cumul sur la durée de vie, rentabilité : calculs existants)
+    const eco = state.eco;
+    const tEco = !eco ? ['Économie', '—', 'facture inconnue', '']
+      : (delta >= 0 ? ['Économie', eur(delta) + '/mois', `${eur(state.facture_avant)} → ${eur(totalApres)}/mois`, '']
+        : ['Surcoût', eur(Math.abs(delta)) + '/mois', 'pendant le crédit', ' p6-tuile--warn']);
+    let rent = ['—', ''];
+    if (eco && !r.indisponible) {
+      if (comptant) {
+        const mois = moisRentabilite(eco, c.resteAttente);
+        rent = mois == null ? [`au-delà de ${r.dureeVie} ans`, ''] : (mois <= 1 ? ['dès le 1er mois', 'rien à récupérer'] : [`en ${mois} mois`, `pour récupérer ${eur(c.resteAttente)}`]);
+      } else if (delta >= 0) rent = ['dès le 1er mois', 'moins cher qu\'aujourd\'hui'];
+      else rent = r.anneeRentable ? [`dès la ${r.anneeRentable}ᵉ année`, 'crédit compris'] : [`au-delà de ${r.dureeVie} ans`, ''];
+    }
     const mois = comptant ? moisRentabilite(state.eco, c.resteAttente) : null;
     const declare = state.eco && !state.eco.ecs_traitee && state.facture_avant < Math.round(state.eco.facture_annuelle / 12)
       ? ` <i>(${eur(Math.round(state.eco.facture_annuelle / 12))} déclarés, dont chauffage)</i>` : '';
-    const d = (v) => eurDash(v, c.contextePret);
     return `
-        <div class="p-resultat">
-          <section class="p-res-col">
-            <h4 class="p-res-titre">Ce que le client paie — <span id="sim-config">${libelleCombinaison(c)}</span></h4>
-            <div class="sim-pnl">
-              <div class="sim-pnl-line"><span>Prix TTC posé${bsR.actif ? ' <i>(PAC)</i>' : ''}</span><b id="sim-prix-ttc">${eur(state.prix_pac || 0)}</b></div>
-              ${renderBallonBloc(state, bsR, 'couts')}
-              <div class="sim-pnl-line sim-pnl-minus"><span>– Prime CEE</span><b id="sim-cee">${d(c.ceeDevis)}</b></div>
-              ${sans
-                ? `<div class="sim-pnl-line p-mpr-avancee"><span>MaPrimeRénov' <i>non déduite, avancée par le client</i></span><b id="sim-mpr">${d(c.mprDevis)}</b></div>`
-                : `<div class="sim-pnl-line sim-pnl-minus"><span>– MaPrimeRénov' <i>déduite</i></span><b id="sim-mpr">${d(c.mprDevis)}</b></div>`}
-              <div class="sim-pnl-line p-aides"><span>Aides (CEE + MaPrimeRénov')</span><b id="sim-aides">${d(c.aidesDevis)}</b></div>
-              <div class="p-total"><span>Total à régler par le client</span><strong id="sim-total-regler">${d(total)}</strong></div>
-              <div class="p-ventilation">dont <b id="sim-reste">${d(c.resteAttente)}</b> de reste à charge${sans ? ` + <b id="sim-avance-montant">${eur(c.mprTotal)}</b> d'avance MaPrimeRénov'` : ''}</div>
-              <div class="sim-pnl-line"><span>Payé comptant</span><b id="sim-paye-comptant">${d(cash)}</b></div>
-              ${finance > 0 ? `<div class="sim-pnl-line"><span>Financé par ${produit}</span><b id="sim-finance">${d(finance)}</b></div>` : ''}
-            </div>
-          </section>
-          <section class="p-res-col">
-            <h4 class="p-res-titre">Quand il paie</h4>
-            <div class="p-quand">
-              <div class="p-quand-ligne p-acompte"><span>À la signature <i>acompte 30 %</i></span><b id="sim-acompte">${d(total * 0.3)}</b></div>
-              <div class="p-quand-ligne"><span>Avant la fin du chantier <i>solde 70 %</i></span><b id="sim-solde">${d(total * 0.7)}</b></div>
-              ${comptant ? '' : `<div class="p-quand-ligne"><span>Chaque mois <i>${produit} · ${String(taux).replace('.', ',')} % · ${c.nMois} mois${state.option === 'opt1' && c.finView.mention ? ' · ' + c.finView.mention.toLowerCase() : ''}</i></span><b id="sim-mensualite">${eur(c.mensOpt)}/mois</b></div>`}
-              ${sans ? `<div class="p-quand-ligne p-mpr-retour"><span>Après les travaux <i>MaPrimeRénov' versée au client</i></span><b id="sim-mpr-apres">+ ${eur(c.mprTotal)}</b></div>` : ''}
-            </div>
-            <div class="p-cout-final"><span>Coût final pour le client <i>(intérêts compris)</i></span><b id="sim-cout-final">${d(coutFinal)}</b></div>
-            ${!state.eco ? `<div class="sim-note sim-note--warn" id="sim-eco-indisponible">Économies non calculées : renseignez la facture de l'énergie de la chaudière, ou la surface et l'énergie du logement pour l'estimer.</div>` : ''}
-            ${state.eco && state.eco.alerte ? `<div class="sim-note sim-note--warn" id="sim-eco-alerte">Résultat inhabituel : vérifiez la facture et l'énergie saisies.</div>` : ''}
-            <div class="sim-aa">
-              <div class="sa-line"><span>Aujourd'hui — ${energieLbl}${state.eco && state.eco.ecs_traitee ? ' <i>(chauffage + eau chaude)</i>' : declare}</span><b class="muted" id="sim-facture-avant">${state.eco ? eur(state.facture_avant) + '/mois' : '—'}</b></div>
-              <div class="sa-line total"><span>Demain</span><b>${state.eco ? eur(totalApres) + '/mois' : '—'}</b></div>
-              <div class="l4s-demain-detail">électricité <span id="sim-facture-apres">${state.eco ? eur(state.facture_apres) + '/mois' : '—'}</span>${comptant ? '' : ` + ${produit} ${eur(c.mensOpt)}/mois`}</div>
-              <div class="sa-delta ${delta>=0?'win':'warn'}"${state.eco ? '' : ' hidden'}>${delta>=0?`✓ Économie de ${eur(delta)}/mois (${eur(delta*12)}/an) dès maintenant`:`Surcoût de ${eur(Math.abs(delta))}/mois (${eur(Math.abs(delta)*12)}/an) pendant le crédit`}</div>
-            </div>
-            <div class="sim-roi">
-              ${comptant && !r.indisponible ? `<div class="sim-roi-head">${mois ? `Paiement de <b>${eur(c.resteAttente)}</b> · rentabilisé en <b>${mois} mois</b>` : `Paiement de <b>${eur(c.resteAttente)}</b> · rentabilité au-delà de ${r.dureeVie} ans`}</div>` : ''}
-              <div class="sim-roi-big-wrap">${r.anneeRentable?`<span class="sim-roi-big">${eur(r.total20)}</span><span class="sim-roi-big-sub">économisés sur ${r.dureeVie} ans</span>`:''}</div>
-              ${state.eco ? `<div class="sim-roi-base" id="sim-roi-base">${ligneBase(r)}</div>` : ''}
-            </div>
-          </section>
+        <div class="p6-blk"><h4>① CE QUE ÇA COÛTE <span>· le calcul du reste à charge</span></h4>${compte}</div>
+        <div class="p6-blk p-quand"><h4>② QUI PAIE, ET QUAND <span>· pour le client : − ce qu'il paie, + ce qu'il récupère</span></h4>${flux}</div>
+        <div class="sim-roi p6-roi"><div class="p6-g p6-g3 p6-tuiles">
+          <div class="p6-tuile${tEco[3]}"><span>${tEco[0]}</span><b id="p6-tuile-eco">${tEco[1]}</b><i>${tEco[2]}</i></div>
+          <div class="p6-tuile"><span>Sur ${r.dureeVie || DUREE_VIE_PAC} ans</span>${r.anneeRentable ? `<b class="sim-roi-big">${eur(r.total20)}</b><i class="sim-roi-big-sub">économisés sur ${r.dureeVie} ans</i>` : `<b>—</b><i>${eco ? `au-delà de ${r.dureeVie} ans` : 'facture inconnue'}</i>`}</div>
+          <div class="p6-tuile p6-tuile--nuit"><span>Rentabilité</span><b id="p6-tuile-rent">${rent[0]}</b><i>${rent[1]}</i></div>
+        </div>
+        ${!state.eco ? `<div class="p6-alerte" id="sim-eco-indisponible">Économies non calculées : renseignez la facture de l'énergie de la chaudière, ou la surface et l'énergie du logement pour l'estimer.</div>` : ''}
+        ${state.eco && state.eco.alerte ? `<div class="p6-alerte" id="sim-eco-alerte">Résultat inhabituel : vérifiez la facture et l'énergie saisies.</div>` : ''}
+        ${state.eco ? `<div class="sim-roi-base p6-base" id="sim-roi-base">${ligneBase(r)}</div>` : ''}</div>
+        <div class="l4-cache" aria-hidden="true">
+          <span id="sim-aides">${d(c.aidesDevis)}</span>
+          <span id="sim-paye-comptant">${d(e.cash)}</span>
+          ${e.finance > 0 ? `<span id="sim-finance">${d(e.finance)}</span>` : ''}
+          <span id="sim-config">${libelleCombinaison(c)}</span>
+          ${sans ? `<span id="sim-avance-montant">${eur(M)}</span>` : `<span id="sim-total-regler">${d(e.total)}</span>`}
+          ${avecMpr ? '' : `<span id="sim-mpr">${d(c.mprDevis)}</span>`}
+          <div class="sim-aa">
+            <div class="sa-line"><span>Aujourd'hui — ${energieLbl}${state.eco && state.eco.ecs_traitee ? ' <i>(chauffage + eau chaude)</i>' : declare}</span><b class="muted" id="sim-facture-avant">${state.eco ? eur(state.facture_avant) + '/mois' : '—'}</b></div>
+            <div class="sa-line total"><span>Demain</span><b>${state.eco ? eur(totalApres) + '/mois' : '—'}</b></div>
+            <div class="l4s-demain-detail">électricité <span id="sim-facture-apres">${state.eco ? eur(state.facture_apres) + '/mois' : '—'}</span></div>
+            <div class="sa-delta ${delta >= 0 ? 'win' : 'warn'}"${state.eco ? '' : ' hidden'}>${delta >= 0 ? `✓ Économie de ${eur(delta)}/mois (${eur(delta * 12)}/an) dès maintenant` : `Surcoût de ${eur(Math.abs(delta))}/mois (${eur(Math.abs(delta) * 12)}/an) pendant le crédit`}</div>
+          </div>
+          ${comptant && !r.indisponible ? `<div class="sim-roi-head">${mois ? `Paiement de <b>${eur(c.resteAttente)}</b> · rentabilisé en <b>${mois} mois</b>` : `Paiement de <b>${eur(c.resteAttente)}</b> · rentabilité au-delà de ${r.dureeVie} ans`}</div>` : ''}
         </div>`;
   }
 
@@ -15780,7 +15933,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     const sub = document.getElementById('sim-surf-sub');
     if (sub) sub.innerHTML = sousLigneSurface(c);
     const pr = document.getElementById('sim-puissance-reco');
-    if (pr) pr.textContent = Number(c.dim?.puissance_kw || 0).toFixed(1) + ' kW';
+    if (pr) pr.textContent = Number(c.dim?.puissance_kw || 0).toFixed(1).replace('.', ',') + ' kW';
     dernierCalcul = c;
     // cellules compte de résultat
     const set=(id,val)=>{ const el=document.getElementById(id); if(el) el.textContent=val; };
@@ -15802,11 +15955,14 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     set('sim-soustotal', eur((state.prix_pac||0) + bs.totalTTC));
     const prixInput = document.getElementById('sim-prix');
     if (prixInput && document.activeElement !== prixInput) {
-      prixInput.value = new Intl.NumberFormat('fr-FR').format(state.prix_pac||0);
+      prixInput.value = nbFr(state.prix_pac||0);
     }
     // Lot 5 : l'étape 7 (montants des cartes) suit aussi la frappe dans le prix
     const fin = document.getElementById('sim-fin');
     if (fin) fin.innerHTML = renderFinancement(c);
+    // Lot 6 : les aides de l'étape 4 aussi (plafonnement selon le prix)
+    const aidesHote = document.getElementById('p-sim-4');
+    if (aidesHote) aidesHote.innerHTML = renderAides(c);
     const args = document.getElementById('sim-arguments');
     if (args) args.innerHTML = renderArguments(c, r, energieLbl, phraseRoi);
     const modelSelect = document.getElementById('sim-modele-select');
@@ -15893,6 +16049,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
       conteneur.addEventListener('click', (e) => {
         const b = e.target.closest && e.target.closest('button');
         if (!b || !conteneur.contains(b)) return;
+        if (b.dataset.p6Go) return;             // Lot 6 : « ← Besoin » (navigation, gérée par le parcours)
         if (b.id === 'sim-arguments-btn') {
           state.arguments_ouverts = !state.arguments_ouverts;
           document.getElementById('sim-arguments')?.classList.toggle('is-open', !!state.arguments_ouverts);
@@ -15900,7 +16057,23 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
           return;
         }
         if (b.id !== 'btn-voir-devis' && b.id !== 'btn-pre-devis') simTouche = true;
+        if (b.dataset.pacNiv) { state.niveau_actif = b.dataset.pacNiv; return; }   // Lot 6 : la sélection du modèle suit (.sim-mod-row)
         if (b.dataset.combi) { state.mode_mpr = b.dataset.mode; if (b.dataset.fin) state.financement_mpr = b.dataset.fin; state.option = b.dataset.opt; }
+        else if (b.dataset.paie6) {             // Lot 6 : Comptant / Crédit travaux / Éco-PTZ
+          state.option = b.dataset.paie6;
+          if (state.option === 'opt3' && state.mode_mpr === 'sans_attente') state.financement_mpr = 'cash';
+        }
+        else if (b.dataset.isoTravaux) { state.iso_deverrouille = b.dataset.isoTravaux === 'oui'; }
+        else if (b.dataset.ballon6) {
+          if (b.dataset.ballon6 === 'non') state.ballon_ref = '';
+          else {
+            const ms = Array.isArray(ballonConfig().modeles) ? ballonConfig().modeles.filter(Boolean) : [];
+            const reco = ballonRecommandation(state);
+            state.ballon_ref = state.ballon_ref || (reco && (ms.find(m => m.type_installation === reco.type) || {}).ref) || (ms[0] || {}).ref || '';
+            ballonAlignerSurEmplacement(state);
+          }
+        }
+        else if (b.dataset.emplacement6) { state.ballon_emplacement = b.dataset.emplacement6; state.ballon_voir_tous = false; ballonAlignerSurEmplacement(state); }
         else if (b.dataset.modeMpr) { state.mode_mpr = b.dataset.modeMpr; }
         else if (b.dataset.finMpr) { state.financement_mpr = b.dataset.finMpr; }
         else if (b.dataset.opt) { state.option = b.dataset.opt; }
@@ -15935,6 +16108,12 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
         } else if (e.target && e.target.id === 'sim-afficher-mention-mpr'){
           state.afficher_mention_mpr = e.target.checked;
           scheduleSaveSimulatorState();
+        } else if (e.target && e.target.id === 'p6-avance-comptant'){
+          // Lot 6 : « Il paie l'avance MaPrimeRénov' comptant » = financement_mpr cash (sinon avance financée)
+          simTouche = true;
+          state.financement_mpr = e.target.checked ? 'cash' : 'credit';
+          scheduleSaveSimulatorState();
+          refresh();
         }
       });
     }
@@ -15958,7 +16137,10 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
 
   // Lot 5 : chaque morceau dans son étape du parcours (#p-sim-2, 5, 6, 7, 8) ; sans parcours (petit
   // écran, autre page), l'ensemble va dans le panneau d'origine.
-  const HOTES_SIM = { iso: 'p-sim-2', besoin: 'p-sim-5', pac: 'p-sim-6', fin: 'p-sim-7', resultat: 'p-sim-8' };
+  // Lot 6 : surface chauffée dans la grille « Le logement » (étape 2), isolation (2), aides (4), besoin (5),
+  // proposition : gauche (PAC + paiement) et droite (résultat + barre de boutons) de l'étape 6
+  const HOTES_SIM = { surface: 'p-sim-surf', iso: 'p-sim-2', aides: 'p-sim-4', besoin: 'p-sim-5', pac: 'p-sim-6a', fin: 'p-sim-6b',
+                      resultat: 'p-sim-6r-corps', barre: 'p-sim-6r-barre' };
   async function refresh(){
     const seq = ++__renderSeq;
     const content=document.getElementById('sim-drawer-content');
@@ -15967,6 +16149,8 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     // 1) Sauvegarder scroll + focus + caret AVANT réinjection
     const defil = document.getElementById('p-corps') || document.querySelector('.sim-body');
     const scrollTop = defil ? defil.scrollTop : 0;
+    const defils = typeof document.querySelectorAll === 'function'                                   // Lot 6 : colonnes
+      ? Array.from(document.querySelectorAll('.p6-defil')).map(el => [el, el.scrollTop]) : [];
     const active = document.activeElement;
     const focusId = active && active.id ? active.id : null;
     let caretStart=null, caretEnd=null;
@@ -15986,6 +16170,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     // 3) Restaurer scroll
     const body2 = document.getElementById('p-corps') || document.querySelector('.sim-body');
     if (body2) body2.scrollTop = scrollTop;
+    defils.forEach(([el, t]) => { if (document.contains(el)) el.scrollTop = t; });
     // 4) Restaurer focus + caret
     if (focusId){
       const again=document.getElementById(focusId);
@@ -16050,6 +16235,12 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
   };
   // Complétude des parties simulateur (dernier calcul) : [besoin, surface chauffée, PAC, eau chaude, financement]
   window.hexaSimEtapesOk = function(){ return dernierCalcul ? etapesOk(dernierCalcul) : null; };
+  // Lot 6 : relit la fiche et réaffiche (type de logement, personnes… qui ne déclenchent pas de relecture)
+  window.hexaSimRafraichir = function(){ if (!simMonte || window.__hexaEstimationExpress) return Promise.resolve(); lireContexteFiche(); return refresh(); };
+  window.hexaSimLire = function(){
+    return { service: state.service, iso_source: state.iso_source, categorie: state.categorie,
+             mpr: dernierCalcul ? dernierCalcul.mprTotal : null, sans_attente: !!(dernierCalcul && dernierCalcul.sansAttente) };
+  };
   // réglages de financement en cours (tests, raccourcis) : mêmes clés que l'état enregistré
   window.hexaSimReglages = function(){
     return { mode_mpr: state.mode_mpr || 'attente', financement_mpr: state.financement_mpr || 'cash', option: state.option || 'opt1',
@@ -16082,7 +16273,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
   // (Lot 4c) étapes du simulateur -> étapes du parcours : 1 Besoin → 5, 2 Logement → 2, 3 PAC → 6,
   // 4 Eau chaude → 5, 5 Financement → 7
   window.hexaSimEtape = function(n){
-    const m = { 1: 5, 2: 2, 3: 6, 4: 5, 5: 7 }[Number(n)] || 5;
+    const m = { 1: 5, 2: 2, 3: 6, 4: 5, 5: 6 }[Number(n)] || 5;   // Lot 6 : PAC et financement -> Proposition
     if (typeof window.hexaParcoursEtape === 'function') window.hexaParcoursEtape(m);
     return Promise.resolve();
   };
@@ -16726,6 +16917,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
       fetch('/api/admin/config', { cache:'no-store' })
     ]);
     M3_ADMIN = r.ok ? await r.json() : {};
+    SA_EDIT = null;                                   // Lot 6 : éditeur du script d'appel relu
     const cfg = cfgR.ok ? await cfgR.json() : {};
     M3_ADMIN.script_notion_url = cfg.script_notion_url || '';
     return M3_ADMIN;
@@ -17039,6 +17231,114 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
         </div>
         <div class="adm-actions"><button type="button" class="adm-btn-save" id="btn-save-params-eco-energie">Enregistrer</button></div>
       </div>`;
+  }
+  // Lot 6 : Admin → Script d'appel. Textes de l'« Accompagnateur d'appel » de la fiche, par étape du parcours :
+  // introduction, questions (avec boutons de réponse et consigne), encarts conditionnels. Stockés dans la
+  // config admin (/api/admin/script-appel), jamais dans le lead.
+  var SA_EDIT = null;
+  const SA_ETAPES = ['Contact', 'Logement', 'Chauffage', 'Foyer', 'Besoin', 'Proposition'];
+  function saModele(){
+    if (!SA_EDIT) SA_EDIT = JSON.parse(JSON.stringify((M3_ADMIN && M3_ADMIN.script_appel) || { etapes: {} }));
+    SA_EDIT.etapes = SA_EDIT.etapes || {};
+    return SA_EDIT;
+  }
+  function saEtapeHtml(n, e, ouvert){
+    const E = adminEscape;
+    const qs = Array.isArray(e.questions) ? e.questions : [], cs = Array.isArray(e.encarts) ? e.encarts : [];
+    return `<details class="sa-etape" data-sa-etape="${n}"${ouvert ? ' open' : ''}><summary>Étape ${n} — ${SA_ETAPES[n - 1]}</summary>
+      <div class="sa-ligne"><label>Titre du panneau</label><input type="text" data-sa="titre" value="${E(e.titre || '')}"></div>
+      <div class="sa-ligne"><label>Texte d'introduction</label><textarea data-sa="intro">${E(e.intro || '')}</textarea></div>
+      ${qs.map((qq, i) => `<div class="sa-carte" data-sa-q="${i}">
+        <div class="sa-ligne"><label>Question ${i + 1}</label><input type="text" data-sa="q-texte" value="${E(qq.texte || '')}"></div>
+        ${(qq.reponses || []).map((r, j) => `<div class="sa-rep" data-sa-r="${j}">
+          <input type="text" data-sa="r-libelle" value="${E(r.libelle || '')}" placeholder="Bouton (ex. Oui)">
+          <input type="text" data-sa="r-consigne" value="${E(r.consigne || '')}" placeholder="Consigne affichée si ce bouton est choisi (facultatif)">
+          <label class="sa-mini" title="Bouton orange : réponse qui demande une action"><input type="checkbox" data-sa="r-alerte"${r.alerte ? ' checked' : ''}> alerte</label>
+          <button type="button" class="sa-mini sa-mini--suppr" data-sa-action="suppr-r" data-e="${n}" data-q="${i}" data-r="${j}" title="Retirer ce bouton">×</button></div>`).join('')}
+        <div class="sa-actions"><button type="button" class="sa-mini" data-sa-action="ajout-r" data-e="${n}" data-q="${i}">+ Bouton de réponse</button>
+          <button type="button" class="sa-mini sa-mini--suppr" data-sa-action="suppr-q" data-e="${n}" data-q="${i}">Supprimer la question</button></div>
+      </div>`).join('')}
+      ${cs.map((c, i) => `<div class="sa-carte" data-sa-c="${i}">
+        <div class="sa-ligne"><label>Encart ${i + 1} — titre</label><input type="text" data-sa="c-titre" value="${E(c.titre || '')}" placeholder="ex. À EXPLIQUER :"></div>
+        <div class="sa-ligne"><label>Texte</label><textarea data-sa="c-texte">${E(c.texte || '')}</textarea></div>
+        <div class="sa-ligne"><label>Condition</label><input type="text" data-sa="c-condition" value="${E(c.condition || '')}" placeholder="vide = toujours · q3=1 · dpe · dpe_classe=F,G · energie=fioul,gaz · ecs_chaudiere · categorie=superieur · service=chauffage_seul"></div>
+        <div class="sa-actions"><button type="button" class="sa-mini sa-mini--suppr" data-sa-action="suppr-c" data-e="${n}" data-c="${i}">Supprimer l'encart</button></div>
+      </div>`).join('')}
+      <div class="sa-actions"><button type="button" class="sa-mini" data-sa-action="ajout-q" data-e="${n}">+ Question</button>
+        <button type="button" class="sa-mini" data-sa-action="ajout-c" data-e="${n}">+ Encart</button></div>
+    </details>`;
+  }
+  function renderScriptAppelSection(ouverts){
+    const m = saModele();
+    const o = ouverts || ['1'];
+    return `<div class="adm-section-block" data-section="script-appel" id="sa-editeur">
+      <p class="sa-aide">Textes du panneau bleu « Accompagnateur d'appel », à droite de chaque étape de la fiche. Remplacés à l'affichage :
+        <code>[Civilité Nom]</code> <code>[prénom de l'utilisateur]</code> <code>[prénom du client]</code> <code>[nom du client]</code>
+        <code>[année du DPE]</code> <code>[date du DPE]</code> <code>[classe DPE]</code>.<br>
+        Encart affiché seulement si sa condition est vraie : vide = toujours · <code>q3=1</code> = 1re réponse à la question 3 ·
+        <code>dpe</code> = un DPE ou un audit est connu · <code>dpe_classe=F,G</code> · <code>energie=fioul,gaz</code> · <code>ecs_chaudiere</code> ·
+        <code>categorie=superieur</code> · <code>service=chauffage_seul</code>.</p>
+      ${[1, 2, 3, 4, 5, 6].map(n => saEtapeHtml(n, m.etapes[String(n)] || {}, o.includes(String(n)))).join('')}
+      <div class="adm-actions"><button type="button" class="adm-btn-save" id="btn-save-script-appel">Enregistrer</button></div>
+    </div>`;
+  }
+  // écran -> modèle (avant d'ajouter / retirer / enregistrer)
+  function saLire(){
+    const m = saModele();
+    const v = (root, sel) => { const x = root.querySelector(sel); return x ? x.value : ''; };
+    document.querySelectorAll('#sa-editeur [data-sa-etape]').forEach(d => {
+      const e = m.etapes[d.dataset.saEtape] = m.etapes[d.dataset.saEtape] || {};
+      e.titre = v(d, ':scope > .sa-ligne [data-sa="titre"]');
+      e.intro = v(d, ':scope > .sa-ligne [data-sa="intro"]');
+      e.questions = Array.from(d.querySelectorAll(':scope > [data-sa-q]')).map(c => ({
+        texte: v(c, '[data-sa="q-texte"]'),
+        reponses: Array.from(c.querySelectorAll('[data-sa-r]')).map(r => ({
+          libelle: v(r, '[data-sa="r-libelle"]'), consigne: v(r, '[data-sa="r-consigne"]'),
+          alerte: !!(r.querySelector('[data-sa="r-alerte"]') || {}).checked }))
+      }));
+      e.encarts = Array.from(d.querySelectorAll(':scope > [data-sa-c]')).map(c => ({
+        titre: v(c, '[data-sa="c-titre"]'), texte: v(c, '[data-sa="c-texte"]'), condition: v(c, '[data-sa="c-condition"]') }));
+    });
+    return m;
+  }
+  function saRedessiner(){
+    const box = document.getElementById('sa-editeur'); if (!box) return;
+    const ouverts = Array.from(box.querySelectorAll('details[open]')).map(d => d.dataset.saEtape);
+    box.outerHTML = renderScriptAppelSection(ouverts);
+  }
+  if (!window.__saDelegue) {
+    window.__saDelegue = true;
+    document.addEventListener('click', async (ev) => {
+      const b = ev.target && ev.target.closest ? ev.target.closest('#sa-editeur [data-sa-action], #btn-save-script-appel') : null;
+      if (!b) return;
+      ev.preventDefault();
+      const m = saLire();
+      if (b.id === 'btn-save-script-appel') {
+        const r = await fetch('/api/admin/script-appel', { method: 'POST', headers: window.adminHeaders(), body: JSON.stringify(m) }).catch(() => null);
+        if (r && r.ok) {
+          const d = await r.json().catch(() => ({}));
+          M3_ADMIN = M3_ADMIN || {};
+          M3_ADMIN.script_appel = d.script_appel || m;
+          SA_EDIT = null;
+          saRedessiner();
+          if (typeof window.hexaScriptAppelRecharger === 'function') window.hexaScriptAppelRecharger();
+          adminToast('✓ Script d\'appel enregistré', '#0D6B3B');
+        } else adminToast('❌ Erreur lors de l\'enregistrement', '#B91C1C');
+        return;
+      }
+      const e = m.etapes[b.dataset.e] = m.etapes[b.dataset.e] || {};
+      e.questions = e.questions || []; e.encarts = e.encarts || [];
+      const qi = Number(b.dataset.q), qq = e.questions[qi];
+      switch (b.dataset.saAction) {
+        case 'ajout-q': e.questions.push({ texte: '', reponses: [{ libelle: 'Oui', consigne: '', alerte: false }, { libelle: 'Non', consigne: '', alerte: false }] }); break;
+        case 'suppr-q': e.questions.splice(qi, 1); break;
+        case 'ajout-r': if (qq) (qq.reponses = qq.reponses || []).push({ libelle: '', consigne: '', alerte: false }); break;
+        case 'suppr-r': if (qq && qq.reponses) qq.reponses.splice(Number(b.dataset.r), 1); break;
+        case 'ajout-c': e.encarts.push({ titre: '', texte: '', condition: '' }); break;
+        case 'suppr-c': e.encarts.splice(Number(b.dataset.c), 1); break;
+      }
+      saRedessiner();
+    });
   }
   function renderParamsFinancement(){
     const d = defaultParamsFinancement();
@@ -17837,6 +18137,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     const admB9 = admBloc('9','9. Gammes & Marques', renderMarquesSection());
     const admB10 = admBloc('10','10. Utilisateurs', renderUtilisateursSection());
     const admB11 = admBloc('11','11. Relances (emails automatiques)', renderRelancesSection());
+    const admB12 = admBloc('12','12. Script d\'appel (accompagnateur de la fiche)', renderScriptAppelSection());
     return `
       <div class="adm-overlay" id="adm-overlay">
         <div class="adm-modal">
@@ -17858,6 +18159,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
             <button class="adm-roottab" data-roottab="ballon">Ballon</button>
             <button class="adm-roottab" data-roottab="eco">Économie & Financement</button>
             <button class="adm-roottab" data-roottab="emails">Emails & Relances</button>
+            <button class="adm-roottab" data-roottab="script">Script d'appel</button>
             <button class="adm-roottab" data-roottab="systeme">Système</button>
           </div>
           <div class="adm-body">
@@ -17869,6 +18171,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
             <div class="adm-rootpanel" data-rootpanel="ballon" hidden>${admB5_3}</div>
             <div class="adm-rootpanel" data-rootpanel="eco" hidden>${admB8}</div>
             <div class="adm-rootpanel" data-rootpanel="emails" hidden>${admB6}${admB11}</div>
+            <div class="adm-rootpanel" data-rootpanel="script" hidden>${admB12}</div>
             <div class="adm-rootpanel" data-rootpanel="systeme" hidden>${admB10}${admB7}</div>
           </div>
         </div>
@@ -21366,7 +21669,8 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     const elec = E.cleEnergie(mode) === 'electricite';
     // saisie à venir (source vide) ou montant déclaré : c'est la facture d'électricité totale
     const totale = elec && (s === '' || E.factureElectriciteTotale(mode, s));
-    if (texte && texte.firstChild) texte.firstChild.textContent = totale ? LIBELLE_COUT_ELEC : LIBELLE_COUT;
+    const lib = totale ? LIBELLE_COUT_ELEC : LIBELLE_COUT;
+    if (texte && texte.firstChild && texte.firstChild.textContent !== lib) texte.firstChild.textContent = lib;
     const ligne = document.getElementById('cout-hors-chauffage');
     if (!ligne) return;
     const m = nombre(el.value);
@@ -21462,6 +21766,25 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
   }
   window.hexaEstimationCoutRecharger = function () { paramsP = null; };
   function valeurChamp(sel) { const e = document.querySelector(sel); return e ? e.value : ''; }
+  // Estimation annuelle à partir du logement (même calcul qu'avant ; Lot 6 : aussi affichée sans être écrite)
+  async function estimationAnnuelle() {
+    const E = window.HexaEconomies;
+    if (!E) return null;
+    const [params, zones] = await charger();
+    const surface = nombre(valeurChamp('#surface-input') || valeurChamp('[name="surface_logement_m2"]'));
+    const cp = String(valeurChamp('#cp-chantier') || valeurChamp('[name="code_postal_chantier"]')).replace(/\D/g, '').slice(0, 5);
+    const dept = cp.startsWith('97') ? cp.slice(0, 3)
+      : (cp.startsWith('20') ? (Number(cp.slice(0, 3)) < 202 ? '2A' : '2B') : cp.slice(0, 2));
+    const zone = (zones && zones[dept]) || '';
+    const mode = valeurChamp('select[name="mode_chauffage"]');
+    const energie = E.cleEnergie(mode);
+    const ecs = valeurChamp('select[name="ecs"]') || valeurChamp('select[name="gestion_ecs"]');
+    return E.estimerFactureAnnuelle(surface ? surface * 0.9 : 0, zone, valeurChamp('[name="annee_construction"]'),
+      mode, E.ecsParChaudiere(ecs, energie), valeurChamp('[name="nombre_personnes"]'), params);
+  }
+  window.hexaCoutEstimationAnnuelle = estimationAnnuelle;
+  // Lot 6 : « Le client connaît sa facture ? » Non -> la saisie réelle est retirée (comme un champ vidé à la main)
+  window.hexaCoutSaisie = function (valeurMensuelle) { saisieUtilisateur(valeurMensuelle == null ? '' : String(valeurMensuelle)); };
   async function lancerEstimation() {
     const el = champ(), E = window.HexaEconomies;
     if (!el || !E) return;
@@ -21628,17 +21951,18 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
   };
   // Lot 5 : parcours en 8 étapes. blocs = sections de la fiche (dans le <form>) affichées à l'étape ;
   // hote = morceau du simulateur (#p-sim-N, hors du <form>).
+  // Lot 6 : parcours en 6 étapes (maquette docs/maquette-parcours-v2.html) ; Proposition = PAC + financement +
+  // résultat sur un seul écran. titre = barre d'étapes, carte = titre de la carte. Le texte « à dire » est dans
+  // l'accompagnateur d'appel (Admin → Script d'appel).
   const ETAPES_P = [
-    { n: 1, titre: 'Contact', blocs: [1], dire: BLOCS[0].dire },
-    { n: 2, titre: 'Logement', blocs: [2], hote: true, dire: BLOCS[1].dire },
-    { n: 3, titre: 'Chauffage', blocs: [3], dire: BLOCS[2].dire },
-    { n: 4, titre: 'Foyer', blocs: [4], dire: BLOCS[3].dire },
-    { n: 5, titre: 'Besoin', blocs: [], hote: true, dire: '« Voulez-vous que la pompe à chaleur fasse aussi votre eau chaude ? »' },
-    { n: 6, titre: 'PAC', blocs: [], hote: true, dire: '' },
-    { n: 7, titre: 'Financement', blocs: [], hote: true, dire: '« Voulez-vous démarrer tout de suite, ou attendre l\'accord de MaPrimeRénov\' ? »' },
-    { n: 8, titre: 'Résultat', blocs: [5], hote: true, dire: '' }
+    { n: 1, titre: 'Contact', carte: 'Contact', blocs: [1], dire: '' },
+    { n: 2, titre: 'Logement', carte: 'Logement', blocs: [2], hote: true, dire: '' },
+    { n: 3, titre: 'Chauffage', carte: 'Chauffage actuel', blocs: [3], dire: '' },
+    { n: 4, titre: 'Foyer', carte: 'Foyer et revenus', blocs: [4], hote: true, dire: '' },
+    { n: 5, titre: 'Besoin', carte: 'Besoin du client', blocs: [], hote: true, dire: '' },
+    { n: 6, titre: 'Proposition', carte: 'Proposition', blocs: [5], hote: true, dire: '' }
   ];
-  const ETAPE_DU_BLOC = { 1: 1, 2: 2, 3: 3, 4: 4, 5: 8, 6: 2 };   // bloc 6 = données techniques (étape 2, dépliable)
+  const ETAPE_DU_BLOC = { 1: 1, 2: 2, 3: 3, 4: 4, 5: 6, 6: 2 };   // bloc 5 = visite technique (étape 6) ; bloc 6 = données techniques (étape 2, dépliable)
   const AIDE_SOUS_CHOIX = 'Demandez de quoi sont faits les radiateurs. Sert au devis.';
   const AIDE_TECHNIQUE = 'Ne modifiez que si le technicien a relevé une autre valeur.';
   const AIDE_STATUT = 'Changez le statut après chaque appel. Arrêtez les relances si le client a dit non.';
@@ -21647,16 +21971,16 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
   // Choix en boutons -> valeurs d'option EXISTANTES du <select>
   const CHOIX = {
     civilite: [['Mme', 'Madame', ['Madame', 'Mme']], ['M.', 'Monsieur']],
-    usage_bien: [['Propriétaire occupant', 'proprietaire_occupant'], ['Bailleur', 'bailleur']],
-    situation_propriete: [['Déjà propriétaire', 'proprietaire'], ['Achat en cours', 'acquisition']],
-    type_logement: [['Maison', 'maison'], ['Appartement', 'appartement']],
-    mode_chauffage: [['Fioul', 'fioul'], ['Gaz', 'gaz'], ['Électricité', 'electricite'], ['Bois-granulés', 'bois'], ['PAC', 'pac']],
+    usage_bien: [['Occupant', 'proprietaire_occupant'], ['Bailleur', 'bailleur']],
+    situation_propriete: [['Propriétaire', 'proprietaire'], ['Achat en cours', 'acquisition']],
+    type_logement: [['Maison', 'maison'], ['Appart.', 'appartement']],
+    mode_chauffage: [['Fioul', 'fioul'], ['Gaz', 'gaz'], ['Électricité', 'electricite'], ['Bois / granulés', 'bois'], ['PAC', 'pac']],
     type_emetteurs: [['Radiateurs à eau', 'radiateurs_classiques', ['radiateurs_classiques', 'radiateurs_fonte', 'radiateurs_basse_temp']],
-                     ['Plancher chauffant', 'plancher_chauffant'], ['Convecteurs électriques', 'convecteurs_electriques']],
-    ecs: [['Par la chaudière', 'chaudiere'], ['Ballon électrique', 'independant'], ['Autre', 'autre']],
+                     ['Plancher chauffant', 'plancher_chauffant'], ['Convecteurs élec.', 'convecteurs_electriques']],
+    ecs: [['La chaudière', 'chaudiere'], ['Un ballon électrique', 'independant'], ['Autre', 'autre']],
     alimentation_electrique: [['Monophasé', 'monophase'], ['Triphasé', 'triphase'], ['Ne sait pas', '', null, 'nsp']]
   };
-  const SOUS_CHOIX_RADIATEURS = [['Fonte', 'radiateurs_fonte'], ['Acier', 'radiateurs_classiques'], ['Basse température', 'radiateurs_basse_temp']];
+  const SOUS_CHOIX_RADIATEURS = [['Fonte', 'radiateurs_fonte'], ['Acier', 'radiateurs_classiques'], ['Basse temp.', 'radiateurs_basse_temp']];
   // ancienne clé cachée type_emetteur, synchronisée à l'écran (valeurs de l'ancien select)
   const VERS_TYPE_EMETTEUR = { plancher_chauffant: 'plancher_chauffant', radiateurs_classiques: 'radiateur_eau',
     radiateurs_fonte: 'radiateur_eau', radiateurs_basse_temp: 'radiateur_eau', convecteurs_electriques: 'convecteur_electrique' };
@@ -21965,27 +22289,47 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     main.className = 'l4-main';
     container.insertBefore(grille, form);
     grille.appendChild(main);
+    // Lot 6 : carte de l'étape (à gauche, boutons en pied) + accompagnateur d'appel (à droite)
     main.innerHTML = `
       <nav class="p-etapes" id="p-etapes" aria-label="Étapes"></nav>
-      <section class="p-carte" id="p-carte">
-        <header class="p-carte-tete">
-          <div class="p-carte-ligne"><span class="p-carte-num" id="p-num">ÉTAPE 1 SUR 8</span><span class="p-carte-legende" id="p-legende"></span></div>
-          <h2 class="p-carte-titre" id="p-titre"></h2>
-          <div class="p-dire" id="p-dire"></div>
-        </header>
-        <div class="p-corps" id="p-corps" data-etape="1"></div>
-      </section>
-      <div class="p-nav">
-        <button type="button" class="p-nav-btn p-nav-btn--prec" id="p-prec">← Précédent</button>
-        <button type="button" class="p-lien-tech" id="p-lien-tech" aria-expanded="false" hidden>Données techniques (auto)</button>
-        <button type="button" class="p-nav-btn" id="p-suiv">Suivant →</button>
+      <div class="p6-rang" id="p6-rang">
+        <section class="p-carte" id="p-carte">
+          <header class="p-carte-tete">
+            <div class="p-carte-ligne"><span class="p-carte-num" id="p-num">ÉTAPE 1 SUR 6</span><span class="p-carte-legende" id="p-legende"></span></div>
+            <h2 class="p-carte-titre" id="p-titre"></h2>
+            <div class="p-dire" id="p-dire" hidden></div>
+          </header>
+          <div class="p-corps" id="p-corps" data-etape="1"></div>
+          <div class="p-nav">
+            <button type="button" class="p-nav-btn p-nav-btn--prec" id="p-prec">← Précédent</button>
+            <button type="button" class="p-lien-tech" id="p-lien-tech" aria-expanded="false" hidden>Données techniques (auto)</button>
+            <button type="button" class="p-nav-btn" id="p-suiv">Suivant →</button>
+          </div>
+        </section>
+        <aside class="p6-aside" id="p6-aside" aria-label="Accompagnateur d'appel"></aside>
       </div>`;
     const corps = q('#p-corps', main);
     corps.appendChild(form);
     const hotes = document.createElement('div');
     hotes.id = 'p-hotes';
     hotes.className = 'l4s';
-    hotes.innerHTML = ETAPES_P.filter(e => e.hote).map(e => `<div class="p-hote" id="p-sim-${e.n}" data-p-etape="${e.n}" hidden></div>`).join('');
+    // Lot 6 : morceaux du simulateur (hors du <form>) ; la surface chauffée est dans la fiche (#p-sim-surf, sans name)
+    hotes.innerHTML = `
+      <div class="p-hote" id="p-sim-2" data-p-etape="2" hidden></div>
+      <div class="p-hote" id="p-sim-4" data-p-etape="4" hidden></div>
+      <div class="p-hote" id="p-sim-5" data-p-etape="5" hidden></div>
+      <div class="p-hote p6-gauche" id="p-sim-6" data-p-etape="6" hidden>
+        <div class="p6-defil" id="p6-gauche-defil">
+          <div class="p6-tete6"><span class="p-carte-num">ÉTAPE 6 SUR 6</span><span class="p6-titre6">Proposition</span></div>
+          <div class="p6-legende-hote"></div>
+          <div id="p-sim-6a"></div>
+          <div id="p-sim-6b"></div>
+        </div>
+      </div>
+      <div class="p-hote p6-droite" id="p-sim-6r" data-p-etape="6" hidden>
+        <div class="p6-defil" id="p6-droite-defil"><div id="p-sim-6r-corps"></div></div>
+        <div class="p6-barre" id="p-sim-6r-barre"></div>
+      </div>`;
     corps.appendChild(hotes);
     q('#p-legende', main).appendChild(legende);
     q('#p-prec', main).addEventListener('click', () => allerEtape(etapeCourante - 1));
@@ -22034,6 +22378,9 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
       ouvrirBloc(b.classList.contains('is-open') ? 0 : Number(b.dataset.bloc));
     }));
 
+    if (typeof window.hexaL6Construire === 'function') {
+      window.hexaL6Construire({ etapes: ETAPES_P, allerEtape: (n) => allerEtape(n), etapeCourante: () => etapeCourante });
+    }
     reglerAide(lireAide());
     ['input', 'change'].forEach(ev => document.addEventListener(ev, (e) => {
       if (e.target && e.target.closest && e.target.closest('#form-prospect')) {
@@ -22067,14 +22414,16 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     const corps = q('#p-corps');
     if (corps) { corps.dataset.etape = String(n); if (change && !(opts && opts.garderDefilement)) corps.scrollTop = 0; }
     const t = q('#p-num'); if (t) t.textContent = `ÉTAPE ${n} SUR ${ETAPES_P.length}`;
-    const ti = q('#p-titre'); if (ti) ti.textContent = E.titre;
+    const ti = q('#p-titre'); if (ti) ti.textContent = E.carte || E.titre;
     const di = q('#p-dire'); if (di) { di.textContent = E.dire ? 'À dire : ' + E.dire : ''; di.hidden = !E.dire; }
     const lt = q('#p-lien-tech'); if (lt) { lt.hidden = n !== 2; lt.setAttribute('aria-expanded', techOuvert ? 'true' : 'false'); lt.textContent = techOuvert ? 'Masquer les données techniques' : 'Données techniques (auto)'; }
-    const pr = q('#p-prec'); if (pr) pr.disabled = n === 1;
-    const su = q('#p-suiv'); if (su) su.disabled = n === ETAPES_P.length;
+    const pr = q('#p-prec'); if (pr) { pr.disabled = n === 1; pr.textContent = n > 1 ? '← ' + ETAPES_P[n - 2].titre : '← Précédent'; }
+    const su = q('#p-suiv'); if (su) { su.disabled = n === ETAPES_P.length; su.textContent = n < ETAPES_P.length ? `Suivant : ${ETAPES_P[n].titre} →` : 'Suivant →'; }
+    if (typeof window.hexaL6Etape === 'function') window.hexaL6Etape(n);
     majEtapes();
     ajusterHauteur();
   }
+  window.hexaParcoursAjuster = function () { ajusterHauteur(); };
   function ouvrirBloc(n) {
     if (!n) return;
     if (n === 6) techOuvert = true;
@@ -22109,11 +22458,11 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
       if (n === 2 && so && !so[1]) return 'manque';        // surface chauffée
       return 'ok';
     }
-    if (n === 8) return [1, 2, 3, 4, 5, 6, 7].every(k => etatEtape(k) === 'ok') ? 'ok' : 'neutre';
     if (!so) return 'neutre';
     if (n === 5) return so[0] && so[3] ? 'ok' : 'manque';
-    if (n === 6) return so[2] ? 'ok' : 'manque';
-    return so[4] ? 'ok' : 'manque';
+    // Lot 6 : Proposition = PAC + financement ; ✓ quand tout le parcours est complet
+    if (!so[2] || !so[4]) return 'manque';
+    return [1, 2, 3, 4, 5].every(k => etatEtape(k) === 'ok') ? 'ok' : 'neutre';
   }
   function majEtapes() {
     const nav = q('#p-etapes'); if (!nav) return;
@@ -22250,6 +22599,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     const n = blocDe(name);
     if (!f || !n) return;
     ouvrirBloc(n);                                   // Lot 5 : va à l'étape du champ
+    if (typeof window.hexaL6Reveler === 'function') window.hexaL6Reveler(f);
     const cible = qa('input:not([type=hidden]):not([disabled]), select:not(.l4-cache):not([disabled]), textarea, .l4-choix button', f)
       .find(e => e.offsetParent !== null);
     if (cible) { cible.focus({ preventScroll: true }); cible.scrollIntoView({ block: 'nearest' }); }
@@ -22317,6 +22667,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
   function majTout() {
     if (!construit) return;
     majChoix(); majBlocs(); majJauge(); majEligibilite(); majRequis(); majEtapes(); majSuivi();
+    if (typeof window.hexaL6Maj === 'function') window.hexaL6Maj();
     // identité relue aussi ici : la ville est posée sans événement après le chargement des communes
     if (typeof window.updateIdentityBanner === 'function') window.updateIdentityBanner();
   }
@@ -22403,7 +22754,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     const monte = typeof window.hexaSimMonter === 'function' ? window.hexaSimMonter(numero || null, { garder: memeLead }) : Promise.resolve();
     Promise.resolve(monte).then(() => {
       if (memeLead || !numero || fiche) { majEtapes(); return; }
-      allerEtape([2, 5, 6, 7].find(n => etatEtape(n) !== 'ok') || 8);
+      allerEtape([2, 5, 6].find(n => etatEtape(n) !== 'ok') || 6);
     });
     setTimeout(ajusterHauteur, 300);    // après le rendu du statut / des relances
   }
@@ -22413,6 +22764,492 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
   function demarrer() { if (!construire()) setTimeout(demarrer, 250); }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => setTimeout(demarrer, 0));
   else setTimeout(demarrer, 0);
+})();
+</script>
+<script id="hexa-lot6-parcours-js">
+/* HEXA — Lot 6 : parcours télépro en 6 étapes (maquette docs/maquette-parcours-v2.html).
+   PRÉSENTATION UNIQUEMENT : les champs de la fiche sont DÉPLACÉS dans des sections (jamais recréés ni
+   renommés : name / id / écouteurs intacts) ; les montants viennent des calculs existants. Appelé par le
+   parcours (Lot 5) : window.hexaL6Construire (une fois), hexaL6Etape(n) (à chaque étape), hexaL6Maj(). */
+(function () {
+  'use strict';
+  const q = (s, r) => (r || document).querySelector(s);
+  const qa = (s, r) => Array.from((r || document).querySelectorAll(s));
+  const champ = (name) => q(`#form-prospect [name="${name}"]`);
+  const val = (name) => { const e = champ(name); return e ? String(e.value || '').trim() : ''; };
+  const fieldDe = (name) => { const e = champ(name); return e ? (e.closest('.field') || null) : null; };
+  const esc = (v) => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  // montants : séparateur de milliers = espace insécable normale U+00A0 (U+202F n'est pas rendue par la police)
+  const nb = (x) => Math.round(Number(x) || 0).toLocaleString('fr-FR').replace(/[  ]/g, ' ');
+  const e0 = (x) => nb(x) + ' €';
+  const nombre = (v) => { const n = parseFloat(String(v == null ? '' : v).replace(/\s/g, '').replace(',', '.')); return Number.isFinite(n) ? n : null; };
+  const LEGENDE = 'Encadré jaune = <b>ce champ change le prix pour le client</b> (aides, reste à charge ou économies). Vérifiez-le deux fois.';
+  let ctx = null;              // parcours (Lot 5) : { etapes, allerEtape, etapeCourante }
+
+  function el(tag, cls, html) { const d = document.createElement(tag); if (cls) d.className = cls; if (html != null) d.innerHTML = html; return d; }
+  const section = (t, cls) => el('div', 'p6-sec' + (cls ? ' ' + cls : ''), t);
+  const sep = () => el('div', 'p6-sep');
+  const grille = (cls) => el('div', 'l4-grid p6-g ' + (cls || ''));
+  const aide = (t) => el('div', 'p6-aide', t);
+  function mettre(g, name, cls) {
+    const f = fieldDe(name);
+    if (!f) return null;
+    g.appendChild(f);
+    if (cls) cls.split(' ').forEach(c => f.classList.add(c));
+    return f;
+  }
+  // libellé sur une ligne, texte de la maquette (les marques * / devis et les badges restent)
+  function libeller(name, texte) {
+    const f = fieldDe(name), lab = f && q(':scope > label', f);
+    if (!lab) return;
+    const row = q('.label-row', lab);
+    const cible = row ? q(':scope > span:first-child', row) : lab;
+    qa('.hint', cible).forEach(h => h.remove());
+    const textes = Array.from(cible.childNodes).filter(n => n.nodeType === 3 && n.textContent.trim());
+    textes.forEach((n, i) => { n.textContent = i === 0 ? texte + ' ' : ''; });
+    if (!textes.length) cible.insertBefore(document.createTextNode(texte + ' '), cible.firstChild);
+  }
+  // l'aide d'un champ (ligne bleue du Lot 4a) devient une infobulle : grilles régulières
+  function aidesEnInfobulles() {
+    qa('#l4-accordeon .l4-grid > .field').forEach(f => {
+      const a = q(':scope > .l4-aide[data-aide]', f), lab = q(':scope > label', f);
+      if (a && lab && !lab.title) lab.title = a.textContent;
+    });
+  }
+
+  // ------------------------------------------------------------------ construction des sections
+  function blocCorps(n) { return q(`#l4-bloc-${n} .l4-corps`); }
+  function vider(corps) { const g = q(':scope > .l4-grid:not(.p6-g)', corps); if (g && !g.children.length) g.classList.add('l4-masque'); }
+
+  function bloc1() {
+    [['civilite', 'Civilité'], ['nom', 'Nom'], ['prenom', 'Prénom'], ['telephone', 'Téléphone'], ['email', 'E-mail'], ['source', 'Provenance']]
+      .forEach(([n, t]) => libeller(n, t));
+    const g = q('#l4-bloc-1 .l4-grid'); if (g) g.classList.add('p6-g', 'p6-g2');
+  }
+
+  function bloc2() {
+    const corps = blocCorps(2); if (!corps) return;
+    const banner = q('#dpe-banner', corps);
+    const g1 = grille('p6-g-adr');
+    mettre(g1, 'adresse_chantier', 'p6-span2'); mettre(g1, 'code_postal_chantier'); mettre(g1, 'ville_chantier');
+    const bande = el('div', 'p6-dpe'); bande.id = 'p6-dpe-bande';
+    const g2 = grille('p6-g-log');
+    mettre(g2, 'type_logement');
+    mettre(g2, 'surface_logement_m2');
+    const surf = el('div', 'field p-hote p6-surf p6-imp'); surf.id = 'p-sim-surf'; surf.dataset.pEtape = '2';
+    g2.appendChild(surf);
+    mettre(g2, 'annee_construction');
+    const g3 = grille('p6-g-log2');
+    mettre(g3, 'hsp');
+    g3.appendChild(el('div', 'p6-vide'));
+    const vb = el('div', 'field p6-valeur-bien', '<label><span class="label-row"><span>Valeur estimée du bien</span><span class="p6-tag">auto</span></span></label><div class="p6-in p6-in--auto" id="p6-valeur-bien">—</div>');
+    g3.appendChild(vb);
+    const g4 = grille('p6-g3');
+    mettre(g4, 'usage_bien'); mettre(g4, 'situation_propriete'); mettre(g4, 'date_acquisition');
+    const g5 = grille('p6-g-bail l4-si-bailleur');
+    mettre(g5, 'adresse_personne'); mettre(g5, 'code_postal_personne'); mettre(g5, 'ville_personne');
+    const kids = [section('1 · ADRESSE'), g1, bande];
+    if (banner) kids.push(banner);
+    kids.push(sep(), section('2 · LE LOGEMENT — PRÉ-REMPLI PAR LE DPE, À CONFIRMER AVEC LE CLIENT', 'p6-sec--bleu'), g2, g3,
+      aide('Surface chauffée : 90 % de la surface habitable par défaut (sans garage ni combles) — à corriger si le client chauffe moins de pièces. Valeur du bien : estimation automatique, sert au calcul du retour sur investissement.'),
+      sep(), section('3 · SITUATION DU CLIENT'), g4, g5);
+    corps.append(...kids);
+    vider(corps);
+    [['adresse_chantier', 'Adresse du logement'], ['code_postal_chantier', 'Code postal'], ['ville_chantier', 'Ville'],
+     ['type_logement', 'Type'], ['surface_logement_m2', 'Surface habitable'], ['annee_construction', 'Année'], ['hsp', 'Hauteur plafond'],
+     ['usage_bien', 'Le client est'], ['situation_propriete', 'Situation'], ['date_acquisition', 'Date d\'acquisition prévue'],
+     ['adresse_personne', '↳ Adresse du propriétaire'], ['code_postal_personne', '↳ CP du propriétaire'], ['ville_personne', '↳ Ville du propriétaire']]
+      .forEach(([n, t]) => libeller(n, t));
+  }
+
+  function bloc3() {
+    const corps = blocCorps(3); if (!corps) return;
+    const gE = grille('p6-g1');
+    mettre(gE, 'mode_chauffage', 'p6-imp');
+    const gM = grille('p6-g-em');
+    const fEm = mettre(gM, 'type_emetteurs');
+    const fSous = el('div', 'field p6-sous', '<label>Les radiateurs sont en</label>');
+    const sous = fEm && q('.l4-sous-choix', fEm);
+    if (sous) fSous.appendChild(sous);
+    const sa = fEm && q('.l4-aide[data-aide="sous-choix"]', fEm);
+    if (sa) fSous.appendChild(sa);
+    gM.appendChild(fSous);
+    const al = q('#l4-alerte-convecteurs');
+    if (al && fEm) { al.classList.remove('l4-span3'); fEm.appendChild(al); }
+    const gC = grille('p6-g1');
+    mettre(gC, 'ecs', 'p6-ecs');
+    const gF = grille('p6-g-fact');
+    const fQ = el('div', 'field p6-fact-q', '<label id="p6-fact-lab">Le client connaît sa facture ?</label>'
+      + '<div class="l4-choix"><button type="button" data-p6-fact="oui">Oui</button><button type="button" data-p6-fact="non">Non</button></div>');
+    gF.appendChild(fQ);
+    mettre(gF, 'cout_energetique_mensuel_eur', 'p6-imp p6-fact-reel');
+    const opts = el('div', 'p6-fact-opts'); opts.id = 'p6-fact-opts';
+    gF.appendChild(opts);
+    const ret = el('div', 'p6-retenu'); ret.id = 'p6-retenu';
+    const gK = grille('p6-g3');
+    mettre(gK, 'alimentation_electrique', 'p6-span2'); mettre(gK, 'puissance_compteur');
+    const fPan = fieldDe('panneau_solaire');                 // pas de panneaux solaires à l'écran (champ conservé)
+    if (fPan) { fPan.classList.add('p6-cache'); gK.appendChild(fPan); }
+    corps.append(section('1 · COMMENT LE CLIENT SE CHAUFFE'), gE, gM, gC, sep(), section('2 · CE QU\'IL PAIE AUJOURD\'HUI'), gF, ret,
+      aide('Priorité : facture réelle du client › DPE / audit › estimation du CRM. Le calcul n\'est jamais bloqué.'),
+      sep(), section('3 · COMPTEUR ÉLECTRIQUE'), gK);
+    vider(corps);
+    [['mode_chauffage', 'Énergie de chauffage'], ['type_emetteurs', 'Radiateurs / émetteurs'], ['ecs', 'L\'eau chaude est faite par'],
+     ['alimentation_electrique', 'Type de compteur'], ['puissance_compteur', 'Puissance du compteur']].forEach(([n, t]) => libeller(n, t));
+  }
+
+  function bloc4() {
+    const corps = blocCorps(4); if (!corps) return;
+    const g = grille('p6-g3');
+    const fN = mettre(g, 'nombre_personnes', 'p6-imp');
+    const inp = fN && q('[name="nombre_personnes"]', fN);     // la grille n'est pas encore dans la page
+    if (fN && inp && !q('.p6-stepper', fN)) {
+      const w = el('div', 'p6-stepper');
+      inp.parentNode.insertBefore(w, inp);
+      w.appendChild(el('button', '', '−')); w.appendChild(inp); w.appendChild(el('button', '', '+'));
+      const [moins, plus] = qa('button', w);
+      moins.type = plus.type = 'button';
+      moins.dataset.p6Pers = '-1'; plus.dataset.p6Pers = '1';
+      moins.setAttribute('aria-label', 'Une personne de moins'); plus.setAttribute('aria-label', 'Une personne de plus');
+    }
+    mettre(g, 'rfr', 'p6-imp');
+    g.appendChild(el('div', 'p6-aide p6-aide--bas', 'Où le trouver : <b>dernier avis d\'impôt</b>, tout en bas de la <b>1re page</b>, en gras.'));
+    const fCat = fieldDe('categorie');
+    if (fCat) {
+      fCat.classList.add('p6-cat-field');
+      const chips = el('div', 'p6-cats'); chips.id = 'p6-cats';
+      chips.innerHTML = Object.keys(window.HEXA_CATEGORIES_L6 || {}).map(k => { const c = window.HEXA_CATEGORIES_L6[k];
+          return `<span class="p6-cat" data-cat="${k}" style="background:${c.bg};color:${c.fg}">${c.lib}</span>`; }).join('');
+      fCat.appendChild(chips);
+    }
+    const cee = q('#cat-cee-badge'); const fCee = cee && cee.closest('.field');
+    if (fCee) fCee.classList.add('p6-cache');
+    corps.append(section('1 · LE FOYER'), g);
+    if (fCat) { const gc = grille('p6-g1'); gc.appendChild(fCat); corps.appendChild(gc); }
+    vider(corps);
+    [['nombre_personnes', 'Personnes au foyer'], ['rfr', 'Revenu fiscal de référence'], ['categorie', 'Catégorie (calculée automatiquement)']]
+      .forEach(([n, t]) => libeller(n, t));
+  }
+
+  function bloc5() { libeller('date_visite_technique_date', 'Date de visite technique'); }
+
+  // ------------------------------------------------------------------ étape 2 : bandeau DPE, valeur du bien
+  function dateFr(v) {
+    const s = String(v || '').trim(); if (!s) return '';
+    const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/); if (m) return `${m[3]}/${m[2]}/${m[1]}`;
+    return s;
+  }
+  function dateIso(v) {
+    const s = String(v || '').trim();
+    let m = s.match(/^(\d{4})-(\d{2})-(\d{2})/); if (m) return new Date(+m[1], +m[2] - 1, +m[3]);
+    m = s.match(/^(\d{2})\/(\d{2})\/(\d{4})/); if (m) return new Date(+m[3], +m[2] - 1, +m[1]);
+    return null;
+  }
+  window.hexaL6DateDpe = () => dateFr(val('dpe_date') || val('source_active_date'));
+  // validité : DPE établi depuis le 01/07/2021 = 10 ans ; 2018 à juin 2021 = 31/12/2024 ; 2013-2017 = 31/12/2022 ;
+  // audit énergétique = 5 ans
+  function validite(v, audit) {
+    const d = dateIso(v); if (!d) return null;
+    let fin;
+    if (audit) fin = new Date(d.getFullYear() + 5, d.getMonth(), d.getDate());
+    else if (d >= new Date(2021, 6, 1)) fin = new Date(d.getFullYear() + 10, d.getMonth(), d.getDate());
+    else if (d >= new Date(2018, 0, 1)) fin = new Date(2024, 11, 31);
+    else if (d >= new Date(2013, 0, 1)) fin = new Date(2022, 11, 31);
+    else fin = d;
+    const p = (n) => String(n).padStart(2, '0');
+    return { ok: fin >= new Date(), fin: `${p(fin.getDate())}/${p(fin.getMonth() + 1)}/${fin.getFullYear()}` };
+  }
+  function majDpe() {
+    const b = q('#p6-dpe-bande'); if (!b) return;
+    const cl = val('dpe_connu').toUpperCase(), num = val('dpe_numero') || val('source_active_numero');
+    const date = val('dpe_date') || val('source_active_date');
+    const audit = /audit/i.test(val('source_active_type') + ' ' + val('dpe_source'));
+    const conso = val('conso_kwh_m2');
+    const cle = [cl, num, date, audit, conso].join('|');
+    if (b.dataset.cle === cle) return;
+    b.dataset.cle = cle;
+    if (!cl && !num) {
+      b.innerHTML = '<div class="p6-dpe-cl p6-dpe-cl--vide">?</div><div class="p6-dpe-txt"><b>Pas de DPE trouvé pour ce logement</b>'
+        + '<span>Choisissez l\'adresse dans la liste puis pointez la parcelle : la recherche DPE / audit se lance seule.</span></div>'
+        + '<a href="#" class="p6-dpe-lien" data-p6-dpe="1">Chercher le DPE</a>';
+      return;
+    }
+    const v = validite(date, audit);
+    const morceaux = [];
+    if (num) morceaux.push(`N° <b>${esc(num)}</b>`);
+    if (date) morceaux.push(`établi le <b>${esc(dateFr(date))}</b>`);
+    if (v) morceaux.push(v.ok ? `valide jusqu'au ${v.fin}` : `<span class="p6-expire">expiré depuis le ${v.fin}</span>`);
+    if (conso) morceaux.push(`conso ${esc(conso)} kWh/m²/an`);
+    b.innerHTML = `<div class="p6-dpe-cl p6-dpe-cl--${/^[A-G]$/.test(cl) ? cl : 'vide'}">${esc(cl || '?')}</div>`
+      + `<div class="p6-dpe-txt"><b>${audit ? 'Audit énergétique officiel trouvé' : 'DPE officiel trouvé'} pour ce logement</b><span>${morceaux.join(' · ')}</span></div>`
+      + '<a href="#" class="p6-dpe-lien" data-p6-dpe="1">Pas le bon logement ?</a>';
+  }
+  function autreLogement() {
+    const lat = parseFloat(val('lat_chantier')), lon = parseFloat(val('lon_chantier'));
+    if (Number.isFinite(lat) && Number.isFinite(lon) && typeof window.openParcelDrawer === 'function') { window.openParcelDrawer(lat, lon); return; }
+    const a = champ('adresse_chantier');
+    if (a) { a.focus(); a.select && a.select(); }
+  }
+  function majValeurBien() {
+    const b = q('#p6-valeur-bien'); if (!b) return;
+    const p = nombre(val('prix_m2_estime')), s = nombre(val('surface_logement_m2'));
+    const t = p > 0 && s > 0 ? e0(p * s) : '—';
+    if (b.textContent !== t) b.textContent = t;
+  }
+
+  // ------------------------------------------------------------------ étape 3 : « Le client connaît sa facture ? »
+  // Oui = saisie de la facture réelle (source reel) ; Non = théorique DPE/audit, sinon estimation du CRM
+  // (fonctions Lot 2). L'état se déduit de cout_energie_source ; le choix affiché n'est jamais enregistré.
+  let factChoix = null, factLead = null, factMemo = null, estim = { cle: null, val: null, attente: false };
+  const SOURCE_LIB = { reel: 'Réel', a_confirmer: 'À confirmer', dpe: 'Théorique DPE', audit: 'Théorique audit', estime: 'Estimation CRM' };
+  const ENERGIE_DE = { fioul: 'de fioul', gaz: 'de gaz', electricite: 'd\'électricité', pac: 'd\'électricité', bois: 'de bois' };
+  const ENERGIE_NOM = { fioul: 'fioul', gaz: 'gaz', electricite: 'électricité', pac: 'électricité', bois: 'bois' };
+  function sourceCout() { return typeof window.hexaCoutSource === 'function' ? window.hexaCoutSource() : val('cout_energie_source'); }
+  function etatFacture() {
+    const s = sourceCout();
+    if (s === 'reel' || s === 'a_confirmer') return 'oui';
+    if (factChoix) return factChoix;
+    return ['dpe', 'audit', 'estime'].includes(s) ? 'non' : '';
+  }
+  function cleEstimation() {
+    return ['surface_logement_m2', 'code_postal_chantier', 'annee_construction', 'mode_chauffage', 'ecs', 'nombre_personnes'].map(val).join('|');
+  }
+  function majEstimation() {
+    const cle = cleEstimation();
+    if (estim.cle === cle || estim.attente || typeof window.hexaCoutEstimationAnnuelle !== 'function') return;
+    estim.attente = true;
+    Promise.resolve(window.hexaCoutEstimationAnnuelle()).catch(() => null).then(v => {
+      estim = { cle, val: v && v > 0 ? v : null, attente: false };
+      majFacture();
+    });
+  }
+  function majFacture() {
+    const fQ = q('.p6-fact-q'); if (!fQ) return;
+    const numero = String(document.body.dataset.prospectNumero || '');
+    if (numero !== factLead) { factLead = numero; factChoix = null; factMemo = null; }
+    const etat = etatFacture();
+    const s = sourceCout();
+    const mode = val('mode_chauffage');
+    const lab = q('#p6-fact-lab');
+    const t = `Le client connaît sa facture ${ENERGIE_DE[mode] || 'de chauffage'} ?`;
+    if (lab && lab.textContent !== t) lab.textContent = t;
+    qa('[data-p6-fact]', fQ).forEach(b => b.classList.toggle('active', b.dataset.p6Fact === etat));
+    const fReel = fieldDe('cout_energetique_mensuel_eur');
+    if (fReel) fReel.classList.toggle('p6-fact-cache', etat !== 'oui');
+    const opts = q('#p6-fact-opts');
+    majEstimation();
+    const mensuel = nombre(val('cout_energetique_mensuel_eur'));
+    const annuel = mensuel > 0 ? mensuel * 12 : null;
+    if (opts) {
+      opts.classList.toggle('p6-fact-cache', etat === 'oui');
+      const theo = (s === 'dpe' || s === 'audit') && annuel ? annuel : null;
+      const retTheo = !!theo, retEst = s === 'estime';
+      const sous = [nombre(val('surface_logement_m2')) ? val('surface_logement_m2') + ' m²' : '', ENERGIE_NOM[mode] || '',
+        val('nombre_personnes') ? val('nombre_personnes') + ' personne' + (Number(val('nombre_personnes')) > 1 ? 's' : '') : ''].filter(Boolean).join(' · ');
+      const html = `<div class="p6-opt${retTheo ? ' on' : ''}"><span class="p6-opt-t">Théorique ${s === 'audit' ? 'audit' : 'DPE'}${retTheo ? ' · retenu' : ''}</span>`
+        + `<span class="p6-opt-v">${theo ? e0(theo) + '/an' : 'pas de DPE'}</span></div>`
+        + `<div class="p6-opt${retEst ? ' on' : ''}"><span class="p6-opt-t">Estimation CRM${retEst ? ' · retenue' : ' (si pas de DPE)'}</span>`
+        + `<span class="p6-opt-v">${retEst && annuel ? e0(annuel) + '/an' : (estim.val ? e0(estim.val) + '/an' : '—')}</span><span class="p6-opt-s">${esc(sous)}</span></div>`;
+      if (opts.dataset.html !== html) { opts.dataset.html = html; opts.innerHTML = html; }
+    }
+    const ret = q('#p6-retenu');
+    if (ret) {
+      const hors = (q('#cout-hors-chauffage') || {}).textContent || '';
+      const html = annuel
+        ? `<b class="p6-retenu-lib">Montant retenu pour le calcul :</b><b class="p6-retenu-val" id="p6-retenu-val">${e0(annuel)}/an</b>`
+          + `<span class="p6-retenu-src">${SOURCE_LIB[s] || 'Saisi'}</span>${hors ? `<span class="p6-retenu-hors">${esc(hors.replace(/^dont\s*/, ''))}</span>` : ''}`
+        : '<b class="p6-retenu-lib">Montant retenu pour le calcul :</b><span class="p6-retenu-hors">aucun pour l\'instant — facture, DPE ou surface + énergie</span>';
+      if (ret.dataset.html !== html) { ret.dataset.html = html; ret.innerHTML = html; }
+    }
+  }
+  // un champ masqué par l'état « Non » (facture réelle) est affiché quand on va dessus (« Manque : facture »)
+  window.hexaL6Reveler = function (el) {
+    if (el && el.closest && el.closest('.p6-fact-reel.p6-fact-cache')) choixFacture('oui', true);
+  };
+  function choixFacture(v, sansFocus) {
+    factChoix = v;
+    const s = sourceCout();
+    if (v === 'oui' && factMemo && !(s === 'reel' || s === 'a_confirmer') && typeof window.hexaCoutSaisie === 'function') {
+      window.hexaCoutSaisie(factMemo);                                  // « Non » par erreur : la facture revient
+      factMemo = null;
+    }
+    if (v === 'non' && (s === 'reel' || s === 'a_confirmer') && typeof window.hexaCoutSaisie === 'function') {
+      factMemo = val('cout_energetique_mensuel_eur') || null;
+      window.hexaCoutSaisie('');                                        // la facture réelle est retirée…
+      if (typeof window.appliquerCoutEnergie === 'function') { try { window.appliquerCoutEnergie(null); } catch (_) {} }   // …le DPE revient s'il existe
+    }
+    majFacture();
+    if (v === 'oui' && !sansFocus) {
+      const px = q('#cout-energie-annuel'), m = champ('cout_energetique_mensuel_eur');
+      const cible = px && px.offsetParent !== null ? px : m;
+      if (cible) cible.focus({ preventScroll: true });
+    }
+  }
+
+  // ------------------------------------------------------------------ étape 4 : catégorie, personnes
+  function majCats() {
+    const c = val('categorie');
+    qa('#p6-cats .p6-cat').forEach(s => s.classList.toggle('on', s.dataset.cat === c));
+  }
+  function personnes(delta) {
+    const inp = champ('nombre_personnes'); if (!inp) return;
+    const n = Math.max(1, Math.min(20, (parseInt(inp.value, 10) || 0) + delta));
+    inp.value = String(n);
+    inp.dispatchEvent(new Event('input', { bubbles: true }));
+    inp.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+
+  // ------------------------------------------------------------------ accompagnateur d'appel
+  let SCRIPT = null, asideOuvert = null, asideHtml = '';
+  const reponses = {};                    // réponses cliquées pendant l'appel, par lead (écran seulement)
+  function chargerScript() {
+    return fetch('/api/script-appel', { cache: 'no-store' }).then(r => r.ok ? r.json() : null).catch(() => null)
+      .then(s => { SCRIPT = s && s.etapes ? s : { etapes: {} }; majAside(true); });
+  }
+  window.hexaScriptAppelRecharger = chargerScript;
+  const cap = (s) => String(s || '').toLowerCase().replace(/(^|[\s'-])(\p{L})/gu, (m, a, b) => a + b.toUpperCase());
+  function remplir(t) {
+    const civ = val('civilite'), nom = val('nom'), prenom = val('prenom');
+    const madame = /^(madame|mme)$/i.test(civ), monsieur = /^(monsieur|m\.?)$/i.test(civ);
+    const civNom = [madame ? 'Madame' : (monsieur ? 'Monsieur' : ''), cap(nom)].filter(Boolean).join(' ') || 'Madame, Monsieur';
+    const user = (window.HEXA_SESSION && window.HEXA_SESSION.user) ? cap(window.HEXA_SESSION.user) : '[votre prénom]';
+    const d = window.hexaL6DateDpe();
+    const an = (d.match(/(\d{4})$/) || [])[1] || 'le DPE';
+    return esc(t).replace(/\[Civilit[ée] Nom\]/gi, esc(civNom)).replace(/\[pr[ée]nom de l'utilisateur\]|\[pr[ée]nom de l&#39;utilisateur\]|\[votre pr[ée]nom\]/gi, esc(user))
+      .replace(/\[pr[ée]nom du client\]/gi, esc(cap(prenom))).replace(/\[nom du client\]/gi, esc(cap(nom)))
+      .replace(/\[ann[ée]e du DPE\]/gi, esc(an)).replace(/\[date du DPE\]/gi, esc(d || '—')).replace(/\[classe DPE\]/gi, esc(val('dpe_connu') || '—'));
+  }
+  const liste = (s) => String(s || '').split(',').map(x => x.trim().toLowerCase()).filter(Boolean);
+  function condition(cnd, rep) {
+    const c = String(cnd || '').trim();
+    if (!c) return true;
+    let m = c.match(/^q(\d+)\s*=\s*(\d+)$/i);
+    if (m) return rep[Number(m[1]) - 1] === Number(m[2]) - 1;
+    if (/^dpe$/i.test(c)) return !!(val('dpe_connu') || val('dpe_numero'));
+    if (/^ecs_chaudiere$/i.test(c)) return val('ecs') === 'chaudiere';
+    m = c.match(/^(dpe_classe|energie|categorie|service)\s*=\s*(.+)$/i);
+    if (m) {
+      const k = m[1].toLowerCase();
+      const v = k === 'dpe_classe' ? val('dpe_connu') : k === 'energie' ? val('mode_chauffage') : k === 'categorie' ? val('categorie')
+        : ((typeof window.hexaSimLire === 'function' && window.hexaSimLire().service) || '');
+      return liste(m[2]).includes(String(v).toLowerCase());
+    }
+    return false;
+  }
+  function htmlAside(n) {
+    const auto = n !== 6;
+    const ouvert = asideOuvert == null ? auto : asideOuvert;
+    if (!ouvert) {
+      return '<button type="button" class="p6-aside-mini" data-p6-aside="1" title="Ouvrir l\'accompagnateur d\'appel"><span aria-hidden="true">◂</span><span class="p6-vert">ACCOMPAGNATEUR D\'APPEL</span></button>';
+    }
+    const E = (SCRIPT && SCRIPT.etapes && SCRIPT.etapes[String(n)]) || {};
+    const numero = String(document.body.dataset.prospectNumero || 'nouveau');
+    const rep = ((reponses[numero] || {})[n]) || {};
+    const parts = [];
+    if (E.intro) parts.push(`<div class="p6-quote">« ${remplir(E.intro)} »</div>`);
+    (E.questions || []).forEach((qq, i) => {
+      const r = rep[i];
+      const choisie = r != null ? (qq.reponses || [])[r] : null;
+      parts.push(`<div class="p6-aq-bloc"><div class="p6-aq">${i + 1}. ${remplir(qq.texte)}</div>`
+        + ((qq.reponses || []).length ? `<div class="p6-arow">${qq.reponses.map((x, j) => `<button type="button" class="${r === j ? (x.alerte ? 'warn' : 'on') : ''}" data-p6-rep="${n}:${i}:${j}">${esc(x.libelle)}</button>`).join('')}</div>` : '')
+        + (choisie && choisie.consigne ? `<div class="p6-consigne">${remplir(choisie.consigne)}</div>` : '') + '</div>');
+    });
+    (E.encarts || []).forEach(c => {
+      if (!condition(c.condition, rep)) return;
+      parts.push(`<div class="p6-wbox">${c.titre ? `<b>${remplir(c.titre)}</b> ` : ''}${c.texte ? remplir(c.texte) : '<i>[à rédiger dans Admin → Script d\'appel]</i>'}</div>`);
+    });
+    if (!parts.length) parts.push('<div class="p6-avide">Pas encore de texte pour cette étape : à rédiger dans Admin → Script d\'appel.</div>');
+    return `<div class="p6-ah"><div><div class="p6-ak">ACCOMPAGNATEUR D'APPEL · ÉTAPE ${n}</div><div class="p6-at">${esc(E.titre || (ctx ? ctx.etapes[n - 1].titre : ''))}</div></div>`
+      + '<button type="button" class="p6-aside-btn" data-p6-aside="1" title="Replier" aria-label="Replier l\'accompagnateur">▸</button></div>'
+      + `<div class="p6-ab" id="p6-aside-corps">${parts.join('')}</div>`
+      + '<div class="p6-af">Textes modifiables dans Admin → Script d\'appel.</div>';
+  }
+  function majAside(force) {
+    const a = q('#p6-aside'); if (!a || !ctx) return;
+    const n = ctx.etapeCourante();
+    const html = htmlAside(n);
+    if (!force && html === asideHtml) return;
+    const corps = q('#p6-aside-corps', a), haut = corps ? corps.scrollTop : 0;
+    asideHtml = html;
+    a.innerHTML = html;
+    const ouvert = !!q('.p6-ah', a);
+    a.classList.toggle('p6-aside--mini', !ouvert);
+    document.body.classList.toggle('p6-aside-replie', !ouvert);
+    const c2 = q('#p6-aside-corps', a); if (c2) c2.scrollTop = haut;
+  }
+
+  // ------------------------------------------------------------------ étape affichée
+  function majLienTech() {
+    const b = q('#p6-lien-tech'), t = q('#p-lien-tech');
+    if (!b || !t) return;
+    const ouvert = t.getAttribute('aria-expanded') === 'true';
+    const txt = ouvert ? '▾ Masquer les données techniques' : '▸ Données techniques automatiques (zone, altitude, niveaux, parcelle, copropriété…)';
+    if (b.textContent !== txt) b.textContent = txt;
+    b.setAttribute('aria-expanded', ouvert ? 'true' : 'false');
+  }
+  function majSous() {
+    const s = q('.p6-sous');
+    if (s) s.classList.toggle('p6-invisible', !/^radiateurs_/.test(val('type_emetteurs')));
+  }
+  let derniereEtape = 0;
+  window.hexaL6Etape = function (n) {
+    document.body.dataset.p6Etape = String(n);
+    const change = n !== derniereEtape;
+    derniereEtape = n;
+    majLienTech();
+    majAside(change);
+    if (change && [4, 5, 6].includes(n) && typeof window.hexaSimRafraichir === 'function') window.hexaSimRafraichir();
+    if (change) qa('.p6-defil').forEach(d => { d.scrollTop = 0; });
+  };
+  window.hexaL6Maj = function () {
+    majDpe(); majValeurBien(); majFacture(); majCats(); majSous(); majLienTech(); majAside(false);
+  };
+
+  // ------------------------------------------------------------------ construction (appelée par le Lot 5)
+  window.hexaL6Construire = function (parcours) {
+    ctx = parcours;
+    document.body.classList.add('l6');
+    const corps = q('#p-corps');
+    const leg = el('div', 'p6-legende', '<span class="p6-hl" aria-hidden="true"></span><span>' + LEGENDE + '</span>');
+    leg.id = 'p6-legende';
+    if (corps) corps.insertBefore(leg, corps.firstChild);
+    const leg6 = q('.p6-legende-hote');
+    if (leg6) leg6.appendChild(el('div', 'p6-legende', '<span class="p6-hl" aria-hidden="true"></span><span>' + LEGENDE + '</span>'));
+    const lien = el('div', 'p-hote p6-lien-tech-hote', '<button type="button" class="p6-lien" id="p6-lien-tech" aria-expanded="false"></button>');
+    lien.id = 'p6-lien-tech-hote'; lien.dataset.pEtape = '2'; lien.hidden = true;
+    if (corps) corps.appendChild(lien);
+    bloc1(); bloc2(); bloc3(); bloc4(); bloc5();
+    aidesEnInfobulles();
+    chargerScript();
+  };
+
+  // ------------------------------------------------------------------ interactions (délégation)
+  document.addEventListener('click', (e) => {
+    const t = e.target && e.target.closest ? e.target.closest('[data-p6-go],[data-p6-fact],[data-p6-pers],[data-p6-aside],[data-p6-rep],[data-p6-dpe],#p6-lien-tech') : null;
+    if (!t || !document.body.classList.contains('l6')) return;
+    e.preventDefault();
+    if (t.dataset.p6Go) { if (typeof window.hexaParcoursEtape === 'function') window.hexaParcoursEtape(Number(t.dataset.p6Go)); return; }
+    if (t.dataset.p6Fact) { choixFacture(t.dataset.p6Fact); return; }
+    if (t.dataset.p6Pers) { personnes(Number(t.dataset.p6Pers)); return; }
+    if (t.dataset.p6Dpe) { autreLogement(); return; }
+    if (t.id === 'p6-lien-tech') { const b = q('#p-lien-tech'); if (b) b.click(); majLienTech(); return; }
+    if (t.dataset.p6Aside) {
+      const n = ctx ? ctx.etapeCourante() : 1;
+      const ouvert = asideOuvert == null ? n !== 6 : asideOuvert;
+      asideOuvert = !ouvert;
+      majAside(true);
+      if (typeof window.hexaParcoursAjuster === 'function') window.hexaParcoursAjuster();
+      return;
+    }
+    if (t.dataset.p6Rep) {
+      const [n, i, j] = t.dataset.p6Rep.split(':').map(Number);
+      const numero = String(document.body.dataset.prospectNumero || 'nouveau');
+      reponses[numero] = reponses[numero] || {};
+      reponses[numero][n] = reponses[numero][n] || {};
+      reponses[numero][n][i] = reponses[numero][n][i] === j ? undefined : j;
+      majAside(true);
+    }
+  });
 })();
 </script>
 <style id="hexa-lot4-fiche">
@@ -22877,5 +23714,329 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
   body.l5 .prospect-sticky-bar .l4-aide-btn { width: 26px; height: 26px; padding: 0; border-radius: 50%; font-size: 13px; line-height: 24px; text-align: center; }
   body.l5 .prospect-sticky-bar .l4-aide-btn.active { background: #1D4ED8; border-color: #1D4ED8; color: #fff; }
 </style>
+<style id="hexa-lot6-parcours">
+  /* ================= Lot 6 — parcours télépro en 6 étapes (maquette docs/maquette-parcours-v2.html) =================
+     Présentation seulement. Carte de l'étape à gauche, accompagnateur d'appel à droite ; champs de 42 px,
+     libellés sur une ligne, grilles régulières, séparateur fin entre les blocs numérotés. */
+  body.l6 { --p6-navy: #002E5A; --p6-red: #D7263D; --p6-green: #1F6B43; --p6-greenbg: #E6F4EC; --p6-blue: #1D4F8C; --p6-bluebg: #EAF2FC;
+    --p6-orange: #E08A2E; --p6-orangebg: #FFF4E5; --p6-line: #DDE1E7; --p6-grey: #5A6675; --p6-txt: #16202C; --p6-field: #F3F5F8; --p6-fieldb: #B4BDC9; }
+  body.l6 #l4-main { gap: 10px; }
+  /* barre d'étapes */
+  body.l6 .p-etapes { gap: 8px; }
+  body.l6 .p-etape { height: 42px; border-radius: 10px; font-size: 14px; font-weight: 600; background: #fff; color: #3A4656; border: 1px solid var(--p6-line); gap: 8px; }
+  body.l6 .p-etape .p-etape-n { background: #E3E7EC; color: var(--p6-navy); font-weight: 800; }
+  body.l6 .p-etape.is-ok { background: #fff; border-color: var(--p6-line); color: var(--p6-green); }
+  body.l6 .p-etape.is-ok .p-etape-n { background: var(--p6-green); color: #fff; }
+  body.l6 .p-etape.is-manque { border-color: #F0C58A; background: #FFF9F1; color: #8A4B00; }
+  body.l6 .p-etape.is-manque .p-etape-n { background: var(--p6-orange); color: #fff; }
+  body.l6 .p-etape.is-courante { background: var(--p6-navy); border-color: var(--p6-navy); color: #fff; font-weight: 800; }
+  body.l6 .p-etape.is-courante .p-etape-n { background: #fff; color: var(--p6-navy); }
+  body.l6 .p-etape.is-courante.is-ok .p-etape-n { background: var(--p6-green); color: #fff; }
+  body.l6 .p-etape.is-courante.is-manque .p-etape-n { background: var(--p6-orange); color: #fff; }
+  /* carte + accompagnateur */
+  .p6-rang { flex: 1 1 auto; min-height: 0; display: flex; gap: 14px; }
+  body.l6 .p-carte { flex: 1 1 auto; min-width: 0; min-height: 0; overflow: hidden; border: 1px solid var(--p6-line); border-radius: 12px; box-shadow: none; }
+  body.l6 .p-carte-tete { padding: 12px 22px 8px; border-bottom: 1px solid #EEF0F3; }
+  body.l6 .p-carte-num { font-size: 12px; font-weight: 800; letter-spacing: .8px; color: var(--p6-red); }
+  body.l6 .p-carte-titre { font-size: 21px; font-weight: 800; color: var(--p6-navy); margin: 0; }
+  body.l6 #p-legende, body.l6 .p-dire { display: none !important; }
+  body.l6 .p-corps { padding: 16px 26px; gap: 16px; }
+  body.l6 .p-nav { flex: none; padding: 10px 22px; border-top: 1px solid var(--p6-line); background: #fff; }
+  body.l6 .p-nav-btn { min-width: 0; height: 44px; padding: 0 28px; border-radius: 8px; font-size: 16px; font-weight: 800; background: var(--p6-navy); border-color: var(--p6-navy); }
+  body.l6 .p-nav-btn--prec { padding: 0 20px; font-size: 15px; font-weight: 700; background: #fff; color: var(--p6-navy); }
+  body.l6 .p-nav-btn:disabled { opacity: .4; }
+  body.l6 #p-suiv:disabled { visibility: hidden; }
+  body.l6 #p-lien-tech { display: none !important; }
+  /* la fiche et les morceaux du simulateur sont rangés dans l'ordre de la maquette */
+  body.l6 .p-corps > #form-prospect, body.l6 .p-corps > #form-prospect > fieldset, body.l6 #l4-accordeon, body.l6 .p-corps > #p-hotes { display: contents !important; }
+  body.l6 .p-corps > .p6-legende { order: 0; }
+  body.l6 .l4-bloc { order: 1; }
+  body.l6 #p-hotes > .p-hote { order: 2; }
+  body.l6 #p6-lien-tech-hote { order: 3; }
+  body.l6 #l4-bloc-6 { order: 4; }
+  body.l6 .l4-bloc.is-open .l4-corps { display: flex !important; flex-direction: column; gap: 16px; }
+  body.l6 .p-corps > *, body.l6 .l4-bloc, body.l6 .l4-bloc.is-open, body.l6 #p-hotes > .p-hote, body.l6 .l4-corps > * { flex: none !important; }
+  body.l6 #p-hotes > .p-hote:not([hidden]) { display: flex; flex-direction: column; gap: 16px; }
+  body.l6[data-p6-etape="1"] #p6-legende, body.l6[data-p6-etape="6"] #p6-legende { display: none; }
+  /* légende, sections, séparateurs, aides */
+  .p6-legende > span:last-child { flex: 1; min-width: 0; }
+  .p6-legende { display: flex; align-items: center; gap: 12px; flex-wrap: nowrap; padding: 9px 14px; background: #FFFBEA; border: 1px solid #F0D98A;
+    border-radius: 10px; font-size: 12px; font-weight: 700; color: #3A4656; flex: none; }
+  .p6-legende b { font-weight: 800; }
+  .p6-hl { display: inline-block; flex-shrink: 0; width: 26px; height: 16px; border-radius: 4px; box-shadow: 0 0 0 4px #FFE08A; background: #fff; border: 1px solid var(--p6-fieldb); }
+  .p6-sec { font-size: 12px; font-weight: 800; color: var(--p6-grey); letter-spacing: .6px; text-transform: none; }
+  .p6-sec--bleu { color: var(--p6-blue); }
+  .p6-sec--vert { color: var(--p6-green); }
+  .p6-sec-sub { font-weight: 600; color: #8A94A3; letter-spacing: 0; }
+  .p6-sec-sub b { color: var(--p6-grey); }
+  .p6-sep { height: 1px; background: #E3E7EC; flex-shrink: 0; }
+  .p6-aide { font-size: 12px; color: var(--p6-blue); line-height: 1.4; }
+  .p6-aide--bas { align-self: end; padding-bottom: 6px; }
+  .p6-cache, .p6-fact-cache, body.l6 .p6-fact-reel.p6-fact-cache { display: none !important; }
+  .p6-invisible { visibility: hidden; }
+  /* grilles */
+  body.l6 .p6-g { display: grid; gap: 16px 20px; align-items: start; }
+  body.l6 .p6-g1 { grid-template-columns: minmax(0, 1fr); }
+  body.l6 .p6-g2, body.l6 #l4-bloc-1 .l4-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  body.l6 .p6-g3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  body.l6 .p6-g-adr { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  body.l6 .p6-g-log { grid-template-columns: 1.3fr 1fr 1fr 1fr; }
+  body.l6 .p6-g-log2 { grid-template-columns: 1.3fr 1fr 2fr; }
+  body.l6 .p6-g-bail { grid-template-columns: 2fr 1fr 1fr; padding: 10px; background: var(--p6-orangebg); border: 1px solid var(--p6-orange); border-radius: 8px; }
+  body.l6 .p6-g-bail .field > label { color: #6B3500 !important; }
+  body.l6 .p6-g-em { grid-template-columns: 3fr 2fr; }
+  body.l6 .p6-g-fact { grid-template-columns: 1.2fr 2fr; }
+  body.l6 .p6-g-iso { grid-template-columns: 1.6fr 1fr 1fr 1fr; }
+  body.l6 .p6-g > .l4-span2, body.l6 .p6-g > .l4-span3, body.l6 #l4-bloc-1 .l4-grid > * { grid-column: auto !important; }
+  body.l6 .p6-g > .p6-span2 { grid-column: span 2 !important; }
+  body.l6 .p6-g > .p6-span3 { grid-column: 1 / -1 !important; }
+  body.l6 .p6-ecs { max-width: 62%; }
+  body.l6 .l4-grid { gap: 16px 20px; }
+  /* libellés : une ligne ; contrôles : 42 px, même taille partout */
+  body.l6 .l4-grid > .field > label { height: 18px !important; line-height: 18px !important; margin: 0 0 5px !important; font-size: 13px !important; }
+  body.l6 .l4-grid > .field > input:not([type=hidden]):not([type=checkbox]):not([type=radio]),
+  body.l6 .l4-grid > .field > select:not(.l4-cache),
+  body.l6 .l4-grid > .field > div > input:not([type=hidden]):not([type=checkbox]):not([type=radio]),
+  body.l6 .l4-grid > .field > div > select,
+  body.l6 .l4-grid > .field > div:has(> input:not([type=hidden]):not([type=checkbox]):not([type=radio])),
+  body.l6 .l4-grid > .field > .field-auto { height: 42px !important; min-height: 42px !important; font-size: 15px; border-radius: 8px; }
+  body.l6 .l4-grid > .field > div:has(> input:not([type=hidden])) > span:not(.field-badge-slot) { height: 42px !important; }
+  body.l6 .l4-grid > .field > .l4-choix { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 8px; }
+  body.l6 .l4-grid > .field > .l4-choix > button, body.l6 .l4-grid > .field > .l4-choix.l4-sous-choix > button {
+    height: 42px; padding: 0 8px; font-size: 14px; font-weight: 600; border-radius: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    border: 1px solid var(--p6-fieldb); background: var(--p6-field); color: var(--p6-txt); }
+  body.l6 .l4-grid > .field > .l4-choix > button.active { background: var(--p6-navy); border-color: var(--p6-navy); color: #fff; font-weight: 700; }
+  body.l6 .l4-sous-choix { margin-top: 0; }
+  /* marques : « devis », « DPE », « auto » en petites pastilles, étoile rouge */
+  body.l6 .l4-pastille-devis, .p6-tag { display: inline-flex; align-items: center; height: 16px; padding: 0 6px; border-radius: 8px; background: var(--p6-bluebg);
+    color: var(--p6-blue); border: 0; font-size: 10px; font-weight: 800; line-height: 16px; }
+  body.l6 .l4-etoile { color: var(--p6-red); }
+  body.l6 .l4-grid > .field > label .badge-source, body.l6 .l4-grid > .field > label .badge-auto-generic { font-size: 0 !important; height: 16px; line-height: 16px !important;
+    padding: 0 6px !important; border-radius: 8px !important; background: var(--p6-bluebg) !important; color: var(--p6-blue) !important; border: 0 !important; }
+  body.l6 .l4-grid > .field > label .badge-source::after { content: 'DPE'; font-size: 10px; font-weight: 800; }
+  body.l6 .l4-grid > .field > label .badge-source.modifie::after, body.l6 .l4-grid > .field > label .badge-manuel::after { content: 'modifié'; }
+  body.l6 .l4-grid > .field > label .badge-source.estime::after { content: 'estimé'; }
+  body.l6 .l4-grid > .field > label .badge-auto-generic::after { content: 'auto'; font-size: 10px; font-weight: 800; }
+  /* pré-rempli par le DPE : bleu très clair */
+  body.l6 .l4-grid > .field.field--auto-dpe-officiel input.l4-plein:not([type=hidden]):not([type=checkbox]):not([type=radio]),
+  body.l6 .l4-grid > .field.field--auto-dpe-enrichi input.l4-plein:not([type=hidden]):not([type=checkbox]):not([type=radio]),
+  body.l6 .l4-grid > .field.field--auto-dpe-officiel select.l4-plein:not(.l4-cache) { background: #F5F9FE !important; border-color: #9DBBE0 !important; }
+  /* encadré jaune = le champ change le prix pour le client */
+  body.l6 .p6-imp > input:not([type=hidden]):not([type=checkbox]), body.l6 .p6-imp > div > input:not([type=hidden]),
+  body.l6 .p6-imp > .l4-choix, body.l6 .p6-imp > .p6-unite, body.l6 .p6-pacs.p6-imp { box-shadow: 0 0 0 4px #FFE08A !important; border-radius: 8px; }
+  body.l6 .p6-imp > .p6-stepper > input { box-shadow: 0 0 0 4px #FFE08A !important; }
+  body.l6 .p6-imp > div:has(> input:not([type=hidden])):not(.p6-stepper):not(.p6-unite) > input { box-shadow: none !important; }
+  body.l6 .p6-imp > div:has(> input:not([type=hidden])):not(.p6-stepper):not(.p6-unite) { box-shadow: 0 0 0 4px #FFE08A; border-radius: 8px; }
+  /* contrôles propres au Lot 6 */
+  .p6-f { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+  .p6-lab { display: flex; align-items: center; gap: 6px; height: 18px; margin: 0 0 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    font-size: 13px; font-weight: 700; color: #2E3A48; }
+  .p6-f > .p6-lab { margin: 0; }
+  .p6-in { height: 42px; display: flex; align-items: center; padding: 0 12px; border: 1px solid var(--p6-fieldb); border-radius: 8px; background: #fff;
+    font-size: 15px; font-weight: 700; color: var(--p6-navy); white-space: nowrap; overflow: hidden; box-sizing: border-box; width: 100%; font-family: inherit; }
+  .p6-in--auto { border-color: #9DBBE0; background: #F5F9FE; }
+  .p6-in--vide { background: var(--p6-orangebg); border: 2px solid var(--p6-orange); color: #8A4B00; font-weight: 600; font-size: 14px; }
+  body.l6 #p-hotes select.p6-in { height: 42px; background: #fff !important; border: 1px solid var(--p6-fieldb) !important; color: var(--p6-navy) !important; font-weight: 700 !important; font-size: 15px; }
+  body.l6 #p-hotes select.p6-in.p6-in--dpe, body.l6 #p-hotes select.p6-in:disabled { background: #F5F9FE !important; border-color: #9DBBE0 !important; color: var(--p6-navy) !important; opacity: 1; }
+  body.l6 #p-hotes select.p6-in.p6-in--travaux:not(:disabled) { background: var(--p6-orangebg) !important; border: 2px solid var(--p6-orange) !important; }
+  .p6-segs { display: grid; gap: 8px; }
+  .p6-segs-2 { grid-template-columns: 1fr 1fr; }
+  .p6-segs-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .p6-seg { height: 42px; border-radius: 8px; font-size: 14px; font-weight: 600; border: 1px solid var(--p6-fieldb); background: var(--p6-field); color: var(--p6-txt);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 8px; font-family: inherit; cursor: pointer; }
+  .p6-seg.on { border-color: var(--p6-navy); background: var(--p6-navy); color: #fff; font-weight: 700; }
+  .p6-segs-3 .p6-seg { font-size: 12.5px; padding: 0 6px; }
+  .p6-seg:disabled { opacity: .45; cursor: default; }
+  body.l6 #sim-ballon-inadapte { border-color: #B45309; }
+  .p6-alerte { padding: 9px 12px; background: var(--p6-orangebg); border: 1px solid var(--p6-orange); border-radius: 8px; font-size: 13px; color: #6B3500; }
+  .p6-ok { padding: 9px 12px; background: var(--p6-greenbg); border-radius: 8px; font-size: 14px; color: var(--p6-green); font-weight: 700; }
+  .p6-lien { align-self: flex-start; border: 0; background: none; padding: 0; font: inherit; font-size: 13px; font-weight: 700; color: var(--p6-blue); cursor: pointer; text-align: left; }
+  .p6-lien:hover { text-decoration: underline; }
+  /* étape 2 */
+  .p6-dpe { display: flex; align-items: center; gap: 14px; padding: 10px 14px; background: var(--p6-bluebg); border: 1px solid #9DBBE0; border-radius: 10px; }
+  .p6-dpe-cl { width: 42px; height: 42px; flex: none; border-radius: 8px; color: #fff; font-size: 24px; font-weight: 800; display: flex; align-items: center; justify-content: center; background: #8A94A3; }
+  .p6-dpe-cl--A { background: #00873F; } .p6-dpe-cl--B { background: #4FA83D; } .p6-dpe-cl--C { background: #9ACD32; color: #16202C; }
+  .p6-dpe-cl--D { background: #F2D100; color: #16202C; } .p6-dpe-cl--E { background: #F0A500; color: #16202C; } .p6-dpe-cl--F { background: #E5642A; } .p6-dpe-cl--G { background: #B3261E; }
+  .p6-dpe-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .p6-dpe-txt > b { font-size: 15px; font-weight: 800; color: var(--p6-navy); }
+  .p6-dpe-txt > span { font-size: 13px; color: var(--p6-blue); }
+  .p6-expire { color: var(--p6-red); font-weight: 700; }
+  .p6-dpe-lien { font-size: 12px; font-weight: 700; color: var(--p6-blue); white-space: nowrap; }
+  body.l6 #p-sim-surf { position: relative; }
+  body.l6 #p-sim-surf .p6-unite { display: flex; align-items: center; gap: 6px; height: 42px; box-sizing: border-box; border: 1px solid var(--p6-fieldb); border-radius: 8px; background: #fff; padding: 0 8px 0 12px; }
+  body.l6 #p-sim-surf .p6-unite > input { flex: 1; min-width: 0; height: 38px !important; min-height: 0 !important; border: 0 !important; background: transparent !important;
+    box-shadow: none !important; padding: 0 !important; font-size: 15px; font-weight: 700; color: var(--p6-navy); outline: none; }
+  body.l6 #p-sim-surf .p6-unite > em { font-style: normal; font-weight: 700; color: var(--p6-navy); }
+  body.l6 #p-sim-surf .sim-info-btn { width: 20px; height: 20px; border-radius: 50%; border: 1px solid var(--p6-fieldb); background: #fff; color: var(--p6-grey); font-size: 11px; padding: 0; cursor: pointer; }
+  body.l6 #p-sim-surf .sim-info-pop { position: absolute; z-index: 6; top: 100%; left: 0; right: -60px; margin-top: 6px; background: #fff; border: 1px solid var(--p6-line);
+    border-radius: 8px; padding: 8px 10px; font-size: 12px; box-shadow: 0 8px 20px rgba(0,0,0,.12); }
+  .p6-vide { min-height: 1px; }
+  /* étape 3 : facture */
+  body.l6 .p6-fact-reel { display: grid !important; grid-template-columns: minmax(0, 1fr) auto; column-gap: 6px; align-items: center; }
+  body.l6 .p6-fact-reel > label { grid-column: 1 / -1; }
+  body.l6 .p6-fact-reel > input { font-size: 16px !important; font-weight: 800 !important; }
+  body.l6 .p6-fact-reel > .cout-meta { margin: 0 !important; }
+  body.l6 .p6-fact-reel .cout-unite { display: inline-flex; height: 42px; border: 1px solid var(--p6-fieldb); border-radius: 8px; overflow: hidden; }
+  body.l6 .p6-fact-reel .cout-unite-btn { height: 100%; padding: 0 12px; font-size: 13px; font-weight: 600; background: var(--p6-field); color: var(--p6-txt); }
+  body.l6 .p6-fact-reel .cout-unite-btn.active { background: var(--p6-navy); color: #fff; font-weight: 700; }
+  body.l6 .p6-fact-reel > .cout-meta > .cout-hors-chauffage { flex-basis: auto; white-space: nowrap; }
+  body.l6 .p6-fact-reel > .cout-meta { display: flex; align-items: center; gap: 6px; flex-wrap: nowrap; }
+  .p6-fact-opts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .p6-opt { display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--p6-line); background: #FAFBFC; }
+  .p6-opt.on { border: 2px solid var(--p6-green); background: #F2F8F4; padding: 9px 11px; }
+  .p6-opt-t { font-size: 12px; font-weight: 700; color: var(--p6-grey); }
+  .p6-opt.on .p6-opt-t { color: var(--p6-green); }
+  .p6-opt-v { font-size: 17px; font-weight: 800; color: var(--p6-grey); }
+  .p6-opt.on .p6-opt-v { color: var(--p6-navy); }
+  .p6-opt-s { font-size: 11px; color: var(--p6-grey); }
+  .p6-retenu { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 8px 12px; background: var(--p6-greenbg); border-radius: 8px; font-size: 13px; }
+  .p6-retenu-lib { color: var(--p6-green); }
+  .p6-retenu-val { font-size: 15px; color: var(--p6-navy); }
+  .p6-retenu-src { padding: 1px 8px; border-radius: 10px; background: #fff; color: var(--p6-green); font-weight: 800; font-size: 11px; }
+  .p6-retenu-hors { color: var(--p6-grey); }
+  body.l6 #l4-alerte-convecteurs { margin-top: 8px; }
+  /* étape 4 */
+  .p6-stepper { display: flex; gap: 6px; }
+  .p6-stepper > button { width: 42px; height: 42px; flex: none; border-radius: 8px; border: 1px solid var(--p6-fieldb); background: var(--p6-field); font-size: 20px; font-weight: 800; color: var(--p6-txt); cursor: pointer; font-family: inherit; }
+  body.l6 .p6-stepper > input { flex: 1; min-width: 0; text-align: center; font-size: 18px !important; font-weight: 800 !important; }
+  body.l6 .p6-cat-field > .field-auto { display: none !important; }
+  .p6-cats { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .p6-cats-lib { font-size: 12px; font-weight: 700; color: var(--p6-grey); }
+  .p6-cat { padding: 6px 12px; border-radius: 14px; font-size: 12px; font-weight: 800; border: 2px solid transparent; opacity: .35; }
+  .p6-cat.on { opacity: 1; border-color: var(--p6-navy); }
+  .p6-aides { display: flex; flex-direction: column; gap: 10px; padding: 12px 14px; border-radius: 10px; background: #F2F8F4; border: 2px solid var(--p6-green); }
+  .p6-aides--vide { gap: 6px; }
+  .p6-aides-tete { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+  .p6-pill { padding: 3px 10px; border-radius: 12px; font-size: 12px; font-weight: 800; white-space: nowrap; }
+  .p6-aides-total { display: flex; align-items: baseline; gap: 12px; }
+  .p6-aides-total > span { font-size: 15px; font-weight: 700; }
+  .p6-aides-total > strong { font-size: 36px; font-weight: 800; color: var(--p6-green); line-height: 1; white-space: nowrap; }
+  .p6-aides-l { display: flex; justify-content: space-between; align-items: center; padding: 9px 14px; background: #fff; border-radius: 8px; }
+  .p6-aides-l > span { font-size: 19px; font-weight: 800; color: var(--p6-navy); white-space: nowrap; }
+  .p6-adire { padding: 9px 14px; background: #fff; border-left: 4px solid var(--p6-green); border-radius: 6px; font-size: 14px; font-style: italic; }
+  /* étape 5 */
+  body.l6 #p-hotes .p-cartes-besoin { margin: 0; align-items: stretch; gap: 16px 20px; }
+  body.l6 #p-hotes .p-carte-choix.p6-carte-choix { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; height: 100%; min-height: 96px; padding: 16px;
+    border-radius: 10px; border: 1px solid var(--p6-fieldb); background: var(--p6-field); color: var(--p6-txt); text-align: left; }
+  body.l6 #p-hotes .p-carte-choix.p6-carte-choix.active { border: 3px solid var(--p6-navy); background: #F5F9FE; color: var(--p6-txt); padding: 14px; }
+  body.l6 #p-hotes .p-carte-choix.p6-carte-choix b { font-size: 17px; font-weight: 800; }
+  body.l6 #p-hotes .p-carte-choix.p6-carte-choix span { font-size: 13px; color: #3A4656; opacity: 1; font-weight: 400; }
+  /* étape 6 : deux colonnes, chacune défile ; boutons alignés en bas à droite */
+  body.l6[data-p6-etape="6"] .p-carte-tete, body.l6[data-p6-etape="6"] .p-nav { display: none; }
+  body.l6[data-p6-etape="6"] .p-corps { display: grid; grid-template-columns: 54% minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; padding: 0; gap: 0; overflow: hidden; }
+  body.l6[data-p6-etape="6"] #p-sim-6 { grid-column: 1; grid-row: 1; min-height: 0; border-right: 1px solid #EEF0F3; }
+  body.l6[data-p6-etape="6"] #l4-bloc-6, body.l6[data-p6-etape="6"] .p6-legende { display: none !important; }
+  body.l6[data-p6-etape="6"] #l4-bloc-5 { grid-column: 1; grid-row: 2; padding: 8px 20px 10px; border-right: 1px solid #EEF0F3; border-top: 1px solid #EEF0F3; }
+  body.l6[data-p6-etape="6"] #l4-bloc-5 .l4-grid { grid-template-columns: minmax(0, 1fr); }
+  body.l6[data-p6-etape="6"] #l4-bloc-5 .l4-grid > .field { display: flex; align-items: center; gap: 10px; flex-wrap: nowrap; }
+  body.l6[data-p6-etape="6"] #l4-bloc-5 .l4-grid > .field > label { flex: none; margin: 0 !important; }
+  body.l6[data-p6-etape="6"] #l4-bloc-5 .l4-grid > .field > * { margin-top: 0 !important; margin-bottom: 0 !important; }
+  body.l6[data-p6-etape="6"] #p-sim-6r { grid-column: 2; grid-row: 1 / span 2; min-height: 0; background: #FAFBFC; position: relative; gap: 0; }
+  body.l6 #p-sim-6 .p6-legende { display: flex !important; }
+  .p6-defil { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+  #p6-gauche-defil { display: flex; flex-direction: column; gap: 12px; padding: 14px 20px; }
+  #p6-droite-defil { padding: 10px 14px; }
+  #p-sim-6a, #p-sim-6b, #sim-fin, #sim-dynamic { display: flex; flex-direction: column; gap: 12px; }
+  #sim-dynamic { gap: 8px; }
+  .p6-tete6 { display: flex; align-items: baseline; gap: 10px; }
+  .p6-titre6 { font-size: 20px; font-weight: 800; color: var(--p6-navy); }
+  .p6-pcard, body.l6 .p6-pcard.sim-mod-row { display: flex; flex-direction: column; align-items: flex-start; justify-content: flex-start; gap: 1px; padding: 7px 10px; border-radius: 10px;
+    text-align: left; color: var(--p6-txt); border: 1px solid var(--p6-fieldb); background: var(--p6-field); font-family: inherit; cursor: pointer; height: 100%; min-width: 0; margin: 0; }
+  .p6-pcard.on, body.l6 .p6-pcard.sim-mod-row.on { border: 3px solid var(--p6-navy); background: #F5F9FE; padding: 5px 8px; }
+  .p6-pcard--vide { opacity: .5; cursor: default; }
+  .p6-g.p6-pacs, .p6-g.p6-pays { gap: 8px; align-items: stretch; }
+  .p6-pgam { font-size: 11px; font-weight: 800; color: var(--p6-grey); }
+  .p6-pmod { font-size: 13px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+  .p6-pprix { font-size: 15px; font-weight: 800; color: var(--p6-navy); white-space: nowrap; }
+  .p6-pay b { font-size: 14px; font-weight: 800; }
+  .p6-pay span { font-size: 11px; color: #3A4656; }
+  .p6-pac-ligne { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 12px; color: var(--p6-grey); }
+  .p6-pac-ligne i { font-style: normal; color: #8A94A3; }
+  .p6-pac-ligne .sim-pnl-edit { display: inline-flex; align-items: center; gap: 4px; }
+  body.l6 #p-hotes #sim-prix { height: 32px; width: 110px; font-size: 14px; font-weight: 700; border-radius: 6px; padding: 0 8px; }
+  .p6-pac-ligne a, .p6-pac-ligne .sim-btn-note-dim { font-size: 12px; font-weight: 700; color: var(--p6-blue); background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline; font-family: inherit; }
+  body.l6 #p-hotes .p-choix-attente { gap: 8px; }
+  .p6-chk { display: flex; align-items: flex-start; gap: 10px; padding: 9px 12px; background: #F7F8FA; border: 1px solid var(--p6-line); border-radius: 10px; cursor: pointer; }
+  .p6-chk input { width: 20px; height: 20px; margin: 1px 0 0; flex: none; }
+  .p6-chk span { display: flex; flex-direction: column; gap: 2px; }
+  .p6-chk b { font-size: 14px; font-weight: 800; }
+  .p6-chk i { font-style: normal; font-size: 12px; color: var(--p6-grey); }
+  .p6-dire { display: flex; flex-direction: column; gap: 4px; padding: 10px 14px; background: #FFF8E1; border: 2px solid #E0A800; border-radius: 10px; }
+  .p6-dire > div { font-size: 15px; line-height: 1.3; }
+  .p6-dire strong { color: var(--p6-navy); font-weight: 800; }
+  .p6-dire .p6-sec { color: #7A5A00; }
+  .p6-blk { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border: 1px solid var(--p6-line); border-radius: 10px; background: #fff; }
+  .p6-blk > h4 { margin: 0 0 2px; font-size: 11px; font-weight: 800; color: var(--p6-grey); letter-spacing: .6px; text-transform: none; }
+  .p6-blk > h4 span { font-weight: 600; color: #8A94A3; letter-spacing: 0; }
+  .p6-calc { display: flex; align-items: center; gap: 10px; padding: 8px 14px; border-radius: 8px; background: #F4F6F9; }
+  .p6-calc-l { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  .p6-calc-l b { font-size: 12px; font-weight: 700; white-space: nowrap; color: var(--p6-txt); }
+  .p6-calc-l i { font-style: normal; font-size: 10px; color: var(--p6-grey); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .p6-calc-v { font-size: 14px; font-weight: 800; white-space: nowrap; color: var(--p6-navy); }
+  .p6-calc--moins { background: var(--p6-greenbg); } .p6-calc--moins .p6-calc-v { color: var(--p6-green); }
+  .p6-calc--plus { background: #FDECEC; } .p6-calc--plus .p6-calc-v { color: #B3261E; }
+  .p6-calc--tot { background: #DCE6F2; } .p6-calc--tot .p6-calc-l b { font-weight: 800; } .p6-calc--tot .p6-calc-v { font-size: 19px; color: var(--p6-navy); }
+  .p6-calc--cle .p6-calc-v { font-size: 17px; }
+  .p6-calc--fin { background: var(--p6-navy); } .p6-calc--fin .p6-calc-l b { color: #fff; font-weight: 800; } .p6-calc--fin .p6-calc-l i { color: #C9D6E8; }
+  .p6-calc--fin .p6-calc-v { color: #fff; font-size: 22px; }
+  .p6-g.p6-tuiles { gap: 6px; }
+  .p6-tuile { display: flex; flex-direction: column; gap: 1px; padding: 6px 10px; border-radius: 8px; background: var(--p6-greenbg); min-width: 0; }
+  .p6-tuile > span { font-size: 11px; font-weight: 700; color: var(--p6-green); }
+  .p6-tuile > b, body.l6 #p-hotes .p6-tuile .sim-roi-big { display: block; font-size: 15px; font-weight: 800; color: var(--p6-green); white-space: nowrap; }
+  .p6-tuile > i, body.l6 #p-hotes .p6-tuile .sim-roi-big-sub { display: block; margin: 0; font-style: normal; font-size: 10px; color: #3A4656; text-transform: none; letter-spacing: 0; font-weight: 400; }
+  .p6-tuile--warn { background: var(--p6-orangebg); } .p6-tuile--warn > span, .p6-tuile--warn > b { color: #8A4B00; }
+  .p6-tuile--nuit { background: var(--p6-navy); } .p6-tuile--nuit > span, .p6-tuile--nuit > i { color: #9FB4CE; } .p6-tuile--nuit > b { color: #fff; font-size: 14px; }
+  .p6-base, body.l6 #p-hotes .p6-base { font-size: 10px; color: #8A94A3; text-align: left; margin: 6px 0 0; }
+  body.l6 #p-hotes .sim-roi.p6-roi { margin: 0; padding: 0; border: 0; background: none; text-align: left; }
+  .p6-barre { flex: none; display: grid; grid-template-columns: auto auto 1fr auto auto; gap: 8px; align-items: center; padding: 10px 14px; border-top: 1px solid var(--p6-line); background: #fff; }
+  .p6-btn { height: 40px; padding: 0 14px; border-radius: 8px; font-size: 13px; font-weight: 700; white-space: nowrap; font-family: inherit; cursor: pointer; }
+  .p6-btn--prec { border: 1px solid var(--p6-navy); background: #fff; color: var(--p6-navy); }
+  .p6-btn--bleu { border: 1px solid var(--p6-blue); background: #fff; color: var(--p6-blue); }
+  .p6-btn--bleu[aria-expanded="true"] { background: var(--p6-bluebg); }
+  .p6-btn--rouge { border: 1px solid var(--p6-red); background: #fff; color: var(--p6-red); padding: 0 16px; }
+  .p6-btn--plein { border: 0; background: var(--p6-red); color: #fff; padding: 0 18px; }
+  .p6-cases { display: flex; flex-direction: column; gap: 1px; justify-self: start; font-size: 11px; color: var(--p6-grey); }
+  .p6-cases .l4s-case { font-size: 11px; }
+  body.l6 #p-hotes #sim-arguments.is-open { position: absolute; left: 14px; right: 14px; top: 10px; bottom: 70px; z-index: 5; overflow: auto; background: #fff;
+    border: 1px solid var(--p6-line); border-radius: 10px; box-shadow: 0 12px 30px rgba(0,0,0,.15); padding: 14px 16px; margin: 0; }
+  /* accompagnateur d'appel */
+  .p6-aside { width: 390px; flex-shrink: 0; display: flex; flex-direction: column; min-height: 0; background: var(--p6-navy); color: #fff; border-radius: 12px; overflow: hidden; }
+  .p6-aside.p6-aside--mini { width: 44px; }
+  .p6-aside-mini { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 12px 0 0; background: transparent; border: 0; color: #fff; cursor: pointer; font-family: inherit; font-size: 16px; }
+  .p6-vert { writing-mode: vertical-rl; transform: rotate(180deg); font-size: 12px; font-weight: 800; letter-spacing: 1px; }
+  .p6-ah { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; padding: 12px 16px 8px; border-bottom: 1px solid #22426A; }
+  .p6-ak { font-size: 11px; font-weight: 800; color: #9FB4CE; letter-spacing: .8px; }
+  .p6-at { font-size: 16px; font-weight: 800; }
+  .p6-aside-btn { flex: none; background: transparent; border: 1px solid #4A6A92; color: #fff; border-radius: 6px; height: 26px; width: 26px; cursor: pointer; font-size: 11px; }
+  .p6-ab { flex: 1; min-height: 0; padding: 12px 16px; display: flex; flex-direction: column; gap: 12px; overflow-y: auto; }
+  .p6-quote { padding: 10px 12px; background: #16365E; border-left: 3px solid var(--p6-red); border-radius: 6px; font-size: 14px; line-height: 1.5; }
+  .p6-aq { font-size: 14px; font-weight: 700; }
+  .p6-arow { display: flex; gap: 6px; margin-top: 5px; flex-wrap: wrap; }
+  .p6-arow button { height: 34px; padding: 0 14px; border-radius: 8px; font-size: 13px; font-weight: 700; border: 1px solid #4A6A92; background: transparent; color: #fff; cursor: pointer; font-family: inherit; }
+  .p6-arow button.on { border-color: #fff; background: #fff; color: var(--p6-navy); }
+  .p6-arow button.warn { border-color: var(--p6-orange); background: var(--p6-orange); color: var(--p6-txt); }
+  .p6-consigne { font-size: 12px; color: #FFC9A8; margin-top: 4px; }
+  .p6-wbox { padding: 10px 12px; background: #fff; color: var(--p6-txt); border-radius: 8px; font-size: 13px; line-height: 1.5; }
+  .p6-wbox > b { color: var(--p6-red); }
+  .p6-wbox i { color: #8A94A3; }
+  .p6-avide { font-size: 13px; color: #9FB4CE; }
+  .p6-af { padding: 9px 16px; border-top: 1px solid #22426A; font-size: 12px; color: #9FB4CE; }
+  /* Admin → Script d'appel */
+  .sa-etape { border: 1px solid #E5E7EB; border-radius: 10px; padding: 10px 12px; margin: 0 0 10px; background: #fff; }
+  .sa-etape > summary { cursor: pointer; font-weight: 700; color: #002E5A; }
+  .sa-ligne { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 8px; align-items: start; margin: 8px 0; }
+  .sa-ligne > label { font-size: 12px; font-weight: 600; color: #334155; padding-top: 6px; }
+  .sa-ligne input[type=text], .sa-ligne textarea { width: 100%; box-sizing: border-box; font: inherit; font-size: 13px; padding: 6px 8px; border: 1px solid #CBD5E1; border-radius: 6px; }
+  .sa-ligne textarea { min-height: 54px; resize: vertical; }
+  .sa-carte { border: 1px dashed #CBD5E1; border-radius: 8px; padding: 8px 10px; margin: 8px 0; background: #F8FAFC; }
+  .sa-rep { display: grid; grid-template-columns: 150px minmax(0, 1fr) auto auto; gap: 6px; align-items: center; margin: 4px 0; }
+  .sa-rep input[type=text] { width: 100%; box-sizing: border-box; font: inherit; font-size: 12.5px; padding: 5px 7px; border: 1px solid #CBD5E1; border-radius: 6px; }
+  .sa-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
+  .sa-mini { border: 1px solid #CBD5E1; background: #fff; border-radius: 6px; padding: 3px 9px; font: inherit; font-size: 12px; cursor: pointer; }
+  .sa-mini--suppr { color: #B91C1C; border-color: #FCA5A5; }
+  .sa-aide { font-size: 12px; color: #475569; line-height: 1.5; margin: 0 0 10px; }
+  .sa-aide code { background: #F1F5F9; padding: 0 4px; border-radius: 4px; }
+</style>
+
 </body>
 </html>
