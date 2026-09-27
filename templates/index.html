@@ -8639,7 +8639,8 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     }
     dateInput?.addEventListener('input', function(){ if (dateInput) dateInput.value = maskDateFr(dateInput.value); updateHiddenFromInput(); });
     dateInput?.addEventListener('blur', updateHiddenFromInput);
-    undefinedInput?.addEventListener('change', syncDateVisite);
+    // (Lot 6b) sans flèche, l'événement arrivait comme « fromHidden » : décocher « À déterminer » se recochait aussitôt
+    undefinedInput?.addEventListener('change', () => syncDateVisite());
     syncBailleurAdresse();
     syncDateVisite();
     const alim = q('[name="alimentation_electrique"]', form);
@@ -23273,7 +23274,11 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     }
     new MutationObserver(suivrePanneaux).observe(document.body, { attributes: true, attributeFilter: ['class'] });
     ['p-suivi-pop', 'p-fin-appel-pop'].forEach(id => { const e = document.getElementById(id); if (e) new MutationObserver(suivrePanneaux).observe(e, { attributes: true, attributeFilter: ['hidden'] }); });
-    window.addEventListener('resize', placerVisiteTechnique);
+    // hauteur de fenêtre en px CSS de la page zoomée (zoom 0,9) : les panneaux vont jusqu'en bas de l'écran
+    const hauteurVue = () => { const z = typeof window.hexaZoom === 'function' ? window.hexaZoom() : 1;
+      document.documentElement.style.setProperty('--p6-vh', Math.ceil(window.innerHeight / z) + 'px'); };
+    hauteurVue();
+    window.addEventListener('resize', () => { hauteurVue(); placerVisiteTechnique(); });
   }
   function htmlAside(n) {
     const auto = n !== 6;
@@ -24306,12 +24311,13 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
   .p6-cases input[type=checkbox]:checked { background: var(--p6-green); }
   .p6-cases input[type=checkbox]:checked::after { left: 14px; }
   /* 3. panneaux latéraux : pleine hauteur, en surimpression (la page ne rétrécit pas), un seul ouvert */
-  body.l6 #hexa-panel-slot { top: 0 !important; height: 100vh !important; height: 100dvh !important; z-index: 1000; }
+  body.l6 #hexa-panel-slot { top: 0 !important; height: var(--p6-vh, 100vh) !important; z-index: 1600 !important; }
   body.l6.panel-is-open .hexa-app-shell__main { padding-right: 0 !important; }
-  body.l6 .parcel-drawer { top: 0 !important; height: 100vh !important; height: 100dvh !important; z-index: 1000; }
+  body.l6 .parcel-drawer { top: 0 !important; height: var(--p6-vh, 100vh) !important; z-index: 1600 !important; }
+  body.l6.p6-panneau-ouvert .prospect-shell-sticky { z-index: 1600 !important; }
   body.l6.parcel-drawer-open #hexa-app-shell { display: block !important; }
   body.l6 .p-suivi-pop, body.l6 .p-fin-appel-pop { position: fixed !important; top: 0 !important; right: 0 !important; bottom: 0 !important; left: auto !important;
-    height: 100vh; height: 100dvh; width: var(--panel-w, 420px); max-width: 100vw; min-width: 0 !important; border-radius: 0; z-index: 1000; overflow-y: auto;
+    height: var(--p6-vh, 100vh); width: var(--panel-w, 420px); max-width: 100vw; min-width: 0 !important; border-radius: 0; z-index: 1000; overflow-y: auto;
     box-shadow: -4px 0 24px rgba(16, 24, 40, .12); border: 0; border-left: 1px solid #E2E8F0; padding: 46px 18px 18px; box-sizing: border-box; }
   .p6-pop-fermer { position: absolute; top: 10px; right: 12px; width: 30px; height: 30px; border: 0; background: #F0F5FA; color: #002E5A; border-radius: 8px;
     font-size: 18px; line-height: 1; cursor: pointer; }
@@ -24347,7 +24353,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
   body.l6[data-p6-etape="2"] .p6-g { row-gap: 6px; }
   body.l6[data-p6-etape="2"] #p6-lien-tech-hote { margin-top: -22px; }
   body.l6 #l4-bloc-5 { display: none !important; }
-  body.l6.p6-suivi-ouvert #l4-bloc-5.l4-bloc { display: block !important; position: fixed; z-index: 1001; background: #fff; margin: 0; padding: 0; border: 0; }
+  body.l6.p6-suivi-ouvert #l4-bloc-5.l4-bloc { display: block !important; position: fixed; z-index: 1700; background: #fff; margin: 0; padding: 0; border: 0; }
   body.l6.p6-suivi-ouvert #l4-bloc-5 .l4-corps { display: block !important; padding: 0 !important; }
   body.l6.p6-suivi-ouvert #l4-bloc-5 .l4-grid { grid-template-columns: minmax(0, 1fr); }
 </style>
