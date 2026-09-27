@@ -101,3 +101,12 @@ def test_devis_affiche_celui_archive(client):
         assert "DEVIS ARCHIVE DE2026-0001" in client.get("/api/devis/PR-07070/preview?variante=devis").text
     finally:
         main._atomic_write_json(main.DEVIS_META_PATH, {})
+
+
+def test_indicateur_jamais_stocke(client):
+    libre = dict(LEAD, numero="PR-07074", statut="devis", telephone="0611121322")
+    main._atomic_write_json(main.LEADS_PATH, [libre])
+    lu = client.get("/api/leads/PR-07074").json()
+    assert lu["dossier_fige"] is False
+    assert client.post("/api/leads/PR-07074", json=dict(lu, compteurs="", dernier_repondu="")).status_code == 200
+    assert "dossier_fige" not in main._read_leads()[0]

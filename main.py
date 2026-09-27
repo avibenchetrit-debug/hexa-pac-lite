@@ -946,6 +946,7 @@ def _normalize_lead_payload(payload: dict) -> dict:
         else:
             normalized[k] = str(value)
 
+    normalized.pop("dossier_fige", None)      # Lot 6c : indicateur de lecture seule (réponse GET), jamais stocké
     if "statut" in normalized:
         normalized["statut"] = _normalize_statut(normalized.get("statut"))
     if "categorie" in normalized:
