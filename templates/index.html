@@ -8639,7 +8639,8 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     }
     dateInput?.addEventListener('input', function(){ if (dateInput) dateInput.value = maskDateFr(dateInput.value); updateHiddenFromInput(); });
     dateInput?.addEventListener('blur', updateHiddenFromInput);
-    undefinedInput?.addEventListener('change', syncDateVisite);
+    // (Lot 6b) sans flèche, l'événement arrivait comme « fromHidden » : décocher « À déterminer » se recochait aussitôt
+    undefinedInput?.addEventListener('change', () => syncDateVisite());
     syncBailleurAdresse();
     syncDateVisite();
     const alim = q('[name="alimentation_electrique"]', form);
@@ -8855,8 +8856,9 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     if (dpe.surface_habitable_logement) {
       setChamp('surface_logement_m2', Math.round(dpe.surface_habitable_logement));
     }
-    if (dpe.annee_construction) setChamp('annee_construction', dpe.annee_construction);
-    else if (dpe.periode_construction) setChamp('annee_construction', dpe.periode_construction);
+    // Lot 6b : une période (« 1948-1974 ») n'est pas une année : le champ reste vide, la période va au bandeau DPE
+    const anneeDpe = window.hexaAnneeOuPeriode ? window.hexaAnneeOuPeriode(dpe.annee_construction || dpe.periode_construction) : (dpe.annee_construction || dpe.periode_construction);
+    if (anneeDpe) setChamp('annee_construction', anneeDpe);
     if (dpe.ep_conso_5_usages_m2 != null) {
       setChamp('conso_kwh_m2', Math.round(dpe.ep_conso_5_usages_m2));
     }
@@ -8912,9 +8914,9 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     if (audit.surface_habitable_logement) {
       setChamp('surface_logement_m2', Math.round(audit.surface_habitable_logement));
     }
-    if (audit.annee_construction) setChamp('annee_construction', audit.annee_construction);
-    else if (audit.periode_constuction) setChamp('annee_construction', audit.periode_constuction);
-    else if (audit.periode_construction) setChamp('annee_construction', audit.periode_construction);
+    const anneeAudit = window.hexaAnneeOuPeriode ? window.hexaAnneeOuPeriode(audit.annee_construction || audit.periode_constuction || audit.periode_construction)
+      : (audit.annee_construction || audit.periode_constuction || audit.periode_construction);
+    if (anneeAudit) setChamp('annee_construction', anneeAudit);
     const ep = audit.cep_initial != null ? audit.cep_initial : audit.ep_conso_5_usages_m2;
     if (ep != null) {
       setChamp('conso_kwh_m2', Math.round(ep));
@@ -14426,34 +14428,20 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
   function zoneReglementaireFromCp(cp){
     const s = String(cp || '').trim();
     const dept = s.startsWith('97') ? s.slice(0, 3) : s.slice(0, 2).toUpperCase();
-    return (DEPT_ZONE_BACKEND && DEPT_ZONE_BACKEND[dept]) || 'H1';
+    return (DEPT_ZONE_BACKEND && DEPT_ZONE_BACKEND[dept]) || 'H1';   // Corse : « 20 » (table officielle)
   }
 
+  // Lot 6b : température de base de la zone OFFICIELLE du département du CP (table du serveur, source unique) :
+  // H1 −7 °C, H2 −4 °C, H3 0 °C. Les sous-zones et la zone écrite dans le DPE ne servent plus au calcul.
   function temperatureExterieureBase(state){
     const cp = String(state.cp_chantier || '').replace(/\D/g, '').slice(0, 5);
     let info;
     if (cp && Object.prototype.hasOwnProperty.call(TEMP_BASE_CP, cp)) {
-      info = { temperature: TEMP_BASE_CP[cp], source: 'cp', zone: state.zone_detail || state.zone || '' };
+      info = { temperature: TEMP_BASE_CP[cp], source: 'cp', zone: zoneReglementaireFromCp(cp) };
+    } else if (cp) {
+      const z = zoneReglementaireFromCp(cp);
+      info = { temperature: TEMP_BASE_ZONE[z] != null ? TEMP_BASE_ZONE[z] : -7, source: 'departement', zone: z };
     } else {
-      const dept = cp.startsWith('97') || cp.startsWith('976') ? cp.slice(0, 3) : cp.slice(0, 2);
-      if (dept && DEPT_SOUS_ZONE[dept]) {
-      const z = DEPT_SOUS_ZONE[dept];
-        info = { temperature: TEMP_BASE_SOUS_ZONE[z], source: 'departement', zone: z };
-      }
-    }
-    if (!info) {
-      const zDetail = normaliserZone(state.zone_detail);
-      if (zDetail && TEMP_BASE_SOUS_ZONE[zDetail] != null) {
-        info = { temperature: TEMP_BASE_SOUS_ZONE[zDetail], source: 'zone', zone: zDetail };
-      }
-    }
-    if (!info) {
-      const z = zonePrincipale(state.zone);
-      if (z && TEMP_BASE_ZONE[z] != null) {
-        info = { temperature: TEMP_BASE_ZONE[z], source: 'zone', zone: z };
-      }
-    }
-    if (!info) {
       info = { temperature: -7, source: 'defaut', zone: 'H1' };
     }
     const altitude = state.altitude == null || state.altitude === '' ? null : Number(state.altitude);
@@ -14923,7 +14911,35 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     return capital*i/(1-Math.pow(1+i,-nMois));
   }
 
-  function calculerCeeBarTh171(state, formule, m3Config) {
+  // Lot 6b : délégataire CEE selon le choix de démarrage (même règle que le serveur, choisir_delegataire) :
+  // attente de l'accord MaPrimeRénov' -> délégataire « attente » (PICOTY) ; tout de suite ou foyer sans
+  // MaPrimeRénov' -> délégataire « tout de suite » (ACE) ; tarif vide -> repli sur « attente » + alerte.
+  const USAGE_PAR_NOM = { PICOTY: 'attente', ACE: 'tout_de_suite' };
+  function usageDelegataire(d){
+    const u = String((d && d.usage) || '').trim();
+    if (u === 'attente' || u === 'tout_de_suite') return u;
+    return USAGE_PAR_NOM[String((d && d.nom) || '').trim().toUpperCase()] || '';
+  }
+  function tarifDelegataire(d, categorie){
+    const v = d ? d[categorie === 'tres_modeste' ? 'mwh_precaire' : 'mwh_classique'] : null;
+    if (v === null || v === undefined || v === '') return null;
+    const n = Number(String(v).replace(',', '.'));
+    return n > 0 ? n : null;
+  }
+  function choisirDelegataire(delegataires, mode, categorie){
+    const liste = (Array.isArray(delegataires) ? delegataires : []).filter(d => d && typeof d === 'object');
+    const ancien = liste.find(d => d.actif) || liste[0] || null;
+    const d = liste.find(x => usageDelegataire(x) === mode) || null;
+    if (mode === 'tout_de_suite' && (!d || tarifDelegataire(d, categorie) === null)) {
+      const repli = liste.find(x => usageDelegataire(x) === 'attente') || ancien;
+      return { d: repli, alerte: `Tarif CEE du délégataire ${(d && d.nom) || 'tout de suite'} non renseigné dans l'Admin : prime calculée avec ${(repli && repli.nom) || '—'}.` };
+    }
+    return { d: d || ancien, alerte: null };
+  }
+  // « attente » si le client attend l'accord et a droit à MaPrimeRénov', sinon « tout_de_suite »
+  function modeCee(st, mprBrut){ return (st.mode_mpr === 'sans_attente' || !(mprBrut > 0)) ? 'tout_de_suite' : 'attente'; }
+
+  function calculerCeeBarTh171(state, formule, m3Config, mode) {
     let typeLogement = state.type_logement || '';
     if (typeLogement.toLowerCase().includes('maison')) typeLogement = 'Maison';
     else if (typeLogement.toLowerCase().includes('appart')) typeLogement = 'Appartement';
@@ -14952,7 +14968,8 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
 
     const kwhc = Number(ligneBase.montant_kwhc || 0) * Number(ligneSurface.facteur || 0) * Number(ligneZone.facteur || 0);
     const mwhc = kwhc / 1000;
-    const delegataire = (m3Config.delegataires || []).find(d => d.actif);
+    const choix = choisirDelegataire(m3Config.delegataires, mode || 'attente', categorie);
+    const delegataire = choix.d;
     if (!delegataire) return { montant: 0, erreur: 'Aucun délégataire actif' };
     const prixUnitaire = categorie === 'tres_modeste'
       ? Number(delegataire.mwh_precaire || 0)
@@ -14960,7 +14977,8 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     const bonif = m3Config.bonification_cee || {};
     const mult = bonif.actif ? Number(bonif.multiplicateur || 1) : 1;
     const montant = Math.round(mwhc * prixUnitaire * mult * 100) / 100;
-    return { montant, erreur: null, details: { typeLogement, etas, surface, zone, categorie, kwhc, mwhc, prixUnitaire, mult } };
+    return { montant, erreur: null, delegataire: delegataire.nom || '', alerte: choix.alerte,
+             details: { typeLogement, etas, surface, zone, categorie, kwhc, mwhc, prixUnitaire, mult } };
   }
 
   // OBSOLÈTE — remplacé par calculerEconomies / services/economies.py (Lot 2).
@@ -15147,29 +15165,33 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     if (M3_CONFIG?.forfaits_mpr && state.categorie in M3_CONFIG.forfaits_mpr) {
       mprDevis = Number(M3_CONFIG.forfaits_mpr[state.categorie]) || 0;
     }
-    const resultCee = calculerCeeBarTh171(state, M3_CONFIG?.formule_bar_th_171 || defaultFormuleBarTh171(), M3_CONFIG || {});
+    const modeCeeCourant = modeCee(state, (state.categorie === 'superieur') ? 0 : mprDevis);
+    const formuleCee = M3_CONFIG?.formule_bar_th_171 || defaultFormuleBarTh171();
+    const resultCee = calculerCeeBarTh171(state, formuleCee, M3_CONFIG || {}, modeCeeCourant);
     ceeBrut = resultCee.montant || 0;
     const plafonds = M3_CONFIG?.plafonds_reglementaires || {};
     const plafondEligible = Number(plafonds.plafond_eligible_ttc) || 12000;
     const plafondsPct = plafonds.plafonds_aides_pct || {};
     const baseEligible = Math.min(state.prix_pac || 0, plafondEligible);
-    let mprFinal = mprDevis;
-    let ceeDevis = ceeBrut;
-    let ceeConserveCalcule = 0;
     const categoriePlafond = state.categorie || 'modeste';
-    if (categoriePlafond === 'superieur') {
-      mprFinal = 0;
-      ceeDevis = ceeBrut;
-    } else {
+    // écrêtement réglementaire (inchangé) : MPR gardée, CEE réduite au plafond
+    const ecreter = (mprBase, cee) => {
+      if (categoriePlafond === 'superieur') return { mpr: 0, cee, conserve: 0 };
       const plafondPct = Number(plafondsPct[categoriePlafond] ?? 0) / 100;
       const plafondAides = baseEligible * plafondPct;
-      const totalBrut = mprDevis + ceeBrut;
-      if (plafondPct > 0 && totalBrut > plafondAides) {
-        mprFinal = mprDevis;
-        ceeDevis = Math.max(plafondAides - mprFinal, 0);
-        ceeConserveCalcule = Math.round((ceeBrut - ceeDevis) * 100) / 100;
+      if (plafondPct > 0 && mprBase + cee > plafondAides) {
+        const c2 = Math.max(plafondAides - mprBase, 0);
+        return { mpr: mprBase, cee: c2, conserve: Math.round((cee - c2) * 100) / 100 };
       }
-    }
+      return { mpr: mprBase, cee, conserve: 0 };
+    };
+    const ec = ecreter(mprDevis, ceeBrut);
+    let mprFinal = ec.mpr;
+    let ceeDevis = ec.cee;
+    let ceeConserveCalcule = ec.conserve;
+    // étape 4 : scénario « tout de suite » (délégataire ACE), le maximum
+    const resultCeeMax = calculerCeeBarTh171(state, formuleCee, M3_CONFIG || {}, 'tout_de_suite');
+    const ecMax = ecreter(mprDevis, resultCeeMax.montant || 0);
     mprDevis = mprFinal;
     const ceeConserve = ceeConserveCalcule;
     const aidesDevis  = ceeDevis + mprDevis;
@@ -15229,6 +15251,9 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
              resteAttente, mprTotal, reste_affiche, base_credit,
              mensOptNet, nMoisNet, modeMpr, finMpr, sansAttente,
              contextePret,
+             // Lot 6b : délégataire CEE de ce calcul et scénario « tout de suite » (étape 4)
+             delegataireCee: resultCee.delegataire || '', alerteDelegataire: resultCee.alerte || null, modeCee: modeCeeCourant,
+             ceeMax: ecMax.cee, aidesMax: ecMax.cee + ecMax.mpr,
              // Categorie AYANT SERVI a ces montants : le bandeau l'affiche telle quelle, sinon un
              // state modifie pendant l'await afficherait SUP au-dessus de chiffres calcules en TMO.
              categorie: state.categorie,
@@ -15346,7 +15371,8 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     const contextePret = !!state.categorie && !!state.zone;
     let mprBase = contextePret && node && node.mpr_devis && node.mpr_devis[state.zone] ? (node.mpr_devis[state.zone][state.categorie] || 0) : 0;
     if (M3_CONFIG && M3_CONFIG.forfaits_mpr && (state.categorie in M3_CONFIG.forfaits_mpr)) mprBase = Number(M3_CONFIG.forfaits_mpr[state.categorie]) || 0;
-    const ceeBrut = (calculerCeeBarTh171(state, (M3_CONFIG && M3_CONFIG.formule_bar_th_171) || defaultFormuleBarTh171(), M3_CONFIG || {}).montant) || 0;
+    const ceeBrut = (calculerCeeBarTh171(state, (M3_CONFIG && M3_CONFIG.formule_bar_th_171) || defaultFormuleBarTh171(), M3_CONFIG || {},
+      modeCee(state, state.categorie === 'superieur' ? 0 : mprBase)).montant) || 0;
     const plafonds = (M3_CONFIG && M3_CONFIG.plafonds_reglementaires) || {};
     const plafondEligible = Number(plafonds.plafond_eligible_ttc) || 12000;
     const plafondsPct = plafonds.plafonds_aides_pct || {};
@@ -15765,7 +15791,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
           <div class="p6-aides p6-aides--vide" id="p6-aides"><span class="p6-sec p6-sec--vert">2 · LES AIDES AUXQUELLES LE CLIENT A DROIT</span>
             <div class="p6-aide">Renseignez le nombre de personnes et le revenu fiscal (et la surface à l'étape Logement) : les aides se calculent toutes seules.</div></div>`;
     }
-    const mpr = c.mprDevis, cee = c.ceeDevis, tot = c.aidesDevis;
+    const mpr = c.mprDevis, cee = c.ceeMax, tot = c.aidesMax;      // Lot 6b : scénario « tout de suite » (maximum)
     const dire = mpr > 0
       ? `« Compte tenu de votre situation, vous avez droit à ${eur(tot)} d'aides : ${eur(mpr)} de MaPrimeRénov' et ${eur(cee)} de prime CEE. »`
       : `« Compte tenu de votre situation, vous avez droit à ${eur(cee)} de prime CEE. »`;
@@ -15779,6 +15805,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
               <div class="p6-aides-l"><b>Prime CEE</b><span id="p6-aides-cee">${eur(cee)}</span></div>
             </div>
             <div class="p6-adire">À dire : ${dire}</div>
+            <div class="p6-aide">Prime CEE selon le choix de démarrage (attente de l'accord MaPrimeRénov' ou travaux tout de suite) : montant maximum affiché, confirmé à l'étape Proposition.</div>
           </div>
           ${c.categorie === 'superieur' ? `<div class="p6-alerte" id="p6-alerte-sup"><b>POINT D'ATTENTION :</b> revenus supérieurs : pas de MaPrimeRénov' pour une PAC air-eau, seule la prime CEE s'applique. Le projet reste possible.</div>` : ''}`;
   }
@@ -15844,7 +15871,9 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     const avecMpr = c.mprDevis > 0 || !c.contextePret;
     let compte = ligneCalc('', 'Prix de la PAC posée', 'fournie et installée, TTC', eur(state.prix_pac || 0), '', 'sim-prix-ttc');
     if (bsR.actif) compte += ligneCalc('+', 'Ballon thermodynamique', 'option, sans aide', eur(bsR.totalTTC), '', 'sim-ballon-montant');
-    compte += ligneCalc('−', 'Prime CEE', 'déduite par Hexa-Rénov\'', d(c.ceeDevis), '', 'sim-cee');
+    compte += ligneCalc('−', 'Prime CEE', c.alerteDelegataire
+      ? `<span class="p6-alerte-txt" id="p6-alerte-delegataire" title="${c.alerteDelegataire.replace(/"/g, '&quot;')}">⚠ ${c.alerteDelegataire}</span>`
+      : 'déduite par Hexa-Rénov\'' + (c.delegataireCee ? ' · ' + c.delegataireCee : ''), d(c.ceeDevis), '', 'sim-cee');
     if (avecMpr) compte += ligneCalc('−', 'MaPrimeRénov\'', sans ? 'aide de l\'État, avancée par le client' : 'aide de l\'État', d(c.mprDevis), '', 'sim-mpr');
     compte += ligneCalc('=', 'Reste à charge', 'ce que la PAC coûte vraiment', d(c.resteAttente), 'tot', 'sim-reste');
     let flux = '';
@@ -15874,6 +15903,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
       ? ` <i>(${eur(Math.round(state.eco.facture_annuelle / 12))} déclarés, dont chauffage)</i>` : '';
     return `
         <div class="p6-blk"><h4>① CE QUE ÇA COÛTE <span>· le calcul du reste à charge</span></h4>${compte}</div>
+
         <div class="p6-blk p-quand"><h4>② QUI PAIE, ET QUAND <span>· pour le client : − ce qu'il paie, + ce qu'il récupère</span></h4>${flux}</div>
         <div class="sim-roi p6-roi"><div class="p6-g p6-g3 p6-tuiles">
           <div class="p6-tuile${tEco[3]}"><span>${tEco[0]}</span><b id="p6-tuile-eco">${tEco[1]}</b><i>${tEco[2]}</i></div>
@@ -17306,6 +17336,21 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     const ouverts = Array.from(box.querySelectorAll('details[open]')).map(d => d.dataset.saEtape);
     box.outerHTML = renderScriptAppelSection(ouverts);
   }
+  if (!window.__repriseAnneeDelegue) {
+    window.__repriseAnneeDelegue = true;
+    document.addEventListener('click', async (ev) => {
+      const b = ev.target && ev.target.closest ? ev.target.closest('[data-reprise-annee]') : null;
+      if (!b) return;
+      const appliquer = b.dataset.repriseAnnee === '1';
+      if (appliquer && !window.confirm('Vider l\'année des leads listés (la période est gardée) ?')) return;
+      const res = document.getElementById('adm-reprise-annee-res');
+      const r = await fetch('/api/admin/reprise-annee', { method: 'POST', headers: window.adminHeaders(), body: JSON.stringify({ appliquer }) }).catch(() => null);
+      if (!r || !r.ok) { if (res) res.textContent = 'Erreur.'; return; }
+      const d = await r.json();
+      if (res) res.innerHTML = (d.appliquer ? 'Reprise appliquée : ' : 'À reprendre : ') + d.nombre + ' lead(s)'
+        + (d.leads.length ? '<br>' + d.leads.map(l => adminEscape(l.numero + ' · ' + l.nom + ' · « ' + l.avant + ' » → vide (période ' + l.periode + ')')).join('<br>') : '');
+    });
+  }
   if (!window.__saDelegue) {
     window.__saDelegue = true;
     document.addEventListener('click', async (ev) => {
@@ -17511,7 +17556,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
         const uname = adminEscape(u.username || '');
         const roleLbl = u.role === 'admin' ? 'Admin' : 'Commercial';
         const statut = actif ? '<b style="color:#0D6B3B;">Actif</b>' : '<b style="color:#B91C1C;">Inactif</b>';
-        const cree = u.cree_at ? adminEscape(String(u.cree_at).slice(0,10)) : '—';
+        const cree = u.cree_at ? adminEscape(String(u.cree_at).slice(0,10).split('-').reverse().join('/')) : '—';
         return '<tr data-username="'+uname+'">'
           + '<td>'+uname+'</td><td>'+roleLbl+'</td><td>'+statut+'</td><td>'+cree+'</td>'
           + '<td><div class="adm-actions">'
@@ -17681,6 +17726,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
           <input type="text" class="adm-del-nom" value="${adminEscape(d.nom || '')}" placeholder="Nom">
           <input type="text" inputmode="decimal" class="adm-del-precaire" value="${adminEscape(d.mwh_precaire ?? '')}" placeholder="MWh précaire">
           <input type="text" inputmode="decimal" class="adm-del-classique" value="${adminEscape(d.mwh_classique ?? '')}" placeholder="MWh classique">
+          <select class="adm-del-usage" title="Délégataire utilisé quand le client…"><option value="">— utilisé quand —</option><option value="attente" ${(d.usage || ({PICOTY:'attente',ACE:'tout_de_suite'})[String(d.nom||'').toUpperCase()]) === 'attente' ? 'selected' : ''}>attente MPR</option><option value="tout_de_suite" ${(d.usage || ({PICOTY:'attente',ACE:'tout_de_suite'})[String(d.nom||'').toUpperCase()]) === 'tout_de_suite' ? 'selected' : ''}>tout de suite</option></select>
           <button type="button" class="adm-btn adm-btn-danger adm-del-remove">Supprimer</button>
         </div>`).join('')}
       </div>
@@ -17737,6 +17783,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
             <input type="text" class="adm-del-nom" value="${adminEscape(d.nom || '')}" placeholder="Nom">
             <input type="text" inputmode="decimal" class="adm-del-precaire" value="${adminEscape(d.mwh_precaire ?? '')}" placeholder="MWh précaire">
             <input type="text" inputmode="decimal" class="adm-del-classique" value="${adminEscape(d.mwh_classique ?? '')}" placeholder="MWh classique">
+          <select class="adm-del-usage" title="Délégataire utilisé quand le client…"><option value="">— utilisé quand —</option><option value="attente" ${(d.usage || ({PICOTY:'attente',ACE:'tout_de_suite'})[String(d.nom||'').toUpperCase()]) === 'attente' ? 'selected' : ''}>attente MPR</option><option value="tout_de_suite" ${(d.usage || ({PICOTY:'attente',ACE:'tout_de_suite'})[String(d.nom||'').toUpperCase()]) === 'tout_de_suite' ? 'selected' : ''}>tout de suite</option></select>
             <button type="button" class="adm-btn adm-btn-danger adm-del-remove">Supprimer</button>
           </div>`).join('')}
         </div>
@@ -18138,6 +18185,11 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     const admB10 = admBloc('10','10. Utilisateurs', renderUtilisateursSection());
     const admB11 = admBloc('11','11. Relances (emails automatiques)', renderRelancesSection());
     const admB12 = admBloc('12','12. Script d\'appel (accompagnateur de la fiche)', renderScriptAppelSection());
+    const admB13 = admBloc('13','13. Reprises de données', `<div class="adm-card" id="adm-reprise-annee">
+        <p class="adm-section-help">Années de construction à 8 chiffres (« 19481974 » : une période du DPE collée dans le champ année). La reprise vide l'année (à redemander au client) et garde la période.</p>
+        <div class="adm-actions" style="justify-content:flex-start;gap:8px"><button type="button" class="adm-btn" data-reprise-annee="0">Voir la liste (sans rien modifier)</button>
+        <button type="button" class="adm-btn adm-btn-danger" data-reprise-annee="1">Appliquer la reprise</button></div>
+        <div id="adm-reprise-annee-res" class="adm-section-help"></div></div>`);
     return `
       <div class="adm-overlay" id="adm-overlay">
         <div class="adm-modal">
@@ -18172,7 +18224,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
             <div class="adm-rootpanel" data-rootpanel="eco" hidden>${admB8}</div>
             <div class="adm-rootpanel" data-rootpanel="emails" hidden>${admB6}${admB11}</div>
             <div class="adm-rootpanel" data-rootpanel="script" hidden>${admB12}</div>
-            <div class="adm-rootpanel" data-rootpanel="systeme" hidden>${admB10}${admB7}</div>
+            <div class="adm-rootpanel" data-rootpanel="systeme" hidden>${admB10}${admB7}${admB13}</div>
           </div>
         </div>
       </div>`;
@@ -19132,9 +19184,11 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     document.getElementById('adm-save-delegataires')?.addEventListener('click', async ()=>{
       const delegataires = Array.from(document.querySelectorAll('.adm-delegataire-row')).map((row)=>({
         nom: row.querySelector('.adm-del-nom')?.value || '',
-        mwh_precaire: Number(String(row.querySelector('.adm-del-precaire')?.value || '').replace(',','.')) || 0,
-        mwh_classique: Number(String(row.querySelector('.adm-del-classique')?.value || '').replace(',','.')) || 0,
-        actif: !!row.querySelector('.adm-del-actif')?.checked
+        // Lot 6b : tarif vide = vide (repli sur le délégataire « attente » tant qu'il n'est pas renseigné)
+        mwh_precaire: String(row.querySelector('.adm-del-precaire')?.value || '').trim() === '' ? '' : (Number(String(row.querySelector('.adm-del-precaire').value).replace(',','.')) || 0),
+        mwh_classique: String(row.querySelector('.adm-del-classique')?.value || '').trim() === '' ? '' : (Number(String(row.querySelector('.adm-del-classique').value).replace(',','.')) || 0),
+        actif: !!row.querySelector('.adm-del-actif')?.checked,
+        usage: row.querySelector('.adm-del-usage')?.value || ''
       }));
       const r = await fetch('/api/admin/m3', { method:'POST', headers: window.adminHeaders(), body: JSON.stringify({ delegataires }) });
       if (r.ok) { M3_ADMIN.delegataires = delegataires; adminToast('✓ Paramètres enregistrés', '#0D6B3B'); window.dispatchEvent(new CustomEvent('hexa-config-changed')); }
@@ -19157,9 +19211,11 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
       document.querySelectorAll('.adm-m3-mpr').forEach(input=>{ forfaits_mpr[input.dataset.cat] = Number(String(input.value).replace(/\s/g,'').replace(',','.')) || 0; });
       const delegataires = Array.from(document.querySelectorAll('.adm-delegataire-row')).map((row,i)=>({
         nom: row.querySelector('.adm-del-nom')?.value || '',
-        mwh_precaire: Number(String(row.querySelector('.adm-del-precaire')?.value || '').replace(',','.')) || 0,
-        mwh_classique: Number(String(row.querySelector('.adm-del-classique')?.value || '').replace(',','.')) || 0,
-        actif: !!row.querySelector('.adm-del-actif')?.checked
+        // Lot 6b : tarif vide = vide (repli sur le délégataire « attente » tant qu'il n'est pas renseigné)
+        mwh_precaire: String(row.querySelector('.adm-del-precaire')?.value || '').trim() === '' ? '' : (Number(String(row.querySelector('.adm-del-precaire').value).replace(',','.')) || 0),
+        mwh_classique: String(row.querySelector('.adm-del-classique')?.value || '').trim() === '' ? '' : (Number(String(row.querySelector('.adm-del-classique').value).replace(',','.')) || 0),
+        actif: !!row.querySelector('.adm-del-actif')?.checked,
+        usage: row.querySelector('.adm-del-usage')?.value || ''
       }));
       const modeles_email = Array.from(document.querySelectorAll('[data-email-i]')).map((card,i)=>({
         id: 'modele_' + (i+1),
@@ -20686,7 +20742,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     const heure = (it.source && it.source.heure) || '';
     const bar = document.createElement('div');
     bar.className = 'hexa-rdv-banner';
-    bar.innerHTML = '<span>🔔 RDV imminent : <strong>'+escapeHtml(nom)+'</strong> à '+escapeHtml(heure)+'</span>'
+    bar.innerHTML = '<span>🔔 RDV imminent : <strong>'+escapeHtml(nom)+'</strong> à '+escapeHtml(window.hexaHeureFr ? window.hexaHeureFr(heure) : heure)+'</span>'
       + '<button type="button" class="hexa-rdv-banner-open">Ouvrir</button>'
       + '<button type="button" class="hexa-rdv-banner-close" aria-label="Fermer">✕</button>';
     document.body.appendChild(bar);
@@ -20961,7 +21017,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
       if (rdv && typeof rdv === 'object'){
         const t = rdv.type === 'visite' ? 'Visite' : 'Appel';
         parts.push('<div class="suivi-item"><span class="suivi-line">📅 <strong>RDV</strong> '
-          + escapeHtml(rdv.date||'') + ' ' + escapeHtml(rdv.heure||'')
+          + escapeHtml(rdv.date ? fmtDate(rdv.date) : '') + ' ' + escapeHtml(rdv.heure ? (window.hexaHeureFr ? window.hexaHeureFr(rdv.heure) : rdv.heure) : '')
           + ' · ' + t + ' · ' + escapeHtml(suiviAssigneLabel(rdv.assigne_a)) + '</span>'
           + '<button type="button" class="btn btn-secondary suivi-done" data-kind="rdv">Marquer fait</button></div>');
       }
@@ -21960,7 +22016,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     { n: 3, titre: 'Chauffage', carte: 'Chauffage actuel', blocs: [3], dire: '' },
     { n: 4, titre: 'Foyer', carte: 'Foyer et revenus', blocs: [4], hote: true, dire: '' },
     { n: 5, titre: 'Besoin', carte: 'Besoin du client', blocs: [], hote: true, dire: '' },
-    { n: 6, titre: 'Proposition', carte: 'Proposition', blocs: [5], hote: true, dire: '' }
+    { n: 6, titre: 'Proposition', carte: 'Proposition', blocs: [], hote: true, dire: '' }
   ];
   const ETAPE_DU_BLOC = { 1: 1, 2: 2, 3: 3, 4: 4, 5: 6, 6: 2 };   // bloc 5 = visite technique (étape 6) ; bloc 6 = données techniques (étape 2, dépliable)
   const AIDE_SOUS_CHOIX = 'Demandez de quoi sont faits les radiateurs. Sert au devis.';
@@ -22264,7 +22320,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
       document.addEventListener('click', (e) => {
         const pop = q('#p-suivi-pop');
         // clic dehors (un élément retiré du DOM par un nouveau rendu du statut n'est pas « dehors »)
-        if (pop && !pop.hidden && document.contains(e.target) && !(e.target.closest && e.target.closest('.p-suivi'))) {
+        if (pop && !pop.hidden && document.contains(e.target) && !(e.target.closest && (e.target.closest('.p-suivi') || e.target.closest('#l4-bloc-5')))) {
           pop.hidden = true; q('#p-suivi-btn').setAttribute('aria-expanded', 'false');
         }
       });
@@ -22817,6 +22873,20 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     });
   }
 
+  // Lot 6b : le texte d'un libellé se tronque (…) ; ses pastilles « devis », « DPE », * restent entières
+  function libellesUneLigne() {
+    qa('#l4-accordeon .l4-grid > .field > label').forEach(lab => {
+      const row = q(':scope > .label-row', lab);
+      const cible = row || lab;
+      if (row) { const s = q(':scope > span:first-child', row); if (s) s.classList.add('p6-lab-txt'); return; }
+      const textes = Array.from(cible.childNodes).filter(n => n.nodeType === 3 && n.textContent.trim());
+      if (!textes.length) return;
+      const s = document.createElement('span'); s.className = 'p6-lab-txt';
+      cible.insertBefore(s, textes[0]);
+      textes.forEach(t => s.appendChild(t));
+    });
+  }
+
   // ------------------------------------------------------------------ construction des sections
   function blocCorps(n) { return q(`#l4-bloc-${n} .l4-corps`); }
   function vider(corps) { const g = q(':scope > .l4-grid:not(.p6-g)', corps); if (g && !g.children.length) g.classList.add('l4-masque'); }
@@ -22839,24 +22909,23 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     const surf = el('div', 'field p-hote p6-surf p6-imp'); surf.id = 'p-sim-surf'; surf.dataset.pEtape = '2';
     g2.appendChild(surf);
     mettre(g2, 'annee_construction');
-    const g3 = grille('p6-g-log2');
-    mettre(g3, 'hsp');
-    g3.appendChild(el('div', 'p6-vide'));
+    mettre(g2, 'hsp');                                           // Lot 6b : une seule rangée (zéro défilement)
     const vb = el('div', 'field p6-valeur-bien', '<label><span class="label-row"><span>Valeur estimée du bien</span><span class="p6-tag">auto</span></span></label><div class="p6-in p6-in--auto" id="p6-valeur-bien">—</div>');
-    g3.appendChild(vb);
+    g2.appendChild(vb);
     const g4 = grille('p6-g3');
     mettre(g4, 'usage_bien'); mettre(g4, 'situation_propriete'); mettre(g4, 'date_acquisition');
     const g5 = grille('p6-g-bail l4-si-bailleur');
     mettre(g5, 'adresse_personne'); mettre(g5, 'code_postal_personne'); mettre(g5, 'ville_personne');
     const kids = [section('1 · ADRESSE'), g1, bande];
     if (banner) kids.push(banner);
-    kids.push(sep(), section('2 · LE LOGEMENT — PRÉ-REMPLI PAR LE DPE, À CONFIRMER AVEC LE CLIENT', 'p6-sec--bleu'), g2, g3,
-      aide('Surface chauffée : 90 % de la surface habitable par défaut (sans garage ni combles) — à corriger si le client chauffe moins de pièces. Valeur du bien : estimation automatique, sert au calcul du retour sur investissement.'),
+    const s2 = section('2 · LE LOGEMENT — PRÉ-REMPLI PAR LE DPE, À CONFIRMER AVEC LE CLIENT', 'p6-sec--bleu');
+    s2.appendChild(el('span', 'l4-aide p6-aide-sec', 'Surface chauffée : 90 % de la surface habitable par défaut.'));
+    kids.push(sep(), s2, g2,
       sep(), section('3 · SITUATION DU CLIENT'), g4, g5);
     corps.append(...kids);
     vider(corps);
     [['adresse_chantier', 'Adresse du logement'], ['code_postal_chantier', 'Code postal'], ['ville_chantier', 'Ville'],
-     ['type_logement', 'Type'], ['surface_logement_m2', 'Surface habitable'], ['annee_construction', 'Année'], ['hsp', 'Hauteur plafond'],
+     ['type_logement', 'Type'], ['surface_logement_m2', 'Surface habitable'], ['annee_construction', 'Année'], ['hsp', 'Hauteur'],
      ['usage_bien', 'Le client est'], ['situation_propriete', 'Situation'], ['date_acquisition', 'Date d\'acquisition prévue'],
      ['adresse_personne', '↳ Adresse du propriétaire'], ['code_postal_personne', '↳ CP du propriétaire'], ['ville_personne', '↳ Ville du propriétaire']]
       .forEach(([n, t]) => libeller(n, t));
@@ -22876,8 +22945,8 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     gM.appendChild(fSous);
     const al = q('#l4-alerte-convecteurs');
     if (al && fEm) { al.classList.remove('l4-span3'); fEm.appendChild(al); }
-    const gC = grille('p6-g1');
-    mettre(gC, 'ecs', 'p6-ecs');
+    const gC = grille('p6-g-ecs');                               // Lot 6b : eau chaude + compteur, une rangée
+    mettre(gC, 'ecs');
     const gF = grille('p6-g-fact');
     const fQ = el('div', 'field p6-fact-q', '<label id="p6-fact-lab">Le client connaît sa facture ?</label>'
       + '<div class="l4-choix"><button type="button" data-p6-fact="oui">Oui</button><button type="button" data-p6-fact="non">Non</button></div>');
@@ -22886,16 +22955,14 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     const opts = el('div', 'p6-fact-opts'); opts.id = 'p6-fact-opts';
     gF.appendChild(opts);
     const ret = el('div', 'p6-retenu'); ret.id = 'p6-retenu';
-    const gK = grille('p6-g3');
-    mettre(gK, 'alimentation_electrique', 'p6-span2'); mettre(gK, 'puissance_compteur');
+    mettre(gC, 'alimentation_electrique'); mettre(gC, 'puissance_compteur');
     const fPan = fieldDe('panneau_solaire');                 // pas de panneaux solaires à l'écran (champ conservé)
-    if (fPan) { fPan.classList.add('p6-cache'); gK.appendChild(fPan); }
-    corps.append(section('1 · COMMENT LE CLIENT SE CHAUFFE'), gE, gM, gC, sep(), section('2 · CE QU\'IL PAIE AUJOURD\'HUI'), gF, ret,
-      aide('Priorité : facture réelle du client › DPE / audit › estimation du CRM. Le calcul n\'est jamais bloqué.'),
-      sep(), section('3 · COMPTEUR ÉLECTRIQUE'), gK);
+    if (fPan) { fPan.classList.add('p6-cache'); gC.appendChild(fPan); }
+    corps.append(section('1 · COMMENT LE CLIENT SE CHAUFFE (ET SON COMPTEUR)'), gE, gM, gC, sep(), section('2 · CE QU\'IL PAIE AUJOURD\'HUI'), gF, ret,
+      aide('Priorité : facture réelle du client › DPE / audit › estimation du CRM. Le calcul n\'est jamais bloqué.'));
     vider(corps);
     [['mode_chauffage', 'Énergie de chauffage'], ['type_emetteurs', 'Radiateurs / émetteurs'], ['ecs', 'L\'eau chaude est faite par'],
-     ['alimentation_electrique', 'Type de compteur'], ['puissance_compteur', 'Puissance du compteur']].forEach(([n, t]) => libeller(n, t));
+     ['alimentation_electrique', 'Compteur électrique'], ['puissance_compteur', 'Puissance']].forEach(([n, t]) => libeller(n, t));
   }
 
   function bloc4() {
@@ -22932,6 +22999,10 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
   }
 
   function bloc5() { libeller('date_visite_technique_date', 'Date de visite technique'); }
+  function bloc6() {
+    const f = fieldDe('dpe_connu');
+    if (f && !q('#p6-dpe-classe', f)) { const d = el('div', 'p6-in p6-in--auto'); d.id = 'p6-dpe-classe'; d.textContent = val('dpe_connu') || '—'; f.appendChild(d); }
+  }
 
   // ------------------------------------------------------------------ étape 2 : bandeau DPE, valeur du bien
   function dateFr(v) {
@@ -22946,13 +23017,26 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     return null;
   }
   window.hexaL6DateDpe = () => dateFr(val('dpe_date') || val('source_active_date'));
+  // Lot 6b : année de construction ; une période (« 1948-1974 », « avant 1948 ») reste hors du champ
+  let periodeConstruction = '';
+  window.hexaAnneeOuPeriode = function (v) {
+    const s = String(v == null ? '' : v).trim();
+    if (/^(1[5-9]|20)\d\d$/.test(s)) return s;
+    if (s) { periodeConstruction = s; if (typeof window.hexaL6Maj === 'function') window.hexaL6Maj(); }
+    return '';
+  };
+  function periodeAffichee() {
+    if (periodeConstruction && !/^\d{4}$/.test(val('annee_construction'))) return periodeConstruction;
+    const m = val('annee_construction').replace(/\s/g, '').match(/^(\d{4})(\d{4})$/);   // ancien bug : « 19481974 »
+    return m ? `${m[1]}-${m[2]}` : '';
+  }
   // validité : DPE établi depuis le 01/07/2021 = 10 ans ; 2018 à juin 2021 = 31/12/2024 ; 2013-2017 = 31/12/2022 ;
   // audit énergétique = 5 ans
   function validite(v, audit) {
     const d = dateIso(v); if (!d) return null;
     let fin;
-    if (audit) fin = new Date(d.getFullYear() + 5, d.getMonth(), d.getDate());
-    else if (d >= new Date(2021, 6, 1)) fin = new Date(d.getFullYear() + 10, d.getMonth(), d.getDate());
+    if (audit) fin = new Date(d.getFullYear() + 5, d.getMonth(), d.getDate() - 1);
+    else if (d >= new Date(2021, 6, 1)) fin = new Date(d.getFullYear() + 10, d.getMonth(), d.getDate() - 1);
     else if (d >= new Date(2018, 0, 1)) fin = new Date(2024, 11, 31);
     else if (d >= new Date(2013, 0, 1)) fin = new Date(2022, 11, 31);
     else fin = d;
@@ -22965,23 +23049,21 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     const date = val('dpe_date') || val('source_active_date');
     const audit = /audit/i.test(val('source_active_type') + ' ' + val('dpe_source'));
     const conso = val('conso_kwh_m2');
-    const cle = [cl, num, date, audit, conso].join('|');
+    const periode = periodeAffichee();
+    const cle = [cl, num, date, audit, conso, periode].join('|');
     if (b.dataset.cle === cle) return;
     b.dataset.cle = cle;
+    const per = periode ? `<span class="p6-dpe-periode">construit ${esc(periode)} — demander l'année</span>` : '';
     if (!cl && !num) {
-      b.innerHTML = '<div class="p6-dpe-cl p6-dpe-cl--vide">?</div><div class="p6-dpe-txt"><b>Pas de DPE trouvé pour ce logement</b>'
-        + '<span>Choisissez l\'adresse dans la liste puis pointez la parcelle : la recherche DPE / audit se lance seule.</span></div>'
-        + '<a href="#" class="p6-dpe-lien" data-p6-dpe="1">Chercher le DPE</a>';
+      b.innerHTML = '<span class="p6-dpe-cl p6-dpe-cl--vide">?</span><span class="p6-dpe-txt"><b>Pas de DPE trouvé</b> · choisissez l\'adresse puis pointez la parcelle</span>'
+        + per + '<a href="#" class="p6-dpe-lien" data-p6-dpe="1">Chercher le DPE</a>';
       return;
     }
     const v = validite(date, audit);
-    const morceaux = [];
-    if (num) morceaux.push(`N° <b>${esc(num)}</b>`);
-    if (date) morceaux.push(`établi le <b>${esc(dateFr(date))}</b>`);
-    if (v) morceaux.push(v.ok ? `valide jusqu'au ${v.fin}` : `<span class="p6-expire">expiré depuis le ${v.fin}</span>`);
-    if (conso) morceaux.push(`conso ${esc(conso)} kWh/m²/an`);
-    b.innerHTML = `<div class="p6-dpe-cl p6-dpe-cl--${/^[A-G]$/.test(cl) ? cl : 'vide'}">${esc(cl || '?')}</div>`
-      + `<div class="p6-dpe-txt"><b>${audit ? 'Audit énergétique officiel trouvé' : 'DPE officiel trouvé'} pour ce logement</b><span>${morceaux.join(' · ')}</span></div>`
+    const morceaux = [`<b>${audit ? 'Audit' : 'DPE'}${num ? ' n° ' + esc(num) : ''}</b>${date ? ' du ' + esc(dateFr(date)) : ''}`];
+    if (v) morceaux.push(v.ok ? `valable jusqu'au ${v.fin}` : `<span class="p6-expire">expiré depuis le ${v.fin}</span>`);
+    b.innerHTML = `<span class="p6-dpe-cl p6-dpe-cl--${/^[A-G]$/.test(cl) ? cl : 'vide'}" title="Classe ${esc(cl || '?')}${conso ? ' · ' + esc(conso) + ' kWh/m²/an' : ''}">${esc(cl || '?')}</span>`
+      + `<span class="p6-dpe-txt">${morceaux.join(' · ')}</span>` + per
       + '<a href="#" class="p6-dpe-lien" data-p6-dpe="1">Pas le bon logement ?</a>';
   }
   function autreLogement() {
@@ -23049,7 +23131,8 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
       const html = `<div class="p6-opt${retTheo ? ' on' : ''}"><span class="p6-opt-t">Théorique ${s === 'audit' ? 'audit' : 'DPE'}${retTheo ? ' · retenu' : ''}</span>`
         + `<span class="p6-opt-v">${theo ? e0(theo) + '/an' : 'pas de DPE'}</span></div>`
         + `<div class="p6-opt${retEst ? ' on' : ''}"><span class="p6-opt-t">Estimation CRM${retEst ? ' · retenue' : ' (si pas de DPE)'}</span>`
-        + `<span class="p6-opt-v">${retEst && annuel ? e0(annuel) + '/an' : (estim.val ? e0(estim.val) + '/an' : '—')}</span><span class="p6-opt-s">${esc(sous)}</span></div>`;
+        + `<span class="p6-opt-v">${retEst && annuel ? e0(annuel) + '/an' : (estim.val ? e0(estim.val) + '/an' : '—')}</span><span class="p6-opt-s">${esc(sous)}</span></div>`
+        + '<div class="p6-opt-note">Estimation d\'après la maison : surface, région et âge.</div>';
       if (opts.dataset.html !== html) { opts.dataset.html = html; opts.innerHTML = html; }
     }
     const ret = q('#p6-retenu');
@@ -23136,9 +23219,70 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     }
     return false;
   }
+  // Lot 6b : un panneau latéral (Notes, Échanges, Documents, carte parcelle, Suivi, Fin d'appel) est-il ouvert ?
+  function panneauOuvert() {
+    const b = document.body.classList;
+    const pop = (id) => { const e = document.getElementById(id); return !!e && !e.hidden; };
+    return b.contains('panel-is-open') || b.contains('parcel-drawer-open') || pop('p-suivi-pop') || pop('p-fin-appel-pop');
+  }
+  function fermerPopsL6(sauf) {
+    [['p-suivi-pop', 'p-suivi-btn'], ['p-fin-appel-pop', 'p-fin-appel-btn']].forEach(([p, bt]) => {
+      if (p === sauf) return;
+      const e = document.getElementById(p); if (e && !e.hidden) { e.hidden = true; const x = document.getElementById(bt); if (x) x.setAttribute('aria-expanded', 'false'); }
+    });
+  }
+  function fermerAutres(sauf) {
+    if (sauf !== 'slot' && typeof window.hexaCloseAllPanels === 'function' && document.body.classList.contains('panel-is-open')) window.hexaCloseAllPanels();
+    if (sauf !== 'parcelle' && typeof window.closeParcelDrawer === 'function' && document.body.classList.contains('parcel-drawer-open')) window.closeParcelDrawer();
+    fermerPopsL6(sauf);
+  }
+  function placerVisiteTechnique() {
+    const place = document.getElementById('p6-vt-place'), pop = document.getElementById('p-suivi-pop');
+    const ouvert = !!pop && !pop.hidden;
+    document.body.classList.toggle('p6-suivi-ouvert', ouvert);
+    if (!ouvert || !place) return;
+    const r = place.getBoundingClientRect(), z = typeof window.hexaZoom === 'function' ? window.hexaZoom() : 1;
+    const bloc = document.getElementById('l4-bloc-5');
+    if (bloc) { bloc.style.top = (r.top / z) + 'px'; bloc.style.left = (r.left / z) + 'px'; bloc.style.width = (r.width / z) + 'px'; }
+  }
+  function suivrePanneaux() {
+    placerVisiteTechnique();
+    const p = panneauOuvert();
+    if (document.body.classList.contains('p6-panneau-ouvert') !== p) { document.body.classList.toggle('p6-panneau-ouvert', p); majAside(true); }
+  }
+  function installerPanneaux() {
+    ['openPanel', 'hexaOpenPanel'].forEach(nom => {
+      const orig = window[nom];
+      if (typeof orig === 'function' && !orig.__l6) { window[nom] = function (id) { fermerAutres('slot'); return orig.apply(this, arguments); }; window[nom].__l6 = true; }
+    });
+    const op = window.openParcelDrawer;
+    if (typeof op === 'function' && !op.__l6) { window.openParcelDrawer = function () { fermerAutres('parcelle'); return op.apply(this, arguments); }; window.openParcelDrawer.__l6 = true; }
+    [['p-suivi-btn', 'p-suivi-pop'], ['p-fin-appel-btn', 'p-fin-appel-pop']].forEach(([b, p]) => {
+      const bt = document.getElementById(b);
+      if (bt && !bt.dataset.l6) { bt.dataset.l6 = '1'; bt.addEventListener('click', () => { fermerAutres(p); setTimeout(suivrePanneaux, 0); }, true); }
+      const pop = document.getElementById(p);
+      if (pop && !pop.querySelector('.p6-pop-fermer')) {
+        const x = el('button', 'p6-pop-fermer', '×'); x.type = 'button'; x.setAttribute('aria-label', 'Fermer');
+        x.addEventListener('click', (e) => { e.stopPropagation(); pop.hidden = true; const bb = document.getElementById(b); if (bb) bb.setAttribute('aria-expanded', 'false'); suivrePanneaux(); });
+        pop.insertBefore(x, pop.firstChild);
+      }
+    });
+    const sp = document.getElementById('p-suivi-pop');
+    if (sp && !document.getElementById('p6-vt-place')) {
+      const t = el('div', 'p6-vt-titre', 'Visite technique'); const place = el('div', 'p6-vt-place'); place.id = 'p6-vt-place';
+      sp.appendChild(t); sp.appendChild(place);
+    }
+    new MutationObserver(suivrePanneaux).observe(document.body, { attributes: true, attributeFilter: ['class'] });
+    ['p-suivi-pop', 'p-fin-appel-pop'].forEach(id => { const e = document.getElementById(id); if (e) new MutationObserver(suivrePanneaux).observe(e, { attributes: true, attributeFilter: ['hidden'] }); });
+    // hauteur de fenêtre en px CSS de la page zoomée (zoom 0,9) : les panneaux vont jusqu'en bas de l'écran
+    const hauteurVue = () => { const z = typeof window.hexaZoom === 'function' ? window.hexaZoom() : 1;
+      document.documentElement.style.setProperty('--p6-vh', Math.ceil(window.innerHeight / z) + 'px'); };
+    hauteurVue();
+    window.addEventListener('resize', () => { hauteurVue(); placerVisiteTechnique(); });
+  }
   function htmlAside(n) {
     const auto = n !== 6;
-    const ouvert = asideOuvert == null ? auto : asideOuvert;
+    const ouvert = panneauOuvert() ? false : (asideOuvert == null ? auto : asideOuvert);
     if (!ouvert) {
       return '<button type="button" class="p6-aside-mini" data-p6-aside="1" title="Ouvrir l\'accompagnateur d\'appel"><span aria-hidden="true">◂</span><span class="p6-vert">ACCOMPAGNATEUR D\'APPEL</span></button>';
     }
@@ -23183,7 +23327,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     const b = q('#p6-lien-tech'), t = q('#p-lien-tech');
     if (!b || !t) return;
     const ouvert = t.getAttribute('aria-expanded') === 'true';
-    const txt = ouvert ? '▾ Masquer les données techniques' : '▸ Données techniques automatiques (zone, altitude, niveaux, parcelle, copropriété…)';
+    const txt = ouvert ? '▾ Masquer les données techniques' : '▸ Données techniques (zone, altitude, parcelle…)';
     if (b.textContent !== txt) b.textContent = txt;
     b.setAttribute('aria-expanded', ouvert ? 'true' : 'false');
   }
@@ -23201,7 +23345,14 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     if (change && [4, 5, 6].includes(n) && typeof window.hexaSimRafraichir === 'function') window.hexaSimRafraichir();
     if (change) qa('.p6-defil').forEach(d => { d.scrollTop = 0; });
   };
+  function ranger() {
+    const notif = document.getElementById('dpe-lookup-bandeau'), bande = document.getElementById('p6-dpe-bande');
+    if (notif && bande && notif.previousElementSibling !== bande) bande.insertAdjacentElement('afterend', notif);
+    const cl = val('dpe_connu').toUpperCase(), dc = document.getElementById('p6-dpe-classe');
+    if (dc && dc.textContent !== (cl || '—')) dc.textContent = cl || '—';
+  }
   window.hexaL6Maj = function () {
+    ranger(); suivrePanneaux();
     majDpe(); majValeurBien(); majFacture(); majCats(); majSous(); majLienTech(); majAside(false);
   };
 
@@ -23218,8 +23369,21 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     const lien = el('div', 'p-hote p6-lien-tech-hote', '<button type="button" class="p6-lien" id="p6-lien-tech" aria-expanded="false"></button>');
     lien.id = 'p6-lien-tech-hote'; lien.dataset.pEtape = '2'; lien.hidden = true;
     if (corps) corps.appendChild(lien);
-    bloc1(); bloc2(); bloc3(); bloc4(); bloc5();
+    bloc1(); bloc2(); bloc3(); bloc4(); bloc5(); bloc6();
     aidesEnInfobulles();
+    libellesUneLigne();
+    // en-tête de carte sur une ligne : n° d'étape, titre et légende « Encadré jaune »
+    const tete = document.querySelector('.p-carte-tete');
+    if (tete && leg) { tete.appendChild(leg); }
+    const t6 = document.querySelector('.p6-tete6'), lh = document.querySelector('.p6-legende-hote');
+    if (t6 && lh && lh.firstChild) t6.appendChild(lh.firstChild);
+    // Enregistrer : dans le pied de carte (la barre du bas disparaît : zéro défilement)
+    const save = document.getElementById('btn-save'), pied = document.querySelector('#p-carte .p-nav');
+    if (save && pied) { const suiv = document.getElementById('p-suiv'); pied.insertBefore(save, suiv); document.body.classList.add('p6-save-pied'); }
+    // notification de recherche DPE : à l'étape 2, sous le bandeau (plus répétée aux autres étapes)
+    const notif = document.getElementById('dpe-lookup-bandeau'), bande = document.getElementById('p6-dpe-bande');
+    if (notif && bande) bande.insertAdjacentElement('afterend', notif);
+    installerPanneaux();
     chargerScript();
   };
 
@@ -24037,6 +24201,164 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
   .sa-aide { font-size: 12px; color: #475569; line-height: 1.5; margin: 0 0 10px; }
   .sa-aide code { background: #F1F5F9; padding: 0 4px; border-radius: 4px; }
 </style>
+<style id="hexa-lot6b">
+  /* ================= Lot 6b — zéro défilement à 1366×768 (zoom 0,9), panneaux latéraux, bandeau DPE compact ================= */
+  /* habillage : bouton Enregistrer dans le pied de carte ; en-tête de carte sur une ligne avec la légende */
+  body.l6.p6-save-pied #form-actions-bar, body.l6.p6-save-pied .form-actions-anchor { display: none !important; }
+  body.l6 .p-nav { padding: 7px 18px; gap: 10px; }
+  body.l6 .p-nav-btn { height: 40px; font-size: 15px; padding: 0 22px; }
+  body.l6 .p-nav-btn--prec { font-size: 14px; padding: 0 16px; }
+  body.l6 .p-nav .btn-save { margin: 0 0 0 auto !important; height: 40px !important; min-height: 0 !important; line-height: 40px !important;
+    padding: 0 18px !important; font-size: 13.5px !important; border-radius: 8px !important; width: auto !important; box-shadow: none !important; }
+  body.l6 .p-nav .btn-save svg { width: 15px; height: 15px; }
+  body.l6 .p-carte-tete { display: flex; align-items: center; gap: 12px; padding: 7px 18px; flex-wrap: nowrap; }
+  body.l6 .p-carte-tete .p-carte-ligne { flex: none; }
+  body.l6 .p-carte-titre { font-size: 18px; white-space: nowrap; }
+  body.l6 .p-carte-tete .p6-legende { margin-left: auto; min-width: 0; flex: 0 1 auto; padding: 4px 10px; gap: 10px; font-size: 11px; }
+  .p6-legende > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  body.l6 .p6-legende .p6-hl { width: 20px; height: 12px; box-shadow: 0 0 0 3px #FFE08A; }
+  body.l6[data-p6-etape="1"] .p-carte-tete .p6-legende { display: none; }
+  body.l6[data-p6-etape="6"] .p6-legende-hote { display: none; }
+  /* corps : espacements resserrés, sections avec un filet (plus de séparateur + marge) */
+  body.l6 .p-corps { padding: 10px 20px; gap: 9px; }
+  body.l6 .l4-bloc.is-open .l4-corps, body.l6 #p-hotes > .p-hote:not([hidden]) { gap: 9px; }
+  body.l6 .p6-g, body.l6 .l4-grid { gap: 9px 14px; }
+  body.l6 .p6-sep { display: none; }
+  body.l6 .p6-sec { padding-top: 7px; border-top: 1px solid #E3E7EC; font-size: 11px; line-height: 14px; }
+  body.l6 .l4-corps > .p6-sec:first-of-type, body.l6 #p-sim-5 > .p6-sec:first-of-type, body.l6 #p-sim-6a > .p6-sec:first-child { border-top: 0; padding-top: 0; }
+  body.l6 .l4-grid > .field > label { height: 18px !important; line-height: 18px !important; margin: 0 0 1px !important; }
+  .p6-lab { height: 18px; margin: 0 0 1px; }
+  body.l6 .p6-aide { font-size: 11.5px; line-height: 1.3; }
+  /* aide activée : une ligne par champ, tronquée (le texte complet en infobulle) */
+  body.l6.l4-aide-on .l4-grid > .field > .l4-aide, body.l6.l4-aide-on .p6-sous > .l4-aide { white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    font-size: 11px; line-height: 14px; margin-top: 2px; }
+  /* 7. libellés : le texte se tronque, les pastilles « devis » / « DPE » / * jamais */
+  body.l6 .l4-grid > .field > label { display: flex !important; align-items: center; gap: 4px; }
+  body.l6 .l4-grid > .field > label > .label-row { display: flex !important; align-items: center; gap: 4px; min-width: 0; max-width: 100%; overflow: hidden; }
+  body.l6 .p6-lab-txt { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  body.l6 .l4-grid > .field > label .l4-marques, body.l6 .l4-grid > .field > label .badge-source, body.l6 .l4-grid > .field > label .badge-auto-generic,
+  body.l6 .l4-grid > .field > label .l4-pastille-devis, body.l6 .l4-grid > .field > label .p6-tag, body.l6 .l4-grid > .field > label .auto-tag { flex: none; }
+  /* étape 2 */
+  body.l6 .p6-g-log { grid-template-columns: 1.35fr 1fr 1fr .78fr .78fr 1.25fr; }
+  body.l6 .p6-g-log .l4-choix > button { font-size: 13px; padding: 0 4px; }
+  body.l6 .p6-g-bail { padding: 6px 10px; }
+  .p6-dpe { padding: 4px 10px; gap: 10px; white-space: nowrap; min-width: 0; }
+  .p6-dpe-cl { width: 26px; height: 26px; font-size: 15px; border-radius: 6px; }
+  .p6-dpe-cl--A { background: #009C6D; } .p6-dpe-cl--B { background: #52B153; } .p6-dpe-cl--C { background: #78BD76; color: #fff; }
+  .p6-dpe-cl--D { background: #F4E70F; color: #16202C; } .p6-dpe-cl--E { background: #F0B40F; color: #16202C; } .p6-dpe-cl--F { background: #EB8235; }
+  .p6-dpe-cl--G { background: #D7221F; }
+  .p6-dpe .p6-dpe-txt { flex: 0 1 auto; min-width: 0; display: block; overflow: hidden; text-overflow: ellipsis; font-size: 13px; color: var(--p6-blue); }
+  .p6-dpe .p6-dpe-txt b { color: var(--p6-navy); font-weight: 800; }
+  .p6-dpe-periode { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; font-size: 12.5px; font-weight: 700; color: #8A4B00; }
+  .p6-dpe .p6-dpe-lien { margin-left: auto; flex: none; }
+  body.l6 #dpe-lookup-bandeau > :not(.dpe-alternates-wrap) { display: none !important; }
+  body.l6 #dpe-lookup-bandeau:not(:has(.dpe-alternates-wrap)) { display: none !important; }
+  body.l6 #dpe-lookup-bandeau { margin: 0; padding: 4px 10px; }
+  body.l6 [data-urbs-field="dpe_connu"] .dpe-buttons { display: none !important; }
+  /* étape 3 : eau chaude + compteur sur une rangée */
+  body.l6 .p6-g-ecs { grid-template-columns: 3fr 3fr 1.15fr; }
+  body.l6 .p6-g-ecs .l4-choix > button, body.l6 .p6-g-em .l4-choix > button { font-size: 13px; padding: 0 5px; }
+  .p6-opt { padding: 6px 10px; gap: 2px; }
+  .p6-opt.on { padding: 5px 9px; }
+  .p6-opt-v { font-size: 15px; }
+  .p6-opt-note { grid-column: 1 / -1; font-size: 11.5px; color: var(--p6-grey); margin-top: -2px; }
+  .p6-retenu { padding: 5px 10px; }
+  /* étape 4 : aides sur deux lignes */
+  .p6-aides { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 16px; row-gap: 6px; align-items: center; padding: 8px 12px; }
+  .p6-aides > .p6-aides-tete, .p6-aides > .p6-adire, .p6-aides > .p6-aide { grid-column: 1 / -1; }
+  .p6-aides-total > strong { font-size: 28px; }
+  .p6-aides-total > span { font-size: 13px; }
+  .p6-aides-l { padding: 6px 12px; }
+  .p6-aides-l > span { font-size: 17px; }
+  .p6-adire { padding: 6px 12px; font-size: 13px; }
+  body.l6 .p6-aides .p6-aide { font-size: 11px; color: var(--p6-grey); }
+  /* étape 5 */
+  body.l6 #p-hotes .p-carte-choix.p6-carte-choix { min-height: 76px; padding: 12px 14px; }
+  body.l6 #p-hotes .p-carte-choix.p6-carte-choix.active { padding: 10px 12px; }
+  /* étape 6 : colonnes resserrées ; lignes de calcul sur une ligne */
+  #p6-gauche-defil { gap: 8px; padding: 9px 18px; }
+  #p6-droite-defil { padding: 8px 12px; }
+  #p-sim-6a, #p-sim-6b, #sim-fin { gap: 8px; }
+  #sim-dynamic { gap: 6px; }
+  .p6-tete6 { flex-wrap: nowrap; align-items: center; }
+  .p6-tete6 .p6-legende { margin-left: auto; min-width: 0; padding: 3px 8px; gap: 8px; font-size: 10.5px; }
+  .p6-titre6 { font-size: 18px; white-space: nowrap; }
+  .p6-pcard, body.l6 .p6-pcard.sim-mod-row { padding: 5px 9px; }
+  .p6-pcard.on, body.l6 .p6-pcard.sim-mod-row.on { padding: 3px 7px; }
+  body.l6 #p-sim-6 .p6-seg { height: 38px; }
+  .p6-chk { padding: 6px 10px; }
+  .p6-dire { padding: 7px 12px; gap: 2px; }
+  .p6-dire > div { font-size: 13.5px; line-height: 1.28; }
+  .p6-blk { padding: 7px 10px; gap: 4px; }
+  .p6-calc { padding: 4px 10px; gap: 8px; min-height: 26px; }
+  .p6-calc-l { flex-direction: row; align-items: baseline; gap: 6px; overflow: hidden; }
+  .p6-calc-l b { flex: none; }
+  .p6-calc-l i { flex: 1 1 auto; min-width: 0; }
+  .p6-calc--tot .p6-calc-v { font-size: 17px; }
+  .p6-calc--cle .p6-calc-v { font-size: 15px; }
+  .p6-calc--fin .p6-calc-v { font-size: 19px; }
+  .p6-tuile { padding: 4px 9px; }
+  /* 9. bas de l'étape 6 : deux interrupteurs sur une ligne, puis les boutons alignés, même hauteur */
+  .p6-barre { grid-template-columns: auto auto 1fr auto auto; grid-template-rows: auto auto; row-gap: 6px; padding: 7px 12px; }
+  .p6-barre .p6-cases { grid-column: 1 / -1; grid-row: 1; flex-direction: row; gap: 18px; justify-self: start; white-space: nowrap; }
+  .p6-barre .p6-btn { grid-row: 2; height: 38px; white-space: nowrap; font-size: 12.5px; padding: 0 12px; }
+  .p6-barre .p6-btn--prec { grid-column: 1; } .p6-barre #sim-arguments-btn { grid-column: 2; }
+  .p6-barre #btn-pre-devis { grid-column: 4; } .p6-barre #btn-voir-devis { grid-column: 5; }
+  .p6-cases .l4s-case { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+  .p6-cases input[type=checkbox] { appearance: none; -webkit-appearance: none; width: 28px; height: 16px; margin: 0; border-radius: 8px; background: #CBD5E1;
+    position: relative; cursor: pointer; flex: none; transition: background .15s; }
+  .p6-cases input[type=checkbox]::after { content: ''; position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 50%; background: #fff; transition: left .15s; }
+  .p6-cases input[type=checkbox]:checked { background: var(--p6-green); }
+  .p6-cases input[type=checkbox]:checked::after { left: 14px; }
+  /* 3. panneaux latéraux : pleine hauteur, en surimpression (la page ne rétrécit pas), un seul ouvert */
+  body.l6 #hexa-panel-slot { top: 0 !important; height: var(--p6-vh, 100vh) !important; z-index: 1600 !important; }
+  body.l6.panel-is-open .hexa-app-shell__main { padding-right: 0 !important; }
+  body.l6 .parcel-drawer { top: 0 !important; height: var(--p6-vh, 100vh) !important; z-index: 1600 !important; }
+  body.l6.p6-panneau-ouvert .prospect-shell-sticky { z-index: 1600 !important; }
+  body.l6.parcel-drawer-open #hexa-app-shell { display: block !important; }
+  body.l6 .p-suivi-pop, body.l6 .p-fin-appel-pop { position: fixed !important; top: 0 !important; right: 0 !important; bottom: 0 !important; left: auto !important;
+    height: var(--p6-vh, 100vh); width: var(--panel-w, 420px); max-width: 100vw; min-width: 0 !important; border-radius: 0; z-index: 1000; overflow-y: auto;
+    box-shadow: -4px 0 24px rgba(16, 24, 40, .12); border: 0; border-left: 1px solid #E2E8F0; padding: 46px 18px 18px; box-sizing: border-box; }
+  .p6-pop-fermer { position: absolute; top: 10px; right: 12px; width: 30px; height: 30px; border: 0; background: #F0F5FA; color: #002E5A; border-radius: 8px;
+    font-size: 18px; line-height: 1; cursor: pointer; }
+  /* 9. visite technique : affichée dans le panneau « Suivi du dossier » (le champ reste dans la fiche) */
+  .p6-vt-titre { margin: 16px 0 6px; font-size: 12px; font-weight: 800; color: #002E5A; }
+  .p6-vt-place { height: 64px; }
+  /* resserrage final (zéro défilement) */
+  body.l6 .p-carte-num { white-space: nowrap; }
+  body.l6 .p6-g-log #annee-construction { width: 100% !important; min-width: 0; }
+  body.l6 .p6-g-log .field-input-row { width: 100%; display: flex; }
+  body.l6 .p6-g-log .field-badge-slot { display: none !important; }
+  body.l6 #l4-bloc-2 .l4-grid > .field > .l4-aide { display: none !important; }      /* étape 2 : aides des champs en infobulle */
+  body.l6 #p6-lien-tech-hote { margin-top: -6px; }
+  body.l6 .p-corps, body.l6 .l4-bloc.is-open .l4-corps, body.l6 #p-hotes > .p-hote:not([hidden]) { gap: 8px; }
+  .p6-dpe { padding: 2px 10px; }
+  .p6-calc { padding: 2px 10px; min-height: 23px; }
+  .p6-calc-l b { font-size: 11.5px; }
+  .p6-blk { padding: 6px 9px; gap: 3px; }
+  .p6-blk > h4 { font-size: 10.5px; margin: 0; }
+  #sim-dynamic { gap: 5px; }
+  #p6-alerte-delegataire { padding: 4px 10px; font-size: 11.5px; }
+  .p6-tuile { padding: 3px 9px; }
+  .p6-tuile > b, body.l6 #p-hotes .p6-tuile .sim-roi-big { font-size: 14px; }
+  .p6-base, body.l6 #p-hotes .p6-base { margin-top: 3px; }
+  body.l6 .p6-sec { border-top: 0; padding-top: 2px; }
+  .p6-aide-sec { display: none !important; }
+  body.l6.l4-aide-on .p6-aide-sec { display: inline !important; margin-left: 10px; font-weight: 400; letter-spacing: 0; font-size: 11px; }
+  body.l6 #p6-lien-tech-hote { margin-top: -26px; align-self: flex-end; }
+  body.l6 .p6-g-bail { padding: 4px 8px; }
+  .p6-alerte-txt { color: #B45309; font-weight: 700; }
+  body.l6[data-p6-etape="2"] .p-corps, body.l6[data-p6-etape="2"] .l4-bloc.is-open .l4-corps,
+  body.l6[data-p6-etape="2"] #p-hotes > .p-hote:not([hidden]) { gap: 6px; }
+  body.l6[data-p6-etape="2"] .p6-g { row-gap: 6px; }
+   body.l6[data-p6-etape="2"] .p-corps { padding-top: 7px; padding-bottom: 7px; }   /* libellés 18 px : 6 px regagnés ici */
+  body.l6[data-p6-etape="2"] #p6-lien-tech-hote { margin-top: -22px; }
+  body.l6 #l4-bloc-5 { display: none !important; }
+  body.l6.p6-suivi-ouvert #l4-bloc-5.l4-bloc { display: block !important; position: fixed; z-index: 1700; background: #fff; margin: 0; padding: 0; border: 0; }
+  body.l6.p6-suivi-ouvert #l4-bloc-5 .l4-corps { display: block !important; padding: 0 !important; }
+  body.l6.p6-suivi-ouvert #l4-bloc-5 .l4-grid { grid-template-columns: minmax(0, 1fr); }
+</style>
+
 
 </body>
 </html>

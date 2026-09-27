@@ -47,6 +47,9 @@ from services.service_devis import (
     calculer_financement_devis,
     calculer_notedim,
     calculer_zone_climatique,
+    choisir_delegataire,
+    mode_cee,
+    usage_delegataire,
     find_modele,
     format_devis_amounts,
     format_sous_traitant,
@@ -851,7 +854,20 @@ def _read_echanges():
 
 def _read_delegataires():
     delegataires = _read_json(DELEGATAIRES_PATH, DEFAULT_DELEGATAIRES)
-    return delegataires if isinstance(delegataires, list) else DEFAULT_DELEGATAIRES
+    delegataires = delegataires if isinstance(delegataires, list) else DEFAULT_DELEGATAIRES
+    # Lot 6b : « utilisé quand » (attente MPR / tout de suite) ; ancien fichier : déduit du nom (PICOTY / ACE).
+    # Pas de délégataire « tout de suite » : ACE ajouté (non enregistré) avec des tarifs vides -> repli sur PICOTY.
+    out = []
+    for d in delegataires:
+        if not isinstance(d, dict):
+            continue
+        d = dict(d)
+        if not d.get("usage") and usage_delegataire(d):
+            d["usage"] = usage_delegataire(d)
+        out.append(d)
+    if not any(usage_delegataire(d) == "tout_de_suite" for d in out):
+        out.append({"nom": "ACE", "mwh_precaire": "", "mwh_classique": "", "actif": False, "usage": "tout_de_suite"})
+    return out
 
 
 def _read_modeles_email():
@@ -1746,7 +1762,9 @@ def _devis_context(numero: str) -> dict:
         forfaits = {}
     categorie = str(lead.get("categorie") or "modeste")
     mpr = _float_value(forfaits.get(categorie), {"tres_modeste": 5000, "modeste": 4000, "intermediaire": 3000, "superieur": 0}.get(categorie, 4000))
-    delegataire = _active_delegataire()
+    # Lot 6b : délégataire selon le choix de démarrage (même règle que le devis)
+    _st = load_state_simulateur(numero) or {}
+    delegataire = choisir_delegataire(_read_delegataires(), mode_cee(lead, _st, {"forfaits_mpr": forfaits}), categorie)[0] or _active_delegataire()
     mwh = max(_float_value(lead.get("surface_logement_m2"), 90) / 10, 1)
     cee_unitaire = _float_value(delegataire.get("mwh_precaire" if categorie == "tres_modeste" else "mwh_classique"), 7.2)
     cee = round(mwh * cee_unitaire * 10, 2)
@@ -1769,7 +1787,7 @@ def _devis_context(numero: str) -> dict:
         "service": service,
         "phase": "Triphasé" if wants_tri else "Monophasé",
         "surface_chauffee": surface_chauffee,
-        "zone": lead.get("zone_climatique") or lead.get("zone_climatique_chantier") or "",
+        "zone": calculer_zone_climatique(lead.get("code_postal_chantier") or lead.get("cp_chantier") or ""),
         "delegataire": delegataire.get("nom", "PICOTY"),
         "categorie": categorie,
     }
@@ -1971,10 +1989,21 @@ def _pick_best(lines, date_field):
     return first   # mode texte : deja trie par date decroissante
 
 
+def _date_heure_fr(iso) -> str:
+    """« 29/09/2025 à 10h12 » (heure de Paris) depuis un horodatage ISO ; la valeur brute sinon."""
+    try:
+        d = datetime.fromisoformat(str(iso))
+        if d.tzinfo is not None:
+            d = d.astimezone(PARIS_TZ)
+        return d.strftime("%d/%m/%Y à %Hh%M")
+    except (TypeError, ValueError):
+        return str(iso or "")
+
+
 def _doc_status(label, rec, date):
     num = rec.get("numero_dpe") or rec.get("n_audit") or ""
     adr = rec.get("adresse_ban") or ""
-    txt = f"{label} trouvé (n°{num} du {date}"
+    txt = f"{label} trouvé (n°{num} du {_format_date_fr(date)}"
     if adr:
         txt += f" — {adr}"
     return txt + ")"
@@ -3366,6 +3395,37 @@ async def save_params_financement(request: Request):
     return {"success": True}
 
 
+# Lot 6b : reprise des années de construction à 8 chiffres. Une période du DPE (« 1948-1974 ») était écrite dans le
+# champ année, qui ne garde que les chiffres : « 19481974 ». Dry-run par défaut ; appliquer = année vidée (à
+# redemander au client), la période est conservée dans periode_construction.
+def _reprise_annee(appliquer: bool) -> list:
+    leads = _read_leads()
+    touches = []
+    for lead in leads:
+        brut = str(lead.get("annee_construction") or "")
+        m = re.fullmatch(r"(\d{4})(\d{4})", re.sub(r"\s", "", brut))
+        if not m or int(m.group(1)) > int(m.group(2)):
+            continue
+        periode = f"{m.group(1)}-{m.group(2)}"
+        touches.append({"numero": lead.get("numero"), "nom": f"{lead.get('nom') or ''} {lead.get('prenom') or ''}".strip(),
+                        "avant": brut, "apres": "", "periode": periode})
+        if appliquer:
+            lead["annee_construction"] = ""
+            lead["periode_construction"] = periode
+    if appliquer and touches:
+        _atomic_write_json(LEADS_PATH, leads)
+    return touches
+
+
+@app.post("/api/admin/reprise-annee")
+async def reprise_annee(request: Request):
+    _require_admin(request)
+    payload = await _read_request_payload(request)
+    appliquer = str(payload.get("appliquer") or "").lower() in ("1", "true", "oui")
+    touches = _reprise_annee(appliquer)
+    return {"appliquer": appliquer, "nombre": len(touches), "leads": touches}
+
+
 # Lot 6 : script d'appel (Admin → Script d'appel). Lecture libre (fiche), écriture admin.
 def _script_appel() -> dict:
     s = load_parametres_admin().get("script_appel")
@@ -3941,8 +4001,8 @@ def _economies_devis(prospect: dict, state: dict, modele_obj, admin: dict, zone_
     if annuel <= 0:
         surface = float_value(devis_value(state, "surface_chauffee", default="")) or (
             float_value(devis_value(prospect, "surface_habitable", "surface_logement_m2", default="")) * 0.9)
-        # zone de l'état simulateur, sinon celle du département du CP (jamais H2 par défaut)
-        annuel = estimer_facture_annuelle(surface, devis_value(state, "zone", default="") or _zone_depuis_cp(prospect) or zone_contexte,
+        # zone officielle du département du CP (jamais celle du DPE, jamais H2 par défaut)
+        annuel = estimer_facture_annuelle(surface, _zone_depuis_cp(prospect) or zone_contexte,
                                           devis_value(prospect, "annee_construction", default=""),
                                           energie, ecs_chaudiere, personnes, params) or 0
         source = "estime"
@@ -3983,11 +4043,8 @@ def _build_devis_context(request: Request, numero: str, version: int | None = No
     cp_chantier = devis_value(prospect, "cp_chantier", "code_postal_chantier", "cp", default="")
     ville_chantier = devis_value(prospect, "ville", "ville_chantier", default="")
     date_visite = devis_value(prospect, "date_visite_technique", default="À déterminer")
-    if date_visite != "À déterminer" and re.fullmatch(r"\d{4}-\d{2}-\d{2}", str(date_visite)):
-        try:
-            date_visite = datetime.strptime(str(date_visite), "%Y-%m-%d").strftime("%d/%m/%Y")
-        except ValueError:
-            pass
+    if date_visite != "À déterminer" and re.match(r"\d{4}-\d{2}-\d{2}", str(date_visite)):
+        date_visite = _format_date_fr(date_visite)
     sous_traitant_context = dict(sous_traitant or {})
     if sous_traitant_context:
         sous_traitant_context["rge_validite"] = (
@@ -4049,6 +4106,15 @@ def _build_devis_context(request: Request, numero: str, version: int | None = No
     context["afficher_mention_mpr"] = state.get("afficher_mention_mpr") is not False
     # financement choisi dans le simulateur (opt1 Crédit Travaux par défaut, comme le simulateur)
     context["financement_devis"] = calculer_financement_devis(_base_credit, admin, str(state.get("option") or "opt1").strip())
+    # Lot 6b : la mention RAI nomme le délégataire qui valorise la prime (attente MPR : PICOTY ; tout de suite : ACE)
+    _deleg = choisir_delegataire(admin.get("delegataires") or [], mode_cee(prospect, state, admin),
+                                 devis_value(prospect, "categorie_revenu", "categorie", default="modeste"))[0] or {}
+    _nom_deleg = str(_deleg.get("nom") or "").strip()
+    if _nom_deleg.upper() == "ACE" or not _nom_deleg:
+        context["delegataire_titre"], context["delegataire_mention"] = "ACE Énergie", "ACE ÉNERGIE (SIREN : 848 595 336)"
+    else:
+        context["delegataire_titre"] = _nom_deleg
+        context["delegataire_mention"] = str(_deleg.get("mention_devis") or _nom_deleg.upper())
     # Mêmes clés qu'avant le Lot 2 (compatibilité) ; l'économie ECS fixe du ballon n'existe plus.
     context["economie_devis"] = {
         "facture_apres_mois": _eco_res.get("apres_mensuel") if _eco_res.get("ok") else None,
@@ -4997,7 +5063,7 @@ async def _send_devis(numero: str, payload: dict, request: Request) -> dict:
     auteur = str(payload.get("auteur") or "Anonyme")
     notes = _read_notes()
     notes.setdefault(numero, []).append(
-        {"texte": f"{'Pré-devis' if variante == 'pre_devis' else 'Devis'} v{version} envoyé le {now} à {email_to} par {auteur}", "date": _now_paris_iso(), "auteur": auteur}
+        {"texte": f"{'Pré-devis' if variante == 'pre_devis' else 'Devis'} v{version} envoyé le {_date_heure_fr(now)} à {email_to} par {auteur}", "date": _now_paris_iso(), "auteur": auteur}
     )
     _atomic_write_json(NOTES_PATH, notes)
 

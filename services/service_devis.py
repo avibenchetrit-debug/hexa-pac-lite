@@ -19,26 +19,30 @@ TYPE_EMETTEURS_LABELS = {
 }
 
 TEMP_BASE_ZONE = {"H1": -7, "H2": -4, "H3": 0}
+# Zone climatique H1 / H2 / H3 par département : répartition OFFICIELLE utilisée par les fiches d'opérations
+# standardisées CEE (dont BAR-TH-171 « Pompe à chaleur de type air/eau », facteur de zone H1 1,2 · H2 1 · H3 0,7).
+# Source : ministère de la Transition écologique, « Répartition des départements par zone climatique » (tableau d'une
+# page, sans date), https://www.ecologie.gouv.fr/sites/default/files/documents/La%20r%C3%A9partition%20des%20d%C3%A9partements%20par%20zone%20climatique.pdf
+# — lu le 27/09/2026 ; mêmes listes que l'arrêté du 5 avril 1988, annexe I « Définition des zones climatiques »
+# (https://www.legifrance.gouv.fr/codes/section_lc/JORFTEXT000000322499/LEGISCTA000006128878/). La Corse y est
+# une seule ligne « 20 Corse » (H3) : « 20 », « 2A » et « 2B ». Outre-mer : arrêté du 22 décembre 2014 définissant
+# les opérations standardisées d'économies d'énergie, article 4 (https://www.legifrance.gouv.fr/loda/id/JORFTEXT000029953752/) :
+# France d'outre-mer en H3, sauf Saint-Pierre-et-Miquelon (975) en H1.
+# La zone écrite dans un DPE / audit (sous-zones H1a…H3) ne sert jamais au calcul (affichage seulement).
 DEPT_ZONE = {
-    "01": "H1", "02": "H1", "03": "H1", "05": "H1", "08": "H1", "10": "H1", "14": "H1",
-    "15": "H1", "19": "H1", "21": "H1", "23": "H1", "25": "H1", "27": "H1", "28": "H1",
-    "36": "H1", "38": "H1", "39": "H1", "42": "H1", "43": "H1", "45": "H1", "51": "H1",
-    "52": "H1", "54": "H1", "55": "H1", "57": "H1", "58": "H1", "59": "H1", "60": "H1",
-    "61": "H1", "62": "H1", "63": "H1", "67": "H1", "68": "H1", "69": "H1", "70": "H1",
-    "71": "H1", "73": "H1", "74": "H1", "75": "H1", "76": "H1", "77": "H1", "78": "H1",
-    "80": "H1", "88": "H1", "89": "H1", "90": "H1", "91": "H1", "92": "H1", "93": "H1",
-    "94": "H1", "95": "H1",
-    "04": "H2", "07": "H2", "09": "H2", "11": "H2", "12": "H2", "16": "H2", "17": "H2",
-    "18": "H2", "22": "H2", "24": "H2", "26": "H2", "29": "H2", "31": "H2", "32": "H2",
-    "33": "H2", "35": "H2", "37": "H2", "40": "H2", "41": "H2", "44": "H2", "46": "H2",
-    "47": "H2", "48": "H2", "49": "H2", "50": "H2", "53": "H2", "56": "H2", "64": "H2",
-    "65": "H2", "72": "H2", "79": "H2", "81": "H2", "82": "H2", "85": "H2", "86": "H2",
-    "87": "H2",
-    "06": "H3", "13": "H3", "2A": "H3", "2B": "H3", "30": "H3", "34": "H3", "66": "H3",
-    "83": "H3", "84": "H3",
+    "01": "H1", "02": "H1", "03": "H1", "05": "H1", "08": "H1", "10": "H1", "14": "H1", "15": "H1", "19": "H1",
+    "21": "H1", "23": "H1", "25": "H1", "27": "H1", "28": "H1", "38": "H1", "39": "H1", "42": "H1", "43": "H1",
+    "45": "H1", "51": "H1", "52": "H1", "54": "H1", "55": "H1", "57": "H1", "58": "H1", "59": "H1", "60": "H1",
+    "61": "H1", "62": "H1", "63": "H1", "67": "H1", "68": "H1", "69": "H1", "70": "H1", "71": "H1", "73": "H1",
+    "74": "H1", "75": "H1", "76": "H1", "77": "H1", "78": "H1", "80": "H1", "87": "H1", "88": "H1", "89": "H1",
+    "90": "H1", "91": "H1", "92": "H1", "93": "H1", "94": "H1", "95": "H1",
+    "04": "H2", "07": "H2", "09": "H2", "12": "H2", "16": "H2", "17": "H2", "18": "H2", "22": "H2", "24": "H2",
+    "26": "H2", "29": "H2", "31": "H2", "32": "H2", "33": "H2", "35": "H2", "36": "H2", "37": "H2", "40": "H2",
+    "41": "H2", "44": "H2", "46": "H2", "47": "H2", "48": "H2", "49": "H2", "50": "H2", "53": "H2", "56": "H2",
+    "64": "H2", "65": "H2", "72": "H2", "79": "H2", "81": "H2", "82": "H2", "84": "H2", "85": "H2", "86": "H2",
+    "06": "H3", "11": "H3", "13": "H3", "20": "H3", "2A": "H3", "2B": "H3", "30": "H3", "34": "H3", "66": "H3", "83": "H3",
+    "971": "H3", "972": "H3", "973": "H3", "974": "H3", "976": "H3", "975": "H1",
 }
-
-
 def value(obj, *keys, default=""):
     for key in keys:
         val = (obj or {}).get(key)
@@ -77,7 +81,7 @@ def normalize_zone(zone, cp=""):
     if raw.startswith("H3"):
         return "H3"
     cp = str(cp or "").strip()
-    dept = cp[:3] if cp.startswith("97") or cp.startswith("976") else cp[:2].upper()
+    dept = cp[:3] if cp.startswith("97") else cp[:2].upper()
     return DEPT_ZONE.get(dept, "H1")
 
 
@@ -129,25 +133,14 @@ def _normaliser_sous_zone(z):
 
 
 def _temperature_base_notedim(prospect):
-    cp = "".join(c for c in str(value(prospect, "cp_chantier", "code_postal_chantier", "cp", default="") or "") if c.isdigit())[:5]
-    info = None
+    # Lot 6b : zone OFFICIELLE du département du CP (DEPT_ZONE), identique au front ; la zone du DPE n'y entre pas
+    cp = "".join(c for c in str(value(prospect, "cp_chantier", "code_postal_chantier", "cp", default="") or "") if c.isdigit() or c.upper() in "AB")[:5]
     if cp and cp in TEMP_BASE_CP:
-        info = {"temperature": TEMP_BASE_CP[cp], "zone": _normaliser_sous_zone(value(prospect, "zone_climatique_chantier", "zone_climatique", default="")) or "H1"}
-    else:
-        dept = cp[:3] if cp.startswith("97") else cp[:2]
-        if dept and dept in DEPT_SOUS_ZONE:
-            z = DEPT_SOUS_ZONE[dept]
-            info = {"temperature": TEMP_BASE_SOUS_ZONE[z], "zone": z}
-    if info is None:
-        z_detail = _normaliser_sous_zone(value(prospect, "zone_climatique_chantier", "zone_climatique", default=""))
-        if z_detail and z_detail in TEMP_BASE_SOUS_ZONE:
-            info = {"temperature": TEMP_BASE_SOUS_ZONE[z_detail], "zone": z_detail}
-    if info is None:
         z = normalize_zone("", cp)
-        if z in TEMP_BASE_ZONE:
-            info = {"temperature": TEMP_BASE_ZONE[z], "zone": z}
-    if info is None:
-        info = {"temperature": -7, "zone": "H1"}
+        info = {"temperature": TEMP_BASE_CP[cp], "zone": z}
+    else:
+        z = normalize_zone("", cp) if cp else "H1"
+        info = {"temperature": TEMP_BASE_ZONE.get(z, -7), "zone": z}
     altitude = float_value(value(prospect, "altitude", default=0), 0)
     correction = ((altitude - 200) / 100) * 0.5 if altitude > 200 else 0
     correction_label = f"correction altitude -{number_fr(correction)} °C" if correction > 0 else "sans correction"
@@ -285,7 +278,52 @@ def calculer_mpr_ballon(prospect, admin_params):
     return 0
 
 
-def calculer_cee_bar_th_171(prospect, state_simulateur, admin_params):
+# Lot 6b : délégataire CEE selon le choix de démarrage (règle métier). Client qui ATTEND l'accord MaPrimeRénov'
+# -> délégataire réglé « attente » (PICOTY, qui préfinance la prime) ; travaux TOUT DE SUITE ou foyer sans
+# MaPrimeRénov' -> délégataire réglé « tout de suite » (ACE). Tarif du délégataire « tout de suite » vide -> repli sur
+# celui de l'attente, avec une alerte. Réglage absent (ancien fichier) : PICOTY = attente, ACE = tout de suite.
+# Précaire = Très modestes, classique pour tous les autres (inchangé). Même règle dans la page (choisirDelegataire).
+USAGES_DELEGATAIRE = ("attente", "tout_de_suite")
+_USAGE_PAR_NOM = {"PICOTY": "attente", "ACE": "tout_de_suite"}
+
+
+def usage_delegataire(d):
+    u = str((d or {}).get("usage") or "").strip()
+    if u in USAGES_DELEGATAIRE:
+        return u
+    return _USAGE_PAR_NOM.get(str((d or {}).get("nom") or "").strip().upper(), "")
+
+
+def tarif_delegataire(d, categorie):
+    """Tarif €/MWh cumac du délégataire pour la catégorie (précaire = Très modestes), None si vide."""
+    v = (d or {}).get("mwh_precaire" if categorie == "tres_modeste" else "mwh_classique")
+    if v in (None, ""):
+        return None
+    f = float_value(v, 0)
+    return f if f > 0 else None
+
+
+def mode_cee(prospect, state_simulateur, admin_params):
+    """« attente » si le client attend l'accord MaPrimeRénov' et a droit à une prime ; sinon « tout_de_suite »."""
+    categorie = value(prospect, "categorie_revenu", "categorie", default="modeste")
+    mpr = 0 if categorie == "superieur" else calculer_mpr(prospect, state_simulateur, admin_params)
+    mode_mpr = str(value(state_simulateur, "mode_mpr", default="attente") or "attente")
+    return "tout_de_suite" if (mode_mpr == "sans_attente" or mpr <= 0) else "attente"
+
+
+def choisir_delegataire(delegataires, mode, categorie):
+    """(délégataire, alerte) pour le mode « attente » / « tout_de_suite »."""
+    liste = [d for d in (delegataires or []) if isinstance(d, dict)]
+    ancien = next((d for d in liste if d.get("actif")), liste[0] if liste else None)
+    d = next((x for x in liste if usage_delegataire(x) == mode), None)
+    if mode == "tout_de_suite" and (d is None or tarif_delegataire(d, categorie) is None):
+        repli = next((x for x in liste if usage_delegataire(x) == "attente"), None) or ancien
+        nom = (d or {}).get("nom") or "tout de suite"
+        return repli, f"Tarif CEE du délégataire {nom} non renseigné dans l'Admin : prime calculée avec {(repli or {}).get('nom', '—')}."
+    return (d or ancien), None
+
+
+def calculer_cee_bar_th_171(prospect, state_simulateur, admin_params, mode=None):
     """Calcule le montant CEE selon la formule officielle BAR-TH-171."""
     formule = (admin_params or {}).get("formule_bar_th_171", {})
     type_logement = value(prospect, "type_logement", "type", default="")
@@ -343,8 +381,8 @@ def calculer_cee_bar_th_171(prospect, state_simulateur, admin_params):
     kwhc = montant_base * facteur_surface * facteur_zone
     mwhc = kwhc / 1000
 
-    delegataires = (admin_params or {}).get("delegataires") or []
-    delegataire = next((d for d in delegataires if d.get("actif")), None)
+    mode = mode or mode_cee(prospect, state_simulateur, admin_params)
+    delegataire, alerte_delegataire = choisir_delegataire((admin_params or {}).get("delegataires") or [], mode, categorie)
     if not delegataire:
         return {"montant": 0, "erreur": "Aucun délégataire CEE actif", "details": {}}
 
@@ -375,6 +413,9 @@ def calculer_cee_bar_th_171(prospect, state_simulateur, admin_params):
             "mwhc": round(mwhc, 2),
             "prix_unitaire": prix_unitaire,
             "type_prix": type_prix,
+            "delegataire": delegataire.get("nom", ""),
+            "mode": mode,
+            "alerte_delegataire": alerte_delegataire,
             "bonification": multiplicateur,
         },
     }
