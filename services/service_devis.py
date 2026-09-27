@@ -133,14 +133,27 @@ def _normaliser_sous_zone(z):
 
 
 def _temperature_base_notedim(prospect):
-    # Lot 6b : zone OFFICIELLE du département du CP (DEPT_ZONE), identique au front ; la zone du DPE n'y entre pas
-    cp = "".join(c for c in str(value(prospect, "cp_chantier", "code_postal_chantier", "cp", default="") or "") if c.isdigit() or c.upper() in "AB")[:5]
+    # Lot 6c : table d'avant (sous-zone du département) remise telle quelle. La zone CEE officielle (DEPT_ZONE,
+    # H1/H2/H3) ne sert QU'À la prime CEE, jamais au dimensionnement.
+    cp = "".join(c for c in str(value(prospect, "cp_chantier", "code_postal_chantier", "cp", default="") or "") if c.isdigit())[:5]
+    info = None
     if cp and cp in TEMP_BASE_CP:
-        z = normalize_zone("", cp)
-        info = {"temperature": TEMP_BASE_CP[cp], "zone": z}
+        info = {"temperature": TEMP_BASE_CP[cp], "zone": _normaliser_sous_zone(value(prospect, "zone_climatique_chantier", "zone_climatique", default="")) or "H1"}
     else:
-        z = normalize_zone("", cp) if cp else "H1"
-        info = {"temperature": TEMP_BASE_ZONE.get(z, -7), "zone": z}
+        dept = cp[:3] if cp.startswith("97") else cp[:2]
+        if dept and dept in DEPT_SOUS_ZONE:
+            z = DEPT_SOUS_ZONE[dept]
+            info = {"temperature": TEMP_BASE_SOUS_ZONE[z], "zone": z}
+    if info is None:
+        z_detail = _normaliser_sous_zone(value(prospect, "zone_climatique_chantier", "zone_climatique", default=""))
+        if z_detail and z_detail in TEMP_BASE_SOUS_ZONE:
+            info = {"temperature": TEMP_BASE_SOUS_ZONE[z_detail], "zone": z_detail}
+    if info is None:
+        z = normalize_zone("", cp)
+        if z in TEMP_BASE_ZONE:
+            info = {"temperature": TEMP_BASE_ZONE[z], "zone": z}
+    if info is None:
+        info = {"temperature": -7, "zone": "H1"}
     altitude = float_value(value(prospect, "altitude", default=0), 0)
     correction = ((altitude - 200) / 100) * 0.5 if altitude > 200 else 0
     correction_label = f"correction altitude -{number_fr(correction)} °C" if correction > 0 else "sans correction"
