@@ -4106,6 +4106,15 @@ def _build_devis_context(request: Request, numero: str, version: int | None = No
     context["afficher_mention_mpr"] = state.get("afficher_mention_mpr") is not False
     # financement choisi dans le simulateur (opt1 Crédit Travaux par défaut, comme le simulateur)
     context["financement_devis"] = calculer_financement_devis(_base_credit, admin, str(state.get("option") or "opt1").strip())
+    # Lot 6b : la mention RAI nomme le délégataire qui valorise la prime (attente MPR : PICOTY ; tout de suite : ACE)
+    _deleg = choisir_delegataire(admin.get("delegataires") or [], mode_cee(prospect, state, admin),
+                                 devis_value(prospect, "categorie_revenu", "categorie", default="modeste"))[0] or {}
+    _nom_deleg = str(_deleg.get("nom") or "").strip()
+    if _nom_deleg.upper() == "ACE" or not _nom_deleg:
+        context["delegataire_titre"], context["delegataire_mention"] = "ACE Énergie", "ACE ÉNERGIE (SIREN : 848 595 336)"
+    else:
+        context["delegataire_titre"] = _nom_deleg
+        context["delegataire_mention"] = str(_deleg.get("mention_devis") or _nom_deleg.upper())
     # Mêmes clés qu'avant le Lot 2 (compatibilité) ; l'économie ECS fixe du ballon n'existe plus.
     context["economie_devis"] = {
         "facture_apres_mois": _eco_res.get("apres_mensuel") if _eco_res.get("ok") else None,
