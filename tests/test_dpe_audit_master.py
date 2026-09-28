@@ -107,19 +107,31 @@ def test_cout_absent_si_le_document_n_a_pas_chauffage_et_eau_chaude(ademe):
     assert chercher()["candidats"][0]["cout_mensuel"] is None                # jamais le total 5 usages
 
 
-# ---------------------------------------------------------------- plusieurs -> choix
-def test_plusieurs_documents_a_la_meme_adresse_choix(ademe):
-    ademe["dpe"] = [dpe("2475E0000001A"), dpe("2375E0000002B", date="2023-05-02")]
+# ---------------------------------------------------------------- plusieurs documents du même logement : le plus récent
+def test_plusieurs_dpe_du_meme_logement_le_plus_recent_gagne(ademe):
+    ademe["dpe"] = [dpe("2375E0000002B", date="2023-05-02"), dpe("2475E0000001A")]
     r = chercher()
-    assert r["etat"] == "choix" and r["retenu"] is None
-    assert "2 documents trouvés à cette adresse" in r["message"]
-    assert [c["numero"] for c in r["candidats"]] == ["2475E0000001A", "2375E0000002B"]      # le plus récent d'abord
+    assert r["etat"] == "auto" and r["candidats"][r["retenu"]]["numero"] == "2475E0000001A"
+    assert "retenu, le plus récent des 2 documents à cette adresse" in r["message"]
+    assert {c["numero"] for c in r["candidats"]} == {"2475E0000001A", "2375E0000002B"}   # l'autre reste proposé
 
 
-def test_dpe_et_audit_du_meme_logement_choix(ademe):
-    ademe["dpe"], ademe["audit"] = [dpe("2475E0000001A")], [audit("A0001")]
+@pytest.mark.parametrize("date_dpe, date_audit, gagnant, cout", [
+    ("2025-06-01", "2025-01-10", "dpe", round((2280 + 360) / 12)),      # DPE plus récent -> DPE (et son coût)
+    ("2024-03-15", "2025-01-10", "audit", round((2900 + 460) / 12)),    # audit plus récent -> audit
+    ("2025-01-10", "2025-01-10", "audit", round((2900 + 460) / 12)),    # même date -> audit
+])
+def test_dpe_et_audit_du_meme_logement_la_date_decide(ademe, date_dpe, date_audit, gagnant, cout):
+    ademe["dpe"], ademe["audit"] = [dpe("2475E0000001A", date=date_dpe)], [audit("A0001", date_etablissement_audit=date_audit)]
     r = chercher()
-    assert r["etat"] == "choix" and r["candidats"][0]["kind"] == "audit"      # audit proposé en premier
+    c = r["candidats"][r["retenu"]]
+    assert r["etat"] == "auto" and c["kind"] == gagnant and c["cout_mensuel"] == cout
+    assert ("l'audit prime" in r["message"]) is (date_dpe == date_audit)
+
+
+def test_plusieurs_documents_dont_un_immeuble_choix(ademe):
+    ademe["dpe"] = [dpe("2475E0000001A"), dpe("2375E0000002B", date="2023-05-02", type_batiment="appartement")]
+    assert chercher()["etat"] == "choix"
 
 
 # ---------------------------------------------------------------- immeuble -> jamais automatique

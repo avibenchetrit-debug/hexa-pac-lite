@@ -20748,7 +20748,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
 (function () {
   'use strict';
   const ID = 'cout-energie-input';
-  const RANG = { '': 0, estime: 1, dpe: 2, audit: 3 };
+  const RANG = { '': 0, estime: 1, dpe: 2, audit: 2 };   // DPE et audit à égalité : le document retenu (le plus récent) décide
   const PROTEGEES = ['reel', 'a_confirmer'];
   const AUTO = ['estime', 'dpe', 'audit'];
   const BADGES = {
@@ -23822,14 +23822,17 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     if (etat.choisi?.periode) note.push(`Construit ${esc(etat.choisi.periode)} (période du document) : demander l'année exacte.`);
     if (etat.gardes.length) note.push('Déjà remplis, conservés : ' + esc(etat.gardes.join(', ')) + '.');
     const icone = { attente: '⏳', auto: '✓', choix: '⚠', aucun: 'ℹ', erreur: '⚠' }[r.etat] || '';
-    const msg = etat.choisi && r.etat === 'choix'
+    const msg = etat.choisi && (r.etat === 'choix' || etat.choisi !== cands[r.retenu])   // choisi par l'utilisateur
       ? `${etat.choisi.kind === 'audit' ? 'Audit' : 'DPE'} n° ${esc(etat.choisi.numero)} retenu : valeurs pré-remplies, à confirmer avec le client.`
       : esc(r.message);
     let h = `<div class="hx-dpe hx-dpe--${esc(r.etat)}"><div class="hx-dpe-msg">${icone} ${msg}</div>`;
     note.forEach((t) => { h += `<div class="hx-dpe-note">${t}</div>`; });
     const liste = r.etat === 'choix' || etat.listeOuverte;
     if (cands.length && liste) h += '<ul class="hx-dpe-liste">' + cands.map(ligneCandidat).join('') + '</ul>';
-    else if (cands.length > 1) h += `<button type="button" class="hx-dpe-lien" data-hx-dpe-autres="1">Voir les ${cands.length} documents trouvés</button>`;
+    else if (cands.length > 1) {                           // retenu automatiquement : les autres en info, au choix
+      h += '<div class="hx-dpe-note">Autre(s) document(s) trouvé(s) :</div><ul class="hx-dpe-liste">'
+        + cands.map((c, i) => (c === etat.choisi ? '' : ligneCandidat(c, i))).join('') + '</ul>';
+    }
     if (r.etat === 'erreur') h += '<button type="button" class="hx-dpe-lien" data-hx-dpe-reessayer="1">Réessayer</button>';
     b.innerHTML = h + '</div>';
   }
