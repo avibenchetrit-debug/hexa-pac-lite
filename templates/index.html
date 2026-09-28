@@ -11597,7 +11597,13 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     });
   }
 
+  function titreErreurFiche(technique) {
+    const t = document.querySelector('#modal-erreur .modal-title'), s = document.querySelector('#modal-erreur .modal-subtitle');
+    if (t) t.textContent = technique ? 'Enregistrement impossible' : 'Champs obligatoires manquants';
+    if (s) s.textContent = technique ? "La fiche n'a pas été enregistrée. Réessayez dans un instant." : "Merci de compléter les champs suivants avant d'enregistrer";
+  }
   async function onSaveClick(e) {
+    const suiteDevis = window.__hexaApresFiche || null;   // Lot 6g : lu avant tout « await » (doublon -> « Continuer » -> devis)
     // Toujours re-cibler les noeuds actifs (PJAX / toggle édition)
     btnSave = document.getElementById('btn-save');
     form = document.getElementById('form-prospect');
@@ -11629,6 +11635,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
         li.textContent = err;
         modalListe.appendChild(li);
       });
+      titreErreurFiche(false);
       modal.classList.add('show');
       return false;
     }
@@ -11640,11 +11647,12 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     if (!window.__skipDuplicateCheck) {
       const duplicates = await checkDuplicatesBeforeSave();
       if (duplicates && duplicates.length) {
+        const suite = suiteDevis;                           // Lot 6g : « Voir le devis » -> ouvrir après « Continuer »
         showDuplicateModal(duplicates, () => {
           window.__skipDuplicateCheck = true;
-          onSaveClick({ preventDefault(){} });
+          Promise.resolve(onSaveClick({ preventDefault(){} })).then(ok => { if (ok === true && suite) suite(); });
         });
-        return false;
+        return 'doublon';
       }
     }
     window.__skipDuplicateCheck = false;
@@ -11672,11 +11680,13 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
               li.textContent = typeof err === 'string' ? err : String(err);
               modalListe.appendChild(li);
             });
+            titreErreurFiche(false);
             modal?.classList.add('show');
           } else {
             const li = document.createElement('li');
             li.textContent = `Erreur technique (HTTP ${r.status}) — réessayer ou contacter le support`;
             modalListe.appendChild(li);
+            titreErreurFiche(true);
             modal?.classList.add('show');
             saveToast(`Erreur technique (HTTP ${r.status})`, '#B91C1C');
           }
@@ -11727,6 +11737,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
         const li = document.createElement('li');
         li.textContent = 'Erreur technique (HTTP 0) — réessayer ou contacter le support';
         modalListe.appendChild(li);
+        titreErreurFiche(true);
         modal?.classList.add('show');
         saveToast('Erreur technique réseau', '#B91C1C');
         return false;
@@ -11734,9 +11745,10 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
   }
   // Lot 6d : « Voir le devis » enregistre la fiche avant d'ouvrir (true = enregistrée)
   // (lead déjà existant : pas d'alerte doublon ici, elle bloquerait l'ouverture à chaque clic ; Enregistrer la garde)
-  window.hexaEnregistrerFiche = () => {
+  window.hexaEnregistrerFiche = (apres) => {
     if ((document.body.dataset.prospectNumero || '').trim()) window.__skipDuplicateCheck = true;
-    return onSaveClick({ preventDefault(){} });
+    window.__hexaApresFiche = apres || null;
+    try { return onSaveClick({ preventDefault(){} }); } finally { window.__hexaApresFiche = null; }
   };
 
   const SAVE_ICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -16516,16 +16528,21 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
 
   // Le devis est calculé par le serveur à partir de l'état enregistré : on enregistre d'abord
   // (sans attendre le délai de 1,5 s) et on n'ouvre qu'une fois l'enregistrement terminé.
-  async function enregistrerAvantDevis(){
-    if (!state.numero || window.__hexaEstimationExpress) return true;
+  async function enregistrerAvantDevis(apres){
+    if (window.__hexaEstimationExpress) return true;
     clearTimeout(simSaveTimeout);
     const boutons = ['btn-voir-devis', 'btn-pre-devis'].map(id => document.getElementById(id)).filter(Boolean);
     boutons.forEach(b => { b.disabled = true; b.setAttribute('aria-busy', 'true'); });
     try {
       // Lot 6d : la fiche d'abord (sinon le devis valide l'ancienne fiche : « Champs à compléter » sur un champ
       // qui vient d'être saisi). Dossier facturé : rien n'est enregistré, le devis archivé s'ouvre.
-      if (!window.__hexaDossierFige && typeof window.hexaEnregistrerFiche === 'function'
-          && document.getElementById('btn-save') && !(await window.hexaEnregistrerFiche())) return 'fiche';
+      if (!window.__hexaDossierFige && typeof window.hexaEnregistrerFiche === 'function' && document.getElementById('btn-save')) {
+        const r = await window.hexaEnregistrerFiche(apres);
+        if (r !== true) return r === 'doublon' ? 'doublon' : 'fiche';
+      }
+      // Lot 6g : fiche nouvelle -> son numéro vient d'être attribué ; le simulateur le prend (choix en cours gardés)
+      if (!state.numero) state.numero = (document.body.dataset.prospectNumero || '').trim() || null;
+      if (!state.numero) return 'sans-numero';
       return await saveSimulatorState();
     } finally {
       boutons.forEach(b => { b.disabled = false; b.removeAttribute('aria-busy'); });
@@ -16542,13 +16559,42 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     requestAnimationFrame(() => t.classList.add('show'));
     setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 400); }, 4000);
   }
+  // Lot 6g : message à l'écran quand le devis ne peut pas s'ouvrir (jamais un clic sans effet)
+  function messageDevis(texte){
+    document.getElementById('sim-devis-echec')?.remove();
+    const t = document.createElement('div');
+    t.className = 'pv-toast';
+    t.id = 'sim-devis-echec';
+    t.setAttribute('role', 'alert');
+    t.textContent = texte;
+    t.style.setProperty('--toast-c', '#B91C1C');
+    document.body.appendChild(t);
+    requestAnimationFrame(() => t.classList.add('show'));
+    setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 400); }, 6000);
+  }
+  const fenetreVisible = () => !!(document.querySelector('#modal-erreur.show') || document.getElementById('modal-duplicate-alert'));
   async function ouvrirModalDevis(varianteForcee){
-    const numero = state.numero || document.body.dataset.prospectNumero;
-    if(!numero) return;
-    const enregistre = await enregistrerAvantDevis();
-    if (enregistre === 'fiche') return;                  // Lot 6d : la fiche a affiché ses erreurs
+    try {
+      await ouvrirModalDevisSuite(varianteForcee);
+    } catch (err) {
+      console.error('Voir le devis', err);
+      messageDevis("Le devis n'a pas pu s'ouvrir (" + (err && err.message ? err.message : 'erreur inattendue') + '). Réessayez.');
+    }
+  }
+  async function ouvrirModalDevisSuite(varianteForcee){
+    const enregistre = await enregistrerAvantDevis(() => ouvrirModalDevis(varianteForcee));
+    if (enregistre === 'doublon') return;                // la fenêtre « doublon » est affichée ; « Continuer » ouvrira le devis
+    if (enregistre === 'fiche') {                        // la fiche a affiché ses erreurs (champs, serveur)
+      if (!fenetreVisible()) messageDevis("La fiche n'a pas pu être enregistrée : devis non ouvert. Vérifiez les champs puis réessayez.");
+      return;
+    }
+    if (enregistre === 'sans-numero') { messageDevis("La fiche n'a pas encore de numéro : enregistrez-la, puis ouvrez le devis."); return; }
     if (!enregistre) { signalerEchecEnregistrementDevis(); return; }
-    const validation = await fetch(`/api/devis/${encodeURIComponent(numero)}/validate`, { cache:'no-store' }).then(r=>r.json()).catch(()=>({ok:false, missing:['Validation indisponible']}));
+    const numero = state.numero || document.body.dataset.prospectNumero;
+    if (!numero) { messageDevis("La fiche n'a pas encore de numéro : enregistrez-la, puis ouvrez le devis."); return; }
+    const validation = await fetch(`/api/devis/${encodeURIComponent(numero)}/validate`, { cache:'no-store' })
+      .then(r => r.ok ? r.json() : Promise.reject(new Error('vérification HTTP ' + r.status)))
+      .catch(e => ({ ok:false, missing:['Vérification du devis impossible : ' + (e && e.message ? e.message : 'réseau') + '. Réessayez.'] }));
     if (!validation.ok) {
       const oldErr = document.getElementById('devis-missing-modal');
       if (oldErr) oldErr.remove();
