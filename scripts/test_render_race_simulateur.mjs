@@ -28,25 +28,52 @@ import vm from 'node:vm';
 const FILE = process.argv[2] || 'templates/index.html';
 const html = fs.readFileSync(FILE, 'utf8');
 
+// Découpe d'une fonction du fichier : chaînes, gabarits imbriqués (`…${`…`}…`) et expressions
+// régulières sont sautés en entier (un guillemet dans une regex ou un gabarit imbriqué ne fausse plus le compte).
+const BS = String.fromCharCode(92);
+function sauterChaine(src, i, q) {
+  for (i++; i < src.length; i++) {
+    const c = src[i];
+    if (c === BS) { i++; continue; }
+    if (c === q) return i;
+    if (q === '`' && c === '$' && src[i + 1] === '{') i = sauterCode(src, i + 2);
+  }
+  return src.length;
+}
+function sauterRegex(src, i) {
+  let classe = false;
+  for (i++; i < src.length; i++) {
+    const c = src[i];
+    if (c === BS) { i++; continue; }
+    if (c === '\n') return i;
+    if (classe) { if (c === ']') classe = false; continue; }
+    if (c === '[') classe = true; else if (c === '/') return i;
+  }
+  return src.length;
+}
+function sauterCode(src, i) {            // renvoie l'index de l'accolade fermante du bloc ouvert juste avant i
+  let depth = 0, prec = '{';
+  for (; i < src.length; i++) {
+    const c = src[i], next = src[i + 1];
+    if (c === '/' && next === '/') { i = src.indexOf('\n', i); if (i === -1) return src.length; continue; }
+    if (c === '/' && next === '*') { i = src.indexOf('*/', i) + 1; continue; }
+    if (c === '"' || c === "'" || c === '`') { i = sauterChaine(src, i, c); prec = 'x'; continue; }
+    if (c === '/' && ('(,=:[!&|?{};+-*%<>~^'.includes(prec) || /(?:return|typeof)\s*$/.test(src.slice(Math.max(0, i - 12), i)))) {
+      i = sauterRegex(src, i); prec = 'x'; continue;
+    }
+    if (c === '{') depth++;
+    else if (c === '}') { if (depth === 0) return i; depth--; }
+    if (!/\s/.test(c)) prec = c;
+  }
+  return src.length;
+}
 function extractFunction(src, name) {
   let start = src.indexOf(`function ${name}(`);
   if (start === -1) throw new Error(`fonction introuvable : ${name}`);
   if (src.slice(Math.max(0, start - 6), start) === 'async ') start -= 6;
-  let depth = 0;
-  for (let i = src.indexOf('{', start); i < src.length; i++) {
-    const c = src[i], next = src[i + 1];
-    if (c === '/' && next === '/') { i = src.indexOf('\n', i); if (i === -1) break; continue; }
-    if (c === '/' && next === '*') { i = src.indexOf('*/', i) + 1; continue; }
-    if (c === '"' || c === "'" || c === '`') {
-      const q = c;
-      const BS = String.fromCharCode(92);
-      for (i++; i < src.length; i++) { if (src[i] === BS) { i++; continue; } if (src[i] === q) break; }
-      continue;
-    }
-    if (c === '{') depth++;
-    else if (c === '}') { depth--; if (depth === 0) return src.slice(start, i + 1); }
-  }
-  throw new Error(`accolade non fermee pour ${name}`);
+  const fin = sauterCode(src, src.indexOf('{', start) + 1);
+  if (fin >= src.length) throw new Error(`accolade non fermee pour ${name}`);
+  return src.slice(start, fin + 1);
 }
 
 let ko = 0;
