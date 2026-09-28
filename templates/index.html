@@ -6139,6 +6139,12 @@ body.sim-left-open .hexa-app-shell__main{
 .devis-modal-body{ flex:1; min-height:0; background:#EEF2F7; }
 .devis-modal-body iframe{ width:100%; height:100%; border:0; }
 .devis-modal-foot{ padding:12px 16px; border-top:1px solid #E2E8F0; display:flex; justify-content:flex-end; }
+/* Fix PDF : échec du téléchargement expliqué dans la fenêtre du devis */
+.devis-pdf-erreur{ display:flex; align-items:flex-start; gap:10px; padding:10px 16px; background:#FEF2F2; border-bottom:1px solid #FECACA; color:#991B1B; font-size:14px; font-weight:600; }
+.devis-pdf-erreur[hidden]{ display:none; }
+.devis-pdf-erreur span{ flex:1; }
+.devis-pdf-erreur button{ border:none; background:none; color:#991B1B; font-size:18px; line-height:1; cursor:pointer; }
+#devis-pdf-btn[aria-busy="true"]{ opacity:.75; cursor:progress; }
 
 /* Compte de résultat : Prix → aides (–) → reste à charge */
 .sim-pnl{ background:#fff; border:1px solid var(--c-line,#E2E8F0); border-radius:10px; padding:14px 16px; }
@@ -16641,6 +16647,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
           <button type="button" class="devis-send-btn" id="devis-send-btn">📧 Envoyer</button>
           <button type="button" class="devis-close-btn" id="devis-close-btn" aria-label="Fermer">×</button>
         </div>
+        <div class="devis-pdf-erreur" id="devis-pdf-erreur" role="alert" hidden><span></span><button type="button" aria-label="Masquer le message">×</button></div>
         <div class="devis-modal-body"><iframe id="devis-preview-frame" title="Aperçu devis" src="${devisUrl}"></iframe></div>
         <div class="devis-modal-foot"><button type="button" class="adm-btn adm-btn-cancel" id="devis-close-bottom">Fermer</button></div>
       </div>`;
@@ -16657,9 +16664,47 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
         document.getElementById('devis-preview-frame').src = btn.dataset.url;
       });
     });
-    document.getElementById('devis-pdf-btn')?.addEventListener('click', ()=>{
-      const url = currentKind === 'notedim' ? `/api/notedim/${encodeURIComponent(numero)}/pdf?t=${Date.now()}` : `/api/devis/${encodeURIComponent(numero)}/pdf?variante=${_variante}&t=${Date.now()}`;
-      window.open(url, '_blank');
+    // Fix PDF : plus de window.open (onglet blanc pendant la génération Chromium, JSON brut en cas d'échec).
+    // Le PDF est reçu ici puis enregistré sous le nom donné par le serveur (numéro du document).
+    const pdfBtn = wrap.querySelector('#devis-pdf-btn');
+    const pdfErreur = wrap.querySelector('#devis-pdf-erreur');
+    const cacherErreurPdf = () => { pdfErreur.hidden = true; };
+    pdfErreur.querySelector('button').addEventListener('click', cacherErreurPdf);
+    pdfBtn.addEventListener('click', async ()=>{
+      if (pdfBtn.getAttribute('aria-busy') === 'true') return;             // un seul PDF à la fois
+      const kind = currentKind;
+      const url = kind === 'notedim' ? `/api/notedim/${encodeURIComponent(numero)}/pdf?t=${Date.now()}` : `/api/devis/${encodeURIComponent(numero)}/pdf?variante=${_variante}&t=${Date.now()}`;
+      const libelle = pdfBtn.textContent;
+      cacherErreurPdf();
+      pdfBtn.disabled = true;
+      pdfBtn.setAttribute('aria-busy', 'true');
+      pdfBtn.textContent = 'Génération…';
+      try {
+        const r = await fetch(url, { cache: 'no-store' });
+        if (!r.ok) {
+          const corps = await r.json().catch(() => ({}));
+          const detail = typeof corps.detail === 'string' ? corps.detail : '';
+          throw new Error(detail || ('le serveur a répondu ' + r.status));
+        }
+        const blob = await r.blob();
+        if (!blob.size || !/pdf/i.test(blob.type || r.headers.get('Content-Type') || '')) throw new Error('le fichier reçu est vide ou n\'est pas un PDF');
+        const m = /filename=([^;]+)/i.exec(r.headers.get('Content-Disposition') || '');
+        const nom = m ? m[1].trim().replace(/^"|"$/g, '') : `${kind === 'notedim' ? 'NoteDim' : (_variante === 'devis' ? 'Devis' : 'Pre-devis')}_${numero}.pdf`;
+        const lien = document.createElement('a');
+        lien.href = URL.createObjectURL(blob);
+        lien.download = nom;
+        lien.style.display = 'none';
+        document.body.appendChild(lien);
+        lien.click();
+        setTimeout(() => { URL.revokeObjectURL(lien.href); lien.remove(); }, 60000);
+      } catch (err) {
+        pdfErreur.querySelector('span').textContent = `Le PDF ${kind === 'notedim' ? 'de la note de dimensionnement' : 'du ' + (_variante === 'devis' ? 'devis' : 'pré-devis')} n'a pas pu être créé : ${err instanceof TypeError ? 'connexion au serveur impossible' : (err && err.message ? err.message : 'erreur inattendue')}. Réessayez dans un instant.`;
+        pdfErreur.hidden = false;
+      } finally {
+        pdfBtn.disabled = false;
+        pdfBtn.removeAttribute('aria-busy');
+        pdfBtn.textContent = libelle;
+      }
     });
     document.getElementById('devis-send-btn')?.addEventListener('click', ()=>openSendDevisMailModal(numero));
   }
