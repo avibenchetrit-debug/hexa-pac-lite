@@ -4496,9 +4496,26 @@ def _devis_archive_fige(numero: str, variante: str) -> dict | None:
     return (meme or items or [None])[-1]
 
 
+def _notedim_archivee(numero: str):
+    """Lot 6h : dossier facturé -> la note de dim envoyée avec le dernier devis (archivée), sinon None."""
+    item = _devis_archive_fige(numero, "devis")
+    f = (item or {}).get("notedim_file")
+    return (item, f) if f and os.path.exists(f) else (None, None)
+
+
+def _numero_notedim_de(numero: str, item: dict | None = None) -> str:
+    """Le n° ND… imprimé sur la note ; pour une note envoyée, l'année est celle de l'envoi."""
+    n = generer_numero_notedim(_find_lead(numero) or {"numero": numero})
+    annee = str((item or {}).get("sent_at") or "")[:4]
+    return re.sub(r"^ND\d{4}", "ND" + annee, n) if re.fullmatch(r"\d{4}", annee) else n
+
+
 @app.get("/api/notedim/{numero}/preview", response_class=HTMLResponse)
 async def notedim_preview(numero: str, request: Request) -> HTMLResponse:
     _require_vt_validee(numero)
+    _item, archive = _notedim_archivee(numero)
+    if archive:
+        return FileResponse(archive, media_type="application/pdf", headers={"Content-Disposition": "inline"})
     return _render_template_response(request, "notedim_pac.html", _build_notedim_context(request, numero))
 
 
@@ -4904,6 +4921,9 @@ async def notedim_public_pdf(numero: str, token: str, request: Request):
 @app.get("/api/notedim/{numero}/pdf")
 async def notedim_pdf(numero: str, request: Request):
     _require_vt_validee(numero)
+    item, archive = _notedim_archivee(numero)
+    if archive:                                   # Lot 6h : dossier facturé -> la note archivée, rien n'est régénéré
+        return FileResponse(archive, media_type="application/pdf", headers=_entete_pdf("NoteDim-DEFINITIVE", _numero_notedim_de(numero, item)))
     version = _next_devis_version(numero)
     ctx = _build_notedim_context(request, numero)
     _refuser_pdf_incomplet(ctx)
@@ -4911,7 +4931,7 @@ async def notedim_pdf(numero: str, request: Request):
     html_nd = templates.env.get_template("notedim_pac.html").render(ctx)
     pdf_bytes = await run_in_threadpool(_html_to_pdf_playwright, html_nd, request)
     _write_pdf(_notedim_path(numero, version), pdf_bytes)
-    return Response(pdf_bytes, media_type="application/pdf", headers=_entete_pdf("NoteDim", ctx.get("numero_notedim") or numero))
+    return Response(pdf_bytes, media_type="application/pdf", headers=_entete_pdf("NoteDim-DEFINITIVE", ctx.get("numero_notedim") or numero))
 
 
 def _email_header_html():
@@ -5741,7 +5761,8 @@ async def download_notedim(numero: str, version: int):
     path = _notedim_path(numero, version)
     if not os.path.exists(path):
         raise HTTPException(status_code=404, detail="Note de dimensionnement introuvable")
-    return FileResponse(path, media_type="application/pdf", filename=os.path.basename(path))
+    item = next((x for x in _sent_devis_items(numero) if isinstance(x, dict) and int(x.get("version") or 0) == version), None)
+    return FileResponse(path, media_type="application/pdf", headers=_entete_pdf("NoteDim-DEFINITIVE", _numero_notedim_de(numero, item)))
 
 
 # ---------------------------------------------------------------------------
