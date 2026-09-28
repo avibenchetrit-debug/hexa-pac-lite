@@ -68,6 +68,7 @@ from services.service_devis import (
     _format_date_fr,
 )
 from services.backup_github import start_backup_scheduler
+from services import dpe_audit, valeur_dvf
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 TEMPLATES_DIR = os.path.join(BASE_DIR, "templates")
@@ -2109,47 +2110,6 @@ def get_parcelle(lat: float, lon: float) -> JSONResponse:
     return JSONResponse({"parcelle": f"{code_insee}-{prefixe}-{section}-{numero}", "source": "ign"})
 
 
-DPE_DATASET = "dpe03existant"
-AUDIT_DATASET = "audit-opendata"
-_DPE_MIN_DATE = "2021-07-01"   # DPE/audit valides depuis le 1er juillet 2021
-
-
-def _ademe_lines(dataset, sort_field, lat=None, lon=None, adresse="", cp="", qs=None):
-    params = {"size": "10"}
-    if lat is not None and lon is not None:
-        # recherche geo : rayon 50m, tri par DISTANCE croissante (pas de sort -> data-fair trie par _geo_distance)
-        params["geo_distance"] = f"{lon}:{lat}:50m"   # ATTENTION : lon puis lat
-    else:
-        q = (str(adresse or "").strip() + " " + str(cp or "").strip()).strip()
-        if not q:
-            return []
-        params["q"] = q
-        params["sort"] = "-" + sort_field   # fallback texte uniquement : tri par date decroissante
-    if qs:
-        params["qs"] = qs
-    url = ("https://data.ademe.fr/data-fair/api/v1/datasets/" + dataset + "/lines?"
-           + urllib.parse.urlencode(params, quote_via=urllib.parse.quote))
-    try:
-        with urllib.request.urlopen(url, timeout=10) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-        return data.get("results") or []
-    except Exception:
-        return []
-
-
-def _pick_best(lines, date_field):
-    """Meilleure ligne : la plus proche (lignes deja triees par distance en mode geo) ;
-    en cas d'egalite de distance, la plus recente. En mode texte (pas de _geo_distance), la 1ere."""
-    if not lines:
-        return None
-    first = lines[0]
-    if first.get("_geo_distance") is not None:   # mode geo : deja trie par distance croissante
-        d0 = first.get("_geo_distance") or 0.0
-        closest = [r for r in lines if abs((r.get("_geo_distance") or 0.0) - d0) < 1.0]
-        return max(closest, key=lambda r: str(r.get(date_field) or ""))   # egalite distance -> plus recent
-    return first   # mode texte : deja trie par date decroissante
-
-
 def _date_heure_fr(iso) -> str:
     """« 29/09/2025 à 10h12 » (heure de Paris) depuis un horodatage ISO ; la valeur brute sinon."""
     try:
@@ -2161,15 +2121,6 @@ def _date_heure_fr(iso) -> str:
         return str(iso or "")
 
 
-def _doc_status(label, rec, date):
-    num = rec.get("numero_dpe") or rec.get("n_audit") or ""
-    adr = rec.get("adresse_ban") or ""
-    txt = f"{label} trouvé (n°{num} du {_format_date_fr(date)}"
-    if adr:
-        txt += f" — {adr}"
-    return txt + ")"
-
-
 def _label_type_logement(val):
     v = str(val or "").strip().lower()
     if "maison" in v:
@@ -2179,72 +2130,22 @@ def _label_type_logement(val):
     return str(val or "")
 
 
-def _enrich_dpe(rec):
-    out = dict(rec)
-    out["classe_energie"] = rec.get("etiquette_dpe", "")
-    out["classe_consommation_energie"] = rec.get("etiquette_dpe", "")
-    out["conso_kwh_m2"] = rec.get("conso_5_usages_par_m2_ep", "")
-    out["cout_5_usages"] = rec.get("cout_total_5_usages", "")
-    out["emission_ges_initial"] = rec.get("emission_ges_5_usages_par_m2", "")
-    out["altitude"] = rec.get("classe_altitude", "")
-    out["nb_niveau_logement"] = rec.get("nombre_niveau_logement", "")
-    return out
-
-
-def _enrich_audit(rec):
-    out = dict(rec)
-    out["classe_energie"] = rec.get("classe_bilan_dpe", "")
-    out["classe_consommation_energie"] = rec.get("classe_bilan_dpe", "")
-    out["conso_kwh_m2"] = rec.get("ep_conso_5_usages_m2", "")
-    out["cout_5_usages"] = rec.get("cout_5_usages", "")
-    out["emission_ges_initial"] = rec.get("emission_ges_5_usages_m2", "")
-    out["altitude"] = rec.get("classe_altitude", "")
-    out["date_etablissement_dpe"] = rec.get("date_etablissement_audit", "")  # le front lit cette cle
-    out["numero_dpe"] = rec.get("numero_dpe") or rec.get("n_audit", "")      # le numero d'audit est dans n_audit
-    return out
-
-
+# Partie B : recherche DPE / audit portée du Master (services/dpe_audit.py) — un seul document à adresse confirmée
+# remplit la fiche ; sinon l'utilisateur choisit dans #dpe-banner.
 @app.get("/api/dpe-lookup")
-def get_dpe_lookup(adresse: str = "", cp: str = "", lat: float | None = None,
-                   lon: float | None = None, prospect_numero: str | None = None) -> JSONResponse:
-    dpe_lines = _ademe_lines(DPE_DATASET, "date_etablissement_dpe", lat, lon, adresse, cp)
-    dpe = _pick_best(dpe_lines, "date_etablissement_dpe")
-    if dpe and str(dpe.get("date_etablissement_dpe") or "") < _DPE_MIN_DATE:
-        dpe = None
-    audit_lines = _ademe_lines(AUDIT_DATASET, "date_etablissement_audit", lat, lon, adresse, cp,
-                               qs='categorie_scenario:"état initial"')
-    audit = _pick_best(audit_lines, "date_etablissement_audit")
-    if audit and str(audit.get("date_etablissement_audit") or "") < _DPE_MIN_DATE:
-        audit = None
+def get_dpe_lookup(adresse: str = "", cp: str = "", lat: float | None = None, lon: float | None = None,
+                   type_logement: str = "") -> JSONResponse:
+    return JSONResponse(dpe_audit.rechercher(adresse, cp, lat, lon, type_logement))
 
-    dpe_date = str((dpe or {}).get("date_etablissement_dpe") or "")
-    audit_date = str((audit or {}).get("date_etablissement_audit") or "")
 
-    if not dpe and not audit:
-        source, badge = "manuel", "SAISIE MANUELLE"
-        status_text = "Aucun DPE/Audit trouvé — saisie manuelle"
-    elif audit and not dpe:
-        source, badge = "audit_officiel", "AUDIT OFFICIEL"
-        status_text = _doc_status("Audit officiel", audit, audit_date)
-    elif dpe and not audit:
-        source, badge = "dpe_officiel", "DPE OFFICIEL"
-        status_text = _doc_status("DPE officiel", dpe, dpe_date)
-    else:
-        if audit_date > dpe_date:
-            source, badge = "audit_officiel", "AUDIT OFFICIEL"
-            status_text = _doc_status("Audit officiel", audit, audit_date)
-        else:
-            source, badge = "dpe_officiel", "DPE OFFICIEL"
-            status_text = _doc_status("DPE officiel", dpe, dpe_date)
+# Partie B : prix au m² DVF (même source et même méthode que le Master) pour prix_m2_estime / _min / _max.
+@app.get("/api/valeur-bien/dvf")
+def get_valeur_bien_dvf(cp: str = "", ville: str = "", type_logement: str = "") -> JSONResponse:
+    try:
+        return JSONResponse(valeur_dvf.prix_m2(cp, ville, type_logement, cache=os.path.join(DATA_DIR, "cache_dvf")))
+    except Exception:  # noqa: BLE001
+        return JSONResponse({"ok": False, "indisponible": True, "raison": "données DVF indisponibles pour le moment"})
 
-    return JSONResponse({
-        "source": source, "badge": badge, "status_text": status_text,
-        "sources": {
-            "dpe_officiel": _enrich_dpe(dpe) if dpe else {},
-            "audit_officiel": _enrich_audit(audit) if audit else {},
-            "urbs_enrichi": {},
-        },
-    })
 
 @app.get("/api/altitude")
 def get_altitude(lat: float, lon: float) -> JSONResponse:

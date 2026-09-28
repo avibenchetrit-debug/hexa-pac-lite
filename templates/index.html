@@ -8689,32 +8689,6 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
   }
   window.syncDpeMetaDisplay = syncDpeMetaDisplay;
 
-  function setChamp(name, valeur) {
-    if (valeur === '' || valeur === null || valeur === undefined) return;
-    const el = document.querySelector(`[name="${name}"]`);
-    if (!el) return;
-    if (el.tagName === 'SELECT') {
-      const existe = Array.from(el.options).some((o) => o.value === String(valeur));
-      if (!existe) return;
-      el.value = String(valeur);
-    } else {
-      el.value = valeur;
-    }
-    el.dispatchEvent(new Event('input', { bubbles: true }));
-    el.dispatchEvent(new Event('change', { bubbles: true }));
-    if (name === 'dpe_numero' || name === 'dpe_date') syncDpeMetaDisplay();
-  }
-
-  function mapEnergieChauffage(energie) {
-    const e = (energie || '').toLowerCase();
-    if (e.includes('gaz') || e.includes('propane') || e.includes('butane') || e.includes('gpl')) return 'gaz';
-    if (e.includes('fioul') || e.includes('fuel')) return 'fioul';
-    if (e.includes('électric') || e.includes('electric')) return 'electricite';
-    if (e.includes('bois') || e.includes('granulé') || e.includes('granule') || e.includes('biomasse')) return 'bois';
-    if (e.includes('pac') || e.includes('pompe')) return 'pac';
-    return '';
-  }
-
   function syncDpeLettre(classe) {
     const el = document.getElementById('dpe-lettre');
     if (el && classe) {
@@ -8742,93 +8716,11 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
 
   window.selectDpeLettre = selectDpeLettre;
 
-  /**
-   * Met à jour les badges "DPE Auto" dans les champs auto-remplis.
-   * source : 'dpe_officiel' | 'audit_officiel' | 'urbs_enrichi' | 'manuel'
-   * numero : numéro officiel ADEME
-   * date   : date établissement (YYYY-MM-DD)
-   */
-  function majBadgesSource(source, numero, date) {
-    // Labels et classes CSS par source
-    const cfg = {
-      dpe_officiel:   { label: 'DPE Officiel', cls: 'badge-dpe-officiel' },
-      audit_officiel: { label: 'Audit Officiel', cls: 'badge-audit-officiel' },
-      urbs_enrichi:   { label: 'URBS Enrichi', cls: 'badge-urbs' },
-      manuel:         { label: 'Manuel', cls: 'badge-manuel' },
-    };
-    const c = cfg[source] || cfg.manuel;
-
-    // Badges par champ : gérés par attachFieldBadges / setDpeBadgeEl (évite doublon)
-
-    // Met à jour le bloc source principal (pill active)
-    const pillMap = {
-      dpe_officiel: 'pill-dpe-officiel',
-      audit_officiel: 'pill-audit-officiel',
-      urbs_enrichi: 'pill-urbs-enrichi',
-    };
-    const activePillId = pillMap[source];
-    document.querySelectorAll('.dpe-source-pill').forEach((p) => {
-      p.classList.toggle('active', p.id === activePillId);
-    });
-
-    // Badge source principal dans l'en-tête bloc 5
-    const badge = document.getElementById('dpe-source-badge');
-    if (badge) {
-      badge.textContent = c.label;
-      badge.className = 'dpe-source-badge dpe-source-badge--' + (source || 'manuel');
-      badge.style.display = '';
-    }
-
-    // Affichage numéro officiel + date dans bloc source
-    const numEl = document.getElementById('dpe-numero-officiel');
-    if (numEl) {
-      if (numero) {
-        numEl.textContent = 'n° ' + numero + (date ? ' · établi le ' + _formatDate(date) : '');
-        numEl.style.display = '';
-      } else {
-        numEl.style.display = 'none';
-      }
-    }
-
-    // Stocker le numéro dans le champ caché
-    setChamp('dpe_numero', numero || '');
-    setChamp('dpe_date', date || '');
-    setChamp('dpe_source', source === 'dpe_officiel' ? 'ademe' : source === 'audit_officiel' ? 'ademe_audit' : source);
-
-    // Supprimer CTA Télécharger DPE (plus besoin)
-    document.querySelectorAll('.dpe-download-link, [data-dpe-download]').forEach((el) => {
-      el.style.display = 'none';
-    });
-
-    // Appel legacy majBadgeDPE si existant
-    if (typeof window.majBadgeDPE === 'function') {
-      window.majBadgeDPE(source === 'dpe_officiel' ? 'ademe' : source === 'audit_officiel' ? 'ademe_audit' : 'not_found', numero);
-    }
-  }
-
   function _formatDate(iso) {
     if (!iso) return '';
     const parts = String(iso).slice(0, 10).split('-');
     if (parts.length === 3) return parts[2] + '/' + parts[1] + '/' + parts[0];
     return iso;
-  }
-
-  function marquerChampsAutoRemplis() {
-    const noms = [
-      'dpe_connu', 'type_logement', 'surface_logement_m2', 'annee_construction',
-      'conso_kwh_m2', 'emissions_ges', 'cout_energetique_mensuel_eur',
-      'nb_niveaux', 'hauteur_batiment', 'panneau_solaire', 'zone_climatique_chantier',
-      'mode_chauffage', 'gestion_ecs', 'type_vmc',
-      'isolation_toiture', 'isolation_murs', 'isolation_planchers', 'isolation_menuiseries',
-    ];
-    noms.forEach((name) => {
-      const el = document.querySelector(`[name="${name}"]`);
-      if (el && el.value) {
-        const wrapper = el.closest('.dpe-field, .field-row, .field, .input-group, td');
-        if (wrapper) wrapper.classList.add('dpe-auto-filled');
-      }
-    });
-    if (window.majRequisSimu) window.majRequisSimu();
   }
 
   window.REQUIS_SIMU_FIELDS = ['surface_logement_m2','code_postal_chantier','type_logement','hsp','altitude','type_emetteurs','mode_chauffage','alimentation_electrique','rfr','nombre_personnes','cout_energetique_mensuel_eur'];
@@ -8850,136 +8742,6 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
   if (document.readyState !== 'loading') window.majRequisSimu();
   else document.addEventListener('DOMContentLoaded', function () { window.majRequisSimu(); });
 
-  function appliquerDpeOfficiel(dpe) {
-    if (!dpe) return;
-    const classe = dpe.classe_energie || dpe.classe_consommation_energie || dpe.etiquette_dpe || dpe.classe_bilan_dpe;
-    selectDpeLettre(classe);
-    const tl = dpe.type_logement || '';
-    const tb = (dpe.type_batiment || dpe.methode_application_dpe || '').toLowerCase();
-    if (tl === 'maison' || tl === 'appartement') setChamp('type_logement', tl);
-    else if (tb.includes('maison')) setChamp('type_logement', 'maison');
-    else if (tb.includes('appartement')) setChamp('type_logement', 'appartement');
-    if (dpe.surface_habitable_logement) {
-      setChamp('surface_logement_m2', Math.round(dpe.surface_habitable_logement));
-    }
-    // Lot 6b : une période (« 1948-1974 ») n'est pas une année : le champ reste vide, la période va au bandeau DPE
-    const anneeDpe = window.hexaAnneeOuPeriode ? window.hexaAnneeOuPeriode(dpe.annee_construction || dpe.periode_construction) : (dpe.annee_construction || dpe.periode_construction);
-    if (anneeDpe) setChamp('annee_construction', anneeDpe);
-    if (dpe.ep_conso_5_usages_m2 != null) {
-      setChamp('conso_kwh_m2', Math.round(dpe.ep_conso_5_usages_m2));
-    }
-    const ges = dpe.emission_ges_initial ?? dpe.emission_ges_5_usages_m2;
-    if (ges != null && ges !== '') {
-      setChamp('emissions_ges', Math.round(Number(ges)));
-    }
-    if (dpe.cout_5_usages != null) {
-      // Stocker annuel en cout_annuel et mensuel dans le champ existant
-      setChamp('cout_energetique_mensuel_eur', Math.round(dpe.cout_5_usages / 12));
-      setChamp('cout_energetique_annuel_eur', Math.round(dpe.cout_5_usages));
-    }
-    if (dpe.nb_niveau_logement) setChamp('nb_niveaux', dpe.nb_niveau_logement);
-    if (dpe.hauteur_sous_plafond != null) setChamp('hsp', dpe.hauteur_sous_plafond);
-    if (dpe.hauteur_sous_plafond && dpe.nb_niveau_logement) {
-      setChamp('hauteur_batiment', Math.round(dpe.hauteur_sous_plafond * dpe.nb_niveau_logement * 10) / 10);
-    }
-    if (dpe.presence_production_pv != null) {
-      setChamp('panneau_solaire', dpe.presence_production_pv === 1 ? 'oui' : 'non');
-    }
-    if (dpe.zone_climatique && !document.getElementById('zone-clim-input')?.value) {
-      setChamp('zone_climatique_chantier', dpe.zone_climatique);
-    }
-    const eChauff = dpe.type_energie_principale_chauffage || '';
-    const mChauff = mapEnergieChauffage(eChauff);
-    if (mChauff) setChamp('mode_chauffage', mChauff);
-    const eECS = dpe.type_energie_principale_ecs || '';
-    if (eECS) setChamp('gestion_ecs', mapEnergieChauffage(eECS) || eECS);
-
-    const numero = dpe.numero_dpe || dpe.numero_rapport_audit || '';
-    const date = dpe.date_etablissement_dpe || '';
-    majBadgesSource('dpe_officiel', numero, date);
-    marquerChampsAutoRemplis();
-
-    if (typeof window.recalculerCategories === 'function') window.recalculerCategories();
-    const an = document.querySelector('[name="annee_construction"]');
-    if (an && an.value && typeof window.calcAgeLogement === 'function') {
-      window.calcAgeLogement(an.value);
-    }
-  }
-
-  function appliquerAuditOfficiel(audit) {
-    if (!audit) return;
-    const classe = audit.classe_energie || audit.classe_bilan_dpe || audit.etiquette_dpe;
-    selectDpeLettre(classe);
-    let tb = (audit.type_batiment || '').toLowerCase();
-    if (!tb) {
-      const dpeSrc = (window.dpeSourcesCache && window.dpeSourcesCache.sources && window.dpeSourcesCache.sources.dpe_officiel) || {};
-      tb = (dpeSrc.type_batiment || '').toLowerCase();
-    }
-    if (tb.includes('maison')) setChamp('type_logement', 'maison');
-    else if (tb.includes('appartement')) setChamp('type_logement', 'appartement');
-    if (audit.surface_habitable_logement) {
-      setChamp('surface_logement_m2', Math.round(audit.surface_habitable_logement));
-    }
-    const anneeAudit = window.hexaAnneeOuPeriode ? window.hexaAnneeOuPeriode(audit.annee_construction || audit.periode_constuction || audit.periode_construction)
-      : (audit.annee_construction || audit.periode_constuction || audit.periode_construction);
-    if (anneeAudit) setChamp('annee_construction', anneeAudit);
-    const ep = audit.cep_initial != null ? audit.cep_initial : audit.ep_conso_5_usages_m2;
-    if (ep != null) {
-      setChamp('conso_kwh_m2', Math.round(ep));
-    }
-    const ges = audit.emission_ges_initial != null ? audit.emission_ges_initial : audit.emission_ges_5_usages_m2;
-    if (ges != null) {
-      setChamp('emissions_ges', Math.round(ges));
-    }
-    if (audit.cout_5_usages != null) {
-      setChamp('cout_energetique_mensuel_eur', Math.round(audit.cout_5_usages / 12));
-      setChamp('cout_energetique_annuel_eur', Math.round(audit.cout_5_usages));
-    }
-    if (audit.nb_niveau_logement) setChamp('nb_niveaux', audit.nb_niveau_logement);
-    if (audit.hauteur_sous_plafond != null) setChamp('hsp', audit.hauteur_sous_plafond);
-    if (audit.hauteur_sous_plafond && audit.nb_niveau_logement) {
-      setChamp('hauteur_batiment', Math.round(audit.hauteur_sous_plafond * audit.nb_niveau_logement * 10) / 10);
-    }
-    if (audit.presence_production_pv != null) {
-      setChamp('panneau_solaire', audit.presence_production_pv === 1 ? 'oui' : 'non');
-    }
-    if (audit.zone_climatique && !document.getElementById('zone-clim-input')?.value) {
-      setChamp('zone_climatique_chantier', audit.zone_climatique);
-    }
-    const eChauff = audit.type_energie_principale_chauffage || '';
-    const mChauff = mapEnergieChauffage(eChauff);
-    if (mChauff) setChamp('mode_chauffage', mChauff);
-    const eECS = audit.type_energie_principale_ecs || '';
-    if (eECS) setChamp('gestion_ecs', mapEnergieChauffage(eECS) || eECS);
-
-    const numero = audit.numero_rapport_audit || audit.numero_dpe || '';
-    const date = audit.date_etablissement_dpe || audit.date_etablissement_audit || '';
-    majBadgesSource('audit_officiel', numero, date);
-    marquerChampsAutoRemplis();
-
-    if (typeof window.recalculerCategories === 'function') window.recalculerCategories();
-    const an = document.querySelector('[name="annee_construction"]');
-    if (an && an.value && typeof window.calcAgeLogement === 'function') {
-      window.calcAgeLogement(an.value);
-    }
-  }
-
-  function afficherLoaderDpe(show) {
-    const statusEl = document.getElementById('dpe-autofill-status');
-    const st = document.getElementById('dpe-source-status');
-    if (show) {
-      if (statusEl) {
-        statusEl.style.display = 'block';
-        statusEl.innerHTML = '⏳ Recherche DPE / Audit ADEME…';
-        statusEl.style.background = '#EEF2F7';
-        statusEl.style.color = '#64748B';
-      }
-      if (st) st.textContent = 'Recherche DPE en cours…';
-    } else if (statusEl && statusEl.innerHTML.includes('Recherche DPE')) {
-      statusEl.style.display = 'none';
-    }
-  }
-
   window.OPTIONAL_BACKEND_APIS_ENABLED = true;
   window.fetchOptionalBackendApi = async function fetchOptionalBackendApi(url) {
     if (!window.OPTIONAL_BACKEND_APIS_ENABLED) {
@@ -8997,109 +8759,6 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     }
   };
 
-  function activerToggleAuditDpe(audit, dpe) {
-    const pillAudit = document.querySelector('.dpe-source-pill[data-source="audit_officiel"]');
-    const pillDpe = document.querySelector('.dpe-source-pill[data-source="dpe_officiel"]');
-    const pillUrbs = document.querySelector('.dpe-source-pill[data-source="urbs_enrichi"]');
-    if (pillAudit) { pillAudit.disabled = !audit; pillAudit.classList.toggle('available', !!audit); }
-    if (pillDpe) { pillDpe.disabled = !dpe; pillDpe.classList.toggle('available', !!dpe); }
-    if (pillUrbs) { pillUrbs.classList.toggle('available', true); }
-
-    [pillAudit, pillDpe].forEach((pill) => {
-      if (!pill) return;
-      pill.addEventListener('click', () => {
-        if (pill === pillAudit && audit) appliquerAuditOfficiel(audit);
-        if (pill === pillDpe && dpe) appliquerDpeOfficiel(dpe);
-      });
-    });
-  }
-
-  async function lancerRechercheDpeAutomatique(lat, lon, cp) {
-    if (!lat || !lon || !cp) return;
-    afficherLoaderDpe(true);
-    const statusEl = document.getElementById('dpe-autofill-status');
-    const adresse = (document.querySelector('input[name="adresse_chantier"]')?.value || '').trim();
-    try {
-      if (typeof window.lancerRechercheDpeSources === 'function') {
-        await window.lancerRechercheDpeSources(adresse, cp, lat, lon);
-      } else {
-        const q = new URLSearchParams({ adresse, cp, lat: String(lat), lon: String(lon) });
-        const data = await window.fetchOptionalBackendApi(`/api/dpe-lookup?${q}`);
-        if (!data) return;
-        const src = data.source;
-        const row = (data.sources && data.sources[src]) || {};
-        if (src === 'audit_officiel') appliquerAuditOfficiel(row);
-        else if (src === 'dpe_officiel') appliquerDpeOfficiel(row);
-        else majBadgesSource('urbs_enrichi', '', '');
-        if (data.energy_v2 && typeof window.appliquerEnergyV2 === 'function') {
-          window.appliquerEnergyV2(data.energy_v2);
-        }
-        if (statusEl && data.notification) {
-          statusEl.innerHTML = data.notification.message || '';
-          statusEl.style.display = statusEl.innerHTML ? 'block' : 'none';
-        }
-      }
-    } catch (e) {
-      if (statusEl) {
-        statusEl.innerHTML = '⚠ Erreur recherche DPE / Audit';
-        statusEl.style.display = 'block';
-      }
-    } finally {
-      afficherLoaderDpe(false);
-    }
-  }
-  window.lancerRechercheDpeAutomatique = lancerRechercheDpeAutomatique;
-
-  // ---------------------------------------------------------------------------
-  // Binding des listeners — identique création ET modification (PJAX safe)
-  // ---------------------------------------------------------------------------
-
-  function bindListeners() {
-    // Champ adresse BAN
-    const adresseInput = document.querySelector('input[name="adresse_chantier"]');
-    const cpInput = document.querySelector('input[name="code_postal_chantier"], [name="cp_chantier"]');
-    const latInput = document.querySelector('input[name="lat_chantier"], [id="lat-input"]');
-    const lonInput = document.querySelector('input[name="lon_chantier"], [id="lon-input"]');
-
-    if (!adresseInput) return;
-
-    // Déclenché après géocodage BAN (event custom ou change sur lat/lon)
-    function onGeoReady() {
-      const lat = parseFloat(latInput?.value || '0');
-      const lon = parseFloat(lonInput?.value || '0');
-      const cp = cpInput?.value || '';
-      if (lat && lon && cp) {
-        lancerRechercheDpeAutomatique(lat, lon, cp);
-      }
-    }
-
-    // Écouter l'événement custom dispatché par le module BAN
-    document.addEventListener('ban-geocode-done', onGeoReady, { once: false });
-
-    // Fallback : si lat/lon déjà remplis (prospect existant chargé)
-    const lat = parseFloat(latInput?.value || '0');
-    const lon = parseFloat(lonInput?.value || '0');
-    const cp = cpInput?.value || '';
-    if (lat && lon && cp) {
-      // Délai court pour laisser le DOM se stabiliser
-      setTimeout(() => lancerRechercheDpeAutomatique(lat, lon, cp), 400);
-    }
-  }
-
-  // Exposition globale pour PJAX / rechargement
-  window.majBadgesSourceDpe = majBadgesSource;
-  window.lancerRechercheDpeAuto = lancerRechercheDpeAutomatique;
-  window.appliquerDpeOfficiel = appliquerDpeOfficiel;
-  window.appliquerAuditOfficiel = appliquerAuditOfficiel;
-
-  // Init au chargement DOM
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', bindListeners);
-  } else {
-    bindListeners();
-  }
-  // Support PJAX
-  document.addEventListener('pjax:complete', bindListeners);
 
 })();
 
@@ -9559,10 +9218,6 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
       try { await window.rechercheReglementaireAuto(lat, lon, state.parcelle); }
       catch (e) { console.debug('reglementaire auto KO (non bloquant):', e); }
     }
-    if (Number.isFinite(lat) && Number.isFinite(lon) && typeof window.lancerRechercheDpeAutomatique === 'function') {
-      const cpDirect = (document.querySelector('[name="code_postal_chantier"]')?.value || '').replace(/\D/g,'').slice(0,5);
-      await window.lancerRechercheDpeAutomatique(lat, lon, cpDirect);
-    }
 
     // Altitude IGN (impacte la note de dimensionnement)
     if (Number.isFinite(lat) && Number.isFinite(lon)) {
@@ -9587,11 +9242,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
         }
       } catch (e) { console.debug('altitude IGN:', e); }
     }
-    if (typeof window.chargerDonneesAdresse === 'function' && adresse && cp5.length === 5) {
-      await window.chargerDonneesAdresse(adresse, cp5, '');
-    } else if (typeof window.lancerRechercheDpeSources === 'function') {
-      await window.lancerRechercheDpeSources(adresse, cp5);
-    }
+    if (adresse && cp5.length === 5 && typeof window.hexaChercherDocuments === 'function') await window.hexaChercherDocuments();
   }
 
   function init() {
@@ -9790,6 +9441,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
   };
 
   document.addEventListener('input', (e) => {
+    if (!e.isTrusted) return;                       // Partie B : seul un geste de l'utilisateur marque « Modifié »
     const name = e.target?.getAttribute?.('name');
     if (!name || !FIELD_SOURCES[name]) return;
     const field = e.target.closest('.field');
@@ -9889,14 +9541,6 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     rafraichirAdressePreview();
   }
 
-  // Si un numéro DPE est déjà connu (import / saisie), le préremplissage ADEME par adresse
-  // peut échouer à cause des divergences d'écriture. On tente alors un lookup direct.
-  document.addEventListener('DOMContentLoaded', () => {
-    const num = (document.getElementById('dpe-numero')?.value || '').trim();
-    if (num) {
-      setTimeout(() => rechercherDPEParNumero(num), 350);
-    }
-  });
 
   // === Badges source URBS / modification manuelle ===
   const _urbsPrefill = new Set();
@@ -10020,47 +9664,6 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
       input.addEventListener('change', handler);
     }
   }
-  function energieKeyFromUrbs(energie) {
-    const e = (energie || '').toLowerCase();
-    if (e.includes('elec')) return 'electricite';
-    if (e.includes('gaz')) return 'gaz';
-    if (e.includes('fioul')) return 'fioul';
-    if (e.includes('bois') || e.includes('granul')) return 'bois_granules';
-    if (e.includes('reseau') || e.includes('chaleur')) return 'reseau_chaleur';
-    return 'defaut';
-  }
-  function calculerCoutEnergieMensuel(opts) {
-    if (opts.fraisAnnuel != null && !isNaN(opts.fraisAnnuel)) {
-      return Math.round(Number(opts.fraisAnnuel) / 12);
-    }
-    const cep = parseFloat(String(opts.cep || '').replace(/\s/g, ''));
-    const surface = parseFloat(String(opts.surface || '').replace(/\s/g, ''));
-    if (!cep || !surface || cep <= 0 || surface <= 0) return null;
-    const cfg = ENERGIE_COEFF[energieKeyFromUrbs(opts.energie)] || ENERGIE_COEFF.defaut || { coeff_ep: 1, prix_kwh: 0.13 };
-    return Math.round((cep / (parseFloat(cfg.coeff_ep) || 1)) * surface * (parseFloat(cfg.prix_kwh) || 0.13) / 12);
-  }
-  function appliquerCoutEnergie(u) {
-    const el = document.getElementById('cout-energie-input');
-    if (!el) return;
-    const cout = calculerCoutEnergieMensuel({
-      fraisAnnuel: u?.cout_energetique_annuel,
-      cep: document.getElementById('conso-kwh-input')?.value,
-      surface: document.getElementById('surface-input')?.value,
-      energie: document.getElementById('type-chauffage-energie')?.value,
-    });
-    if (cout != null) {
-      // Lot 2 : écriture automatique via setCoutEnergieAuto -> jamais par-dessus une saisie réelle.
-      const ecrit = typeof window.setCoutEnergieAuto === 'function'
-        ? window.setCoutEnergieAuto(cout, 'dpe')
-        : (el.value = cout, el.dispatchEvent(new Event('input', { bubbles: true })), el.dispatchEvent(new Event('change', { bubbles: true })), true);
-      if (ecrit && u) marquerUrbsField('cout_energetique_mensuel_eur', 'badge-cout', u.source_dpe === 'officiel' ? 'officiel' : 'enrichi');
-    }
-  }
-  ['conso-kwh-input', 'surface-input'].forEach(id => {
-    document.getElementById(id)?.addEventListener('input', () => appliquerCoutEnergie(null));
-  });
-  document.querySelector('select[name="mode_chauffage"]')?.addEventListener('change', () => appliquerCoutEnergie(null));
-
   document.getElementById('btn-infos-complementaires')?.addEventListener('click', function() {
     const open = this.getAttribute('aria-expanded') === 'true';
     this.setAttribute('aria-expanded', open ? 'false' : 'true');
@@ -10135,6 +9738,8 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     const lonEl = document.getElementById('lon-chantier');
     if (latEl && lat != null) latEl.value = String(lat);
     if (lonEl && lon != null) lonEl.value = String(lon);
+    // Partie B : l'ADEME place ses documents sur le point BAN du numéro (la parcelle confirmée ensuite déplace lat/lon)
+    window.hexaBanPoint = { adresse: ligne, cp: p.postcode || '', lat, lon };
     fermerBanSuggestions();
     rafraichirAdressePreview();
     applyAutoFieldStyle(document.querySelector('.ban-field-wrap'), 'api');
@@ -10203,20 +9808,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
   async function chargerDonneesAdresse(adresse, cp, banId) {
     const cp5 = (cp || '').replace(/\D/g, '').slice(0, 5);
     if (!adresse || cp5.length !== 5) return;
-    const dpeStatus = document.getElementById('dpe-autofill-status');
     try {
-      const urbsUrl = banId
-        ? `/api/urbs?ban_id=${encodeURIComponent(banId)}&adresse=${encodeURIComponent(adresse)}&cp=${encodeURIComponent(cp5)}`
-        : `/api/urbs?adresse=${encodeURIComponent(adresse)}&cp=${encodeURIComponent(cp5)}`;
-      const urbs = await window.fetchOptionalBackendApi(urbsUrl);
-      if (urbs && !urbs.error) {
-        appliquerUrbs(urbs);
-        if (dpeStatus) {
-          dpeStatus.style.display = 'none';
-          dpeStatus.innerHTML = '';
-        }
-      }
-
       const latEl = document.getElementById('lat-chantier');
       const lonEl = document.getElementById('lon-chantier');
       let lat = latEl?.value ? parseFloat(latEl.value) : NaN;
@@ -10230,16 +9822,9 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
           if (lonEl) lonEl.value = lon;
         }
       }
-      if (!isNaN(lat) && !isNaN(lon) && cp5.length === 5) {
-        if (typeof window.lancerRechercheDpeAutomatique === 'function') {
-          await window.lancerRechercheDpeAutomatique(lat, lon, cp5);
-        } else {
-          await lancerRechercheDpeSources(adresse, cp5);
-        }
-        await rechercheReglementaireAuto(lat, lon);
-      } else {
-        await lancerRechercheDpeSources(adresse, cp5);
-      }
+      // Partie B : une seule recherche DPE / audit (module hexa-dpe-master-js), jamais deux fois la même adresse
+      if (typeof window.hexaChercherDocuments === 'function') await window.hexaChercherDocuments();
+      if (!isNaN(lat) && !isNaN(lon) && cp5.length === 5) await rechercheReglementaireAuto(lat, lon);
       recalculerCategories();
     } catch (e) {
       console.debug('chargerDonneesAdresse:', e);
@@ -10306,155 +9891,6 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     } catch (e) {
       if (statusEl) statusEl.innerHTML = '<span class="cadastre-status-warn">Vérification impossible</span>';
     }
-  }
-
-  function appliquerUrbs(u) {
-    if (!u || u.error) return;
-    const dpeKind = u.source_dpe === 'officiel' ? 'officiel' : 'enrichi';
-    if (u.imope_id) document.getElementById('urbs-imope-id').value = u.imope_id;
-    if (u.type_logement) {
-      const sel = document.querySelector('select[name="type_logement"]');
-      if (sel) { sel.value = u.type_logement; marquerUrbsField('type_logement', 'badge-type-logement', dpeKind); }
-    }
-    if (u.surface) {
-      const si = document.getElementById('surface-input');
-      if (si) { si.value = Math.round(Number(u.surface)); marquerUrbsField('surface_logement_m2', 'badge-surface', dpeKind); }
-    }
-    if (u.annee_construction) {
-      const an = document.getElementById('annee-construction');
-      if (an) { an.value = Math.round(Number(u.annee_construction)); calcAgeLogement(an.value); marquerUrbsField('annee_construction', 'badge-annee', dpeKind); }
-    }
-    if (u.nb_niveaux != null) {
-      const el = document.getElementById('nb-niveaux-input');
-      if (el) {
-        el.value = Math.round(Number(u.nb_niveaux));
-        marquerUrbsComplementaire('nb_niveaux', 'badge-nb-niveaux', u.source_dpe === 'officiel' ? 'officiel' : 'enrichi');
-      }
-    }
-    if (u.hauteur != null) {
-      const el = document.getElementById('hauteur-batiment-input');
-      if (el) {
-        el.value = u.hauteur;
-        marquerUrbsComplementaire('hauteur_batiment', 'badge-hauteur', u.source_dpe === 'officiel' ? 'officiel' : 'enrichi');
-      }
-    }
-    if (u.altitude != null) {
-      const el = document.getElementById('altitude-input');
-      if (el) {
-        el.value = Math.round(Number(u.altitude));
-        marquerUrbsComplementaire('altitude', 'badge-altitude', u.source_dpe === 'officiel' ? 'officiel' : 'enrichi');
-      }
-    }
-    Object.entries(ISO_BADGE_BY_FIELD).forEach(([field, badgeId]) => {
-      const val = u[field];
-      if (!val) return;
-      const sel = document.querySelector(`select[name="${field}"]`);
-      if (sel && !sel.value) {
-        sel.value = val;
-        marquerUrbsField(field, badgeId, dpeKind);
-      }
-    });
-    const lettre = u.dpe_officiel || u.dpe_enrichi || u.dpe_connu;
-    if (lettre) {
-      document.getElementById('dpe-input').value = lettre;
-      document.querySelectorAll('.dpe-btn').forEach(b => b.classList.toggle('selected', b.dataset.dpe === lettre));
-      if (u.source_dpe === 'officiel') {
-        document.getElementById('dpe-source').value = 'officiel';
-        majBadgeDPE('ademe', u.dpe_numero);
-        setDpeBadgeEl('badge-dpe-label', 'officiel');
-      } else if (u.source_dpe === 'enrichi') {
-        document.getElementById('dpe-source').value = 'onb_urbs';
-        const fiab = u.fiabilite_dpe || 78;
-        document.getElementById('dpe-fiabilite').value = fiab;
-        const badgeEl = document.getElementById('dpe-source-badge');
-        if (badgeEl) {
-          badgeEl.style.display = 'inline';
-          badgeEl.style.background = '#E8EFF7';
-          badgeEl.style.color = '#1A4A7A';
-          badgeEl.textContent = '🔵 DPE ENRICHI · Fiabilité ' + fiab + '% (±1 étiquette)';
-        }
-        setDpeBadgeEl('badge-dpe-label', 'enrichi');
-      }
-      if (u.dpe_numero) {
-        document.getElementById('dpe-numero').value = u.dpe_numero;
-        if (typeof window.syncDpeMetaDisplay === 'function') window.syncDpeMetaDisplay();
-        const lien = document.getElementById('dpe-lien-officiel');
-        if (lien) {
-          lien.style.display = 'block';
-          lien.innerHTML = `<a href="https://observatoire-dpe-audit.ademe.fr/pub/dpe/${encodeURIComponent(u.dpe_numero)}" target="_blank" rel="noopener">📄 Voir le DPE officiel</a>`;
-        }
-        const pNum = document.body.dataset.prospectNumero;
-        if (pNum && u.source_dpe === 'officiel') {
-          fetch(`/api/prospect/${encodeURIComponent(pNum)}/dpe-auto-document`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ dpe_numero: u.dpe_numero }),
-          }).catch(() => {});
-        }
-      }
-      if (typeof window.majBoutonVisualiserDpe === 'function') window.majBoutonVisualiserDpe();
-      if (u.dpe_date) { document.getElementById('dpe-date').value = u.dpe_date; if (typeof window.syncDpeMetaDisplay === 'function') window.syncDpeMetaDisplay(); }
-    }
-    if (u.conso_kwh != null) {
-      const el = document.getElementById('conso-kwh-input');
-      if (el) { el.value = Math.round(Number(u.conso_kwh)); marquerUrbsField('conso_kwh_m2', 'badge-conso', dpeKind); }
-    }
-    if (u.ges != null) {
-      const el = document.getElementById('emissions-ges-input');
-      if (el) { el.value = Math.round(Number(u.ges)); marquerUrbsField('emissions_ges', 'badge-ges', dpeKind); }
-    }
-    if (u.zone_climatique_urb) {
-      updateZoneClimatique(u.zone_climatique_urb);
-      setDpeBadgeEl('badge-zone-clim', u.source_dpe === 'officiel' ? 'officiel' : 'enrichi');
-    }
-    appliquerCoutEnergie(u);
-    if (u.chauffage_type) {
-      const sel = document.querySelector('select[name="mode_chauffage"]');
-      if (sel && !sel.value) {
-        sel.value = u.chauffage_type;
-        marquerUrbsField('mode_chauffage', 'badge-mode-chauffage', u.source_dpe === 'officiel' ? 'officiel' : 'enrichi');
-        sel.dispatchEvent(new Event('change'));
-      }
-    }
-    if (u.chauffage_energie) {
-      // On conserve la valeur (persistée) mais on ne l'affiche plus dans la fiche (champ supprimé).
-      document.getElementById('type-chauffage-energie').value = u.chauffage_energie;
-      marquerUrbsField('type_chauffage_energie', 'badge-mode-chauffage', u.source_dpe === 'officiel' ? 'officiel' : 'enrichi');
-    }
-    if (u.panneau_solaire != null) {
-      const ps = u.panneau_solaire ? 'oui' : 'non';
-      const pin = document.getElementById('panneau-solaire-input');
-      if (pin) pin.value = ps;
-      document.querySelectorAll('#panneau-solaire-pills .pill').forEach(p => {
-        p.classList.toggle('selected', p.dataset.value === ps);
-      });
-      marquerUrbsComplementaire('panneau_solaire', 'badge-panneau', u.source_dpe === 'officiel' ? 'officiel' : 'enrichi');
-    }
-    if (u.prix_m2_estime != null) {
-      const el = document.getElementById('prix-m2-estime-input');
-      if (el) {
-        el.value = Math.round(Number(u.prix_m2_estime));
-        marquerUrbsComplementaire('prix_m2_estime', 'badge-prix-m2', u.source_dpe === 'officiel' ? 'officiel' : 'enrichi');
-      }
-    }
-    const kindPrix = u.source_dpe === 'officiel' ? 'officiel' : 'enrichi';
-    if (u.prix_m2_min != null) {
-      const elMin = document.getElementById('prix-m2-min');
-      if (elMin) elMin.value = u.prix_m2_min;
-    }
-    if (u.prix_m2_max != null) {
-      const elMax = document.getElementById('prix-m2-max');
-      if (elMax) elMax.value = u.prix_m2_max;
-    }
-    if (u.prix_m2_min != null || u.prix_m2_max != null) {
-      marquerUrbsComplementaire('prix_m2_range', 'badge-prix-m2-range', kindPrix);
-    }
-    const range = document.getElementById('prix-m2-range-display');
-    if (range && (u.prix_m2_min || u.prix_m2_max)) {
-      range.textContent = [u.prix_m2_min, u.prix_m2_max].filter(Boolean).join(' – ') + ' €/m²';
-    }
-    applyGlobalDpeBadgeState(u);
-    recalculerCategories();
   }
 
   function appliquerCopro(c) {
@@ -10792,175 +10228,6 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     }
   }
 
-  let dpeSourcesCache = null;
-
-  function afficherMetaOfficielle(data, sourceKey) {
-    const num = data.numero_rapport_audit || data.numero_dpe || data.n_audit || '';
-    const dt = (data.date_etablissement_dpe || data.date_etablissement_audit || '').toString().slice(0, 10);
-    const numEl = document.getElementById('dpe-numero-officiel');
-    if (numEl && num) {
-      let dtFr = '';
-      if (dt.length === 10) {
-        const p = dt.split('-');
-        dtFr = p[2] + '/' + p[1] + '/' + p[0];
-      }
-      numEl.textContent = 'n° ' + num + (dtFr ? ' · établi le ' + dtFr : '');
-      numEl.style.display = 'block';
-    }
-    if (data.numero_dpe || data.numero_rapport_audit) {
-      const dn = document.getElementById('dpe-numero');
-      if (dn) { dn.value = data.numero_rapport_audit || data.numero_dpe; if (typeof window.syncDpeMetaDisplay === 'function') window.syncDpeMetaDisplay(); }
-    }
-    if (dt) {
-      const dd = document.getElementById('dpe-date');
-      if (dd) { dd.value = dt; if (typeof window.syncDpeMetaDisplay === 'function') window.syncDpeMetaDisplay(); }
-    }
-    if (typeof window.majBadgesSource === 'function') {
-      window.majBadgesSource(sourceKey, num, dt);
-    }
-  }
-
-  function appliquerDonneesSourceDpe(data, sourceKey) {
-    if (!data || !Object.keys(data).length) return;
-    if (sourceKey === 'audit_officiel' && typeof window.appliquerAuditOfficiel === 'function') {
-      window.appliquerAuditOfficiel(data);
-      afficherMetaOfficielle(data, sourceKey);
-      return;
-    }
-    if (sourceKey === 'dpe_officiel' && typeof window.appliquerDpeOfficiel === 'function') {
-      window.appliquerDpeOfficiel(data);
-      afficherMetaOfficielle(data, sourceKey);
-      return;
-    }
-    const lettre = (data.classe_energie || '').toString().trim().toUpperCase().slice(0, 1);
-    if (lettre) {
-      document.getElementById('dpe-input').value = lettre;
-      document.querySelectorAll('.dpe-btn').forEach(b => b.classList.toggle('selected', b.dataset.dpe === lettre));
-    }
-    const fieldMap = {
-      surface_logement_m2: 'surface-input',
-      annee_construction: 'annee-construction',
-      conso_kwh_m2: ['conso-kwh-input', 'cep_initial'],
-      emissions_ges: ['emissions-ges-input', 'emission_ges_initial'],
-      cout_energetique_mensuel_eur: ['cout-energie-input', 'cout_energetique_mensuel_eur'],
-    };
-    Object.entries(fieldMap).forEach(([k, ids]) => {
-      const idList = Array.isArray(ids) ? ids : [ids];
-      const elId = idList[0];
-      const el = document.getElementById(elId);
-      if (!el) return;
-      let v = data[k];
-      if ((v == null || v === '') && idList[1]) v = data[idList[1]];
-      if (el && v != null && v !== '') {
-        const n = Number(v);
-        el.value = (k.includes('conso') || k.includes('emissions') || k.includes('cout') || k.includes('surface'))
-          ? (Number.isFinite(n) ? Math.round(n) : v)
-          : v;
-      }
-    });
-    afficherMetaOfficielle(data, sourceKey);
-    const srcMap = { dpe_officiel: 'dpe_officiel', audit_officiel: 'audit_officiel', urbs_enrichi: 'onb_urbs' };
-    const ds = document.getElementById('dpe-source');
-    if (ds) ds.value = srcMap[sourceKey] || sourceKey || 'manuel';
-    if (typeof window.majBoutonVisualiserDpe === 'function') window.majBoutonVisualiserDpe();
-    const an = document.getElementById('annee-construction');
-    if (an && an.value) calcAgeLogement(an.value);
-    recalculerCategories();
-  }
-
-  function majPillsDpeSources(payload) {
-    dpeSourcesCache = payload;
-    window.dpeSourcesCache = payload;
-    const status = document.getElementById('dpe-source-status');
-    const sources = payload?.sources || {};
-    ['dpe_officiel', 'audit_officiel', 'urbs_enrichi'].forEach(key => {
-      const pill = document.querySelector(`.dpe-source-pill[data-source="${key}"]`);
-      if (!pill) return;
-      const has = sources[key] && Object.keys(sources[key]).length > 0;
-      pill.disabled = !has && key !== 'urbs_enrichi';
-      pill.classList.toggle('is-available', has || key === 'urbs_enrichi');
-    });
-    const sel = payload?.source || 'manuel';
-    document.querySelectorAll('.dpe-source-pill').forEach(p => {
-      p.classList.toggle('is-active', p.dataset.source === sel);
-    });
-    const badgeEl = document.getElementById('dpe-source-badge');
-    if (badgeEl) {
-      const badge = payload?.badge || 'SAISIE MANUELLE';
-      const cls = sel === 'dpe_officiel' ? 'dpe-source-badge--officiel'
-        : sel === 'audit_officiel' ? 'dpe-source-badge--audit'
-        : sel === 'urbs_enrichi' ? 'dpe-source-badge--urbs' : 'dpe-source-badge--manuel';
-      badgeEl.className = 'dpe-source-badge ' + cls;
-      badgeEl.textContent = badge;
-      badgeEl.style.display = 'inline-block';
-    }
-    if (status) {
-      const st = payload?.status_text
-        || (sel === 'urbs_enrichi' && sources.urbs_enrichi?.classe_energie ? 'Données URBS enrichies (fallback)' : 'Saisissez l\'adresse pour lancer la recherche.');
-      status.textContent = st;
-    }
-    if (sources[sel]) appliquerDonneesSourceDpe(sources[sel], sel);
-    else if (payload?.official_numero && status) {
-      const srcData = sources[sel] || {};
-      afficherMetaOfficielle(srcData, sel);
-    }
-    if (payload?.energy_v2) {
-      const ev2El = document.getElementById('energy-v2-json');
-      if (ev2El) ev2El.value = JSON.stringify(payload.energy_v2);
-      const m = payload.energy_v2.meta || {};
-      const st = document.getElementById('source-active-type');
-      const sn = document.getElementById('source-active-numero');
-      const sd = document.getElementById('source-active-date');
-      if (st && m.source_active_type) st.value = m.source_active_type;
-      if (sn && m.source_active_numero) sn.value = m.source_active_numero;
-      if (sd && m.source_active_date) sd.value = m.source_active_date;
-      if (payload.dpe_officiel != null) {
-        const fl = document.getElementById('dpe-officiel-flag');
-        if (fl) fl.value = payload.dpe_officiel ? '1' : '0';
-      }
-    }
-    if (typeof window.afficherBandeauDpe === 'function') window.afficherBandeauDpe(payload);
-    if (payload?.energy_v2 && typeof window.appliquerEnergyV2Bloc7 === 'function') {
-      window.appliquerEnergyV2Bloc7(payload.energy_v2);
-    }
-    const pNum = document.body.dataset.prospectNumero;
-    if (pNum && payload?.energy_v2) {
-      fetch(`/api/prospect/${encodeURIComponent(pNum)}/simulation-auto-v2`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-        body: JSON.stringify({ energy_v2: payload.energy_v2, parcours: 'anah' }),
-      }).catch(() => {});
-    }
-  }
-
-  async function lancerRechercheDpeSources(adresse, cp) {
-    const lat = document.getElementById('lat-chantier')?.value;
-    const lon = document.getElementById('lon-chantier')?.value;
-    const st = document.getElementById('dpe-source-status');
-    if (st) st.textContent = 'Recherche DPE en cours…';
-  try {
-      const q = new URLSearchParams({ adresse, cp });
-      if (lat && lon) { q.set('lat', lat); q.set('lon', lon); }
-      const pNum = document.body.dataset.prospectNumero;
-      if (pNum) q.set('prospect_numero', pNum);
-      const data = await window.fetchOptionalBackendApi(`/api/dpe-lookup?${q.toString()}`);
-      if (!data) return;
-      majPillsDpeSources(data);
-    } catch {
-      if (st) st.textContent = 'Recherche DPE indisponible — saisie manuelle';
-    }
-  }
-  window.lancerRechercheDpeSources = lancerRechercheDpeSources;
-
-  document.querySelectorAll('.dpe-source-pill').forEach(pill => {
-    pill.addEventListener('click', () => {
-      if (pill.disabled) return;
-      const key = pill.dataset.source;
-      if (!dpeSourcesCache?.sources?.[key]) return;
-      dpeSourcesCache.source = key;
-      majPillsDpeSources(dpeSourcesCache);
-    });
-  });
   const anneeInput = document.getElementById('annee-construction');
   if (anneeInput && anneeInput.value) calcAgeLogement(anneeInput.value);
 
@@ -11950,35 +11217,6 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
   }
   
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // DPE AUTO-FILL — API ADEME (DPE officiel) → ONB URBS (proxy enrichi)
-  // ═══════════════════════════════════════════════════════════════════════════
-
-  const DPE_ADEME_URL = 'https://data.ademe.fr/data-fair/api/v1/datasets/dpe03existant/lines';
-  const DPE_FIELDS = 'classe_consommation_energie,surface_habitable_logement,type_energie_principale_chauffage,type_batiment,numero_dpe,adresse_ban,date_etablissement_dpe,code_postal_ban,nom_commune,annee_construction,conso_5_usages_ef_energie_n,emission_ges_5_usages_n';
-
-  // Mapping énergies DPE → mode_chauffage applicatif
-  const ENERGIE_TO_CHAUFFAGE = {
-    'gaz naturel': 'gaz', 'gaz propane': 'gaz', 'gaz butane': 'gaz',
-    'fioul domestique': 'fioul', 'fioul': 'fioul',
-    'électricité': 'electricite', 'electricite': 'electricite', "électricité d'origine renouvelable utilisée dans le bâtiment": 'electricite',
-    'bois – bûches': 'bois', 'bois – granulés (pellets) ou briquettes': 'bois', 'bois – plaquettes forestières': 'bois', 'bois': 'bois',
-    'réseau de chaleur urbain': 'electricite',
-    'pompe à chaleur': 'pac', 'aérothermie': 'pac', 'géothermie': 'pac',
-  };
-
-  const DPE_COLORS = {
-    'A':'#009460','B':'#51A851','C':'#B5CF45','D':'#F0E619','E':'#F0AF19','F':'#E6531D','G':'#C5161A'
-  };
-
-  let _dpeSearchTimer = null;
-  let _lastDpeSearch = '';
-  window.resetDpeDynamicState = function () {
-    dpeSourcesCache = null;
-    window.dpeSourcesCache = null;
-    _lastDpeSearch = '';
-  };
-
   function majBadgeDPE(source, numero) {
     const badgeEl = document.getElementById('dpe-source-badge');
     if (!badgeEl) return;
@@ -12002,304 +11240,6 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
       badgeEl.textContent = '';
     }
   }
-
-  function setSelectIfExists(name, value, force) {
-    if (!value) return;
-    const el = document.querySelector(`select[name="${name}"]`);
-    if (el && (force || !el.value)) {
-      el.value = value;
-      el.dispatchEvent(new Event('change'));
-    }
-  }
-
-  async function rechercherDPE(adresse, cp, typeLogement) {
-    if (!adresse || !cp || adresse.length < 5) return;
-    const searchKey = `${adresse}|${cp}`;
-    if (searchKey === _lastDpeSearch) return;
-    _lastDpeSearch = searchKey;
-
-    const statusEl = document.getElementById('dpe-autofill-status');
-    const badgeEl = document.getElementById('dpe-source-badge');
-    if (!statusEl) return;
-    statusEl.style.display = 'block';
-    statusEl.innerHTML = '⏳ Recherche du DPE dans la base ADEME…';
-    statusEl.style.background = 'var(--bg-input)';
-    statusEl.style.color = 'var(--text-muted)';
-    statusEl.style.border = '1px solid var(--border)';
-    if (badgeEl) badgeEl.style.display = 'none';
-
-    try {
-      const url = `/api/dpe?adresse=${encodeURIComponent(adresse)}&cp=${encodeURIComponent(cp)}&type_logement=${encodeURIComponent(typeLogement || 'maison')}`;
-      const resp = await fetch(url);
-
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      const data = await resp.json();
-
-      if (data.lat && data.lon) {
-        const latEl = document.getElementById('lat-chantier');
-        const lonEl = document.getElementById('lon-chantier');
-        if (latEl) latEl.value = data.lat;
-        if (lonEl) lonEl.value = data.lon;
-      }
-
-      const results = data.results || [];
-      if (results.length === 0) {
-        statusEl.innerHTML = `⚠ Aucun DPE officiel trouvé à cette adresse (${data.total || 0} résultat${data.total === 1 ? '' : 's'}).`;
-        statusEl.style.background = '#FEF9C3';
-        statusEl.style.color = '#92400E';
-        majBadgeDPE('not_found', null);
-        document.getElementById('dpe-multi-panel').style.display = 'none';
-        return;
-      }
-      const isApart = typeLogement === 'appartement';
-
-      if (results.length === 1 || (!isApart && results.length > 0)) {
-        // Single result → auto-fill
-        appliquerDPE(results[0], 'ademe');
-        if (results.length > 1) {
-          // More DPEs at same address, show them
-          afficherMultiDPE(results, 'ademe');
-        }
-      } else if (isApart && results.length > 1) {
-        // Apartment with multiple DPEs → let user pick
-        statusEl.innerHTML = `🏢 ${results.length} DPE trouvés à cette adresse (appartements). Sélectionnez le bon :`;
-        statusEl.style.background = '#DBEAFE'; statusEl.style.color = '#1E40AF';
-        afficherMultiDPE(results, 'ademe');
-      } else {
-        appliquerDPE(results[0], 'ademe');
-      }
-
-    } catch (err) {
-      
-      statusEl.innerHTML = `⚠ API ADEME indisponible (${err.message}). → <a href="#" onclick="lancerDPEEnrichiONBURBS(); return false;" style="color:var(--bleu);font-weight:700;">Calculer DPE enrichi ONB URBS</a>`;
-      statusEl.style.background = '#FEF3C7'; statusEl.style.color = '#92400E';
-    }
-  }
-
-  async function rechercherDPEParNumero(numero) {
-    const statusEl = document.getElementById('dpe-autofill-status');
-    if (!statusEl) return;
-    const num = (numero || '').trim();
-    if (!num) return;
-    statusEl.style.display = 'block';
-    statusEl.innerHTML = '⏳ Recherche DPE par numéro…';
-    statusEl.style.background = 'var(--bg-input)';
-    statusEl.style.color = 'var(--text-muted)';
-    statusEl.style.border = '1px solid var(--border)';
-    try {
-      const resp = await fetch(`/api/dpe/numero?numero=${encodeURIComponent(num)}`);
-      const data = await resp.json();
-      const results = data.results || [];
-      if (!resp.ok || results.length === 0) {
-        statusEl.innerHTML = `⚠ DPE introuvable pour le numéro ${escapeHtml(num)}`;
-        statusEl.style.background = '#FEF9C3';
-        statusEl.style.color = '#92400E';
-        return;
-      }
-      appliquerDPE(results[0], 'ademe');
-    } catch (e) {
-      statusEl.innerHTML = `⚠ Recherche DPE par numéro indisponible (${e.message || e})`;
-      statusEl.style.background = '#FEF3C7';
-      statusEl.style.color = '#92400E';
-    }
-  }
-
-  function appliquerDPE(dpe, source) {
-    const statusEl = document.getElementById('dpe-autofill-status');
-
-    // Type logement
-    const typeBat = (dpe.type_batiment || dpe.type_installation || '').toLowerCase();
-    const selType = document.querySelector('select[name="type_logement"]');
-    if (selType && typeBat) {
-      if (!selType.value && (typeBat.includes('appart') || typeBat.includes('immeuble'))) {
-        selType.value = 'appartement';
-      } else if (!selType.value && typeBat.includes('maison')) {
-        selType.value = 'maison';
-      }
-    }
-
-    // DPE class
-    const classe = dpe.classe_consommation_energie?.toUpperCase();
-    if (classe && ['A','B','C','D','E','F','G'].includes(classe)) {
-      document.getElementById('dpe-input').value = classe;
-      document.querySelectorAll('.dpe-btn').forEach(b => {
-        b.classList.toggle('selected', b.dataset.dpe === classe);
-      });
-    }
-
-    // Surface
-    const surface = dpe.surface_habitable_logement;
-    if (surface && surface > 0) {
-      const surfaceInput = document.getElementById('surface-input');
-      if (surfaceInput && !surfaceInput.value) {
-        surfaceInput.value = Math.round(surface);
-      }
-    }
-
-    // Année de construction
-    const annee = dpe.annee_construction;
-    if (annee && annee > 1800) {
-      const anneeEl = document.getElementById('annee-construction');
-      if (anneeEl && !anneeEl.value) {
-        anneeEl.value = Math.round(annee);
-        calcAgeLogement(anneeEl.value);
-      }
-    }
-
-    // Consommation / GES
-    const conso = dpe.conso_5_usages_ef_energie_n;
-    if (conso != null && conso > 0) {
-      const consoEl = document.querySelector('input[name="conso_kwh_m2"]');
-      if (consoEl && !consoEl.value) consoEl.value = Math.round(conso);
-    }
-    const ges = dpe.emission_ges_5_usages_n;
-    if (ges != null && ges > 0) {
-      const gesEl = document.querySelector('input[name="emissions_ges"]');
-      if (gesEl && !gesEl.value) gesEl.value = Math.round(ges);
-    }
-
-    // Mode de chauffage
-    const energie = (dpe.type_energie_principale_chauffage || '').toLowerCase();
-    let modeKey = ENERGIE_TO_CHAUFFAGE[energie];
-    if (!modeKey) {
-      for (const [k, v] of Object.entries(ENERGIE_TO_CHAUFFAGE)) {
-        if (energie.includes(k)) { modeKey = v; break; }
-      }
-    }
-    if (modeKey) {
-      const sel = document.querySelector('select[name="mode_chauffage"]');
-      if (sel) { sel.value = modeKey; sel.dispatchEvent(new Event('change')); }
-    }
-
-    // Type logement
-    typeBat = (dpe.type_batiment || '').toLowerCase();
-    selType = document.querySelector('select[name="type_logement"]');
-    if (selType) {
-      if (typeBat.includes('appartement')) selType.value = 'appartement';
-      else if (typeBat.includes('maison')) selType.value = 'maison';
-    }
-
-    // Ventilation / isolation (champs ADEME si présents)
-    const mapIso = (val) => {
-      if (!val) return '';
-      const v = String(val).toLowerCase();
-      if (v.includes('correct') || v.includes('bon')) return 'correctement_isole';
-      if (v.includes('faible') || v.includes('moyen')) return 'faiblement_isole';
-      if (v.includes('non') || v.includes('pas')) return 'non_isole';
-      return 'inconnu';
-    };
-    ['isolation_toiture','isolation_murs','isolation_planchers','isolation_menuiseries'].forEach(f => {
-      if (!dpe[f]) return;
-      const mapped = mapIso(dpe[f]);
-      setSelectIfExists(f, mapped, true);
-      if (mapped && ISO_BADGE_BY_FIELD[f]) {
-        marquerUrbsField(f, ISO_BADGE_BY_FIELD[f], source === 'ademe' ? 'officiel' : 'enrichi');
-      }
-    });
-    if (dpe.type_ventilation) setSelectIfExists('type_vmc', dpe.type_ventilation.toLowerCase().includes('vmc') ? 'vmc_sf' : 'naturelle', true);
-    const ecsType = (dpe.type_installation_ecs || dpe.type_generateur_ecs || '').toLowerCase();
-    if (ecsType.includes('chaudi') || ecsType.includes('gaz') || ecsType.includes('fioul')) {
-      setSelectIfExists('gestion_ecs', 'chaudiere', true);
-    } else if (ecsType) {
-      setSelectIfExists('gestion_ecs', 'independant', true);
-    }
-
-    // Hidden metadata
-    if (dpe.numero_dpe) { document.getElementById('dpe-numero').value = dpe.numero_dpe; if (typeof window.syncDpeMetaDisplay === 'function') window.syncDpeMetaDisplay(); }
-    if (dpe.date_etablissement_dpe) { document.getElementById('dpe-date').value = dpe.date_etablissement_dpe; if (typeof window.syncDpeMetaDisplay === 'function') window.syncDpeMetaDisplay(); }
-    document.getElementById('dpe-source').value = source;
-
-    majBadgeDPE(source, dpe.numero_dpe);
-
-    const date = dpe.date_etablissement_dpe ? new Date(dpe.date_etablissement_dpe).toLocaleDateString('fr-FR') : '';
-    const surf = surface ? ` · ${Math.round(surface)} m²` : '';
-    const ener = dpe.type_energie_principale_chauffage ? ` · ${dpe.type_energie_principale_chauffage}` : '';
-    const classeColor = DPE_COLORS[classe] || '#64748B';
-
-    statusEl.style.display = 'block';
-    statusEl.innerHTML = `✓ DPE récupéré automatiquement — Classe <strong style="color:${classeColor};font-size:14px;">${classe || '?'}</strong>${surf}${ener}${date ? ` · daté du ${date}` : ''}
-      <button type="button" onclick="corrigerDPEManuellement()" style="margin-left:10px;font-size:10px;padding:2px 7px;border:1px solid var(--border);border-radius:3px;background:transparent;color:var(--text-muted);cursor:pointer;font-family:inherit;">✏ Corriger</button>`;
-    statusEl.style.background = '#F0FDF4';
-    statusEl.style.color = '#166534';
-    statusEl.style.border = '1px solid rgba(22,163,74,0.3)';
-
-    document.getElementById('dpe-multi-panel').style.display = 'none';
-  }
-
-  function formatLigneMultiDpe(dpe) {
-    const date = dpe.date_etablissement_dpe
-      ? new Date(dpe.date_etablissement_dpe).toLocaleDateString('fr-FR')
-      : '—';
-    const numero = (dpe.numero_dpe || dpe.numero || dpe.id || '').toString().trim() || '—';
-    const classe = (dpe.classe_consommation_energie || dpe.classe_energie || '?').toString().toUpperCase().slice(0, 1) || '—';
-    const surfRaw = dpe.surface_habitable_logement ?? dpe.surface_logement ?? dpe.surface;
-    const surface = surfRaw != null && surfRaw !== '' ? `${Math.round(Number(surfRaw))} m²` : '—';
-    return `${date} · ${numero} · ${classe} · ${surface}`;
-  }
-
-  function afficherMultiDPE(results, source) {
-    const panel = document.getElementById('dpe-multi-panel');
-    const list = document.getElementById('dpe-multi-list');
-    panel.style.display = 'block';
-    list.innerHTML = results.slice(0, 8).map((dpe) => {
-      const classe = (dpe.classe_consommation_energie || dpe.classe_energie || '?').toString().toUpperCase().slice(0, 1);
-      const color = DPE_COLORS[classe] || '#64748B';
-      const ligne = formatLigneMultiDpe(dpe);
-      return `<div onclick="appliquerDPE(${JSON.stringify(dpe).replace(/</g,'\u003c')}, '${source}')"
-                   style="display:flex;align-items:center;gap:10px;padding:6px 10px;border-radius:4px;border:1px solid var(--border);cursor:pointer;background:var(--bg-panel);transition:all 0.12s;"
-                   onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background='var(--bg-panel)'">
-               <span style="font-weight:900;font-size:16px;color:${color};width:18px;text-align:center;flex-shrink:0;">${classe}</span>
-               <span style="font-size:12px;flex:1;line-height:1.35;">${ligne}</span>
-               <span style="font-size:10px;color:var(--bleu);font-weight:700;flex-shrink:0;">Sélectionner →</span>
-             </div>`;
-    }).join('');
-  }
-
-  function corrigerDPEManuellement() {
-    const statusEl = document.getElementById('dpe-autofill-status');
-    statusEl.innerHTML = '✏ Mode correction — Cliquez sur la lettre DPE pour la modifier.';
-    statusEl.style.background = '#F8FAFC'; statusEl.style.color = '#64748B';
-    document.getElementById('dpe-source').value = 'manuel';
-    majBadgeDPE(null, null);
-  }
-
-  async function lancerDPEEnrichiONBURBS() {
-    const adresse = (document.querySelector('input[name="adresse_chantier"]')?.value || '').trim();
-    const cp = (document.querySelector('input[name="code_postal_chantier"]')?.value || '').replace(/\D/g, '').slice(0, 5);
-    const statusEl = document.getElementById('dpe-autofill-status');
-    if (!statusEl || !adresse || cp.length !== 5) return;
-    statusEl.style.display = 'block';
-    statusEl.innerHTML = '⏳ Calcul DPE enrichi URBS…';
-    statusEl.style.background = '#E8EFF7'; statusEl.style.color = '#1A4A7A';
-    try {
-      const u = await window.fetchOptionalBackendApi(`/api/urbs?adresse=${encodeURIComponent(adresse)}&cp=${encodeURIComponent(cp)}`);
-      if (!u) {
-        statusEl.style.display = 'none';
-        return;
-      }
-      if (u.error) throw new Error(u.error);
-      appliquerUrbs(u);
-      statusEl.innerHTML = '✓ Données URBS appliquées à la fiche.';
-      statusEl.style.background = '#E6F4ED'; statusEl.style.color = '#0D6B3B';
-    } catch (err) {
-      statusEl.innerHTML = '⚠ URBS : ' + err.message;
-      statusEl.style.background = '#FDE8EC'; statusEl.style.color = '#B01830';
-    }
-  }
-  window.lancerDPEEnrichiONBURBS = lancerDPEEnrichiONBURBS;
-
-  // Au chargement : URBS + parcelle si adresse déjà renseignée (DPE via URBS à la sélection BAN)
-  (async function initDonneesAdresseExistantes() {
-    const adr = (document.querySelector('input[name="adresse_chantier"]')?.value || '').trim();
-    const cp = getCpChantierPourCalcul();
-    if (adr.length >= 5 && cp.length === 5) {
-      await chargerDonneesAdresse(adr, cp);
-      const lat = parseFloat(document.getElementById('lat-chantier')?.value || '');
-      const lon = parseFloat(document.getElementById('lon-chantier')?.value || '');
-      if (!isNaN(lat) && !isNaN(lon)) await rechercheParcelleAuto(lat, lon);
-    }
-    recalculerCategories();
-  })();
 
   const dpeNumInit = document.getElementById('dpe-numero');
   if (dpeNumInit && dpeNumInit.value) {
@@ -14786,7 +13726,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
       if (saved.iso_toit) state.iso_toit = saved.iso_toit;
       if (saved.iso_mur) state.iso_mur = saved.iso_mur;
       if (saved.iso_menuiserie) state.iso_menuiserie = saved.iso_menuiserie;
-      state.iso_source = saved.iso_source === 'dpe' ? 'dpe' : '';
+      state.iso_source = (saved.iso_source === 'dpe' || saved.iso_source === 'manuel') ? saved.iso_source : '';
       // Champs pilotes par la fiche prospect (categorie ANAH/CEE, zone, revenus,
       // type de logement, alimentation, surface) : ils ne sont VOLONTAIREMENT pas
       // restaures depuis le snapshot. Les recharger figerait le simulateur sur la
@@ -16064,9 +15004,9 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     const voirBallons=(id,tous)=>document.getElementById(id)?.addEventListener('click',e=>{ e.preventDefault(); state.ballon_voir_tous=tous; refresh(); });
     voirBallons('sim-ballon-voir-tous', true);
     voirBallons('sim-ballon-voir-reco', false);
-    onIn('iso-toit',v=>{ state.iso_toit=v; state.modele_force=false; });
-    onIn('iso-mur',v=>{ state.iso_mur=v; state.modele_force=false; });
-    onIn('iso-menuiserie',v=>{ state.iso_menuiserie=v; state.modele_force=false; });
+    onIn('iso-toit',v=>{ state.iso_toit=v; state.iso_source='manuel'; state.modele_force=false; });
+    onIn('iso-mur',v=>{ state.iso_mur=v; state.iso_source='manuel'; state.modele_force=false; });
+    onIn('iso-menuiserie',v=>{ state.iso_menuiserie=v; state.iso_source='manuel'; state.modele_force=false; });
     // Prix PAC : pendant la frappe on garde la valeur brute et on PATCHE seulement les
     // résultats (l'input n'est pas recréé -> curseur intact). Au blur on reformate.
     const prix=document.getElementById('sim-prix');
@@ -16321,7 +15261,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
   // Lot 4 : la session DPE pré-remplit l'isolation (toit, murs, fenêtres). Refusé si l'utilisateur a
   // déverrouillé (« Travaux depuis le DPE ») ; valeurs inconnues ignorées.
   window.setIsolationDpe = function(toit, mur, fenetres){
-    if (state.iso_deverrouille) return false;
+    if (state.iso_deverrouille || state.iso_source === 'manuel') return false;   // Partie B : choix manuel conservé
     const niveaux = ['tres_bien', 'bien', 'isole', 'peu', 'non'];
     const vitrages = ['double', 'sur_vitrage', 'simple'];
     let change = false;
@@ -21140,8 +20080,6 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     }
   }
   window.resetGlobalsFiche = function (options) {
-    window.dpeSourcesCache = null;
-    window._lastDpeSearch = '';
     if (typeof window.resetDpeDynamicState === 'function') window.resetDpeDynamicState();
     if (typeof window.resetAdresseDynamicState === 'function') window.resetAdresseDynamicState();
     if (typeof window.resetNotesPanelState === 'function') window.resetNotesPanelState();
@@ -21395,6 +20333,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     renderFicheVt(lead);
     renderFicheRelances(lead);
     if (typeof window.hexaLot4ApresChargement === 'function') window.hexaLot4ApresChargement();
+    if (typeof window.hexaDpeApresChargement === 'function') window.hexaDpeApresChargement();
   }
   async function openFiche(p, opts){
     opts = opts || {};
@@ -23210,7 +22149,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     g2.appendChild(surf);
     mettre(g2, 'annee_construction');
     mettre(g2, 'hsp');                                           // Lot 6b : une seule rangée (zéro défilement)
-    const vb = el('div', 'field p6-valeur-bien', '<label><span class="label-row"><span>Valeur estimée du bien</span><span class="p6-tag">auto</span></span></label><div class="p6-in p6-in--auto" id="p6-valeur-bien">—</div>');
+    const vb = el('div', 'field p6-valeur-bien', '<label><span class="label-row"><span>Valeur estimée du bien</span><span class="p6-tag">auto</span></span></label><div class="p6-in p6-in--auto" id="p6-valeur-bien">—</div><div class="p6-valeur-src" id="p6-valeur-bien-src"></div>');
     g2.appendChild(vb);
     const g4 = grille('p6-g3');
     mettre(g4, 'usage_bien'); mettre(g4, 'situation_propriete'); mettre(g4, 'date_acquisition');
@@ -23367,6 +22306,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
       + '<a href="#" class="p6-dpe-lien" data-p6-dpe="1">Pas le bon logement ?</a>';
   }
   function autreLogement() {
+    if (typeof window.hexaDpeAutreLogement === 'function' && window.hexaDpeAutreLogement()) return;   // Partie B : choix dans #dpe-banner
     const lat = parseFloat(val('lat_chantier')), lon = parseFloat(val('lon_chantier'));
     if (Number.isFinite(lat) && Number.isFinite(lon) && typeof window.openParcelDrawer === 'function') { window.openParcelDrawer(lat, lon); return; }
     const a = champ('adresse_chantier');
@@ -23377,6 +22317,9 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     const p = nombre(val('prix_m2_estime')), s = nombre(val('surface_logement_m2'));
     const t = p > 0 && s > 0 ? e0(p * s) : '—';
     if (b.textContent !== t) b.textContent = t;
+    const src = q('#p6-valeur-bien-src');                        // Partie B : d'où vient le prix au m²
+    const st = typeof window.hexaValeurBienSource === 'function' ? window.hexaValeurBienSource() : '';
+    if (src && src.textContent !== st) src.textContent = st;
   }
 
   // ------------------------------------------------------------------ étape 3 : « Le client connaît sa facture ? »
@@ -24733,6 +23676,278 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
   body.l6.p6-suivi-ouvert #l4-bloc-5 .l4-grid { grid-template-columns: minmax(0, 1fr); }
 </style>
 
+<style id="hexa-dpe-master">
+  /* Partie B : bandeau de la recherche DPE / audit (#dpe-banner) */
+  #dpe-banner:empty { display: none; }
+  .hx-dpe { margin: 6px 0 2px; padding: 8px 12px; border-radius: 8px; border: 1px solid #D6E2F0; background: #F5F9FE; font-size: 13px; color: #1E293B; }
+  .hx-dpe--auto { border-color: #B7DDC4; background: #F1FAF4; }
+  .hx-dpe--choix { border-color: #F2C98A; background: #FFF8EC; }
+  .hx-dpe--erreur { border-color: #F5B5B5; background: #FEF2F2; color: #991B1B; }
+  .hx-dpe-msg { font-weight: 600; }
+  .hx-dpe-note { margin-top: 3px; font-size: 12px; color: #475569; }
+  .hx-dpe-liste { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+  .hx-dpe-cand { width: 100%; display: flex; align-items: center; gap: 8px; text-align: left; padding: 5px 8px; border: 1px solid #D6E2F0; border-radius: 6px; background: #fff; cursor: pointer; font: inherit; }
+  .hx-dpe-cand:hover { border-color: #6E9BD1; }
+  .hx-dpe-cand.is-choisi { border-color: #16A34A; box-shadow: 0 0 0 1px #16A34A inset; }
+  .hx-dpe-cand .hx-dpe-txt { flex: 1; min-width: 0; }
+  .hx-dpe-cand .hx-dpe-sous { display: block; font-size: 12px; color: #64748B; }
+  .hx-dpe-cand .hx-dpe-ok { color: #15803D; font-weight: 700; }
+  .hx-dpe-cand .hx-dpe-incertain { color: #B45309; font-weight: 700; }
+  .hx-dpe-cand b { flex: none; color: #1D4ED8; font-size: 12px; }
+  .hx-dpe-lien { margin-top: 5px; border: 0; background: none; padding: 0; color: #1D4ED8; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
+  .p6-valeur-src { margin-top: 2px; font-size: 11px; line-height: 1.3; color: #64748B; }
+</style>
+<script id="hexa-dpe-master-js">
+/* Partie B — UNE recherche DPE / audit (logique du Master, services/dpe_audit.py), UNE fonction de remplissage,
+   le bandeau #dpe-banner pour choisir, et le prix au m² DVF dans les champs existants prix_m2_*.
+   Règles : une saisie manuelle n'est jamais écrasée (on n'écrit que dans un champ vide ou déjà rempli par ce
+   module) ; la recherche ne se relance pas à l'ouverture d'une fiche déjà remplie ; aucun nouveau champ. */
+(function () {
+  'use strict';
+  const q = (sel, r) => (r || document).querySelector(sel);
+  const champ = (n) => q(`#form-prospect [name="${n}"]`) || q(`[name="${n}"]`);
+  const val = (n) => String(champ(n)?.value ?? '').trim();
+  const esc = (t) => String(t ?? '').replace(/[&<>\x22\x27]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\x22': '&quot;', '\x27': '&#39;' }[c]));
+  const nombre = (t) => { const n = parseFloat(String(t || '').replace(/\s/g, '').replace(',', '.')); return Number.isFinite(n) ? n : 0; };
+  const nbFr = (n) => Math.round(n).toLocaleString('fr-FR');
+  const LIBELLES = { type_logement: 'type de logement', surface_logement_m2: 'surface', annee_construction: 'année',
+    hsp: 'hauteur sous plafond', conso_kwh_m2: 'consommation', emissions_ges: 'GES', dpe_connu: 'classe DPE',
+    nb_niveaux: 'niveaux', mode_chauffage: 'chauffage', dpe_numero: 'n° de DPE', dpe_date: 'date du DPE' };
+  const PRIX = ['prix_m2_estime', 'prix_m2_min', 'prix_m2_max'];
+
+  // valeur_bien_source : la seule clé ajoutée (phrase de source du prix DVF ; vide = prix saisi à la main)
+  const form = document.getElementById('form-prospect');
+  if (form && !form.querySelector('[name="valeur_bien_source"]')) {
+    const i = document.createElement('input');
+    i.type = 'hidden'; i.name = 'valeur_bien_source'; i.id = 'valeur-bien-source';
+    form.appendChild(i);
+  }
+
+  const neuf = (cleChargee) => ({ cleChargee, derniere: '', seq: 0, resultat: null, choisi: null, auto: new Map(),
+    gardes: [], coutDoc: null, forcer: false, listeOuverte: false });
+  let etat = neuf('');
+  let dvf = { cle: null, cleChargee: null, erreur: '', seq: 0 };
+
+  function cleAdresse() {
+    return [val('adresse_chantier').toUpperCase().replace(/\s+/g, ' '), val('code_postal_chantier').replace(/\D/g, '').slice(0, 5)].join('|');
+  }
+  function cleDvf() {
+    return [val('code_postal_chantier').replace(/\D/g, '').slice(0, 5), val('ville_chantier').toUpperCase(), /appart/i.test(val('type_logement')) ? 'A' : 'M'].join('|');
+  }
+  const majEcran = () => {
+    if (typeof window.syncDpeMetaDisplay === 'function') window.syncDpeMetaDisplay();
+    if (typeof window.majRequisSimu === 'function') window.majRequisSimu();
+    if (typeof window.hexaL6Maj === 'function') window.hexaL6Maj();
+  };
+
+  // ---------------------------------------------------------------- remplissage (une seule fonction)
+  function ecrire(name, v) {
+    const el = champ(name); if (!el) return false;
+    if (el.tagName === 'SELECT' && ![...el.options].some((o) => o.value === String(v))) return false;
+    if (name === 'dpe_connu' && typeof window.selectDpeLettre === 'function') window.selectDpeLettre(v);
+    el.value = String(v);
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+    el.closest('.field')?.classList.add('field--auto-dpe-officiel');
+    return true;
+  }
+  function appliquer(c) {
+    if (!c) return;
+    etat.choisi = c;
+    etat.gardes = [];
+    Object.entries(c.valeurs || {}).forEach(([name, v]) => {
+      if (v === '' || v == null) return;
+      const actuel = val(name);
+      const libre = actuel === '' || etat.auto.get(name) === actuel;    // vide, ou rempli par ce module
+      if (!libre) { if (actuel !== String(v) && LIBELLES[name]) etat.gardes.push(LIBELLES[name]); return; }
+      if (ecrire(name, v)) etat.auto.set(name, val(name));
+    });
+    if (c.periode && typeof window.hexaAnneeOuPeriode === 'function') window.hexaAnneeOuPeriode(c.periode);
+    if (c.cout_mensuel > 0) {
+      etat.coutDoc = { montant: c.cout_mensuel, src: c.kind === 'audit' ? 'audit' : 'dpe' };
+      if (typeof window.setCoutEnergieAuto === 'function') window.setCoutEnergieAuto(etat.coutDoc.montant, etat.coutDoc.src);
+    }
+    const iso = c.isolation || {};
+    if ((iso.toit || iso.mur || iso.fenetres) && typeof window.setIsolationDpe === 'function') window.setIsolationDpe(iso.toit, iso.mur, iso.fenetres);
+    if (typeof window.recalculerCategories === 'function') window.recalculerCategories();
+    const an = val('annee_construction');
+    if (an && typeof window.calcAgeLogement === 'function') window.calcAgeLogement(an);
+    majEcran();
+  }
+  // Lot 6 (« le client ne connaît pas sa facture ») : le coût du document revient s'il existe
+  window.appliquerCoutEnergie = function () {
+    if (etat.coutDoc && typeof window.setCoutEnergieAuto === 'function') window.setCoutEnergieAuto(etat.coutDoc.montant, etat.coutDoc.src);
+  };
+
+  // un geste de l'utilisateur rend le champ « manuel » : plus jamais écrasé
+  function saisieManuelle(e) {
+    if (!e.isTrusted) return;
+    const n = e.target?.getAttribute?.('name');
+    if (n && etat.auto.has(n)) { etat.auto.delete(n); e.target.closest('.field')?.classList.remove('field--auto-dpe-officiel'); }
+    if (n && PRIX.includes(n)) { const s = champ('valeur_bien_source'); if (s) s.value = ''; dvf.erreur = ''; majEcran(); }
+    if (n === 'type_logement' && e.type === 'change') lancerDvf();
+  }
+  document.addEventListener('input', saisieManuelle, true);
+  document.addEventListener('change', saisieManuelle, true);
+  // boutons de choix (classe DPE, type de logement, chauffage…) : le clic de l'utilisateur est une saisie manuelle
+  document.addEventListener('click', (e) => {
+    if (!e.isTrusted || !e.target.closest) return;
+    if (e.target.closest('.dpe-btn')) etat.auto.delete('dpe_connu');
+    const choix = e.target.closest('.l4-choix[data-for] button');
+    if (!choix) return;
+    const n = choix.closest('.l4-choix').dataset.for;
+    if (etat.auto.has(n)) { etat.auto.delete(n); champ(n)?.closest('.field')?.classList.remove('field--auto-dpe-officiel'); }
+    if (n === 'type_logement') setTimeout(() => lancerDvf(), 0);
+  }, true);
+
+  // ---------------------------------------------------------------- bandeau #dpe-banner
+  function ligneCandidat(c, i) {
+    const cl = /^[A-G]$/.test(c.classe) ? c.classe : 'vide';
+    const sous = [c.adresse, c.etage ? 'étage ' + c.etage : '', c.complement,
+      c.valeurs?.surface_logement_m2 ? c.valeurs.surface_logement_m2 + ' m²' : ''].filter(Boolean).join(' · ');
+    const id = c.identite === 'adresse_ok'
+      ? '<span class="hx-dpe-ok">adresse confirmée</span>'
+      : `<span class="hx-dpe-incertain">à ${c.distance_m ?? '?'} m, numéro non vérifiable</span>`;
+    return `<li><button type="button" class="hx-dpe-cand${etat.choisi === c ? ' is-choisi' : ''}" data-hx-dpe="${i}">`
+      + `<span class="p6-dpe-cl p6-dpe-cl--${cl}">${esc(c.classe || '?')}</span>`
+      + `<span class="hx-dpe-txt">${c.kind === 'audit' ? 'Audit' : 'DPE'} n° ${esc(c.numero)} du ${esc(c.date_fr)} · ${id}`
+      + `<span class="hx-dpe-sous">${esc(sous)}</span></span><b>${etat.choisi === c ? 'Retenu' : 'Choisir'}</b></button></li>`;
+  }
+  function rendre() {
+    const b = document.getElementById('dpe-banner'); if (!b) return;
+    const r = etat.resultat;
+    if (!r) { if (b.innerHTML) b.innerHTML = ''; return; }
+    const cands = r.candidats || [];
+    const note = [];
+    if (etat.choisi?.periode) note.push(`Construit ${esc(etat.choisi.periode)} (période du document) : demander l'année exacte.`);
+    if (etat.gardes.length) note.push('Déjà remplis, conservés : ' + esc(etat.gardes.join(', ')) + '.');
+    const icone = { attente: '⏳', auto: '✓', choix: '⚠', aucun: 'ℹ', erreur: '⚠' }[r.etat] || '';
+    const msg = etat.choisi && r.etat === 'choix'
+      ? `${etat.choisi.kind === 'audit' ? 'Audit' : 'DPE'} n° ${esc(etat.choisi.numero)} retenu : valeurs pré-remplies, à confirmer avec le client.`
+      : esc(r.message);
+    let h = `<div class="hx-dpe hx-dpe--${esc(r.etat)}"><div class="hx-dpe-msg">${icone} ${msg}</div>`;
+    note.forEach((t) => { h += `<div class="hx-dpe-note">${t}</div>`; });
+    const liste = r.etat === 'choix' || etat.listeOuverte;
+    if (cands.length && liste) h += '<ul class="hx-dpe-liste">' + cands.map(ligneCandidat).join('') + '</ul>';
+    else if (cands.length > 1) h += `<button type="button" class="hx-dpe-lien" data-hx-dpe-autres="1">Voir les ${cands.length} documents trouvés</button>`;
+    if (r.etat === 'erreur') h += '<button type="button" class="hx-dpe-lien" data-hx-dpe-reessayer="1">Réessayer</button>';
+    b.innerHTML = h + '</div>';
+  }
+  document.addEventListener('click', (e) => {
+    const t = e.target.closest?.('#dpe-banner [data-hx-dpe], #dpe-banner [data-hx-dpe-autres], #dpe-banner [data-hx-dpe-reessayer]');
+    if (!t) return;
+    e.preventDefault();
+    if (t.dataset.hxDpeAutres) { etat.listeOuverte = true; rendre(); return; }
+    if (t.dataset.hxDpeReessayer) { chercher({ forcer: true }); return; }
+    const c = (etat.resultat?.candidats || [])[Number(t.dataset.hxDpe)];
+    if (c) { appliquer(c); rendre(); lancerDvf(); }
+  });
+
+  // ---------------------------------------------------------------- recherche (une seule, dédoublonnée)
+  async function chercher(opts) {
+    opts = opts || {};
+    const cle = cleAdresse();
+    const [adr, cp] = cle.split('|');
+    if (adr.length < 5 || cp.length !== 5) return null;
+    const forcer = opts.forcer || etat.forcer;
+    if (!forcer && (cle === etat.cleChargee || cle === etat.derniere)) return null;   // pas de relance
+    etat.forcer = false;
+    etat.derniere = cle;
+    const seq = ++etat.seq;
+    const p = new URLSearchParams({ adresse: val('adresse_chantier'), cp, type_logement: val('type_logement') });
+    const ban = window.hexaBanPoint;
+    if (ban && ban.lat != null && String(ban.adresse || '').toUpperCase().replace(/\s+/g, ' ') === adr && String(ban.cp) === cp) {
+      p.set('lat', ban.lat); p.set('lon', ban.lon);
+    }
+    etat.resultat = { etat: 'attente', message: 'Recherche du DPE / audit de ce logement…', candidats: [] };
+    etat.choisi = null; etat.listeOuverte = false; etat.gardes = [];
+    rendre();
+    let r;
+    try {
+      const signal = AbortSignal.timeout ? AbortSignal.timeout(45000) : undefined;
+      const resp = await fetch('/api/dpe-lookup?' + p.toString(), { signal, cache: 'no-store' });
+      if (!resp.ok) throw new Error('le serveur a répondu ' + resp.status);
+      r = await resp.json();
+    } catch (err) {
+      etat.derniere = '';
+      r = { etat: 'erreur', candidats: [], message: 'Recherche DPE / audit impossible ('
+        + (err && err.name === 'TimeoutError' ? 'délai dépassé' : (err instanceof TypeError ? 'connexion au serveur impossible' : (err?.message || 'erreur'))) + ').' };
+    }
+    if (seq !== etat.seq) return null;                    // une recherche plus récente a pris le relais
+    etat.resultat = r;
+    if (r.etat === 'auto' && r.retenu != null) appliquer((r.candidats || [])[r.retenu]);
+    rendre();
+    lancerDvf();
+    return r;
+  }
+  window.hexaChercherDocuments = chercher;
+  window.hexaDpeAutreLogement = function () {
+    if (etat.resultat?.candidats?.length) { etat.listeOuverte = true; rendre(); document.getElementById('dpe-banner')?.scrollIntoView({ block: 'nearest' }); return true; }
+    const [adr, cp] = cleAdresse().split('|');
+    if (adr.length >= 5 && cp.length === 5) { chercher({ forcer: true }); return true; }
+    return false;
+  };
+
+  // ---------------------------------------------------------------- prix au m² DVF -> prix_m2_estime / _min / _max
+  function ecrirePrix(name, v) {
+    const el = champ(name); if (!el) return;
+    el.value = String(v);
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+  async function lancerDvf(opts) {
+    const cle = cleDvf();
+    if (cle.split('|')[0].length !== 5) return;
+    if (!(opts && opts.forcer) && (cle === dvf.cle || cle === dvf.cleChargee)) return;
+    dvf.cle = cle;
+    const manuel = () => !val('valeur_bien_source') && PRIX.some((n) => val(n) !== '');
+    if (manuel()) { dvf.erreur = ''; majEcran(); return; }             // prix saisis à la main : on n'y touche pas
+    const seq = ++dvf.seq;
+    const [cp, ville] = cle.split('|');
+    let r;
+    try {
+      const signal = AbortSignal.timeout ? AbortSignal.timeout(45000) : undefined;
+      const resp = await fetch('/api/valeur-bien/dvf?' + new URLSearchParams({ cp, ville, type_logement: val('type_logement') }), { signal, cache: 'no-store' });
+      r = resp.ok ? await resp.json() : { ok: false, raison: 'données DVF indisponibles pour le moment' };
+    } catch (_) {
+      r = { ok: false, raison: 'données DVF indisponibles pour le moment' };
+    }
+    if (seq !== dvf.seq || manuel()) return;
+    if (r.ok) {
+      ecrirePrix('prix_m2_estime', r.prix_m2);
+      ecrirePrix('prix_m2_min', r.q1 ?? '');
+      ecrirePrix('prix_m2_max', r.q3 ?? '');
+      const s = champ('valeur_bien_source'); if (s) s.value = r.source || '';
+      dvf.erreur = '';
+    } else {
+      dvf.erreur = r.raison || 'données DVF indisponibles pour le moment';   // la valeur existante reste, marquée « estimation »
+      dvf.cle = null;                                                         // un prochain changement réessaiera
+    }
+    majEcran();
+  }
+  window.hexaValeurBienSource = function () {
+    const p = nombre(val('prix_m2_estime'));
+    if (dvf.erreur) return p > 0 ? `estimation (DVF : ${dvf.erreur})` : `Pas d'estimation DVF : ${dvf.erreur}.`;
+    const src = val('valeur_bien_source');
+    if (src && p > 0) return `Source DVF : ${src} (${nbFr(p)} €/m²)`;
+    return p > 0 ? 'estimation' : '';
+  };
+
+  // ---------------------------------------------------------------- cycle de vie de la fiche
+  window.resetDpeDynamicState = function () {
+    etat = neuf('');
+    dvf = { cle: null, cleChargee: null, erreur: '', seq: dvf.seq + 1 };
+    window.hexaBanPoint = null;
+    rendre();
+  };
+  // fiche enregistrée rouverte : son adresse est « déjà cherchée » (aucune relance automatique)
+  window.hexaDpeApresChargement = function () {
+    etat = neuf(cleAdresse());
+    dvf = { cle: null, cleChargee: cleDvf(), erreur: '', seq: dvf.seq + 1 };
+    rendre();
+  };
+})();
+</script>
 
 </body>
 </html>
