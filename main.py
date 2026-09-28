@@ -4707,6 +4707,15 @@ def _render_devis_ctx(request: Request, ctx: dict) -> str:
     return templates.env.get_template("devis_pac.html").render(ctx)
 
 
+def _devis_client_courant(numero: str) -> dict | None:
+    """Lien client sans numéro de version : la DERNIÈRE version envoyée ; dossier facturé : le devis archivé."""
+    archive = _devis_archive_fige(numero, "devis")
+    if archive:
+        return archive
+    items = [x for x in _sent_devis_items(numero) if isinstance(x, dict)]
+    return items[-1] if items else None
+
+
 @app.get("/devis-public/{numero}/{token}", response_class=HTMLResponse)
 async def devis_public(numero: str, token: str, request: Request):
     if not _verify_devis_token(numero, token):
@@ -4714,9 +4723,8 @@ async def devis_public(numero: str, token: str, request: Request):
             "titre": "Ce lien n'est plus valide",
             "message": "Le lien que vous avez utilisé n'est plus accessible. Cela peut arriver si votre devis a été mis à jour depuis son envoi. Contactez-nous, nous vous renvoyons votre devis à jour immédiatement.",
         })
-    _items = _sent_devis_items(numero)
-    if _items:
-        _item = _items[0]
+    _item = _devis_client_courant(numero)
+    if _item:
         _html_file = _item.get("html_file")
         if _html_file and os.path.exists(_html_file):
             _pdf_url = f"/devis-public/{numero}/{token}/pdf"
@@ -4724,7 +4732,7 @@ async def devis_public(numero: str, token: str, request: Request):
         _pdf_file = _item.get("file")
         if _pdf_file and os.path.exists(_pdf_file):
             return FileResponse(_pdf_file, media_type="application/pdf", headers={"Content-Disposition": "inline"})
-    _pre_devis = bool(_items and _items[0].get("variante") == "pre_devis")
+    _pre_devis = bool(_item and _item.get("variante") == "pre_devis")
     html_devis = _render_devis_html(request, numero, avec_sous_traitant=not _pre_devis)
     barre = (
         '<div style="position:fixed;top:0;left:0;right:0;z-index:9999;'
@@ -4753,11 +4761,11 @@ async def devis_public(numero: str, token: str, request: Request):
 async def devis_public_pdf(numero: str, token: str, request: Request):
     if not _verify_devis_token(numero, token):
         raise HTTPException(status_code=403, detail="Lien invalide")
-    _items = _sent_devis_items(numero)
-    if _items:
-        _pdf_file = _items[0].get("file")
+    _item = _devis_client_courant(numero)
+    if _item:
+        _pdf_file = _item.get("file")
         if _pdf_file and os.path.exists(_pdf_file):
-            return FileResponse(_pdf_file, media_type="application/pdf", headers=_entete_pdf_client(numero, _items[0]))
+            return FileResponse(_pdf_file, media_type="application/pdf", headers=_entete_pdf_client(numero, _item))
     pdf_bytes = _html_to_pdf_playwright(_render_devis_html(request, numero), request)
     num = generer_numero_devis(_find_lead(numero) or {}, _next_sent_version(numero))
     return Response(pdf_bytes, media_type="application/pdf", headers=_entete_pdf("Devis", num))
