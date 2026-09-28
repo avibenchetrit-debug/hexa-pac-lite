@@ -56,10 +56,10 @@ def test_script_appel_par_defaut(client):
     # deux encarts différents selon la réponse à la question 3
     assert [c["condition"] for c in e1["encarts"]] == ["q3=1", "q3=2"]
     e2 = s["etapes"]["2"]
-    assert e2["encarts"][0]["condition"] == "dpe"
-    assert "Depuis [année du DPE], avez-vous fait des travaux d'isolation : toit, murs ou fenêtres ?" in e2["encarts"][0]["texte"]
-    for n in "3456":                                    # emplacements vides, éditables
-        assert s["etapes"][n]["intro"] == "" and s["etapes"][n]["questions"] == [] and s["etapes"][n]["encarts"] == []
+    # Lot 6f : la question d'isolation devient la question 4 de l'étape 2 ; étapes 3 à 6 pré-remplies (tests/test_lot6f.py)
+    assert "Depuis [année du DPE], avez-vous fait des travaux d'isolation : toit, murs ou fenêtres ?" in e2["questions"][3]["texte"]
+    for n in "3456":
+        assert s["etapes"][n]["intro"] and s["etapes"][n]["questions"]
 
 
 def test_script_appel_ecriture_reservee_admin(client):

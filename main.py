@@ -244,10 +244,12 @@ DEFAULT_SCRIPT_APPEL = {
             "questions": [
                 {"texte": "Êtes-vous bien à l'origine de cette demande ?",
                  "reponses": [{"libelle": "Oui", "consigne": "", "alerte": False},
-                              {"libelle": "Non", "consigne": "S'excuser et clôturer : Fin d'appel → statut « Erreur ».", "alerte": True}]},
+                              {"libelle": "Non", "consigne": "S'excuser et clôturer : Fin d'appel → statut « Erreur ».", "alerte": True,
+                               "action": "cloturer"}]},
                 {"texte": "Avez-vous un moment pour mieux comprendre votre projet ?",
                  "reponses": [{"libelle": "Oui", "consigne": "", "alerte": False},
-                              {"libelle": "Non, rappeler", "consigne": "« Quand puis-je vous rappeler ? » → Fin d'appel → programmer le rappel.", "alerte": True}]},
+                              {"libelle": "Non, rappeler", "consigne": "« Quand puis-je vous rappeler ? » → Fin d'appel → programmer le rappel.", "alerte": True,
+                               "action": "rappel"}]},
                 {"texte": "Où en êtes-vous dans votre projet ?",
                  "reponses": [{"libelle": "Découverte", "consigne": "", "alerte": False},
                               {"libelle": "Sait ce qu'il veut", "consigne": "", "alerte": False}]},
@@ -258,19 +260,100 @@ DEFAULT_SCRIPT_APPEL = {
             ],
         },
         "2": {
-            "titre": "Le logement", "intro": "", "questions": [],
+            "titre": "Le logement",
+            "intro": "Pour préparer votre projet, j'ai besoin de quelques informations sur votre logement. Ça prend deux minutes.",
+            "questions": [
+                {"texte": "« Quelle est l'adresse exacte du logement ? »", "reponses": []},
+                {"texte": "« C'est bien une maison ? Elle fait environ [surface] m², construite vers [année] ? »", "reponses": []},
+                {"texte": "« Vous en êtes propriétaire et vous y habitez ? »", "reponses": [],
+                 "note": "Si loué : demander l'adresse où il habite. Si achat en cours : demander la date de signature chez le notaire."},
+                {"texte": "« Depuis [année du DPE], avez-vous fait des travaux d'isolation : toit, murs ou fenêtres ? »",
+                 "reponses": [{"libelle": "Non", "consigne": "", "alerte": False},
+                              {"libelle": "Oui", "consigne": "Noter les travaux dans « Isolation » (toit, murs, fenêtres).", "alerte": False}]},
+                {"texte": "« Vous chauffez toute la maison, ou certaines pièces restent fermées ? »", "reponses": []},
+            ],
             "encarts": [
-                {"titre": "À VÉRIFIER (DPE du [date du DPE]) :",
-                 "texte": "« Depuis [année du DPE], avez-vous fait des travaux d'isolation : toit, murs ou fenêtres ? » "
-                          "→ répondre dans le bloc 4.",
-                 "condition": "dpe"},
+                {"titre": "À DIRE :", "texte": "« Votre maison consomme beaucoup : c'est justement là que la pompe à chaleur fait la plus "
+                                             "grosse différence. »", "condition": "dpe_classe=F,G"},
+                {"titre": "À DIRE :", "texte": "« Pas de souci, on va estimer ensemble. »", "condition": "!dpe"},
+                {"titre": "À SAVOIR :", "texte": "Pas de MaPrimeRénov' pour un logement de moins de 15 ans. La prime CEE reste possible.",
+                 "condition": "age<15"},
             ],
         },
-        "3": {"titre": "Le chauffage", "intro": "", "questions": [], "encarts": []},
-        "4": {"titre": "Le foyer", "intro": "", "questions": [], "encarts": []},
-        "5": {"titre": "Le besoin", "intro": "", "questions": [], "encarts": []},
-        "6": {"titre": "La proposition", "intro": "", "questions": [], "encarts": []},
-    }
+        "3": {
+            "titre": "Le chauffage",
+            "intro": "Parlons maintenant de votre chauffage actuel.",
+            "questions": [
+                {"texte": "« Vous vous chauffez comment aujourd'hui : fioul, gaz, électricité, bois ? »", "reponses": []},
+                {"texte": "« Vos radiateurs, ce sont des radiateurs à eau, en fonte ou en acier, ou des radiateurs électriques ? »", "reponses": []},
+                {"texte": "« Et l'eau chaude, c'est la même chaudière qui la fait ? »", "reponses": []},
+                {"texte": "« Combien payez-vous par an pour votre fioul ou votre gaz, à peu près ? »", "reponses": [],
+                 "note": "S'il ne sait pas : « Pas de souci, je vais l'estimer. »"},
+                {"texte": "« Votre compteur électrique est-il monophasé ou triphasé ? C'est écrit sur votre facture d'électricité. »", "reponses": []},
+            ],
+            "encarts": [
+                {"titre": "À DIRE :", "texte": "« C'est le cas où la pompe à chaleur fait la plus grosse économie, et où la prime est la "
+                                             "plus élevée. »", "condition": "energie=fioul,gaz"},
+                {"titre": "ATTENTION :", "texte": "« Il faudra créer un circuit de chauffage. Le technicien le verra lors de sa visite. »",
+                 "condition": "emetteurs=convecteurs_electriques"},
+            ],
+        },
+        "4": {
+            "titre": "Le foyer",
+            "intro": "Pour calculer vos aides, j'ai besoin de deux informations sur votre foyer.",
+            "questions": [
+                {"texte": "« Combien êtes-vous à vivre dans le logement ? »", "reponses": []},
+                {"texte": "« Quel est votre revenu fiscal de référence ? Il est sur votre dernier avis d'impôt, tout en bas de la "
+                          "première page, en gras. »", "reponses": []},
+            ],
+            "encarts": [
+                {"titre": "S'IL HÉSITE :", "texte": "« C'est uniquement pour calculer vos aides : plus il est bas, plus vous avez droit à "
+                                                  "des aides. »", "condition": ""},
+                {"titre": "À DIRE :", "texte": "« Vous n'avez pas droit à MaPrimeRénov', mais la prime CEE reste acquise. »",
+                 "condition": "categorie=superieur"},
+            ],
+        },
+        "5": {
+            "titre": "Le besoin",
+            "intro": "Maintenant, voyons ce que doit faire votre pompe à chaleur.",
+            "questions": [
+                {"texte": "« Voulez-vous qu'elle chauffe uniquement la maison, ou aussi l'eau chaude ? »", "reponses": []},
+                {"texte": "« Quand on enlève la chaudière, il faut une solution pour l'eau chaude : un ballon thermodynamique, ou une "
+                          "pompe à chaleur qui fait aussi l'eau chaude. »", "reponses": [],
+                 "condition": "service=chauffage_seul & ecs_chaudiere"},
+                {"texte": "« Avez-vous une pièce non chauffée de plus de 15 m², comme un garage ou un cellier ? »", "reponses": [],
+                 "condition": "ballon"},
+            ],
+            "encarts": [],
+        },
+        "6": {
+            "titre": "La proposition",
+            "intro": "J'ai tout ce qu'il me faut. Je vous explique ce que ça donne pour vous.",
+            "questions": [
+                {"texte": "« Voulez-vous démarrer tout de suite, ou attendre l'accord de MaPrimeRénov', environ 5 mois ? »", "reponses": []},
+                {"texte": "« Comment préférez-vous payer : comptant, avec un crédit, ou avec un prêt à taux zéro ? »", "reponses": []},
+            ],
+            "encarts": [
+                {"titre": "« C'est trop cher »", "repliable": True, "condition": "",
+                 "texte": "« Je comprends. Mais regardez : avec les aides, il vous reste [reste à charge]. Et vous économisez "
+                          "[économie mensuelle] € par mois sur votre facture, dès le premier mois. Et les aides changent souvent : "
+                          "l'État a moins d'argent, elles ont déjà baissé plusieurs fois. Aujourd'hui, vous y avez droit ; je ne peux "
+                          "pas vous garantir que ce sera encore le cas dans six mois. »"},
+                {"titre": "« Je dois réfléchir / en parler à mon conjoint »", "repliable": True, "action": "rappel", "condition": "",
+                 "texte": "« C'est normal, c'est une décision à deux. Je vous propose un appel à trois avec votre conjoint : je vous "
+                          "réexplique tout, et vous posez toutes vos questions. Quel jour vous arrange ? »"},
+                {"titre": "« J'ai déjà un autre devis »", "repliable": True, "condition": "",
+                 "texte": "« Très bien, comparez, c'est normal. Regardez bien trois choses : la marque de la pompe à chaleur, sa "
+                          "puissance, et surtout l'installation. Et demandez-vous si l'entreprise sera encore là dans un an en cas de "
+                          "souci. Nous, oui : Hexa-Rénov', entreprise certifiée RGE, depuis [année de création]. »"},
+                {"titre": "POUR CONCLURE :", "condition": "",
+                 "texte": "« Je vous envoie votre pré-devis par e-mail. La prochaine étape, c'est la visite du technicien. Quel jour "
+                          "vous arrange ? »"},
+            ],
+        },
+    },
+    # Lot 6f : version 2 = étapes 2 à 6 pré-remplies (une config enregistrée plus ancienne est complétée une fois)
+    "version": 2,
 }
 
 DEFAULT_PARAMETRES_ADMIN = {
@@ -3508,14 +3591,29 @@ async def reprise_annee(request: Request):
 
 # Lot 6 : script d'appel (Admin → Script d'appel). Lecture libre (fiche), écriture admin.
 def _script_appel() -> dict:
-    s = load_parametres_admin().get("script_appel")
+    params = load_parametres_admin()
+    s = params.get("script_appel")
     if not isinstance(s, dict) or not isinstance(s.get("etapes"), dict):
         return json.loads(json.dumps(DEFAULT_SCRIPT_APPEL))
     etapes = {}
     for n in ("1", "2", "3", "4", "5", "6"):
         e = s["etapes"].get(n)
         etapes[n] = e if isinstance(e, dict) else json.loads(json.dumps(DEFAULT_SCRIPT_APPEL["etapes"][n]))
-    return {"etapes": etapes}
+    # Lot 6f : config enregistrée avant la version 2 -> étapes 2 à 6 pré-remplies, étape 1 (éditée) conservée telle quelle.
+    # Écrit une seule fois ; ensuite, ce qui est modifié dans l'admin reste.
+    if int(s.get("version") or 1) < 2:
+        for n in ("2", "3", "4", "5", "6"):
+            etapes[n] = json.loads(json.dumps(DEFAULT_SCRIPT_APPEL["etapes"][n]))
+        params["script_appel"] = {"etapes": etapes, "version": 2}
+        save_parametres_admin_atomic(params)
+    return {"etapes": etapes, "version": 2}
+
+
+ACTIONS_SCRIPT = ("rappel", "cloturer")
+
+
+def _sans_vides(d: dict, facultatifs: tuple) -> dict:
+    return {k: v for k, v in d.items() if k not in facultatifs or v}    # Lot 6f : bouton de réponse qui ouvre le rappel / propose de clôturer
 
 
 def _nettoyer_script_appel(payload) -> dict:
@@ -3530,14 +3628,19 @@ def _nettoyer_script_appel(payload) -> dict:
         for q in (e.get("questions") or [])[:12]:
             if not isinstance(q, dict) or not txt(q.get("texte")):
                 continue
-            reponses = [{"libelle": txt(r.get("libelle"), 60), "consigne": txt(r.get("consigne")), "alerte": bool(r.get("alerte"))}
+            # Lot 6f : champs facultatifs (action, note, condition, dépliable) écrits seulement s'ils sont renseignés
+            reponses = [_sans_vides({"libelle": txt(r.get("libelle"), 60), "consigne": txt(r.get("consigne")), "alerte": bool(r.get("alerte")),
+                                     "action": r.get("action") if r.get("action") in ACTIONS_SCRIPT else ""}, ("action",))
                         for r in (q.get("reponses") or [])[:4] if isinstance(r, dict) and txt(r.get("libelle"), 60)]
-            questions.append({"texte": txt(q.get("texte")), "reponses": reponses})
-        encarts = [{"titre": txt(c.get("titre"), 120), "texte": txt(c.get("texte")), "condition": txt(c.get("condition"), 120)}
+            questions.append(_sans_vides({"texte": txt(q.get("texte")), "reponses": reponses, "note": txt(q.get("note")),
+                                          "condition": txt(q.get("condition"), 120)}, ("note", "condition")))
+        encarts = [_sans_vides({"titre": txt(c.get("titre"), 120), "texte": txt(c.get("texte")), "condition": txt(c.get("condition"), 120),
+                                "repliable": bool(c.get("repliable")), "action": "rappel" if c.get("action") == "rappel" else ""},
+                               ("repliable", "action"))
                    for c in (e.get("encarts") or [])[:12] if isinstance(c, dict) and (txt(c.get("titre"), 120) or txt(c.get("texte")))]
         etapes[n] = {"titre": txt(e.get("titre"), 80) or DEFAULT_SCRIPT_APPEL["etapes"][n]["titre"],
                      "intro": txt(e.get("intro")), "questions": questions, "encarts": encarts}
-    return {"etapes": etapes}
+    return {"etapes": etapes, "version": 2}
 
 
 @app.get("/api/script-appel")

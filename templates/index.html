@@ -16291,7 +16291,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
   // Lot 6 : relit la fiche et réaffiche (type de logement, personnes… qui ne déclenchent pas de relecture)
   window.hexaSimRafraichir = function(){ if (!simMonte || window.__hexaEstimationExpress) return Promise.resolve(); lireContexteFiche(); return refresh(); };
   window.hexaSimLire = function(){
-    return { service: state.service, iso_source: state.iso_source, categorie: state.categorie,
+    return { service: state.service, iso_source: state.iso_source, categorie: state.categorie, ballon: !!state.ballon_ref,
              mpr: dernierCalcul ? dernierCalcul.mprTotal : null, sans_attente: !!(dernierCalcul && dernierCalcul.sansAttente) };
   };
   // réglages de financement en cours (tests, raccourcis) : mêmes clés que l'état enregistré
@@ -17318,10 +17318,13 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
       <div class="sa-ligne"><label>Texte d'introduction</label><textarea data-sa="intro">${E(e.intro || '')}</textarea></div>
       ${qs.map((qq, i) => `<div class="sa-carte" data-sa-q="${i}">
         <div class="sa-ligne"><label>Question ${i + 1}</label><input type="text" data-sa="q-texte" value="${E(qq.texte || '')}"></div>
+        <div class="sa-ligne"><label>Note (en italique)</label><input type="text" data-sa="q-note" value="${E(qq.note || '')}" placeholder="ex. Si loué : demander l'adresse où il habite"></div>
+        <div class="sa-ligne"><label>Affichée si</label><input type="text" data-sa="q-condition" value="${E(qq.condition || '')}" placeholder="vide = toujours · ex. service=chauffage_seul & ecs_chaudiere"></div>
         ${(qq.reponses || []).map((r, j) => `<div class="sa-rep" data-sa-r="${j}">
           <input type="text" data-sa="r-libelle" value="${E(r.libelle || '')}" placeholder="Bouton (ex. Oui)">
           <input type="text" data-sa="r-consigne" value="${E(r.consigne || '')}" placeholder="Consigne affichée si ce bouton est choisi (facultatif)">
           <label class="sa-mini" title="Bouton orange : réponse qui demande une action"><input type="checkbox" data-sa="r-alerte"${r.alerte ? ' checked' : ''}> alerte</label>
+          <select data-sa="r-action" title="Action du bouton"><option value="">— action —</option><option value="rappel"${r.action === 'rappel' ? ' selected' : ''}>ouvrir le rappel</option><option value="cloturer"${r.action === 'cloturer' ? ' selected' : ''}>proposer de clôturer</option></select>
           <button type="button" class="sa-mini sa-mini--suppr" data-sa-action="suppr-r" data-e="${n}" data-q="${i}" data-r="${j}" title="Retirer ce bouton">×</button></div>`).join('')}
         <div class="sa-actions"><button type="button" class="sa-mini" data-sa-action="ajout-r" data-e="${n}" data-q="${i}">+ Bouton de réponse</button>
           <button type="button" class="sa-mini sa-mini--suppr" data-sa-action="suppr-q" data-e="${n}" data-q="${i}">Supprimer la question</button></div>
@@ -17329,7 +17332,9 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
       ${cs.map((c, i) => `<div class="sa-carte" data-sa-c="${i}">
         <div class="sa-ligne"><label>Encart ${i + 1} — titre</label><input type="text" data-sa="c-titre" value="${E(c.titre || '')}" placeholder="ex. À EXPLIQUER :"></div>
         <div class="sa-ligne"><label>Texte</label><textarea data-sa="c-texte">${E(c.texte || '')}</textarea></div>
-        <div class="sa-ligne"><label>Condition</label><input type="text" data-sa="c-condition" value="${E(c.condition || '')}" placeholder="vide = toujours · q3=1 · dpe · dpe_classe=F,G · energie=fioul,gaz · ecs_chaudiere · categorie=superieur · service=chauffage_seul"></div>
+        <div class="sa-ligne"><label>Condition</label><input type="text" data-sa="c-condition" value="${E(c.condition || '')}" placeholder="vide = toujours · q3=1 · dpe · !dpe · dpe_classe=F,G · energie=fioul,gaz · emetteurs=convecteurs_electriques · age<15 · ballon"></div>
+        <div class="sa-ligne"><label>Affichage</label><span><label class="sa-mini"><input type="checkbox" data-sa="c-repliable"${c.repliable ? ' checked' : ''}> dépliable (objection)</label>
+          <label class="sa-mini"><input type="checkbox" data-sa="c-rappel"${c.action === 'rappel' ? ' checked' : ''}> bouton « Programmer le rappel »</label></span></div>
         <div class="sa-actions"><button type="button" class="sa-mini sa-mini--suppr" data-sa-action="suppr-c" data-e="${n}" data-c="${i}">Supprimer l'encart</button></div>
       </div>`).join('')}
       <div class="sa-actions"><button type="button" class="sa-mini" data-sa-action="ajout-q" data-e="${n}">+ Question</button>
@@ -17342,10 +17347,12 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     return `<div class="adm-section-block" data-section="script-appel" id="sa-editeur">
       <p class="sa-aide">Textes du panneau bleu « Accompagnateur d'appel », à droite de chaque étape de la fiche. Remplacés à l'affichage :
         <code>[Civilité Nom]</code> <code>[prénom de l'utilisateur]</code> <code>[prénom du client]</code> <code>[nom du client]</code>
-        <code>[année du DPE]</code> <code>[date du DPE]</code> <code>[classe DPE]</code>.<br>
-        Encart affiché seulement si sa condition est vraie : vide = toujours · <code>q3=1</code> = 1re réponse à la question 3 ·
-        <code>dpe</code> = un DPE ou un audit est connu · <code>dpe_classe=F,G</code> · <code>energie=fioul,gaz</code> · <code>ecs_chaudiere</code> ·
-        <code>categorie=superieur</code> · <code>service=chauffage_seul</code>.</p>
+        <code>[année du DPE]</code> <code>[date du DPE]</code> <code>[classe DPE]</code> <code>[surface]</code> <code>[année]</code>
+        <code>[reste à charge]</code> <code>[économie mensuelle]</code> (laissées entre crochets si la fiche ne les a pas).<br>
+        Question ou encart affiché seulement si sa condition est vraie : vide = toujours · <code>q3=1</code> = 1re réponse à la question 3 ·
+        <code>dpe</code> = un DPE ou un audit est connu · <code>!dpe</code> = pas de DPE · <code>dpe_classe=F,G</code> · <code>energie=fioul,gaz</code> ·
+        <code>emetteurs=convecteurs_electriques</code> · <code>ecs_chaudiere</code> · <code>categorie=superieur</code> · <code>service=chauffage_seul</code> ·
+        <code>ballon</code> = ballon choisi · <code>age&lt;15</code> = logement de moins de 15 ans · <code>a &amp; b</code> = les deux.</p>
       ${[1, 2, 3, 4, 5, 6].map(n => saEtapeHtml(n, m.etapes[String(n)] || {}, o.includes(String(n)))).join('')}
       <div class="adm-actions"><button type="button" class="adm-btn-save" id="btn-save-script-appel">Enregistrer</button></div>
     </div>`;
@@ -17359,13 +17366,15 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
       e.titre = v(d, ':scope > .sa-ligne [data-sa="titre"]');
       e.intro = v(d, ':scope > .sa-ligne [data-sa="intro"]');
       e.questions = Array.from(d.querySelectorAll(':scope > [data-sa-q]')).map(c => ({
-        texte: v(c, '[data-sa="q-texte"]'),
+        texte: v(c, '[data-sa="q-texte"]'), note: v(c, '[data-sa="q-note"]'), condition: v(c, '[data-sa="q-condition"]'),
         reponses: Array.from(c.querySelectorAll('[data-sa-r]')).map(r => ({
           libelle: v(r, '[data-sa="r-libelle"]'), consigne: v(r, '[data-sa="r-consigne"]'),
-          alerte: !!(r.querySelector('[data-sa="r-alerte"]') || {}).checked }))
+          alerte: !!(r.querySelector('[data-sa="r-alerte"]') || {}).checked, action: v(r, '[data-sa="r-action"]') }))
       }));
       e.encarts = Array.from(d.querySelectorAll(':scope > [data-sa-c]')).map(c => ({
-        titre: v(c, '[data-sa="c-titre"]'), texte: v(c, '[data-sa="c-texte"]'), condition: v(c, '[data-sa="c-condition"]') }));
+        titre: v(c, '[data-sa="c-titre"]'), texte: v(c, '[data-sa="c-texte"]'), condition: v(c, '[data-sa="c-condition"]'),
+        repliable: !!(c.querySelector('[data-sa="c-repliable"]') || {}).checked,
+        action: (c.querySelector('[data-sa="c-rappel"]') || {}).checked ? 'rappel' : '' }));
     });
     return m;
   }
@@ -22947,6 +22956,8 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
   #sim-dynamic .p6-tuile > span { font-size: 12px; }
   #sim-dynamic .p6-tuile > b, body.l6 #p-hotes #sim-dynamic .p6-tuile .sim-roi-big { font-size: 17px; }
   #sim-dynamic .p6-tuile > i, body.l6 #p-hotes #sim-dynamic .p6-tuile .sim-roi-big-sub { font-size: 11px; }
+  /* accompagnateur ouvert à l'étape 6 (colonne plus étroite) : les valeurs des tuiles passent à la ligne, jamais coupées */
+  #sim-dynamic .p6-tuile > b, body.l6 #p-hotes #sim-dynamic .p6-tuile .sim-roi-big { white-space: normal; overflow-wrap: anywhere; }
   /* resserrement automatique, seulement si la colonne déborde */
   #p-sim-6r.p6-dense #sim-dynamic { gap: 6px; }
   #p-sim-6r.p6-dense #sim-dynamic > .p6-blk { gap: 3px; padding: 6px 10px; }
@@ -22997,6 +23008,9 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     new MutationObserver(planifier).observe(corps, { childList: true, subtree: true, characterData: true });
     new MutationObserver(planifier).observe(hote, { attributes: true, attributeFilter: ['hidden'] });
     window.addEventListener('resize', planifier);
+    // largeur changée (accompagnateur ouvert / replié) : le texte repasse à la ligne, on remesure
+    const defil = document.getElementById('p6-droite-defil');
+    if (defil && typeof ResizeObserver === 'function') { let l = 0; new ResizeObserver(() => { if (defil.clientWidth !== l) { l = defil.clientWidth; planifier(); } }).observe(defil); }
     planifier();
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', brancher); else brancher();
@@ -23392,16 +23406,38 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     const civNom = [madame ? 'Madame' : (monsieur ? 'Monsieur' : ''), cap(nom)].filter(Boolean).join(' ') || 'Madame, Monsieur';
     const user = (window.HEXA_SESSION && window.HEXA_SESSION.user) ? cap(window.HEXA_SESSION.user) : '[votre prénom]';
     const d = window.hexaL6DateDpe();
-    const an = (d.match(/(\d{4})$/) || [])[1] || 'le DPE';
-    return esc(t).replace(/\[Civilit[ée] Nom\]/gi, esc(civNom)).replace(/\[pr[ée]nom de l'utilisateur\]|\[pr[ée]nom de l&#39;utilisateur\]|\[votre pr[ée]nom\]/gi, esc(user))
+    // Lot 6f : variable sans valeur dans la fiche -> laissée lisible, entre crochets
+    const an = (d.match(/(\d{4})$/) || [])[1] || '[année du DPE]';
+    const surf = nombre(val('surface_logement_m2')), annee = (String(val('annee_construction')).match(/^\d{4}$/) || [])[0];
+    const txt = (s) => { const e = document.querySelector(s); return e ? e.textContent.replace(/[\u202f\u00a0]/g, ' ').replace(/\s+/g, ' ').trim() : ''; };
+    const reste = /\d/.test(txt('#sim-reste')) ? txt('#sim-reste') : '';
+    const tuile = document.getElementById('p6-tuile-eco'), ecoLib = tuile && tuile.previousElementSibling ? tuile.previousElementSibling.textContent : '';
+    const eco = /^Économie/.test(ecoLib) ? (txt('#p6-tuile-eco').match(/^([\d ]+)/) || [])[1] : '';
+    return esc(t).replace(/\[surface\]/gi, surf > 0 ? esc(String(Math.round(surf))) : '[surface]')
+      .replace(/\[ann[ée]e\]/gi, annee ? esc(annee) : '[année]')
+      .replace(/\[reste [àa] charge\]/gi, reste ? esc(reste) : '[reste à charge]')
+      .replace(/\[[ée]conomie mensuelle\]/gi, eco ? esc(eco.trim()) : '[économie mensuelle]')
+      .replace(/\[Civilit[ée] Nom\]/gi, esc(civNom)).replace(/\[pr[ée]nom de l'utilisateur\]|\[pr[ée]nom de l&#39;utilisateur\]|\[votre pr[ée]nom\]/gi, esc(user))
       .replace(/\[pr[ée]nom du client\]/gi, esc(cap(prenom))).replace(/\[nom du client\]/gi, esc(cap(nom)))
       .replace(/\[ann[ée]e du DPE\]/gi, esc(an)).replace(/\[date du DPE\]/gi, esc(d || '—')).replace(/\[classe DPE\]/gi, esc(val('dpe_connu') || '—'));
   }
   const liste = (s) => String(s || '').split(',').map(x => x.trim().toLowerCase()).filter(Boolean);
   function condition(cnd, rep) {
-    const c = String(cnd || '').trim();
-    if (!c) return true;
+    const c0 = String(cnd || '').trim();
+    if (!c0) return true;
+    // Lot 6f : « a & b » = les deux ; « !a » = le contraire
+    if (c0.includes('&')) return c0.split('&').every(x => condition(x, rep));
+    if (c0.startsWith('!')) return !condition(c0.slice(1), rep);
+    const c = c0;
     let m = c.match(/^q(\d+)\s*=\s*(\d+)$/i);
+    m = m || null;
+    if (!m) {
+      const a = c.match(/^age\s*<\s*(\d+)$/i);
+      if (a) { const an = parseInt(val('annee_construction'), 10); return an > 1000 && (new Date().getFullYear() - an) < Number(a[1]); }
+      if (/^ballon$/i.test(c)) return !!(typeof window.hexaSimLire === 'function' && window.hexaSimLire().ballon);
+      const em = c.match(/^emetteurs\s*=\s*(.+)$/i);
+      if (em) return liste(em[1]).includes(String(val('type_emetteurs')).toLowerCase());
+    }
     if (m) return rep[Number(m[1]) - 1] === Number(m[2]) - 1;
     if (/^dpe$/i.test(c)) return !!(val('dpe_connu') || val('dpe_numero'));
     if (/^ecs_chaudiere$/i.test(c)) return val('ecs') === 'chaudiere';
@@ -23475,6 +23511,31 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     hauteurVue();
     window.addEventListener('resize', () => { hauteurVue(); placerVisiteTechnique(); });
   }
+  // Lot 6f : action d'une réponse ; étape 1 éditée dans l'admin (sans action) : « Non » à la 1re question -> clôturer,
+  // « … rappeler » -> rappel
+  function actionReponse(n, i, r) {
+    if (r.action) return r.action;
+    if (n === 1 && i === 0 && /^non$/i.test(String(r.libelle || '').trim())) return 'cloturer';
+    if (n === 1 && /rappeler/i.test(String(r.libelle || ''))) return 'rappel';
+    return '';
+  }
+  // Lot 6f : ouvre le rappel (date, heure) du panneau « Fin d'appel »
+  function ouvrirRappel() {
+    setTimeout(() => {
+      const pop = document.getElementById('p-fin-appel-pop'), bt = document.getElementById('p-fin-appel-btn');
+      if (pop && pop.hidden && bt) bt.click();
+      setTimeout(() => {
+        const d = document.getElementById('suivi-rap-date');
+        if (d) { d.scrollIntoView({ block: 'nearest' }); d.focus({ preventScroll: true }); d.classList.add('p6-rappel-cible'); setTimeout(() => d.classList.remove('p6-rappel-cible'), 2500); }
+      }, 50);
+    }, 0);
+  }
+  window.hexaL6OuvrirRappel = ouvrirRappel;
+  // Lot 6f : « Non » (pas à l'origine de la demande) -> statut « Perdu » par le menu de statut de la fiche (même chemin)
+  function cloturer() {
+    const opt = document.querySelector('#fiche-statut-slot .pv-statut-opt[data-k="perdu"]');
+    if (opt) opt.click();
+  }
   function htmlAside(n) {
     const auto = n !== 6;
     const ouvert = panneauOuvert() ? false : (asideOuvert == null ? auto : asideOuvert);
@@ -23486,16 +23547,29 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     const rep = ((reponses[numero] || {})[n]) || {};
     const parts = [];
     if (E.intro) parts.push(`<div class="p6-quote">« ${remplir(E.intro)} »</div>`);
+    let vue = 0;
     (E.questions || []).forEach((qq, i) => {
+      if (!condition(qq.condition, rep)) return;            // Lot 6f : question affichée selon la fiche
+      vue += 1;
       const r = rep[i];
       const choisie = r != null ? (qq.reponses || [])[r] : null;
-      parts.push(`<div class="p6-aq-bloc"><div class="p6-aq">${i + 1}. ${remplir(qq.texte)}</div>`
+      const act = choisie ? actionReponse(n, i, choisie) : '';
+      parts.push(`<div class="p6-aq-bloc"><div class="p6-aq">${vue}. ${remplir(qq.texte)}</div>`
+        + (qq.note ? `<div class="p6-anote">${remplir(qq.note)}</div>` : '')
         + ((qq.reponses || []).length ? `<div class="p6-arow">${qq.reponses.map((x, j) => `<button type="button" class="${r === j ? (x.alerte ? 'warn' : 'on') : ''}" data-p6-rep="${n}:${i}:${j}">${esc(x.libelle)}</button>`).join('')}</div>` : '')
-        + (choisie && choisie.consigne ? `<div class="p6-consigne">${remplir(choisie.consigne)}</div>` : '') + '</div>');
+        + (choisie && choisie.consigne ? `<div class="p6-consigne">${remplir(choisie.consigne)}</div>` : '')
+        + (act === 'cloturer' ? '<button type="button" class="p6-aact p6-aact--rouge" data-p6-cloturer="1">Clôturer le dossier : statut « Perdu »</button>' : '')
+        + (act === 'rappel' ? '<button type="button" class="p6-aact" data-p6-rappel="1">📅 Programmer le rappel</button>' : '') + '</div>');
     });
     (E.encarts || []).forEach(c => {
       if (!condition(c.condition, rep)) return;
-      parts.push(`<div class="p6-wbox">${c.titre ? `<b>${remplir(c.titre)}</b> ` : ''}${c.texte ? remplir(c.texte) : '<i>[à rédiger dans Admin → Script d\'appel]</i>'}</div>`);
+      const corps = (c.texte ? remplir(c.texte) : '<i>[à rédiger dans Admin → Script d\'appel]</i>')
+        + (c.action === 'rappel' ? '<button type="button" class="p6-aact" data-p6-rappel="1">📅 Programmer le rappel</button>' : '');
+      if (c.repliable) {                                     // Lot 6f : objection, dépliée au besoin
+        parts.push(`<details class="p6-wbox p6-objection"><summary>${remplir(c.titre || 'Objection')}</summary><div>${corps}</div></details>`);
+        return;
+      }
+      parts.push(`<div class="p6-wbox">${c.titre ? `<b>${remplir(c.titre)}</b> ` : ''}${corps}</div>`);
     });
     if (!parts.length) parts.push('<div class="p6-avide">Pas encore de texte pour cette étape : à rédiger dans Admin → Script d\'appel.</div>');
     return `<div class="p6-ah"><div><div class="p6-ak">ACCOMPAGNATEUR D'APPEL · ÉTAPE ${n}</div><div class="p6-at">${esc(E.titre || (ctx ? ctx.etapes[n - 1].titre : ''))}</div></div>`
@@ -23584,13 +23658,15 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
 
   // ------------------------------------------------------------------ interactions (délégation)
   document.addEventListener('click', (e) => {
-    const t = e.target && e.target.closest ? e.target.closest('[data-p6-go],[data-p6-fact],[data-p6-pers],[data-p6-aside],[data-p6-rep],[data-p6-dpe],#p6-lien-tech') : null;
+    const t = e.target && e.target.closest ? e.target.closest('[data-p6-go],[data-p6-fact],[data-p6-pers],[data-p6-aside],[data-p6-rep],[data-p6-dpe],[data-p6-rappel],[data-p6-cloturer],#p6-lien-tech') : null;
     if (!t || !document.body.classList.contains('l6')) return;
     e.preventDefault();
     if (t.dataset.p6Go) { if (typeof window.hexaParcoursEtape === 'function') window.hexaParcoursEtape(Number(t.dataset.p6Go)); return; }
     if (t.dataset.p6Fact) { choixFacture(t.dataset.p6Fact); return; }
     if (t.dataset.p6Pers) { personnes(Number(t.dataset.p6Pers)); return; }
     if (t.dataset.p6Dpe) { autreLogement(); return; }
+    if (t.dataset.p6Rappel) { ouvrirRappel(); return; }
+    if (t.dataset.p6Cloturer) { cloturer(); return; }
     if (t.id === 'p6-lien-tech') { const b = q('#p-lien-tech'); if (b) b.click(); majLienTech(); return; }
     if (t.dataset.p6Aside) {
       const n = ctx ? ctx.etapeCourante() : 1;
@@ -23607,6 +23683,9 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
       reponses[numero][n] = reponses[numero][n] || {};
       reponses[numero][n][i] = reponses[numero][n][i] === j ? undefined : j;
       majAside(true);
+      // Lot 6f : « Non, rappeler » ouvre directement le rappel du panneau « Fin d'appel »
+      const E = (SCRIPT && SCRIPT.etapes && SCRIPT.etapes[String(n)]) || {}, rr = ((E.questions || [])[i] || {}).reponses || [];
+      if (reponses[numero][n][i] === j && rr[j] && actionReponse(n, i, rr[j]) === 'rappel') ouvrirRappel();
     }
   });
 })();
@@ -24375,6 +24454,15 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
   .p6-arow button.on { border-color: #fff; background: #fff; color: var(--p6-navy); }
   .p6-arow button.warn { border-color: var(--p6-orange); background: var(--p6-orange); color: var(--p6-txt); }
   .p6-consigne { font-size: 12px; color: #FFC9A8; margin-top: 4px; }
+  /* Lot 6f : note sous la question, boutons d'action, objections dépliables */
+  .p6-anote { font-size: 12px; font-style: italic; color: #C9D6E8; margin-top: 3px; }
+  .p6-aact { margin-top: 6px; padding: 5px 10px; border: 0; border-radius: 6px; background: #fff; color: var(--p6-navy); font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
+  .p6-aact--rouge { background: var(--p6-red); color: #fff; }
+  .p6-wbox .p6-aact { display: block; background: var(--p6-navy); color: #fff; }
+  .p6-objection > summary { cursor: pointer; font-weight: 800; color: var(--p6-red); list-style: none; }
+  .p6-objection > summary::before { content: '▸ '; } .p6-objection[open] > summary::before { content: '▾ '; }
+  .p6-objection > div { margin-top: 6px; }
+  #suivi-rap-date.p6-rappel-cible { outline: 3px solid #F59E0B; outline-offset: 1px; }
   .p6-wbox { padding: 10px 12px; background: #fff; color: var(--p6-txt); border-radius: 8px; font-size: 13px; line-height: 1.5; }
   .p6-wbox > b { color: var(--p6-red); }
   .p6-wbox i { color: #8A94A3; }
