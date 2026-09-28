@@ -17765,6 +17765,11 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
           <input type="text" inputmode="decimal" class="adm-del-precaire" value="${adminEscape(d.mwh_precaire ?? '')}" placeholder="MWh précaire">
           <input type="text" inputmode="decimal" class="adm-del-classique" value="${adminEscape(d.mwh_classique ?? '')}" placeholder="MWh classique">
           <select class="adm-del-usage" title="Délégataire utilisé quand le client…"><option value="">— utilisé quand —</option><option value="attente" ${(d.usage || ({PICOTY:'attente',ACE:'tout_de_suite'})[String(d.nom||'').toUpperCase()]) === 'attente' ? 'selected' : ''}>attente MPR</option><option value="tout_de_suite" ${(d.usage || ({PICOTY:'attente',ACE:'tout_de_suite'})[String(d.nom||'').toUpperCase()]) === 'tout_de_suite' ? 'selected' : ''}>tout de suite</option></select>
+          <div class="adm-del-mention">
+            <input type="text" class="adm-del-mention-titre" value="${adminEscape(d.mention_titre || '')}" placeholder="Titre de la mention (ex. Mention RAI — Partenaire Picoty)">
+            <textarea class="adm-del-mention-texte" rows="4" placeholder="Mention CEE du devis et du pré-devis">${adminEscape(d.mention_devis || '')}</textarea>
+            <p class="adm-opt2-note">Mention CEE du devis et du pré-devis quand ce délégataire est utilisé. Variables : {montant_cee} = prime CEE du devis (ex. 11 893,80) · {montant_cee_lettres} = la même en lettres.</p>
+          </div>
           <button type="button" class="adm-btn adm-btn-danger adm-del-remove">Supprimer</button>
         </div>`).join('')}
       </div>
@@ -17822,6 +17827,11 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
             <input type="text" inputmode="decimal" class="adm-del-precaire" value="${adminEscape(d.mwh_precaire ?? '')}" placeholder="MWh précaire">
             <input type="text" inputmode="decimal" class="adm-del-classique" value="${adminEscape(d.mwh_classique ?? '')}" placeholder="MWh classique">
           <select class="adm-del-usage" title="Délégataire utilisé quand le client…"><option value="">— utilisé quand —</option><option value="attente" ${(d.usage || ({PICOTY:'attente',ACE:'tout_de_suite'})[String(d.nom||'').toUpperCase()]) === 'attente' ? 'selected' : ''}>attente MPR</option><option value="tout_de_suite" ${(d.usage || ({PICOTY:'attente',ACE:'tout_de_suite'})[String(d.nom||'').toUpperCase()]) === 'tout_de_suite' ? 'selected' : ''}>tout de suite</option></select>
+          <div class="adm-del-mention">
+            <input type="text" class="adm-del-mention-titre" value="${adminEscape(d.mention_titre || '')}" placeholder="Titre de la mention (ex. Mention RAI — Partenaire Picoty)">
+            <textarea class="adm-del-mention-texte" rows="4" placeholder="Mention CEE du devis et du pré-devis">${adminEscape(d.mention_devis || '')}</textarea>
+            <p class="adm-opt2-note">Mention CEE du devis et du pré-devis quand ce délégataire est utilisé. Variables : {montant_cee} = prime CEE du devis (ex. 11 893,80) · {montant_cee_lettres} = la même en lettres.</p>
+          </div>
             <button type="button" class="adm-btn adm-btn-danger adm-del-remove">Supprimer</button>
           </div>`).join('')}
         </div>
@@ -19226,7 +19236,9 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
         mwh_precaire: String(row.querySelector('.adm-del-precaire')?.value || '').trim() === '' ? '' : (Number(String(row.querySelector('.adm-del-precaire').value).replace(',','.')) || 0),
         mwh_classique: String(row.querySelector('.adm-del-classique')?.value || '').trim() === '' ? '' : (Number(String(row.querySelector('.adm-del-classique').value).replace(',','.')) || 0),
         actif: !!row.querySelector('.adm-del-actif')?.checked,
-        usage: row.querySelector('.adm-del-usage')?.value || ''
+        usage: row.querySelector('.adm-del-usage')?.value || '',
+        mention_titre: row.querySelector('.adm-del-mention-titre')?.value || '',
+        mention_devis: row.querySelector('.adm-del-mention-texte')?.value || ''
       }));
       const r = await fetch('/api/admin/m3', { method:'POST', headers: window.adminHeaders(), body: JSON.stringify({ delegataires }) });
       if (r.ok) { M3_ADMIN.delegataires = delegataires; adminToast('✓ Paramètres enregistrés', '#0D6B3B'); window.dispatchEvent(new CustomEvent('hexa-config-changed')); }
@@ -19253,7 +19265,9 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
         mwh_precaire: String(row.querySelector('.adm-del-precaire')?.value || '').trim() === '' ? '' : (Number(String(row.querySelector('.adm-del-precaire').value).replace(',','.')) || 0),
         mwh_classique: String(row.querySelector('.adm-del-classique')?.value || '').trim() === '' ? '' : (Number(String(row.querySelector('.adm-del-classique').value).replace(',','.')) || 0),
         actif: !!row.querySelector('.adm-del-actif')?.checked,
-        usage: row.querySelector('.adm-del-usage')?.value || ''
+        usage: row.querySelector('.adm-del-usage')?.value || '',
+        mention_titre: row.querySelector('.adm-del-mention-titre')?.value || '',
+        mention_devis: row.querySelector('.adm-del-mention-texte')?.value || ''
       }));
       const modeles_email = Array.from(document.querySelectorAll('[data-email-i]')).map((card,i)=>({
         id: 'modele_' + (i+1),
@@ -22989,6 +23003,11 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
 })();
 </script>
 <style id="hexa-lot6c-verrou">
+  /* Lot 6e : champs du délégataire sur une ligne, sa mention CEE dessous sur toute la largeur */
+  .adm-delegataire-row { display: grid; grid-template-columns: auto minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr) auto auto; gap: 8px; align-items: center; }
+  .adm-delegataire-row > .adm-del-remove { grid-row: 1; grid-column: 6; }
+  .adm-del-mention { grid-row: 2; grid-column: 2 / -1; display: flex; flex-direction: column; gap: 6px; margin: 0 0 10px; }
+  .adm-del-mention textarea { width: 100%; font: inherit; font-size: 12.5px; }
   .p6-note-ecs { font-size: 13px; line-height: 18px; color: #334155; }   /* Lot 6d : phrase simple, plus d'alerte orange */
   .p6-fige-bandeau { display: none; flex: none; margin-left: auto; height: 24px; line-height: 22px; padding: 0 12px; border-radius: 12px;
     background: #FEF3C7; color: #92400E; border: 1px solid #F59E0B; font-size: 12px; font-weight: 800; white-space: nowrap; }

@@ -84,7 +84,7 @@ def test_delegataires_lus_avec_usage_et_ace_cree_vide():
     main._atomic_write_json(main.DELEGATAIRES_PATH, [{"nom": "PICOTY", "mwh_precaire": 12.5, "mwh_classique": 7.2, "actif": True}])
     d = main._read_delegataires()
     assert d[0]["usage"] == "attente"
-    assert d[1] == {"nom": "ACE", "mwh_precaire": "", "mwh_classique": "", "actif": False, "usage": "tout_de_suite"}
+    assert {k: d[1][k] for k in ("nom", "mwh_precaire", "mwh_classique", "actif", "usage")} ==         {"nom": "ACE", "mwh_precaire": "", "mwh_classique": "", "actif": False, "usage": "tout_de_suite"}
     main._atomic_write_json(main.DELEGATAIRES_PATH, DELEG)
     assert [x["usage"] for x in main._read_delegataires()] == ["attente", "tout_de_suite"]
 
@@ -100,7 +100,7 @@ def test_devis_suit_le_delegataire(client):
         montants[mode] = float(re.sub(r"[^\d,]", "", ctx["montant_cee"]).replace(",", "."))
     assert montants["sans_attente"] > montants["attente"] > 0
     # mention RAI du devis : le délégataire qui valorise la prime
-    for mode, attendu in (("attente", "offerte par PICOTY"), ("sans_attente", "offerte par ACE ÉNERGIE")):
+    for mode, attendu in (("attente", "versée par PICOTY"), ("sans_attente", "offerte par ACE ÉNERGIE")):   # Lot 6e : mention PICOTY complète
         main._atomic_write_json(main._state_simulateur_path(LEAD["numero"]), {})
         main.save_state_simulateur_atomic(LEAD["numero"], {"service": "chauffage_seul", "option": "opt1", "mode_mpr": mode})
         assert attendu in client.get(f"/api/devis/{LEAD['numero']}/preview?variante=devis").text
