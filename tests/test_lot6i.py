@@ -341,7 +341,8 @@ def test_noms_des_pdf_cote_client(page, tmp_path):
         cd = lambda u: page.request.get(page.base + u).headers.get("content-disposition", "")
         assert cd(f"/devis-public/PR-94001/1/{main._sign_devis_token_v('PR-94001', 1)}/pdf") == 'attachment; filename="Pre-devis_PD2026-7512-1FF.pdf"'
         assert cd(f"/devis-public/PR-94001/2/{main._sign_devis_token_v('PR-94001', 2)}/pdf") == 'attachment; filename="Devis_DE2026-7512-2FF.pdf"'
-        assert cd(f"/devis-public/PR-94001/{main._sign_devis_token('PR-94001')}/pdf") == 'attachment; filename="Pre-devis_PD2026-7512-1FF.pdf"'
+        # lien sans numéro de version : la dernière version envoyée (tests/test_lien_devis_client.py)
+        assert cd(f"/devis-public/PR-94001/{main._sign_devis_token('PR-94001')}/pdf") == 'attachment; filename="Devis_DE2026-7512-2FF.pdf"'
         r = page.request.get(page.base + f"/notedim-public/PR-94001/{main._sign_notedim_token('PR-94001')}/pdf", timeout=90000)
         assert r.status == 200 and r.headers["content-disposition"] == f'attachment; filename="Note-de-dimensionnement_ND{AN}-94001-FI.pdf"'
         assert "DEFINITIVE" not in r.headers["content-disposition"]
