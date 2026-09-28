@@ -345,11 +345,18 @@ def rechercher(adresse: str, cp: str, lat: float | None = None, lon: float | Non
         note = " (les " + ("audits" if "audit" in erreurs else "DPE") + " n'ont pas pu être consultés)"
     confirmes = [c for c in cands if c["identite"] == "adresse_ok"]
     appart = "appart" in _sans_accents(type_logement)
-    if len(confirmes) == 1 and not confirmes[0]["immeuble"] and not appart:
-        c = confirmes[0]
+    if confirmes and not appart and not any(c["immeuble"] for c in confirmes):
+        # Même logement (adresse confirmée, hors appartement) : le PLUS RÉCENT gagne ; à date égale seulement, l'audit.
+        c = max(confirmes, key=lambda x: (x["date"], x["kind"] == "audit"))
+        doc = f"{'Audit' if c['kind'] == 'audit' else 'DPE'} n° {c['numero']} du {c['date_fr']}"
+        if len(confirmes) == 1:
+            msg = f"{doc} trouvé à cette adresse"
+        elif any(x is not c and x["date"] == c["date"] for x in confirmes):
+            msg = f"{doc} retenu (même date qu'un autre document : l'audit prime)"
+        else:
+            msg = f"{doc} retenu, le plus récent des {len(confirmes)} documents à cette adresse"
         return {"etat": "auto", "candidats": cands, "retenu": cands.index(c),
-                "message": f"{'Audit' if c['kind'] == 'audit' else 'DPE'} n° {c['numero']} du {c['date_fr']} trouvé à "
-                           f"cette adresse : valeurs pré-remplies, à confirmer avec le client{note}."}
+                "message": f"{msg} : valeurs pré-remplies, à confirmer avec le client{note}."}
     if not cands:
         return {"etat": "aucun", "candidats": [], "retenu": None,
                 "message": f"Aucun DPE ni audit établi depuis le 01/07/2021 à cette adresse : saisie manuelle{note}."}

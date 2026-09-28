@@ -153,17 +153,35 @@ def test_un_document_confirme_remplit_la_fiche(page):
     assert len(page.lookups) == 1                                         # une seule recherche (BAN + CP + parcelle)
 
 
-# ---------------------------------------------------------------- plusieurs -> choix
-def test_plusieurs_documents_choix_dans_le_bandeau(page):
+# ---------------------------------------------------------------- même logement : le plus récent, l'autre en info
+def test_plusieurs_documents_le_plus_recent_retenu_l_autre_au_choix(page):
     SIMU["dpe"] = [dpe("2475E0000001A"), dpe("2375E0000002B", date="2023-05-02", surface_habitable_logement=96)]
     nouvelle_fiche(page)
-    assert "2 documents trouvés à cette adresse" in bandeau(page, "choix")
-    assert val(page, "surface_logement_m2") == "" and val(page, "dpe_numero") == ""        # rien d'automatique
-    boutons = page.query_selector_all("#dpe-banner .hx-dpe-cand")
-    assert len(boutons) == 2 and "adresse confirmée" in boutons[1].inner_text()
-    boutons[1].click()
+    assert "DPE n° 2475E0000001A du 15/03/2024 retenu, le plus récent des 2 documents" in bandeau(page, "auto")
+    assert (val(page, "surface_logement_m2"), val(page, "dpe_numero")) == ("118", "2475E0000001A")
+    autres = page.query_selector_all("#dpe-banner .hx-dpe-cand")
+    assert len(autres) == 1 and "DPE n° 2375E0000002B du 02/05/2023" in autres[0].inner_text()   # type, n°, date
+    autres[0].click()                                                    # l'autre document, choisi
     assert (val(page, "surface_logement_m2"), val(page, "dpe_numero"), val(page, "dpe_date")) == ("96", "2375E0000002B", "02/05/2023")
     assert "DPE n° 2375E0000002B retenu" in page.inner_text("#dpe-banner")
+
+
+@pytest.mark.parametrize("date_dpe, date_audit, gagnant, cout, autre_cout", [
+    ("2025-06-01", "2025-01-10", "2475E0000001A", "220", "280"),        # DPE plus récent -> DPE et son coût
+    ("2024-03-15", "2025-01-10", "A0001", "280", "220"),                # audit plus récent -> audit
+    ("2025-01-10", "2025-01-10", "A0001", "280", "220"),                # même date -> audit
+])
+def test_dpe_ou_audit_la_date_decide_et_le_cout_suit(page, date_dpe, date_audit, gagnant, cout, autre_cout):
+    SIMU["dpe"] = [dpe("2475E0000001A", date=date_dpe)]
+    SIMU["audit"] = [audit("A0001", date_etablissement_audit=date_audit)]
+    nouvelle_fiche(page)
+    bandeau(page, "auto")
+    assert val(page, "dpe_numero") == gagnant
+    src = "audit" if gagnant == "A0001" else "dpe"
+    assert (val(page, "cout_energetique_mensuel_eur"), val(page, "cout_energie_source")) == (cout, src)
+    page.click("#dpe-banner .hx-dpe-cand")                              # l'autre document : son coût s'applique
+    autre_src = "dpe" if src == "audit" else "audit"
+    assert (val(page, "cout_energetique_mensuel_eur"), val(page, "cout_energie_source")) == (autre_cout, autre_src)
 
 
 # ---------------------------------------------------------------- immeuble -> jamais automatique
@@ -187,8 +205,7 @@ def test_saisie_manuelle_jamais_ecrasee(page):
         pg.fill("[name=prix_m2_estime]", "4200")                          # prix au m² saisi à la main
         pg.click("#p6-lien-tech")
     nouvelle_fiche(page, saisir)
-    bandeau(page, "choix")
-    page.query_selector_all("#dpe-banner .hx-dpe-cand")[0].click()
+    bandeau(page, "auto")                                                 # le plus récent (2475E…) est retenu
     assert val(page, "surface_logement_m2") == "95"                        # jamais écrasée par le document
     assert val(page, "conso_kwh_m2") == "288"
     assert "Déjà remplis, conservés : surface" in page.inner_text("#dpe-banner")
@@ -199,7 +216,7 @@ def test_saisie_manuelle_jamais_ecrasee(page):
     page.evaluate("window.hexaParcoursEtape(3)")
     page.click(".l4-choix[data-for=mode_chauffage] button[data-valeur=fioul]")   # choix par bouton : manuel aussi
     page.evaluate("window.hexaParcoursEtape(2)")
-    page.query_selector_all("#dpe-banner .hx-dpe-cand")[1].click()        # autre document choisi
+    page.click("#dpe-banner .hx-dpe-cand")                              # autre document choisi
     assert val(page, "conso_kwh_m2") == "250" and val(page, "dpe_numero") == "2375E0000002B"
     assert val(page, "mode_chauffage") == "fioul"
     time.sleep(0.5)
@@ -229,9 +246,12 @@ def test_isolation_du_document_sans_choix_manuel(page):
 
 
 def test_facture_reelle_jamais_ecrasee_par_le_cout_du_document(page):
-    SIMU["dpe"] = [dpe("2475E0000001A")]
+    SIMU["dpe"] = [dpe("2475E0000001A", date="2025-06-01")]
+    SIMU["audit"] = [audit("A0001")]
     nouvelle_fiche(page, lambda pg: pg.evaluate("window.hexaCoutSaisie && window.hexaCoutSaisie('310')"))
     bandeau(page, "auto")
+    assert val(page, "cout_energetique_mensuel_eur") == "310" and val(page, "cout_energie_source") == "reel"
+    page.click("#dpe-banner .hx-dpe-cand")                              # choix de l'autre document
     assert val(page, "cout_energetique_mensuel_eur") == "310" and val(page, "cout_energie_source") == "reel"
 
 
