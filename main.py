@@ -21,6 +21,7 @@ from zoneinfo import ZoneInfo
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.concurrency import run_in_threadpool
 from fastapi.templating import Jinja2Templates
 from services.economies import (
     _arrondi,
@@ -4608,15 +4609,41 @@ async def devis_pdf(numero: str, request: Request, variante: str | None = None):
     avec_sous_traitant = (variante == "devis")
     archive = _devis_archive_fige(numero, variante)
     if archive and archive.get("file") and os.path.exists(archive["file"]):
-        return FileResponse(archive["file"], media_type="application/pdf", filename=os.path.basename(archive["file"]))
+        pre = (archive.get("variante") or "devis") == "pre_devis"
+        return FileResponse(archive["file"], media_type="application/pdf",
+                            headers=_entete_pdf("Pre-devis" if pre else "Devis", _numero_imprime(archive.get("numero_devis") or numero, pre)))
     # Aperçu : rendu + stream éphémère. NE fige AUCUNE version (seul _send_devis fige).
-    pdf_bytes = _html_to_pdf_playwright(_render_devis_html(request, numero, avec_sous_traitant=avec_sous_traitant), request)
-    fname = "Devis" if variante == "devis" else "Pre-devis"
-    return StreamingResponse(
-        io.BytesIO(pdf_bytes),
-        media_type="application/pdf",
-        headers={"Content-Disposition": f'attachment; filename="{fname}_{numero}.pdf"'},
-    )
+    ctx = _build_devis_context(request, numero, avec_sous_traitant=avec_sous_traitant)
+    _refuser_pdf_incomplet(ctx)
+    # Chromium tourne hors de la boucle : pendant la génération, le reste de l'application répond.
+    pdf_bytes = await run_in_threadpool(_html_to_pdf_playwright, _render_devis_ctx(request, ctx), request)
+    return Response(pdf_bytes, media_type="application/pdf",
+                    headers=_entete_pdf("Pre-devis" if ctx.get("pre_devis") else "Devis",
+                                        _numero_imprime(ctx.get("numero_devis") or numero, bool(ctx.get("pre_devis")))))
+
+
+def _numero_imprime(numero_devis: str, pre_devis: bool) -> str:
+    """Le numéro tel qu'imprimé sur le document : un pré-devis affiche PD… à la place de DE… (devis_pac_template)."""
+    n = str(numero_devis or "")
+    return "PD" + n[2:] if pre_devis and n.startswith("DE") else n
+
+
+def _entete_pdf(prefixe: str, numero_document: str) -> dict:
+    """Fix PDF : le fichier téléchargé porte le numéro du document (celui imprimé dessus), pas celui du prospect."""
+    sur = re.sub(r"[^A-Za-z0-9_.-]", "_", str(numero_document or "document"))
+    return {"Content-Disposition": f'attachment; filename="{prefixe}_{sur}.pdf"', "Cache-Control": "no-store"}
+
+
+def _refuser_pdf_incomplet(ctx: dict) -> None:
+    """Fix PDF : fiche incomplète -> message (422) au lieu d'un PDF de la page d'erreur."""
+    if ctx.get("_error_template"):
+        manque = [str(x) for x in (ctx.get("missing") or [])]
+        raise HTTPException(status_code=422, detail="Champs à compléter : " + " ; ".join(manque) if manque else "Champs à compléter")
+
+
+def _render_devis_ctx(request: Request, ctx: dict) -> str:
+    ctx.setdefault("request", request)
+    return templates.env.get_template("devis_pac.html").render(ctx)
 
 
 @app.get("/devis-public/{numero}/{token}", response_class=HTMLResponse)
@@ -4977,13 +5004,13 @@ async def notedim_public_pdf(numero: str, token: str, request: Request):
 async def notedim_pdf(numero: str, request: Request):
     _require_vt_validee(numero)
     version = _next_devis_version(numero)
-    pdf_bytes = _html_to_pdf_playwright(_render_notedim_html(request, numero), request)
+    ctx = _build_notedim_context(request, numero)
+    _refuser_pdf_incomplet(ctx)
+    ctx.setdefault("request", request)
+    html_nd = templates.env.get_template("notedim_pac.html").render(ctx)
+    pdf_bytes = await run_in_threadpool(_html_to_pdf_playwright, html_nd, request)
     _write_pdf(_notedim_path(numero, version), pdf_bytes)
-    return StreamingResponse(
-        io.BytesIO(pdf_bytes),
-        media_type="application/pdf",
-        headers={"Content-Disposition": f'attachment; filename="NoteDim_{numero}.pdf"'},
-    )
+    return Response(pdf_bytes, media_type="application/pdf", headers=_entete_pdf("NoteDim", ctx.get("numero_notedim") or numero))
 
 
 def _email_header_html():
