@@ -7603,6 +7603,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
   <div class="fiche-statut-row"><span class="fiche-statut-lbl">Statut</span><span id="fiche-statut-slot"></span></div>
   <div class="fiche-vt-row"><span class="fiche-vt-lbl">Visite technique</span><span id="fiche-vt-slot"></span></div>
   <div class="fiche-rel-row"><span class="fiche-vt-lbl">Relances auto</span><span id="fiche-relances-slot"></span></div>
+  <div class="fiche-fact-row" hidden><span class="fiche-vt-lbl">Facture</span><span id="fiche-facture-slot"></span></div>
 </div>
 
   
@@ -12693,7 +12694,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
             <button type="button" class="hexa-meta-card-action" data-devis-download="${item.version}">📥 Télécharger</button>
             <button type="button" class="hexa-meta-card-action" data-devis-resend="${item.version}">📧 Renvoyer</button>
           </div>
-          ${item.has_notedim ? `<div class="docs-notedim-row"><span class="docs-notedim-label">Note de dimensionnement</span><button type="button" class="hexa-meta-card-action" data-notedim-preview="${item.version}">👁 Aperçu</button><button type="button" class="hexa-meta-card-action" data-notedim-download="${item.version}">📥 Télécharger</button></div>` : ''}
+          ${item.has_notedim ? `<div class="docs-notedim-row"><span class="docs-notedim-label">Note de dim définitive (envoyée avec le devis ${escapeHtml(item.numero_devis || '')})</span><button type="button" class="hexa-meta-card-action" data-notedim-preview="${item.version}" data-numero-devis="${escapeHtml(item.numero_devis || '')}">👁 Aperçu</button><button type="button" class="hexa-meta-card-action" data-notedim-download="${item.version}">📥 Télécharger</button></div>` : ''}
         </div>`).join('');
       root.insertAdjacentHTML('beforeend', '<div class="docs-facture-row" style="margin-top:12px;padding-top:10px;border-top:1px solid #E2E8F0;display:flex;flex-wrap:wrap;align-items:center;gap:8px;">'
         + '<span style="font-size:12px;font-weight:700;color:#002E5A;">Installation finie</span>'
@@ -12768,7 +12769,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
         btn.addEventListener('click', () => window.ouvrirSimulationsDrawer?.(currentProspect));
       });
       root.querySelectorAll('[data-notedim-preview]').forEach(btn => {
-        btn.addEventListener('click', () => openNotedimPdfViewer(btn.dataset.notedimPreview));
+        btn.addEventListener('click', () => openNotedimPdfViewer(btn.dataset.notedimPreview, btn.dataset.numeroDevis));
       });
       root.querySelectorAll('[data-notedim-download]').forEach(btn => {
         btn.addEventListener('click', () => window.open(`/api/notedim/${encodeURIComponent(currentProspect)}/download?version=${encodeURIComponent(btn.dataset.notedimDownload)}`, '_blank'));
@@ -12817,7 +12818,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     ov.classList.add('open');
   }
 
-  function openNotedimPdfViewer(version) {
+  function openNotedimPdfViewer(version, numeroDevis) {
     ensureViewer();
     const ov = document.getElementById('doc-viewer-overlay');
     const body = document.getElementById('doc-viewer-body');
@@ -12825,7 +12826,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     if (!ov || !body) return;
     const viewUrl = `/api/notedim/${encodeURIComponent(currentProspect)}/view?version=${encodeURIComponent(version)}`;
     const dlUrl = `/api/notedim/${encodeURIComponent(currentProspect)}/download?version=${encodeURIComponent(version)}`;
-    ttl.textContent = `Note de dimensionnement v${version}`;
+    ttl.textContent = 'Note de dim définitive' + (numeroDevis ? ` (envoyée avec le devis ${numeroDevis})` : '');
     body.innerHTML = `<iframe title="Note v${version}" src="${viewUrl}"></iframe>`;
     document.getElementById('doc-viewer-dl').onclick = () => window.open(dlUrl, '_blank');
     ov.classList.add('open');
@@ -13006,6 +13007,23 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     await loadCategories();
     await refreshStatus();
     navToRoot();
+  };
+
+  // Lot 6h : ouvrir le panneau Documents directement sur la ligne « Installation finie » ou sur les factures
+  window.hexaOuvrirDocumentsSur = async function(numero, cible) {
+    await window.ouvrirDocuments(numero);
+    let ligne = null;
+    if (cible === 'factures') {
+      await refreshFacturesList();
+      document.getElementById('docs-factures-block')?.classList.remove('is-collapsed');
+      ligne = document.getElementById('docs-factures-block');
+    } else {
+      document.getElementById('docs-devis-block')?.classList.remove('is-collapsed');
+      ligne = document.querySelector('#docs-devis-list .docs-facture-row');
+      if (ligne) { ligne.classList.add('docs-cible'); setTimeout(() => ligne.classList.remove('docs-cible'), 2500); }
+    }
+    if (ligne) ligne.scrollIntoView({ block: 'center' });
+    if (cible !== 'factures') document.getElementById('facture-date-fin')?.focus({ preventScroll: true });
   };
 
   window.fermerDocuments = function() {
@@ -14599,7 +14617,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
             <span class="sim-pnl-edit"><input type="text" inputmode="numeric" id="sim-prix" value="${nbFr(state.prix_pac || 0)}"><em>€</em></span>
             ${state.sous_dimensionnement ? '<span class="sim-warn-badge">⚠ Vérifier</span>' : ''}
             <a href="#" class="sim-voir-tous">Tous les modèles</a>
-            <button class="sim-btn-note-dim" type="button" onclick="event.stopPropagation(); window.ouvrirNoteDim(); return false;">Note de dimensionnement</button>
+            ${document.body.dataset.vtValidee === '1' ? '' : '<button class="sim-btn-note-dim" type="button" onclick="event.stopPropagation(); window.ouvrirNoteDim(); return false;">Pré-note de dim (provisoire)</button>'}
           </div>
           <span class="sim-allmodels"${state.show_all_models ? '' : ' hidden'}><select id="sim-modele-select" class="sim-model-select p6-in">
             ${catalogueOptionsOrdonnees(state).map(m => `<option value="${m.id}" ${m.id === state.modele_pac_id ? 'selected' : ''}>${m.label} · ${puissanceModele(m)} kW · ${eur(m.prix_ttc)}</option>`).join('')}
@@ -14619,6 +14637,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
             <label class="l4s-case"><input type="checkbox" id="sim-afficher-apercu" ${state.afficher_apercu !== false ? 'checked' : ''}> Économies sur le devis</label>
             <label class="l4s-case"><input type="checkbox" id="sim-afficher-mention-mpr" ${state.afficher_mention_mpr !== false ? 'checked' : ''}> Mention MaPrimeRénov'</label>
           </span>
+          ${document.body.dataset.vtValidee === '1' ? '<button type="button" id="btn-note-definitive" class="p6-btn p6-btn--vert">📐 Note de dim définitive</button>' : ''}
           <button type="button" id="btn-voir-devis" class="p6-btn p6-btn--plein">Voir le devis</button>`;
     const aides = renderAides(c);
     return { surface, iso, aides, besoin, pac, fin, resultat, barre };
@@ -15068,6 +15087,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
           b.setAttribute('aria-expanded', state.arguments_ouverts ? 'true' : 'false');
           return;
         }
+        if (b.id === 'btn-note-definitive') { ouvrirModalDevis(undefined, 'notedim'); return; }   // Lot 6h : fenêtre du devis, onglet de la note
         if (b.id !== 'btn-voir-devis' && b.id !== 'btn-pre-devis') simTouche = true;
         if (b.dataset.pacNiv) { state.niveau_actif = b.dataset.pacNiv; return; }   // Lot 6 : la sélection du modèle suit (.sim-mod-row)
         if (b.dataset.combi) { state.mode_mpr = b.dataset.mode; if (b.dataset.fin) state.financement_mpr = b.dataset.fin; state.option = b.dataset.opt; }
@@ -15428,9 +15448,11 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     wrap.innerHTML = `
       <div class="sim-dim-box">
         <div class="sim-dim-head">
-          <h3>Note de dimensionnement</h3>
+          <h3>PRÉ-NOTE DE DIMENSIONNEMENT — PROVISOIRE</h3>
           <button type="button" id="sim-dim-close" aria-label="Fermer">×</button>
         </div>
+        <div class="sim-dim-provisoire" role="note">Calcul provisoire, fait avec les informations données par le client au téléphone. Ne pas faire signer. La note définitive sera disponible après validation de la visite technique.</div>
+        <div class="sim-dim-filigrane" aria-hidden="true"><span>PROVISOIRE — NE PAS SIGNER</span></div>
         <div class="sim-dim-content">
           <p>Méthode appliquée : NF EN 12831 — méthode simplifiée G × V × ΔT</p>
 
@@ -15519,16 +15541,16 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 400); }, 6000);
   }
   const fenetreVisible = () => !!(document.querySelector('#modal-erreur.show') || document.getElementById('modal-duplicate-alert'));
-  async function ouvrirModalDevis(varianteForcee){
+  async function ouvrirModalDevis(varianteForcee, onglet){
     try {
-      await ouvrirModalDevisSuite(varianteForcee);
+      await ouvrirModalDevisSuite(varianteForcee, onglet);
     } catch (err) {
       console.error('Voir le devis', err);
       messageDevis("Le devis n'a pas pu s'ouvrir (" + (err && err.message ? err.message : 'erreur inattendue') + '). Réessayez.');
     }
   }
-  async function ouvrirModalDevisSuite(varianteForcee){
-    const enregistre = await enregistrerAvantDevis(() => ouvrirModalDevis(varianteForcee));
+  async function ouvrirModalDevisSuite(varianteForcee, onglet){
+    const enregistre = await enregistrerAvantDevis(() => ouvrirModalDevis(varianteForcee, onglet));
     if (enregistre === 'doublon') return;                // la fenêtre « doublon » est affichée ; « Continuer » ouvrira le devis
     if (enregistre === 'fiche') {                        // la fiche a affiché ses erreurs (champs, serveur)
       if (!fenetreVisible()) messageDevis("La fiche n'a pas pu être enregistrée : devis non ouvert. Vérifiez les champs puis réessayez.");
@@ -15577,22 +15599,24 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     const _variante = (varianteForcee === 'pre_devis' || varianteForcee === 'devis') ? varianteForcee : (vtOk ? 'devis' : 'pre_devis');
     const devisUrl = `/api/devis/${encodeURIComponent(numero)}/preview?variante=${_variante}&t=${Date.now()}`;
     const notedimUrl = `/api/notedim/${encodeURIComponent(numero)}/preview?t=${Date.now()}`;
+    const surNote = vtOk && onglet === 'notedim';           // Lot 6h : « Note de dim définitive » ouvre directement sa note
     wrap.innerHTML = `
       <div class="devis-modal-box" role="dialog" aria-modal="true">
         <div class="devis-modal-head">
           <div class="devis-modal-title">${vtOk ? 'Devis' : 'Pré-devis'} ${numero}</div>
-          <button type="button" class="adm-btn adm-btn-ghost devis-tab active" data-url="${devisUrl}" data-kind="devis">📄 ${vtOk ? 'Devis' : 'Pré-devis'}</button>
-          ${vtOk ? `<button type="button" class="adm-btn adm-btn-ghost devis-tab" data-url="${notedimUrl}" data-kind="notedim">📐 Note de dim</button>` : ''}
+          <button type="button" class="adm-btn adm-btn-ghost devis-tab${surNote ? '' : ' active'}" data-url="${devisUrl}" data-kind="devis">📄 ${vtOk ? 'Devis' : 'Pré-devis'}</button>
+          ${vtOk ? `<button type="button" class="adm-btn adm-btn-ghost devis-tab${surNote ? ' active' : ''}" data-url="${notedimUrl}" data-kind="notedim">📐 Note de dim définitive</button>` : ''}
           <button type="button" class="adm-btn adm-btn-primary" id="devis-pdf-btn">📥 Télécharger PDF</button>
           <button type="button" class="devis-send-btn" id="devis-send-btn">📧 Envoyer</button>
           <button type="button" class="devis-close-btn" id="devis-close-btn" aria-label="Fermer">×</button>
         </div>
         <div class="devis-pdf-erreur" id="devis-pdf-erreur" role="alert" hidden><span></span><button type="button" aria-label="Masquer le message">×</button></div>
-        <div class="devis-modal-body"><iframe id="devis-preview-frame" title="Aperçu devis" src="${devisUrl}"></iframe></div>
+        <div class="devis-note-definitive" id="devis-note-definitive"${surNote ? '' : ' hidden'}>NOTE DÉFINITIVE — à faire signer par le client et à envoyer au délégataire</div>
+        <div class="devis-modal-body"><iframe id="devis-preview-frame" title="Aperçu devis" src="${surNote ? notedimUrl : devisUrl}"></iframe></div>
         <div class="devis-modal-foot"><button type="button" class="adm-btn adm-btn-cancel" id="devis-close-bottom">Fermer</button></div>
       </div>`;
     document.body.appendChild(wrap);
-    let currentKind = 'devis';
+    let currentKind = surNote ? 'notedim' : 'devis';
     const close = () => wrap.remove();
     document.getElementById('devis-close-btn')?.addEventListener('click', close);
     document.getElementById('devis-close-bottom')?.addEventListener('click', close);
@@ -15601,6 +15625,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
       btn.addEventListener('click', ()=>{
         wrap.querySelectorAll('.devis-tab').forEach(b=>b.classList.toggle('active', b===btn));
         currentKind = btn.dataset.kind;
+        wrap.querySelector('#devis-note-definitive').hidden = currentKind !== 'notedim';   // bandeau à l'écran seulement
         document.getElementById('devis-preview-frame').src = btn.dataset.url;
       });
     });
@@ -20293,6 +20318,35 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     const bR = slot.querySelector('.fiche-vt-refuser'); if(bR) bR.addEventListener('click', function(){ postVt('refuser'); });
     const bA = slot.querySelector('.fiche-vt-annuler'); if(bA) bA.addEventListener('click', function(e){ e.preventDefault(); postVt('annuler'); });
   }
+  // Lot 6h : facture visible depuis « Suivi » — installation finie sans facture -> « Générer la facture »
+  // (panneau Documents, ligne « Installation finie ») ; facture existante -> « Voir la facture ».
+  async function renderFicheFacture(lead){
+    const slot = document.getElementById('fiche-facture-slot');
+    const row = slot && slot.closest('.fiche-fact-row');
+    if(!slot || !row) return;
+    const numero = String((lead && lead.numero) || '').trim();
+    slot.innerHTML = ''; row.hidden = true;
+    if(!numero) return;
+    let factures = [];
+    try {
+      const r = await fetch('/api/factures/' + encodeURIComponent(numero) + '/list', { cache:'no-store' });
+      factures = r.ok ? await r.json() : [];
+    } catch(_) { factures = []; }
+    if(String(document.body.dataset.prospectNumero || '').trim() !== numero) return;   // autre fiche ouverte entre-temps
+    if(Array.isArray(factures) && factures.length){
+      slot.innerHTML = '<a href="#" class="fiche-facture-voir">🧾 Voir la facture</a>';
+    } else if(String((lead && lead.statut) || '') === 'installation_finie'){
+      slot.innerHTML = '<button type="button" class="fiche-vt-btn fiche-facture-generer">🧾 Générer la facture</button>';
+    } else return;
+    row.hidden = false;
+    const aller = function(cible){ return function(e){
+      e.preventDefault();
+      const pop = document.getElementById('p-suivi-pop'); if(pop) pop.hidden = true;
+      if(typeof window.hexaOuvrirDocumentsSur === 'function') window.hexaOuvrirDocumentsSur(numero, cible);
+    }; };
+    slot.querySelector('.fiche-facture-generer')?.addEventListener('click', aller('installation-finie'));
+    slot.querySelector('.fiche-facture-voir')?.addEventListener('click', aller('factures'));
+  }
   function hydrateProspectForm(lead){
     const form=document.getElementById('form-prospect'); if(!form) return;
     clearProspectForm();
@@ -20332,6 +20386,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     renderFicheStatut(lead);
     renderFicheVt(lead);
     renderFicheRelances(lead);
+    renderFicheFacture(lead);
     if (typeof window.hexaLot4ApresChargement === 'function') window.hexaLot4ApresChargement();
     if (typeof window.hexaDpeApresChargement === 'function') window.hexaDpeApresChargement();
   }
@@ -23146,6 +23201,23 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
   .p-suivi-pop { position: absolute; right: 0; top: calc(100% + 8px); z-index: 70; min-width: 470px; background: #fff; border: 1px solid #E2E8F0;
     border-radius: 10px; box-shadow: 0 12px 30px rgba(0, 0, 0, .15); padding: 12px 14px; }
   .p-suivi-pop[hidden] { display: none; }
+  /* Lot 6h : dans « Suivi », la visite technique d'abord, « Valider la VT » bien visible ; la facture ensuite */
+  .p-suivi-pop .fiche-statvt-top { display: flex; flex-direction: column; }
+  .p-suivi-pop .fiche-statvt-top .fiche-vt-row { order: -1; }
+  .p-suivi-pop .fiche-vt-btn.fiche-vt-valider { background: #16A34A; color: #fff; font-size: 14px; font-weight: 800; padding: 8px 16px; border-radius: 8px; }
+  .fiche-fact-row[hidden] { display: none !important; }
+  .fiche-facture-generer { background: #002E5A; color: #fff; font-weight: 700; }
+  .fiche-facture-voir { font-weight: 700; color: #1D4ED8; }
+  .docs-facture-row.docs-cible { outline: 2px solid #16A34A; outline-offset: 4px; border-radius: 6px; }
+  /* Lot 6h : pré-note provisoire (bandeau orange, filigrane à l'impression) et note définitive (bandeau vert, écran) */
+  .sim-dim-provisoire { margin: 0 0 10px; padding: 10px 14px; background: #FFF4E5; border: 1px solid #F5B25B; border-radius: 8px; color: #9A4A00; font-weight: 700; font-size: 13px; line-height: 1.4; }
+  .sim-dim-filigrane { display: none; }
+  @media print {
+    .sim-dim-filigrane { display: flex; position: fixed; inset: 0; align-items: center; justify-content: center; pointer-events: none; z-index: 99999; }
+    .sim-dim-filigrane span { transform: rotate(-35deg); font: 800 56px/1 Arial, sans-serif; color: rgba(194, 65, 12, .22); white-space: nowrap; }
+  }
+  .devis-note-definitive { padding: 9px 16px; background: #DCFCE7; border-bottom: 1px solid #86EFAC; color: #14532D; font-weight: 800; font-size: 14px; }
+  .devis-note-definitive[hidden] { display: none; }
   body.l5 .p-suivi-pop .fiche-statvt-top { flex-direction: column; align-items: flex-start !important; gap: 10px; border: 0; margin: 0 !important; padding: 0 !important; }
   body.l5 .p-suivi-pop .fiche-statvt-top::before { font-size: 12px; color: #002E5A; font-weight: 800; }
   body.l5 .p-suivi-pop .fiche-statvt-top > div { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -23467,6 +23539,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
   .p6-btn--bleu[aria-expanded="true"] { background: var(--p6-bluebg); }
   .p6-btn--rouge { border: 1px solid var(--p6-red); background: #fff; color: var(--p6-red); padding: 0 16px; }
   .p6-btn--plein { border: 0; background: var(--p6-red); color: #fff; padding: 0 18px; }
+  .p6-btn--vert { border: 0; background: #15803D; color: #fff; padding: 0 14px; }   /* Lot 6h : note définitive */
   .p6-cases { display: flex; flex-direction: column; gap: 1px; justify-self: start; font-size: 11px; color: var(--p6-grey); }
   .p6-cases .l4s-case { font-size: 11px; }
   body.l6 #p-hotes #sim-arguments.is-open { position: absolute; left: 14px; right: 14px; top: 10px; bottom: 70px; z-index: 5; overflow: auto; background: #fff;
@@ -23620,7 +23693,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
   .p6-barre .p6-cases { grid-column: 1 / -1; grid-row: 1; flex-direction: row; gap: 18px; justify-self: start; white-space: nowrap; }
   .p6-barre .p6-btn { grid-row: 2; height: 38px; white-space: nowrap; font-size: 12.5px; padding: 0 12px; }
   .p6-barre .p6-btn--prec { grid-column: 1; } .p6-barre #sim-arguments-btn { grid-column: 2; }
-  .p6-barre #btn-pre-devis { grid-column: 4; } .p6-barre #btn-voir-devis { grid-column: 5; }
+  .p6-barre #btn-pre-devis, .p6-barre #btn-note-definitive { grid-column: 4; } .p6-barre #btn-voir-devis { grid-column: 5; }
   .p6-cases .l4s-case { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
   .p6-cases input[type=checkbox] { appearance: none; -webkit-appearance: none; width: 28px; height: 16px; margin: 0; border-radius: 8px; background: #CBD5E1;
     position: relative; cursor: pointer; flex: none; transition: background .15s; }
