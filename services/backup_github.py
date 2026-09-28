@@ -40,6 +40,7 @@ def _collect_json_files(data_dir):
     """Tous les *.json sous DATA_DIR (exclut PDF/documents binaires)."""
     files = {}
     for root, _dirs, names in os.walk(data_dir):
+        _dirs[:] = [d for d in _dirs if d != "cache_dvf"]   # cache public DVF (30 jours) : rien à sauvegarder
         for name in names:
             if not name.endswith(".json"):
                 continue

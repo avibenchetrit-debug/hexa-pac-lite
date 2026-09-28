@@ -108,7 +108,9 @@ def test_devis_suit_le_delegataire(client):
 
 # ---------------------------------------------------------------- 4. dates en jj/mm/aaaa
 def test_dates_francaises():
-    assert main._doc_status("DPE officiel", {"numero_dpe": "2506E3080625Z"}, "2025-09-29") == "DPE officiel trouvé (n°2506E3080625Z du 29/09/2025)"
+    # Partie B : le message de la recherche DPE (services/dpe_audit) remplace _doc_status, date toujours en jj/mm/aaaa
+    c = main.dpe_audit.candidat({"numero_dpe": "2506E3080625Z", "date_etablissement_dpe": "2025-09-29"}, "dpe", "")
+    assert (c["date_fr"], c["valeurs"]["dpe_date"]) == ("29/09/2025", "29/09/2025")
     assert main._date_heure_fr("2025-09-29T10:12:00+02:00") == "29/09/2025 à 10h12"
 
 
