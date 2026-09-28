@@ -11603,7 +11603,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     form = document.getElementById('form-prospect');
     modal = document.getElementById('modal-erreur');
     modalListe = document.getElementById('modal-erreur-liste');
-    if (!btnSave || !form) return;
+    if (!btnSave || !form) return false;
     const btn = btnSave;
 
     // 1. Nettoyer le RFR (retirer espaces)
@@ -11630,7 +11630,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
         modalListe.appendChild(li);
       });
       modal.classList.add('show');
-      return;
+      return false;
     }
 
     const prospectNumero = (document.body.dataset.prospectNumero || '').trim();
@@ -11644,7 +11644,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
           window.__skipDuplicateCheck = true;
           onSaveClick({ preventDefault(){} });
         });
-        return;
+        return false;
       }
     }
     window.__skipDuplicateCheck = false;
@@ -11657,7 +11657,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     btn.dataset.label = saveLabel;
     btn.disabled = true;
     btn.innerHTML = '⏳ Enregistrement…';
-    fetch(url, { method: 'POST', body: fd, headers: { 'X-Requested-With': 'fetch' }, credentials: 'same-origin' })
+    return fetch(url, { method: 'POST', body: fd, headers: { 'X-Requested-With': 'fetch' }, credentials: 'same-origin' })
       .then(async (r) => {
         let data = {};
         try { data = await r.json(); } catch (e) { /* ignore */ }
@@ -11681,7 +11681,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
             saveToast(`Erreur technique (HTTP ${r.status})`, '#B91C1C');
           }
           if (rfrInput) rfrInput.value = formaterRFR(rfrInput.value);
-          return;
+          return false;
         }
 
         if (!(data.ok || data.status === 'ok')) {
@@ -11693,7 +11693,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
           });
           modal?.classList.add('show');
           if (rfrInput) rfrInput.value = formaterRFR(rfrInput.value);
-          return;
+          return false;
         }
 
         const savedNumero = (data.numero || data.lead?.numero || prospectNumero || '').trim();
@@ -11718,6 +11718,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
         if (typeof window.hexaRefreshProspectsTable === 'function') {
           window.hexaRefreshProspectsTable();
         }
+        return true;
       })
       .catch(() => {
         btn.disabled = false;
@@ -11728,8 +11729,15 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
         modalListe.appendChild(li);
         modal?.classList.add('show');
         saveToast('Erreur technique réseau', '#B91C1C');
+        return false;
       });
   }
+  // Lot 6d : « Voir le devis » enregistre la fiche avant d'ouvrir (true = enregistrée)
+  // (lead déjà existant : pas d'alerte doublon ici, elle bloquerait l'ouverture à chaque clic ; Enregistrer la garde)
+  window.hexaEnregistrerFiche = () => {
+    if ((document.body.dataset.prospectNumero || '').trim()) window.__skipDuplicateCheck = true;
+    return onSaveClick({ preventDefault(){} });
+  };
 
   const SAVE_ICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
           <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
@@ -15591,7 +15599,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
           </div>
           <div class="sim-note l4-cache" id="sim-service-note">${ecsDuo ? 'La PAC (modèle DUO) assure le chauffage et l\'eau chaude. Aucun ballon à ajouter.' : 'La PAC assure le chauffage. Pour l\'eau chaude : conserver l\'existant ou ajouter un ballon thermodynamique (sans aide MaPrimeRénov\' depuis le 01/09/2026).'}</div>
           ${ecsDuo ? `<div class="p6-ok" id="sim-ecs-duo">L'eau chaude est assurée par la PAC DUO. Rien à ajouter.</div>` : `
-          ${alerteEcsChaudiere(state) ? `<div class="p6-alerte" id="sim-alerte-ecs">L'eau chaude est faite par la chaudière qui va être déposée : il faudra une solution (PAC DUO ou ballon).</div>` : ''}
+          ${alerteEcsChaudiere(state) ? `<div class="p6-note-ecs" id="sim-alerte-ecs">La PAC assure uniquement le chauffage des radiateurs.</div>` : ''}
           <div class="p6-sep"></div>
           <div class="p6-sec">2 · BALLON THERMODYNAMIQUE <span class="p6-sec-sub">· option, sans aide MaPrimeRénov' · prix du catalogue admin</span></div>
           <div class="p6-g p6-g3">
@@ -15653,7 +15661,6 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
             <label class="l4s-case"><input type="checkbox" id="sim-afficher-apercu" ${state.afficher_apercu !== false ? 'checked' : ''}> Économies sur le devis</label>
             <label class="l4s-case"><input type="checkbox" id="sim-afficher-mention-mpr" ${state.afficher_mention_mpr !== false ? 'checked' : ''}> Mention MaPrimeRénov'</label>
           </span>
-          <button type="button" id="btn-pre-devis" class="p6-btn p6-btn--rouge">Pré-devis</button>
           <button type="button" id="btn-voir-devis" class="p6-btn p6-btn--plein">Voir le devis</button>`;
     const aides = renderAides(c);
     return { surface, iso, aides, besoin, pac, fin, resultat, barre };
@@ -16125,8 +16132,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
         else if (b.dataset.finMpr) { state.financement_mpr = b.dataset.finMpr; }
         else if (b.dataset.opt) { state.option = b.dataset.opt; }
         else if (b.dataset.paie) { state.option = b.dataset.paie === 'comptant' ? 'opt3' : (state.option === 'opt3' ? 'opt1' : state.option); }
-        else if (b.id === 'btn-voir-devis') { ouvrirModalDevis(); return; }
-        else if (b.id === 'btn-pre-devis') { ouvrirModalDevis('pre_devis'); return; }
+        else if (b.id === 'btn-voir-devis') { ouvrirModalDevis(); return; }   // Lot 6d : pré-devis tant que la VT n'est pas validée
         else if (b.closest('[data-sim-for="sim-service"]')) {
           // même effet que l'ancienne liste : change déclenché (recalcul + sauvegarde de l'état)
           const selService = document.getElementById('sim-service');
@@ -16516,6 +16522,10 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     const boutons = ['btn-voir-devis', 'btn-pre-devis'].map(id => document.getElementById(id)).filter(Boolean);
     boutons.forEach(b => { b.disabled = true; b.setAttribute('aria-busy', 'true'); });
     try {
+      // Lot 6d : la fiche d'abord (sinon le devis valide l'ancienne fiche : « Champs à compléter » sur un champ
+      // qui vient d'être saisi). Dossier facturé : rien n'est enregistré, le devis archivé s'ouvre.
+      if (!window.__hexaDossierFige && typeof window.hexaEnregistrerFiche === 'function'
+          && document.getElementById('btn-save') && !(await window.hexaEnregistrerFiche())) return 'fiche';
       return await saveSimulatorState();
     } finally {
       boutons.forEach(b => { b.disabled = false; b.removeAttribute('aria-busy'); });
@@ -16535,7 +16545,9 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
   async function ouvrirModalDevis(varianteForcee){
     const numero = state.numero || document.body.dataset.prospectNumero;
     if(!numero) return;
-    if (!(await enregistrerAvantDevis())) { signalerEchecEnregistrementDevis(); return; }
+    const enregistre = await enregistrerAvantDevis();
+    if (enregistre === 'fiche') return;                  // Lot 6d : la fiche a affiché ses erreurs
+    if (!enregistre) { signalerEchecEnregistrementDevis(); return; }
     const validation = await fetch(`/api/devis/${encodeURIComponent(numero)}/validate`, { cache:'no-store' }).then(r=>r.json()).catch(()=>({ok:false, missing:['Validation indisponible']}));
     if (!validation.ok) {
       const oldErr = document.getElementById('devis-missing-modal');
@@ -16552,7 +16564,16 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
       document.body.appendChild(err);
       const closeErr = () => err.remove();
       err.querySelector('.devis-close-btn')?.addEventListener('click', closeErr);
-      err.querySelector('#btn-completer-devis')?.addEventListener('click', ()=>{ closeErr(); document.getElementById('form-prospect')?.scrollIntoView({behavior:'smooth'}); });
+      err.querySelector('#btn-completer-devis')?.addEventListener('click', ()=>{
+        closeErr();
+        // Lot 6d : parcours en étapes -> première étape de la fiche où il manque un champ (l'ancien défilement ne menait nulle part)
+        if (typeof window.hexaParcoursEtats === 'function' && typeof window.hexaParcoursEtape === 'function') {
+          const e = window.hexaParcoursEtats().find(x => x.etape <= 5 && x.etat === 'manque');
+          window.hexaParcoursEtape(e ? e.etape : 1);
+          return;
+        }
+        document.getElementById('form-prospect')?.scrollIntoView({behavior:'smooth'});
+      });
       err.addEventListener('click', e=>{ if(e.target===err) closeErr(); });
       return;
     }
@@ -22887,7 +22908,88 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
   };
 })();
 </script>
+<style id="hexa-lot6d">
+  /* Lot 6d : étape 6, colonne de droite. Libellés 15 px, montants 16 px, montants clés 24 px ; l'explication sous son
+     libellé, jamais tronquée ; les lignes s'étirent sur la hauteur libre. Si la colonne déborde (cas chargés :
+     tout de suite + avance + crédit + ballon), .p6-dense puis .p6-dense2 resserrent : zéro défilement à 1366×768. */
+  #p6-droite-defil { display: flex; flex-direction: column; }
+  #p-sim-6r-corps { flex: 1 0 auto; display: flex; flex-direction: column; }
+  #p-sim-6r-corps > #sim-dynamic { flex: 1 0 auto; gap: 12px; }
+  #sim-dynamic > .p6-blk { flex: 1 0 auto; gap: 6px; padding: 10px 12px; }
+  #sim-dynamic .p6-blk > h4 { font-size: 11.5px; margin: 0 0 2px; }
+  #sim-dynamic .p6-calc { flex: 1 0 auto; align-items: center; gap: 12px; padding: 6px 12px; min-height: 0; }
+  #sim-dynamic .p6-calc-l { flex-direction: column; align-items: flex-start; gap: 1px; overflow: visible; }
+  #sim-dynamic .p6-calc-l b { flex: none; font-size: 15px; line-height: 19px; white-space: normal; }
+  #sim-dynamic .p6-calc-l i { flex: none; font-size: 12px; line-height: 15px; white-space: normal; overflow: visible; text-overflow: clip; }
+  #sim-dynamic .p6-calc-v { font-size: 16px; }
+  #sim-dynamic .p6-calc--cle .p6-calc-v { font-size: 16px; }
+  #sim-dynamic .p6-calc--tot .p6-calc-v, #sim-dynamic .p6-calc--fin .p6-calc-v { font-size: 24px; line-height: 28px; }
+  /* ② vu du client : ce qu'il paie (−) en texte foncé neutre, ce qu'il récupère (+) en vert ; ① garde le vert des aides */
+  #sim-dynamic .p-quand .p6-calc--moins { background: #F1F4F8; }
+  #sim-dynamic .p-quand .p6-calc--moins .p6-calc-v { color: #1E293B; }
+  #sim-dynamic .p-quand .p6-calc--plus { background: var(--p6-greenbg); }
+  #sim-dynamic .p-quand .p6-calc--plus .p6-calc-v { color: var(--p6-green); }
+  #sim-dynamic .p6-tuile { padding: 6px 10px; }
+  #sim-dynamic .p6-tuile > span { font-size: 12px; }
+  #sim-dynamic .p6-tuile > b, body.l6 #p-hotes #sim-dynamic .p6-tuile .sim-roi-big { font-size: 17px; }
+  #sim-dynamic .p6-tuile > i, body.l6 #p-hotes #sim-dynamic .p6-tuile .sim-roi-big-sub { font-size: 11px; }
+  /* resserrement automatique, seulement si la colonne déborde */
+  #p-sim-6r.p6-dense #sim-dynamic { gap: 6px; }
+  #p-sim-6r.p6-dense #sim-dynamic > .p6-blk { gap: 3px; padding: 6px 10px; }
+  #p-sim-6r.p6-dense #sim-dynamic .p6-calc { padding: 3px 10px; }
+  #p-sim-6r.p6-dense #sim-dynamic .p6-calc-l i { font-size: 11px; line-height: 13px; }
+  #p-sim-6r.p6-dense #sim-dynamic .p6-tuile { padding: 3px 9px; }
+  #p-sim-6r.p6-dense2 #sim-dynamic .p6-calc-l b { font-size: 13.5px; line-height: 16px; }
+  #p-sim-6r.p6-dense2 #sim-dynamic .p6-calc-v { font-size: 15px; }
+  #p-sim-6r.p6-dense2 #sim-dynamic .p6-calc--tot .p6-calc-v, #p-sim-6r.p6-dense2 #sim-dynamic .p6-calc--fin .p6-calc-v { font-size: 20px; line-height: 24px; }
+  #p-sim-6r.p6-dense2 #sim-dynamic .p6-calc { padding: 2px 10px; }
+  #p-sim-6r.p6-dense2 #sim-dynamic .p6-calc-l i { font-size: 10.5px; line-height: 12px; }
+  #p-sim-6r.p6-dense2 #sim-dynamic .p6-tuile > b, body.l6 #p-hotes #p-sim-6r.p6-dense2 .p6-tuile .sim-roi-big { font-size: 14px; }
+  /* tuiles : libellé et valeur sur une ligne, le détail dessous */
+  #p-sim-6r.p6-dense2 #sim-dynamic .p6-tuile { flex-direction: row; flex-wrap: wrap; align-items: baseline; column-gap: 6px; }
+  #p-sim-6r.p6-dense2 #sim-dynamic .p6-tuile > i, body.l6 #p-hotes #p-sim-6r.p6-dense2 .p6-tuile .sim-roi-big-sub { flex-basis: 100%; }
+  /* cas les plus chargés (tout de suite + avance + crédit + ballon) */
+  #p-sim-6r.p6-dense3 #sim-dynamic { gap: 4px; }
+  #p-sim-6r.p6-dense3 #p6-droite-defil { padding-top: 4px; padding-bottom: 4px; }
+  #p-sim-6r.p6-dense3 #sim-dynamic > .p6-blk { gap: 2px; padding: 4px 8px; }
+  #p-sim-6r.p6-dense3 #sim-dynamic .p6-blk > h4 { font-size: 10px; }
+  #p-sim-6r.p6-dense3 #sim-dynamic .p6-calc { padding: 1px 10px; }
+  #p-sim-6r.p6-dense3 #sim-dynamic .p6-calc-l b { font-size: 13px; line-height: 15px; }
+  #p-sim-6r.p6-dense3 #sim-dynamic .p6-calc-l i { font-size: 10px; line-height: 11.5px; }
+  #p-sim-6r.p6-dense3 #sim-dynamic .p6-calc-v { font-size: 14px; }
+  #p-sim-6r.p6-dense3 #sim-dynamic .p6-calc--tot .p6-calc-v, #p-sim-6r.p6-dense3 #sim-dynamic .p6-calc--fin .p6-calc-v { font-size: 18px; line-height: 21px; }
+  #p-sim-6r.p6-dense3 #sim-dynamic .p6-tuile { padding: 2px 8px; }
+  #p-sim-6r.p6-dense3 #sim-dynamic .p6-base { margin-top: 1px; }
+</style>
+<script id="hexa-lot6d-js">
+/* Lot 6d : resserre la colonne de droite de l'étape 6 seulement si elle déborde (mesure après chaque rendu). */
+(function(){
+  let attente = false;
+  function ajuster(){
+    attente = false;
+    const hote = document.getElementById('p-sim-6r'), defil = document.getElementById('p6-droite-defil');
+    if (!hote || !defil || hote.hidden || !defil.clientHeight) return;
+    hote.classList.remove('p6-dense', 'p6-dense2', 'p6-dense3');
+    for (const cls of ['p6-dense', 'p6-dense2', 'p6-dense3']) {
+      if (defil.scrollHeight <= defil.clientHeight + 1) break;
+      hote.classList.add(cls);
+    }
+  }
+  function planifier(){ if (!attente) { attente = true; requestAnimationFrame(ajuster); } }
+  window.hexaAjusterDroite6 = ajuster;
+  function brancher(){
+    const corps = document.getElementById('p-sim-6r-corps'), hote = document.getElementById('p-sim-6r');
+    if (!corps || !hote) { setTimeout(brancher, 500); return; }
+    new MutationObserver(planifier).observe(corps, { childList: true, subtree: true, characterData: true });
+    new MutationObserver(planifier).observe(hote, { attributes: true, attributeFilter: ['hidden'] });
+    window.addEventListener('resize', planifier);
+    planifier();
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', brancher); else brancher();
+})();
+</script>
 <style id="hexa-lot6c-verrou">
+  .p6-note-ecs { font-size: 13px; line-height: 18px; color: #334155; }   /* Lot 6d : phrase simple, plus d'alerte orange */
   .p6-fige-bandeau { display: none; flex: none; margin-left: auto; height: 24px; line-height: 22px; padding: 0 12px; border-radius: 12px;
     background: #FEF3C7; color: #92400E; border: 1px solid #F59E0B; font-size: 12px; font-weight: 800; white-space: nowrap; }
   body.p6-fige .p6-fige-bandeau { display: inline-flex; align-items: center; }
