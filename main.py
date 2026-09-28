@@ -852,6 +852,48 @@ def _read_echanges():
     return echanges if isinstance(echanges, dict) else {}
 
 
+# Lot 6e : mention CEE obligatoire du devis et du pré-devis, par délégataire (Admin → Délégataires CEE, modifiable).
+# Variables : {montant_cee} = prime CEE du devis en chiffres (« 11 893,80 ») ; {montant_cee_lettres} = en lettres.
+MENTION_CEE_DEFAUT = {
+    "PICOTY": ("Mention RAI — Partenaire Picoty",
+               "Prime liée à la valorisation des certificats d'économies d'énergie versée par PICOTY, société au capital "
+               "social de 1 548 360,00 €, immatriculée au RCS de Guéret sous le n° 777 347 386, dont le siège social est "
+               "situé rue André et Guy PICOTY – BP1 23300 LA SOUTERRAINE. Représentée par ECAIR, société au capital social "
+               "de 132 970,00 €, immatriculée au RCS de Bobigny sous le n° 952 862 670, dont le siège social est situé "
+               "5 rue Pleyel, 93200 SAINT-DENIS, en qualité de mandataire, pour la somme de {montant_cee} euros."),
+    # texte ACE d'avant le Lot 6e, à l'identique (montant en lettres)
+    "ACE": ("Mention RAI — Partenaire ACE Énergie",
+            "« La présente offre comprend une Prime d'un montant de {montant_cee_lettres} euros, qui vous est offerte par "
+            "ACE ÉNERGIE (SIREN : 848 595 336) dans le cadre de son rôle actif et incitatif, au titre du dispositif des "
+            "certificats d'économies d'énergie »"),
+}
+
+
+def _mention_cee_defaut(d: dict) -> tuple:
+    nom = str((d or {}).get("nom") or "").strip()
+    if nom.upper() in MENTION_CEE_DEFAUT:
+        return MENTION_CEE_DEFAUT[nom.upper()]
+    if not nom:
+        return MENTION_CEE_DEFAUT["ACE"]
+    return (f"Mention RAI — Partenaire {nom}",
+            "« La présente offre comprend une Prime d'un montant de {montant_cee_lettres} euros, qui vous est offerte par "
+            + nom.upper() + " dans le cadre de son rôle actif et incitatif, au titre du dispositif des certificats "
+            "d'économies d'énergie »")
+
+
+def _montant_fr(valeur) -> str:
+    """11893.8 -> « 11 893,80 » (espace insécable entre les milliers, 2 décimales)."""
+    return f"{float_value(valeur):,.2f}".replace(",", "\u00a0").replace(".", ",")
+
+
+def _mention_cee(d: dict, montant_cee, montant_cee_lettres: str) -> tuple:
+    titre_defaut, texte_defaut = _mention_cee_defaut(d)
+    titre = str((d or {}).get("mention_titre") or "").strip() or titre_defaut
+    texte = str((d or {}).get("mention_devis") or "").strip() or texte_defaut
+    texte = texte.replace("{montant_cee}", _montant_fr(montant_cee)).replace("{montant_cee_lettres}", str(montant_cee_lettres or ""))
+    return titre, texte
+
+
 def _read_delegataires():
     delegataires = _read_json(DELEGATAIRES_PATH, DEFAULT_DELEGATAIRES)
     delegataires = delegataires if isinstance(delegataires, list) else DEFAULT_DELEGATAIRES
@@ -864,9 +906,15 @@ def _read_delegataires():
         d = dict(d)
         if not d.get("usage") and usage_delegataire(d):
             d["usage"] = usage_delegataire(d)
+        # Lot 6e : mention CEE pré-remplie (PICOTY / ACE) tant qu'elle n'a pas été enregistrée dans l'admin
+        if "mention_devis" not in d or "mention_titre" not in d:
+            titre, texte = _mention_cee_defaut(d)
+            d.setdefault("mention_titre", titre)
+            d.setdefault("mention_devis", texte)
         out.append(d)
     if not any(usage_delegataire(d) == "tout_de_suite" for d in out):
-        out.append({"nom": "ACE", "mwh_precaire": "", "mwh_classique": "", "actif": False, "usage": "tout_de_suite"})
+        out.append({"nom": "ACE", "mwh_precaire": "", "mwh_classique": "", "actif": False, "usage": "tout_de_suite",
+                    "mention_titre": MENTION_CEE_DEFAUT["ACE"][0], "mention_devis": MENTION_CEE_DEFAUT["ACE"][1]})
     return out
 
 
@@ -4141,12 +4189,9 @@ def _build_devis_context(request: Request, numero: str, version: int | None = No
     # Lot 6b : la mention RAI nomme le délégataire qui valorise la prime (attente MPR : PICOTY ; tout de suite : ACE)
     _deleg = choisir_delegataire(admin.get("delegataires") or [], mode_cee(prospect, state, admin),
                                  devis_value(prospect, "categorie_revenu", "categorie", default="modeste"))[0] or {}
-    _nom_deleg = str(_deleg.get("nom") or "").strip()
-    if _nom_deleg.upper() == "ACE" or not _nom_deleg:
-        context["delegataire_titre"], context["delegataire_mention"] = "ACE Énergie", "ACE ÉNERGIE (SIREN : 848 595 336)"
-    else:
-        context["delegataire_titre"] = _nom_deleg
-        context["delegataire_mention"] = str(_deleg.get("mention_devis") or _nom_deleg.upper())
+    # Lot 6e : texte complet de la mention, stocké sur le délégataire ; montant = la ligne « Prime CEE » du devis
+    context["mention_cee_titre"], context["mention_cee_texte"] = _mention_cee(
+        _deleg, calculs.get("montant_cee"), calculs.get("montant_cee_lettres"))
     # Mêmes clés qu'avant le Lot 2 (compatibilité) ; l'économie ECS fixe du ballon n'existe plus.
     context["economie_devis"] = {
         "facture_apres_mois": _eco_res.get("apres_mensuel") if _eco_res.get("ok") else None,
