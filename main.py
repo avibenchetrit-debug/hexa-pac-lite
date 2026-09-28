@@ -234,50 +234,82 @@ DEFAULT_PARAMS_FINANCEMENT = {
 # Lot 6 : script d'appel de l'« Accompagnateur d'appel » (une entrée par étape du parcours).
 # Stocké dans la config admin (parametres_admin.json, clé script_appel), jamais dans le lead.
 # Encarts : condition "" (toujours), "qN=R" (réponse R à la question N, à partir de 1), "dpe" (DPE ou audit
-# connu), "dpe_classe=F,G", "energie=fioul,gaz", "ecs_chaudiere", "categorie=superieur", "service=chauffage_seul".
-# Textes : [Civilité Nom], [prénom de l'utilisateur], [prénom du client], [nom du client], [année du DPE],
-# [date du DPE], [classe DPE] sont remplacés à l'affichage.
+# connu), "dpe_classe=F,G", "energie=fioul,gaz", "ecs_chaudiere", "ecs=independant", "categorie=superieur",
+# "service=chauffage_seul", "rfr" (revenu saisi) ; « a & b » = les deux, « a | b » = l'un ou l'autre, « !a » = le contraire.
+# Lot 6i : une question peut être un texte « à dire » (type "dire") ; une réponse peut avoir un texte à dire ("texte") et
+# une explication repliée ("explication", « ▸ Expliquer au client ») ; une étape aussi ("explication").
+# Variables remplacées à l'affichage : [civilité nom], [prénom utilisateur], [surface], [année], [année du DPE],
+# [X coût théorique], [catégorie], [aides], [MPR], [CEE], [reste à charge], [économie mensuelle], [année avis],
+# [année revenus] (et les anciennes : [prénom du client], [nom du client], [date du DPE], [classe DPE]).
 DEFAULT_SCRIPT_APPEL = {
     "etapes": {
         "1": {
             "titre": "Prise de contact",
-            "intro": "Bonjour [Civilité Nom], [prénom de l'utilisateur] de la société Hexa-Rénov'. Je vous contacte car "
-                     "nous avons reçu de votre part une demande pour un projet d'installation de pompe à chaleur air-eau.",
+            "intro": "Bonjour [civilité nom], [prénom utilisateur] de la société Hexa-Rénov'. Je vous contacte car nous avons reçu "
+                     "de votre part une demande pour un projet d'installation de pompe à chaleur air-eau.",
             "questions": [
                 {"texte": "Êtes-vous bien à l'origine de cette demande ?",
                  "reponses": [{"libelle": "Oui", "consigne": "", "alerte": False},
-                              {"libelle": "Non", "consigne": "S'excuser et clôturer : Fin d'appel → statut « Erreur ».", "alerte": True,
-                               "action": "cloturer"}]},
-                {"texte": "Avez-vous un moment pour mieux comprendre votre projet ?",
+                              {"libelle": "Non", "consigne": "", "alerte": True, "action": "cloturer",
+                               "texte": "Excusez-moi pour le dérangement, bonne journée."}]},
+                {"texte": "Avez-vous un moment pour qu'on parle de votre projet ?",
                  "reponses": [{"libelle": "Oui", "consigne": "", "alerte": False},
-                              {"libelle": "Non, rappeler", "consigne": "« Quand puis-je vous rappeler ? » → Fin d'appel → programmer le rappel.", "alerte": True,
-                               "action": "rappel"}]},
+                              {"libelle": "Non, rappeler", "consigne": "", "alerte": True, "action": "rappel",
+                               "texte": "Pas de souci. Quand puis-je vous rappeler ?"}]},
                 {"texte": "Où en êtes-vous dans votre projet ?",
-                 "reponses": [{"libelle": "Découverte", "consigne": "", "alerte": False},
-                              {"libelle": "Sait ce qu'il veut", "consigne": "", "alerte": False}]},
+                 "reponses": [{"libelle": "Découverte", "alerte": False,
+                               "consigne": "Prime CEE : uniquement si la pompe à chaleur remplace une chaudière fioul ou gaz.",
+                               "explication": "Le fioul et le gaz coûtent de plus en plus cher.\n"
+                                              "La pompe à chaleur fonctionne comme un frigo à l'envers : le frigo sort la chaleur de "
+                                              "l'intérieur ; la pompe à chaleur prend la chaleur de l'air dehors, même en hiver, et la "
+                                              "fait entrer chez vous.\n"
+                                              "Résultat : avec le fioul ou le gaz, 1 kWh acheté = 1 kWh de chaleur ; avec la pompe à "
+                                              "chaleur, 1 kWh acheté = 3,5 kWh de chaleur. C'est plus de 3 fois plus économique. Et "
+                                              "votre maison prend de la valeur, parce que sa note énergétique s'améliore.\n"
+                                              "Vous avez droit à deux aides : MaPrimeRénov', de l'État, selon vos revenus ; la prime "
+                                              "CEE, payée par les fournisseurs d'énergie. Ensemble, elles peuvent aller jusqu'à "
+                                              "10 800 €. Et on les déduit directement de votre devis : vous avancez moins."},
+                              {"libelle": "Sait ce qu'il veut", "alerte": False,
+                               "consigne": "Sa réponse indique l'argument à mettre en avant à l'étape 6.",
+                               "texte": "Très bien. Vous avez déjà un devis ? Qu'est-ce qui vous fait nous appeler : le prix, la "
+                                        "confiance, ou les aides déduites du devis ?"}]},
             ],
-            "encarts": [
-                {"titre": "À EXPLIQUER :", "texte": "", "condition": "q3=1"},
-                {"titre": "À DEMANDER :", "texte": "", "condition": "q3=2"},
-            ],
+            "encarts": [],
         },
         "2": {
             "titre": "Le logement",
             "intro": "Pour préparer votre projet, j'ai besoin de quelques informations sur votre logement. Ça prend deux minutes.",
             "questions": [
-                {"texte": "« Quelle est l'adresse exacte du logement ? »", "reponses": []},
-                {"texte": "« C'est bien une maison ? Elle fait environ [surface] m², construite vers [année] ? »", "reponses": []},
-                {"texte": "« Vous en êtes propriétaire et vous y habitez ? »", "reponses": [],
-                 "note": "Si loué : demander l'adresse où il habite. Si achat en cours : demander la date de signature chez le notaire."},
-                {"texte": "« Depuis [année du DPE], avez-vous fait des travaux d'isolation : toit, murs ou fenêtres ? »",
+                {"texte": "Quelle est l'adresse exacte du logement ?", "reponses": [],
+                 "note": "La choisir dans la liste proposée. Le DPE se cherche tout seul."},
+                {"texte": "C'est bien une maison ou un appartement ? Elle fait environ [surface] m², construite vers [année] ?",
+                 "reponses": [], "condition": "dpe", "note": "Relire les valeurs du DPE. Le client confirme ou corrige."},
+                {"texte": "Depuis [année du DPE], avez-vous fait des travaux d'isolation : toit, murs ou fenêtres ?", "condition": "dpe",
                  "reponses": [{"libelle": "Non", "consigne": "", "alerte": False},
-                              {"libelle": "Oui", "consigne": "Noter les travaux dans « Isolation » (toit, murs, fenêtres).", "alerte": False}]},
-                {"texte": "« Vous chauffez toute la maison, ou certaines pièces restent fermées ? »", "reponses": []},
+                              {"libelle": "Oui", "consigne": "Corriger le bloc 4.", "alerte": False,
+                               "texte": "Qu'avez-vous fait exactement ?"}]},
+                {"type": "dire", "condition": "!dpe", "reponses": [],
+                 "texte": "Je n'ai pas trouvé de diagnostic pour votre logement. Pas de souci, on va le remplir ensemble.",
+                 "note": "Poser chaque question et remplir le champ."},
+                {"texte": "C'est une maison ou un appartement ?", "reponses": [], "condition": "!dpe"},
+                {"texte": "Quelle est la surface habitable, à peu près ?", "reponses": [], "condition": "!dpe"},
+                {"texte": "Elle a été construite vers quelle année ? Même approximativement.", "reponses": [], "condition": "!dpe"},
+                {"texte": "Quelle est la hauteur sous plafond ? Environ 2,50 m ?", "reponses": [], "condition": "!dpe"},
+                {"texte": "Les combles ou le toit sont isolés ?", "reponses": [], "condition": "!dpe"},
+                {"texte": "Et les murs ?", "reponses": [], "condition": "!dpe"},
+                {"texte": "Vos fenêtres sont en simple ou en double vitrage ?", "reponses": [], "condition": "!dpe"},
+                {"texte": "Vous en êtes propriétaire, et vous y habitez ?",
+                 "reponses": [{"libelle": "Oui, j'y habite", "consigne": "", "alerte": False},
+                              {"libelle": "Je le loue à quelqu'un", "consigne": "", "alerte": False,
+                               "texte": "Quelle est l'adresse où vous habitez ?"},
+                              {"libelle": "Achat en cours", "consigne": "", "alerte": False,
+                               "texte": "Quand signez-vous chez le notaire ?"}]},
+                {"texte": "Vous chauffez toute la maison, ou certaines pièces restent fermées ?", "reponses": [],
+                 "note": "Si des pièces ne sont pas chauffées, baisser la surface chauffée."},
             ],
             "encarts": [
-                {"titre": "À DIRE :", "texte": "« Votre maison consomme beaucoup : c'est justement là que la pompe à chaleur fait la plus "
-                                             "grosse différence. »", "condition": "dpe_classe=F,G"},
-                {"titre": "À DIRE :", "texte": "« Pas de souci, on va estimer ensemble. »", "condition": "!dpe"},
+                {"titre": "À DIRE :", "texte": "« Votre maison consomme beaucoup : c'est là que la pompe à chaleur fait la plus grosse "
+                                             "différence. »", "condition": "dpe_classe=F,G"},
                 {"titre": "À SAVOIR :", "texte": "Pas de MaPrimeRénov' pour un logement de moins de 15 ans. La prime CEE reste possible.",
                  "condition": "age<15"},
             ],
@@ -286,59 +318,117 @@ DEFAULT_SCRIPT_APPEL = {
             "titre": "Le chauffage",
             "intro": "Parlons maintenant de votre chauffage actuel.",
             "questions": [
-                {"texte": "« Vous vous chauffez comment aujourd'hui : fioul, gaz, électricité, bois ? »", "reponses": []},
-                {"texte": "« Vos radiateurs, ce sont des radiateurs à eau, en fonte ou en acier, ou des radiateurs électriques ? »", "reponses": []},
-                {"texte": "« Et l'eau chaude, c'est la même chaudière qui la fait ? »", "reponses": []},
-                {"texte": "« Combien payez-vous par an pour votre fioul ou votre gaz, à peu près ? »", "reponses": [],
-                 "note": "S'il ne sait pas : « Pas de souci, je vais l'estimer. »"},
-                {"texte": "« Votre compteur électrique est-il monophasé ou triphasé ? C'est écrit sur votre facture d'électricité. »", "reponses": []},
+                {"texte": "Vous vous chauffez comment aujourd'hui : fioul, gaz, électricité, bois ?", "reponses": []},
+                {"texte": "Vos radiateurs, ce sont des radiateurs à eau, en fonte ou en acier, ou des radiateurs électriques ?", "reponses": []},
+                {"texte": "Et l'eau chaude, c'est la même chaudière qui la fait ?", "reponses": []},
+                {"texte": "D'après votre diagnostic, votre chauffage coûte environ [X coût théorique] € par an. Attention, c'est un "
+                          "chiffre théorique : il est calculé avec une méthode officielle, comme si la maison était chauffée à 19 °C par "
+                          "une famille type, pas avec vos vraies habitudes. Vous avez une idée de ce que vous payez vraiment ? Par an "
+                          "ou par mois, comme vous préférez.", "reponses": [], "condition": "dpe",
+                 "note": "Montant réel donné → le saisir, c'est toujours plus précis.\nNe sait pas → on garde le chiffre du diagnostic."},
+                {"texte": "Combien payez-vous pour votre fioul ou votre gaz, à peu près ? Par an ou par mois.", "reponses": [],
+                 "condition": "!dpe",
+                 "note": "Ne sait pas → « Pas de souci, je vais l'estimer. » Cliquer sur Non : le CRM estime tout seul."},
+                {"texte": "Pouvez-vous aller voir votre compteur Linky, le compteur vert ? Sur l'étiquette, en haut, regardez les petits "
+                          "ronds : un rond, c'est du monophasé ; trois ronds, c'est du triphasé. Ensuite, appuyez sur la touche du "
+                          "compteur pour faire défiler les écrans : vous verrez la puissance de votre abonnement, en kVA.", "reponses": [],
+                 "note": "Ne peut pas vérifier → « Ne sait pas », le technicien vérifiera.\nPuissance trop faible pour la PAC : le "
+                         "client doit demander une augmentation à son fournisseur d'électricité, pour éviter les coupures. Ça peut "
+                         "prendre jusqu'à un mois : à lancer tôt."},
             ],
             "encarts": [
-                {"titre": "À DIRE :", "texte": "« C'est le cas où la pompe à chaleur fait la plus grosse économie, et où la prime est la "
-                                             "plus élevée. »", "condition": "energie=fioul,gaz"},
-                {"titre": "ATTENTION :", "texte": "« Il faudra créer un circuit de chauffage. Le technicien le verra lors de sa visite. »",
+                {"titre": "À DIRE :", "texte": "« C'est là que la pompe à chaleur fait la plus grosse économie. Et vous avez droit à la "
+                                             "prime CEE, parce qu'on remplace votre chaudière. »", "condition": "energie=fioul,gaz"},
+                {"titre": "À DIRE :", "texte": "« Pas de prime CEE dans ce cas : elle est réservée au remplacement d'une chaudière fioul "
+                                             "ou gaz. »", "condition": "energie=electricite,bois"},
+                {"titre": "ATTENTION :", "texte": "« Il faudra créer un circuit de chauffage. Le technicien le verra pendant sa visite. »",
                  "condition": "emetteurs=convecteurs_electriques"},
             ],
         },
         "4": {
             "titre": "Le foyer",
-            "intro": "Pour calculer vos aides, j'ai besoin de deux informations sur votre foyer.",
+            "intro": "",
+            "explication": "Pour calculer vos aides, j'ai besoin de deux informations sur votre foyer. L'État classe tous les foyers "
+                           "en 4 catégories de revenus : très modestes, modestes, intermédiaires et supérieurs. Plus vos revenus sont "
+                           "bas, plus vos aides sont élevées. C'est la même chose pour MaPrimeRénov' et pour la prime CEE. Je ne vous "
+                           "demande pas votre avis d'impôt maintenant : pour l'instant, c'est juste une simulation. Il vous sera "
+                           "demandé plus tard, pour le dossier. Ces informations restent confidentielles.",
             "questions": [
-                {"texte": "« Combien êtes-vous à vivre dans le logement ? »", "reponses": []},
-                {"texte": "« Quel est votre revenu fiscal de référence ? Il est sur votre dernier avis d'impôt, tout en bas de la "
-                          "première page, en gras. »", "reponses": []},
+                {"texte": "Combien êtes-vous à vivre dans le logement ?", "reponses": []},
+                {"texte": "Quel est votre revenu fiscal de référence ? Prenez votre dernier avis d'impôt, celui de [année avis] sur vos "
+                          "revenus de [année revenus]. Le montant est tout en bas de la première page, en gras.", "reponses": [],
+                 "note": "Deux avis d'impôt (couple non marié ni pacsé) → additionner les deux montants.\nPas sous la main → "
+                         "« Donnez-moi un montant approximatif, et vous me le confirmerez. » Programmer un rappel."},
             ],
             "encarts": [
-                {"titre": "S'IL HÉSITE :", "texte": "« C'est uniquement pour calculer vos aides : plus il est bas, plus vous avez droit à "
-                                                  "des aides. »", "condition": ""},
-                {"titre": "À DIRE :", "texte": "« Vous n'avez pas droit à MaPrimeRénov', mais la prime CEE reste acquise. »",
-                 "condition": "categorie=superieur"},
+                {"titre": "À DIRE :", "condition": "rfr",
+                 "texte": "« Compte tenu de votre situation, vous êtes dans la catégorie [catégorie]. Vous avez droit à [aides] € "
+                          "d'aides : [MPR] € de MaPrimeRénov' et [CEE] € de prime CEE. »"},
+                {"titre": "Si le client veut vérifier", "repliable": True, "condition": "rfr",
+                 "texte": "« Vous pouvez retrouver ces catégories sur le site officiel France Rénov', ou sur notre site hexa-renov.fr, "
+                          "à la page pompe à chaleur air-eau. »"},
+                {"titre": "S'IL HÉSITE :", "condition": "",
+                 "texte": "« C'est uniquement pour calculer vos aides : plus il est bas, plus vous y avez droit. »"},
+                {"titre": "À DIRE :", "condition": "categorie=superieur",
+                 "texte": "« Vous n'avez pas droit à MaPrimeRénov', mais la prime CEE reste possible si on remplace une chaudière "
+                          "fioul ou gaz. »"},
             ],
         },
         "5": {
             "titre": "Le besoin",
             "intro": "Maintenant, voyons ce que doit faire votre pompe à chaleur.",
             "questions": [
-                {"texte": "« Voulez-vous qu'elle chauffe uniquement la maison, ou aussi l'eau chaude ? »", "reponses": []},
-                {"texte": "« Quand on enlève la chaudière, il faut une solution pour l'eau chaude : un ballon thermodynamique, ou une "
-                          "pompe à chaleur qui fait aussi l'eau chaude. »", "reponses": [],
-                 "condition": "service=chauffage_seul & ecs_chaudiere"},
-                {"texte": "« Avez-vous une pièce non chauffée de plus de 15 m², comme un garage ou un cellier ? »", "reponses": [],
-                 "condition": "ballon"},
+                {"texte": "Voulez-vous qu'elle chauffe uniquement la maison, ou aussi l'eau chaude ?", "reponses": []},
+                {"type": "dire", "condition": "service=chauffage_ecs", "reponses": [],
+                 "texte": "Le modèle DUO a un ballon d'eau chaude intégré de 190 litres. Il est un peu plus cher, mais tout est réglé "
+                          "en un seul appareil. Les aides restent les mêmes.",
+                 "note": "190 litres conviennent en général jusqu'à 4 personnes. Au-delà, le signaler au technicien."},
+                {"type": "dire", "condition": "service=chauffage_seul & ecs=independant",
+                 "texte": "Vous pouvez garder votre ballon électrique, il continuera à faire votre eau chaude. Ou le remplacer par un "
+                          "ballon thermodynamique, qui consomme environ 3 fois moins.",
+                 "reponses": [{"libelle": "Il garde", "consigne": "", "alerte": False},
+                              {"libelle": "Il remplace", "consigne": "Poser la question suivante.", "alerte": False}]},
+                {"type": "dire", "condition": "service=chauffage_seul & ecs_chaudiere",
+                 "texte": "Quand on enlève votre chaudière, il faut une autre solution pour l'eau chaude : soit la pompe à chaleur "
+                          "DUO, avec son ballon intégré, soit un ballon thermodynamique à part.",
+                 "reponses": [{"libelle": "DUO", "consigne": "Choisir « Chauffage + eau chaude ».", "alerte": False},
+                              {"libelle": "Ballon", "consigne": "Poser la question suivante.", "alerte": False}]},
+                {"texte": "Avez-vous une pièce non chauffée de plus de 15 m², comme un garage ou un cellier ?",
+                 "condition": "q3=2 | q4=2 | ballon",
+                 "note": "Le ballon thermodynamique n'a plus droit à MaPrimeRénov' depuis le 01/09/2026. Son prix s'ajoute au devis, sans aide.",
+                 "reponses": [{"libelle": "Oui", "consigne": "→ ballon compact.", "alerte": False},
+                              {"libelle": "Petite pièce, gaines possibles", "consigne": "→ ballon compact gainable.", "alerte": False},
+                              {"libelle": "Pas de place", "consigne": "→ split : une partie dehors, une partie dedans.", "alerte": False}]},
             ],
-            "encarts": [],
+            "encarts": [
+                {"titre": "S'IL HÉSITE :", "condition": "service=chauffage_seul & ecs_chaudiere",
+                 "texte": "« Le modèle DUO fait tout en un seul appareil, un peu plus cher. Le ballon est une option à part, que vous "
+                          "pouvez aussi ajouter plus tard. »"},
+            ],
         },
         "6": {
             "titre": "La proposition",
             "intro": "J'ai tout ce qu'il me faut. Je vous explique ce que ça donne pour vous.",
             "questions": [
-                {"texte": "« Voulez-vous démarrer tout de suite, ou attendre l'accord de MaPrimeRénov', environ 5 mois ? »", "reponses": []},
-                {"texte": "« Comment préférez-vous payer : comptant, avec un crédit, ou avec un prêt à taux zéro ? »", "reponses": []},
+                {"texte": "Voulez-vous attendre l'accord de MaPrimeRénov', ou démarrer les travaux tout de suite ?",
+                 "reponses": [{"libelle": "Attendre", "consigne": "", "alerte": False,
+                               "texte": "L'accord prend environ 5 mois. Ensuite, on déduit la prime directement de votre devis : "
+                                        "vous n'avancez rien."},
+                              {"libelle": "Tout de suite", "consigne": "", "alerte": False,
+                               "texte": "On peut démarrer rapidement. Vous avancez la prime MaPrimeRénov', et l'État vous la reverse "
+                                        "sur votre compte bancaire après les travaux."}]},
+                {"texte": "Comment préférez-vous payer ?", "note": "Lire au client l'encadré jaune « À dire au client ».",
+                 "reponses": [{"libelle": "Comptant", "consigne": "Il paie lui-même.", "alerte": False},
+                              {"libelle": "Crédit travaux", "consigne": "", "alerte": False,
+                               "texte": "La banque paie l'entreprise à la fin des travaux, et vous remboursez chaque mois."},
+                              {"libelle": "Éco-PTZ", "consigne": "", "alerte": False,
+                               "texte": "C'est un prêt à taux zéro, sans intérêts. Votre banque vous prête l'argent, et vous "
+                                        "remboursez chaque mois."}]},
             ],
             "encarts": [
                 {"titre": "« C'est trop cher »", "repliable": True, "condition": "",
                  "texte": "« Je comprends. Mais regardez : avec les aides, il vous reste [reste à charge]. Et vous économisez "
-                          "[économie mensuelle] € par mois sur votre facture, dès le premier mois. Et les aides changent souvent : "
+                          "[économie mensuelle] € par mois sur votre facture, dès le premier mois. Les aides changent souvent : "
                           "l'État a moins d'argent, elles ont déjà baissé plusieurs fois. Aujourd'hui, vous y avez droit ; je ne peux "
                           "pas vous garantir que ce sera encore le cas dans six mois. »"},
                 {"titre": "« Je dois réfléchir / en parler à mon conjoint »", "repliable": True, "action": "rappel", "condition": "",
@@ -347,15 +437,56 @@ DEFAULT_SCRIPT_APPEL = {
                 {"titre": "« J'ai déjà un autre devis »", "repliable": True, "condition": "",
                  "texte": "« Très bien, comparez, c'est normal. Regardez bien trois choses : la marque de la pompe à chaleur, sa "
                           "puissance, et surtout l'installation. Et demandez-vous si l'entreprise sera encore là dans un an en cas de "
-                          "souci. Nous, oui : Hexa-Rénov', entreprise certifiée RGE, depuis [année de création]. »"},
+                          "souci. Nous, oui : Hexa-Rénov', entreprise certifiée RGE. »"},
                 {"titre": "POUR CONCLURE :", "condition": "",
-                 "texte": "« Je vous envoie votre pré-devis par e-mail. La prochaine étape, c'est la visite du technicien. Quel jour "
-                          "vous arrange ? »"},
+                 "texte": "« Est-ce que ça vous convient ? La prochaine étape, c'est la visite de notre technicien, chez vous, pour "
+                          "tout vérifier. Quel jour vous arrange ? Je vous envoie votre pré-devis par e-mail. »"},
             ],
         },
     },
-    # Lot 6f : version 2 = étapes 2 à 6 pré-remplies (une config enregistrée plus ancienne est complétée une fois)
-    "version": 2,
+    # Lot 6i : FAQ client (Admin → Script d'appel → « FAQ client »), ouverte par « ❓ Questions du client »
+    "faq": [
+        {"question": "Est-ce que ça fait du bruit ?",
+         "reponse": "L'unité extérieure fait un bruit léger, comparable à un réfrigérateur à quelques mètres. Le technicien la place "
+                    "loin des chambres et des voisins."},
+        {"question": "Est-ce que ça marche quand il fait très froid ?",
+         "reponse": "Oui. Les pompes à chaleur que nous proposons fonctionnent jusqu'à −20 °C dehors, et même plus froid pour certains "
+                    "modèles. Et leur puissance est calculée pour votre région, justement pour les jours les plus froids."},
+        {"question": "Je garde mes radiateurs ?",
+         "reponse": "Oui, si ce sont des radiateurs à eau. Le technicien vérifie pendant la visite."},
+        {"question": "Ma facture va augmenter ?",
+         "reponse": "Non, votre facture d'énergie baisse, à condition que la pompe à chaleur soit bien dimensionnée, c'est-à-dire de "
+                    "la bonne puissance pour votre maison. Sous-dimensionnée, elle tourne en permanence et déclenche sa résistance "
+                    "électrique d'appoint : elle consomme trop. Surdimensionnée, elle s'allume et s'éteint sans arrêt (on parle de "
+                    "cycles courts) : elle consomme plus et use le compresseur, qui peut casser. C'est pour ça qu'on vous pose des "
+                    "questions sur l'isolation de votre maison, ce qu'on appelle l'enveloppe thermique. Notre technicien les vérifie "
+                    "ensuite sur place. Bien dimensionnée, vous payez moins dès la première année, et encore plus sur 20 ans, parce "
+                    "que le prix du fioul et du gaz augmente en général plus vite que celui de l'électricité."},
+        {"question": "Vous faites l'entretien ?",
+         "reponse": "Non, l'entretien est un métier à part. Il est obligatoire tous les deux ans, et vous pouvez le confier au "
+                    "chauffagiste de votre choix."},
+        {"question": "C'est garanti combien de temps ?",
+         "reponse": "Le fabricant garantit l'appareil jusqu'à 5 ans, selon la marque. Et surtout, notre installation est couverte par "
+                    "notre garantie décennale : 10 ans."},
+        {"question": "Combien de temps durent les travaux ?",
+         "reponse": "En général, un à deux jours. Le technicien vous le confirme lors de sa visite."},
+        {"question": "Qui s'occupe des démarches ?",
+         "reponse": "C'est nous. On remplit tout pour MaPrimeRénov', la prime CEE et la déclaration en mairie. Vous avez juste quelques "
+                    "documents à signer. Tout est inclus, sans frais en plus."},
+        {"question": "Les aides sont garanties ?",
+         "reponse": "La prime CEE est déduite directement de votre devis. Pour MaPrimeRénov', le montant est confirmé par l'État quand "
+                    "il accepte votre dossier."},
+        {"question": "Et mon ancienne chaudière ?",
+         "reponse": "On la retire. Pour la cuve à fioul, c'est une entreprise spécialisée dans le dégazage qui s'en occupe."},
+        {"question": "Il faut une autorisation de la mairie ?",
+         "reponse": "Parfois, selon votre commune. Si elle est nécessaire, on fait la démarche pour vous."},
+        {"question": "Je peux changer d'avis ?",
+         "reponse": "Oui. Après la signature, vous avez 14 jours pour vous rétracter, sans frais."},
+        {"question": "Vous êtes certifiés ?",
+         "reponse": "Oui, nous sommes certifiés RGE. C'est obligatoire pour que vous puissiez toucher les aides."},
+    ],
+    # Lot 6i : version 3 = textes définitifs + FAQ ; une config enregistrée plus ancienne est remplacée une fois
+    "version": 3,
 }
 
 DEFAULT_PARAMETRES_ADMIN = {
@@ -3501,14 +3632,15 @@ def _script_appel() -> dict:
     for n in ("1", "2", "3", "4", "5", "6"):
         e = s["etapes"].get(n)
         etapes[n] = e if isinstance(e, dict) else json.loads(json.dumps(DEFAULT_SCRIPT_APPEL["etapes"][n]))
-    # Lot 6f : config enregistrée avant la version 2 -> étapes 2 à 6 pré-remplies, étape 1 (éditée) conservée telle quelle.
-    # Écrit une seule fois ; ensuite, ce qui est modifié dans l'admin reste.
-    if int(s.get("version") or 1) < 2:
-        for n in ("2", "3", "4", "5", "6"):
-            etapes[n] = json.loads(json.dumps(DEFAULT_SCRIPT_APPEL["etapes"][n]))
-        params["script_appel"] = {"etapes": etapes, "version": 2}
+    faq = s.get("faq") if isinstance(s.get("faq"), list) else json.loads(json.dumps(DEFAULT_SCRIPT_APPEL["faq"]))
+    # Lot 6i : config enregistrée avant la version 3 -> les textes définitifs remplacent tout le script (demande du
+    # 28/09/2026). Écrit une seule fois ; ensuite, ce qui est modifié dans l'admin reste.
+    if int(s.get("version") or 1) < 3:
+        nouveau = json.loads(json.dumps(DEFAULT_SCRIPT_APPEL))
+        params["script_appel"] = nouveau
         save_parametres_admin_atomic(params)
-    return {"etapes": etapes, "version": 2}
+        return nouveau
+    return {"etapes": etapes, "faq": faq, "version": 3}
 
 
 ACTIONS_SCRIPT = ("rappel", "cloturer")
@@ -3527,22 +3659,33 @@ def _nettoyer_script_appel(payload) -> dict:
     for n in ("1", "2", "3", "4", "5", "6"):
         e = src.get(n) if isinstance(src.get(n), dict) else {}
         questions = []
-        for q in (e.get("questions") or [])[:12]:
+        for q in (e.get("questions") or [])[:20]:
             if not isinstance(q, dict) or not txt(q.get("texte")):
                 continue
             # Lot 6f : champs facultatifs (action, note, condition, dépliable) écrits seulement s'ils sont renseignés
             reponses = [_sans_vides({"libelle": txt(r.get("libelle"), 60), "consigne": txt(r.get("consigne")), "alerte": bool(r.get("alerte")),
-                                     "action": r.get("action") if r.get("action") in ACTIONS_SCRIPT else ""}, ("action",))
+                                     "action": r.get("action") if r.get("action") in ACTIONS_SCRIPT else "",
+                                     "texte": txt(r.get("texte")), "explication": txt(r.get("explication"), 4000)},
+                                    ("action", "texte", "explication"))
                         for r in (q.get("reponses") or [])[:4] if isinstance(r, dict) and txt(r.get("libelle"), 60)]
             questions.append(_sans_vides({"texte": txt(q.get("texte")), "reponses": reponses, "note": txt(q.get("note")),
-                                          "condition": txt(q.get("condition"), 120)}, ("note", "condition")))
+                                          "condition": txt(q.get("condition"), 120), "type": "dire" if q.get("type") == "dire" else "",
+                                          "explication": txt(q.get("explication"), 4000)},
+                                         ("note", "condition", "type", "explication")))
         encarts = [_sans_vides({"titre": txt(c.get("titre"), 120), "texte": txt(c.get("texte")), "condition": txt(c.get("condition"), 120),
                                 "repliable": bool(c.get("repliable")), "action": "rappel" if c.get("action") == "rappel" else ""},
                                ("repliable", "action"))
                    for c in (e.get("encarts") or [])[:12] if isinstance(c, dict) and (txt(c.get("titre"), 120) or txt(c.get("texte")))]
-        etapes[n] = {"titre": txt(e.get("titre"), 80) or DEFAULT_SCRIPT_APPEL["etapes"][n]["titre"],
-                     "intro": txt(e.get("intro")), "questions": questions, "encarts": encarts}
-    return {"etapes": etapes, "version": 2}
+        etapes[n] = _sans_vides({"titre": txt(e.get("titre"), 80) or DEFAULT_SCRIPT_APPEL["etapes"][n]["titre"],
+                                 "intro": txt(e.get("intro")), "explication": txt(e.get("explication"), 4000),
+                                 "questions": questions, "encarts": encarts}, ("explication",))
+    faq_src = payload.get("faq") if isinstance(payload, dict) else None
+    if isinstance(faq_src, list):
+        faq = [{"question": txt(f.get("question"), 300), "reponse": txt(f.get("reponse"), 4000)}
+               for f in faq_src[:60] if isinstance(f, dict) and txt(f.get("question"), 300)]
+    else:                                      # enregistrement sans FAQ (ancien écran) : celle en place reste
+        faq = _script_appel().get("faq") or []
+    return {"etapes": etapes, "faq": faq, "version": 3}
 
 
 @app.get("/api/script-appel")
@@ -4614,13 +4757,16 @@ async def devis_public_pdf(numero: str, token: str, request: Request):
     if _items:
         _pdf_file = _items[0].get("file")
         if _pdf_file and os.path.exists(_pdf_file):
-            return FileResponse(_pdf_file, media_type="application/pdf", filename=f"Devis_{numero}.pdf")
+            return FileResponse(_pdf_file, media_type="application/pdf", headers=_entete_pdf_client(numero, _items[0]))
     pdf_bytes = _html_to_pdf_playwright(_render_devis_html(request, numero), request)
-    return StreamingResponse(
-        io.BytesIO(pdf_bytes),
-        media_type="application/pdf",
-        headers={"Content-Disposition": f'attachment; filename="Devis_{numero}.pdf"'},
-    )
+    num = generer_numero_devis(_find_lead(numero) or {}, _next_sent_version(numero))
+    return Response(pdf_bytes, media_type="application/pdf", headers=_entete_pdf("Devis", num))
+
+
+def _entete_pdf_client(numero: str, item: dict) -> dict:
+    """Lot 6i : côté client, « Devis_DE… » / « Pre-devis_PD… » (numéro imprimé sur le document envoyé)."""
+    pre = (item.get("variante") or "devis") == "pre_devis"
+    return _entete_pdf("Pre-devis" if pre else "Devis", _numero_imprime(item.get("numero_devis") or numero, pre))
 
 
 def _devis_bar_html(pdf_url: str, pre_devis: bool = False) -> str:
@@ -4686,7 +4832,7 @@ async def devis_public_versionne_pdf(numero: str, version: int, token: str, requ
     pdf_file = item.get("file")
     if not pdf_file or not os.path.exists(pdf_file):
         raise HTTPException(status_code=404, detail="Devis introuvable")
-    return FileResponse(pdf_file, media_type="application/pdf", filename=f"Devis_{numero}.pdf")
+    return FileResponse(pdf_file, media_type="application/pdf", headers=_entete_pdf_client(numero, item))
 
 
 _facture_lock = threading.Lock()
@@ -4911,11 +5057,9 @@ async def notedim_public_pdf(numero: str, token: str, request: Request):
     if not _verify_notedim_token(numero, token):
         raise HTTPException(status_code=403, detail="Lien invalide")
     pdf_bytes = _html_to_pdf_playwright(_render_notedim_html(request, numero), request)
-    return StreamingResponse(
-        io.BytesIO(pdf_bytes),
-        media_type="application/pdf",
-        headers={"Content-Disposition": f'attachment; filename="NoteDim_{numero}.pdf"'},
-    )
+    # Lot 6i : côté client, sans « DEFINITIVE » (réservé à l'usage interne)
+    return Response(pdf_bytes, media_type="application/pdf",
+                    headers=_entete_pdf("Note-de-dimensionnement", _numero_notedim_de(numero)))
 
 
 @app.get("/api/notedim/{numero}/pdf")

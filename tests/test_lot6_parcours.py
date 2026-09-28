@@ -41,25 +41,26 @@ def params_vierges():
 # ---------------------------------------------------------------- script d'appel
 def test_script_appel_par_defaut(client):
     s = client.get("/api/script-appel").json()
-    assert sorted(s["etapes"]) == ["1", "2", "3", "4", "5", "6"]
+    assert sorted(s["etapes"]) == ["1", "2", "3", "4", "5", "6"] and s["version"] == 3
     e1 = s["etapes"]["1"]
-    assert e1["intro"].startswith("Bonjour [Civilité Nom], [prénom de l'utilisateur] de la société Hexa-Rénov'.")
+    # Lot 6i : textes définitifs
+    assert e1["intro"].startswith("Bonjour [civilité nom], [prénom utilisateur] de la société Hexa-Rénov'.")
     assert "pompe à chaleur air-eau" in e1["intro"]
     assert [q["texte"] for q in e1["questions"]] == ["Êtes-vous bien à l'origine de cette demande ?",
-                                                      "Avez-vous un moment pour mieux comprendre votre projet ?",
+                                                      "Avez-vous un moment pour qu'on parle de votre projet ?",
                                                       "Où en êtes-vous dans votre projet ?"]
     assert [r["libelle"] for r in e1["questions"][0]["reponses"]] == ["Oui", "Non"]
-    assert e1["questions"][0]["reponses"][1]["alerte"] and "clôturer" in e1["questions"][0]["reponses"][1]["consigne"]
+    assert e1["questions"][0]["reponses"][1]["action"] == "cloturer"
+    assert e1["questions"][0]["reponses"][1]["texte"] == "Excusez-moi pour le dérangement, bonne journée."
     assert [r["libelle"] for r in e1["questions"][1]["reponses"]] == ["Oui", "Non, rappeler"]
-    assert "rappel" in e1["questions"][1]["reponses"][1]["consigne"]
+    assert e1["questions"][1]["reponses"][1]["action"] == "rappel"
     assert [r["libelle"] for r in e1["questions"][2]["reponses"]] == ["Découverte", "Sait ce qu'il veut"]
-    # deux encarts différents selon la réponse à la question 3
-    assert [c["condition"] for c in e1["encarts"]] == ["q3=1", "q3=2"]
+    assert e1["questions"][2]["reponses"][0]["explication"].startswith("Le fioul et le gaz coûtent de plus en plus cher.")
     e2 = s["etapes"]["2"]
-    # Lot 6f : la question d'isolation devient la question 4 de l'étape 2 ; étapes 3 à 6 pré-remplies (tests/test_lot6f.py)
-    assert "Depuis [année du DPE], avez-vous fait des travaux d'isolation : toit, murs ou fenêtres ?" in e2["questions"][3]["texte"]
+    assert "Depuis [année du DPE], avez-vous fait des travaux d'isolation : toit, murs ou fenêtres ?" == e2["questions"][2]["texte"]
     for n in "3456":
-        assert s["etapes"][n]["intro"] and s["etapes"][n]["questions"]
+        assert s["etapes"][n]["questions"]
+    assert len(s["faq"]) == 13
 
 
 def test_script_appel_ecriture_reservee_admin(client):

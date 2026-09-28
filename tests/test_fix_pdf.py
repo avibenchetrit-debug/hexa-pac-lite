@@ -119,8 +119,15 @@ def page(serveur):
 def _ouvrir_devis(pg, numero=None):
     if numero:
         pg.goto(f"{pg.base}/prospect/{numero}")
-        pg.wait_for_function("document.body.dataset.prospectNumero === %r" % numero)
-    pg.evaluate("window.hexaParcoursEtape(6)")
+        pg.wait_for_function("document.body.dataset.prospectNumero === %r && typeof window.hexaParcoursEtape === 'function'" % numero)
+    # la fiche peut encore se réafficher (étape 1) juste après son chargement : on insiste jusqu'à voir l'étape 6
+    for _ in range(10):
+        pg.evaluate("window.hexaParcoursEtape(6)")
+        try:
+            pg.wait_for_selector("#btn-voir-devis", state="visible", timeout=1500)
+            break
+        except sync_api.Error:
+            continue
     pg.click("#btn-voir-devis")
     pg.wait_for_selector("#devis-pdf-btn", timeout=30000)
 
