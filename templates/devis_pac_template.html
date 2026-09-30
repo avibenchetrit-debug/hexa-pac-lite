@@ -60,6 +60,13 @@
       padding-left: 0 !important;
       padding-right: 0 !important;
     }
+    /* Lot 7a : LA cause du bloc « Solution chauffage » plus étroit sur le PDF. Ses voisins perdent leur retrait
+       latéral à l'impression (les marges viennent de la page) ; .legal-intro, qui le contient, gardait sa MARGE
+       d'écran de 56 px de chaque côté : bloc rentré de 56 px à gauche et à droite. */
+    .legal-intro {
+      margin-left: 0 !important;
+      margin-right: 0 !important;
+    }
     .family, .lot, .recap, .recap-grid, .recap-rac, .reglements-box, .payment-card, .subcontractor {
       page-break-inside: avoid;
       break-inside: avoid;
