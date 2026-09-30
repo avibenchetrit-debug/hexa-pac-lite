@@ -5051,6 +5051,38 @@ def _mention_cee_d_origine(rec: dict, montant_cee_lettres: str) -> tuple:
             "reconstituée (PDF d'origine illisible) : texte ACE en vigueur à sa date")
 
 
+def _lignes_pdf(source) -> list:
+    try:
+        from pypdf import PdfReader
+        r = PdfReader(io.BytesIO(source) if isinstance(source, (bytes, bytearray)) else source)
+        return [re.sub(r"[ \t]+", " ", l).strip() for pg in r.pages for l in (pg.extract_text() or "").splitlines() if l.strip()]
+    except Exception:
+        return []
+
+
+AJOUTS_RECTIFICATIVE = ("Ancien système de chauffage déposé", "Application :", "Usage :",
+                        "Dépose et évacuation de l'ancienne chaudière", "Dépose et évacuation des équipements remplacés")
+
+
+def _differences_avec_l_originale(rec: dict, pdf_rectificative: bytes, numero_facture: str) -> list | None:
+    """Les lignes qui diffèrent entre la facture d'origine et la rectificative, HORS ajouts prévus (numéro, date
+    d'émission, mention en tête, ancien système / application / usage, ligne de dépose, pagination).
+    None si le PDF d'origine est illisible (la comparaison n'a pas pu se faire)."""
+    orig = _lignes_pdf(rec.get("file") or "")
+    if not orig:
+        return None
+    neuf = _lignes_pdf(pdf_rectificative)
+    aujourd_hui = datetime.now(PARIS_TZ).strftime("%d/%m/%Y")
+
+    def prevu(l, dates):
+        return (re.fullmatch(r"(.* )?Page \d+ / \d+", l) or any(a in l for a in AJOUTS_RECTIFICATIVE)
+                or rec.get("numero_facture", "") in l or numero_facture in l or "rectificative" in l.lower()
+                or "annule et remplace" in l or any(d and d in l and ("émission" in l or l == d) for d in dates))
+    en_moins = [l for l in orig if l not in neuf and not prevu(l, [rec.get("date_emission", "")])]
+    en_plus = [l for l in neuf if l not in orig and not prevu(l, [aujourd_hui])]
+    return [f"− {l}" for l in en_moins] + [f"+ {l}" for l in en_plus]
+
+
 def _montant_depuis_texte(v) -> float:
     return float_value(re.sub(r"[^\d,.-]", "", str(v or "")).replace(",", "."))
 
@@ -5089,9 +5121,11 @@ async def apercu_facture_rectificative(numero: str, request: Request, annule: st
     html, infos = _rendu_rectificative(request, numero, rec, APERCU_SANS_NUMERO)
     _verifier_rectifiable(numero, rec, infos)
     pdf = await run_in_threadpool(_html_to_pdf_playwright, html, request)
+    ecarts = _differences_avec_l_originale(rec, pdf, APERCU_SANS_NUMERO)
     return Response(pdf, media_type="application/pdf", headers={
         "Content-Disposition": f'inline; filename="Apercu-rectificative-{rec.get("numero_facture")}.pdf"',
-        "X-Mention-Source": infos["mention_source"].encode("ascii", "ignore").decode()})
+        "X-Mention-Source": infos["mention_source"].encode("ascii", "ignore").decode(),
+        "X-Ecarts-Originale": "non compare (PDF d'origine illisible)" if ecarts is None else str(len(ecarts))})
 
 
 @app.post("/api/facture/{numero}/rectificative")
@@ -5115,6 +5149,15 @@ async def emettre_facture_rectificative(numero: str, request: Request) -> JSONRe
         pdf_bytes = _html_to_pdf_playwright(html, request)
         pdf_bytes = _append_fiche_technique(pdf_bytes, numero)
         pdf_bytes = _append_fiche_ballon(pdf_bytes, numero)
+        # « Contenu IDENTIQUE à l'originale » : comparé ligne à ligne au PDF d'origine ; tout écart hors ajouts
+        # prévus (ex. sous-traitant ou fiche produit modifiés depuis dans l'admin) -> refus, rien n'est émis.
+        ecarts = _differences_avec_l_originale(rec, pdf_bytes, numero_facture)
+        if ecarts is None:
+            raise HTTPException(status_code=409, detail="PDF de la facture d'origine illisible : comparaison impossible, "
+                                                        "rectificative refusée")
+        if ecarts:
+            raise HTTPException(status_code=409, detail="La rectificative différerait de l'originale au-delà des ajouts "
+                                                        "prévus — rien n'est émis : " + " | ".join(ecarts[:8]))
         pdf_path = _facture_pdf_path(numero, numero_facture)
         _write_pdf(pdf_path, pdf_bytes)
         counters[f"facture_{annee}"] = seq

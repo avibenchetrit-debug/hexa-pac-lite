@@ -131,3 +131,23 @@ def test_montant_different_refuse(base, dossier_facture):
     assert r.status_code == 409 and "différent" in r.json()["detail"]
     assert len(main._read_factures_meta()[NUM]) == 1
     assert main._read_json(main.COUNTERS_PATH, {}).get(f"facture_{time.strftime('%Y')}") == 1
+
+
+def test_ecart_hors_ajouts_prevus_refuse(base, dossier_facture):
+    """Le sous-traitant a changé dans l'admin depuis l'originale : la rectificative ne serait plus identique."""
+    params = main.load_parametres_admin()
+    st = next((x for x in params.get("sous_traitants", []) if x.get("actif")), None)
+    if not st:
+        pytest.skip("aucun sous-traitant actif dans les paramètres par défaut")
+    ancien_nom = st.get("entreprise")
+    st["entreprise"] = "AUTRE ENTREPRISE SAS"
+    main.save_parametres_admin_atomic(params)
+    try:
+        r = httpx.post(f"{base}/api/facture/{NUM}/rectificative", json={}, cookies=_cookies("admin"), timeout=120)
+        assert r.status_code == 409 and "AUTRE ENTREPRISE SAS" in r.json()["detail"]
+        assert len(main._read_factures_meta()[NUM]) == 1
+        assert main._read_json(main.COUNTERS_PATH, {}).get(f"facture_{time.strftime('%Y')}") == 1
+    finally:
+        params = main.load_parametres_admin()
+        next(x for x in params.get("sous_traitants", []) if x.get("actif"))["entreprise"] = ancien_nom
+        main.save_parametres_admin_atomic(params)
