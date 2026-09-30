@@ -18,6 +18,32 @@ TYPE_EMETTEURS_LABELS = {
     "convecteurs_electriques": "Convecteurs électriques",
 }
 
+# Lot 7a (30/09/2026) — exigé par le bureau de contrôle ACE, dans le bloc « Solution chauffage » du devis ET
+# de la facture, sous le libellé BAR-TH-171 : l'ancien système DÉPOSÉ (chaudière fioul / gaz / charbon : rien
+# d'autre n'est écrit), le type d'application (termes EXACTS d'ACE, deux cas) et l'usage.
+ENERGIES_CHAUDIERE_DEPOSEE = ("fioul", "gaz", "charbon")
+
+
+def lignes_solution_chauffage(prospect, state=None) -> dict:
+    energie = str(value(prospect, "mode_chauffage", "chauffage_actuel", default="") or "").strip().lower()
+    emetteurs = str(value(prospect, "type_emetteurs", default="") or "").strip().lower()
+    service = str(value(state or {}, "service", default="chauffage_seul") or "").strip().lower()
+    ancien = (f"Ancien système de chauffage déposé : chaudière {energie} — énergie : {energie}"
+              if energie in ENERGIES_CHAUDIERE_DEPOSEE else "")
+    if emetteurs == "plancher_chauffant":
+        application = "Application : basse température"
+    elif emetteurs.startswith("radiateurs"):
+        application = "Application : moyenne ou haute température"
+    else:
+        application = ""
+    usage = ("Usage : chauffage + eau chaude sanitaire" if service in ("chauffage_ecs", "chauffage+ecs")
+             else "Usage : chauffage")
+    return {"ancien_systeme": ancien, "application": application, "usage": usage,
+            "depose_induits": (f"Dépose et évacuation de l'ancienne chaudière {energie}" if ancien
+                               else "Dépose et évacuation des équipements remplacés - chaudière"),
+            "energie_non_mentionnee": "" if ancien else (energie or "non renseignée")}
+
+
 TEMP_BASE_ZONE = {"H1": -7, "H2": -4, "H3": 0}
 # Zone climatique H1 / H2 / H3 par département : répartition OFFICIELLE utilisée par les fiches d'opérations
 # standardisées CEE (dont BAR-TH-171 « Pompe à chaleur de type air/eau », facteur de zone H1 1,2 · H2 1 · H3 0,7).

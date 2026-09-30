@@ -42,6 +42,7 @@ from starlette.background import BackgroundTask
 
 from services.service_devis import (
     DEPT_ZONE,
+    lignes_solution_chauffage,
     calculer_devis,
     calculer_economie_devis,
     resoudre_ballon,
@@ -1077,12 +1078,21 @@ MENTION_CEE_DEFAUT = {
                "situé rue André et Guy PICOTY – BP1 23300 LA SOUTERRAINE. Représentée par ECAIR, société au capital social "
                "de 132 970,00 €, immatriculée au RCS de Bobigny sous le n° 952 862 670, dont le siège social est situé "
                "5 rue Pleyel, 93200 SAINT-DENIS, en qualité de mandataire, pour la somme de {montant_cee} euros."),
-    # texte ACE d'avant le Lot 6e, à l'identique (montant en lettres)
+    # Lot 7a (30/09/2026) : texte EXACT exigé par ACE, montant en chiffres (= la ligne « Prime CEE » du devis)
     "ACE": ("Mention RAI — Partenaire ACE Énergie",
-            "« La présente offre comprend une Prime d'un montant de {montant_cee_lettres} euros, qui vous est offerte par "
-            "ACE ÉNERGIE (SIREN : 848 595 336) dans le cadre de son rôle actif et incitatif, au titre du dispositif des "
-            "certificats d'économies d'énergie »"),
+            "« La présente offre comprend une prime de {montant_cee} € offerte par ACE ÉNERGIE (SIREN : 848 595 336) "
+            "dans le cadre du dispositif des CEE »"),
 }
+# L'ancien texte ACE (montant en lettres) : une mention enregistrée TELLE QUELLE dans l'admin est remplacée par
+# le nouveau texte (une seule fois) ; une mention modifiée à la main reste celle de l'admin.
+MENTION_ACE_AVANT_LOT7A = (
+    "« La présente offre comprend une Prime d'un montant de {montant_cee_lettres} euros, qui vous est offerte par "
+    "ACE ÉNERGIE (SIREN : 848 595 336) dans le cadre de son rôle actif et incitatif, au titre du dispositif des "
+    "certificats d'économies d'énergie »")
+
+
+def _est_ace(d: dict) -> bool:
+    return bool(re.match(r"^ACE\b", str((d or {}).get("nom") or "").strip().upper()))
 
 
 def _mention_cee_defaut(d: dict) -> tuple:
@@ -1127,6 +1137,8 @@ def _read_delegataires():
             titre, texte = _mention_cee_defaut(d)
             d.setdefault("mention_titre", titre)
             d.setdefault("mention_devis", texte)
+        if str(d.get("mention_devis") or "").strip() == MENTION_ACE_AVANT_LOT7A:
+            d["mention_devis"] = MENTION_CEE_DEFAUT["ACE"][1]          # Lot 7a : texte exigé par ACE
         out.append(d)
     if not any(usage_delegataire(d) == "tout_de_suite" for d in out):
         out.append({"nom": "ACE", "mwh_precaire": "", "mwh_classique": "", "actif": False, "usage": "tout_de_suite",
@@ -4340,6 +4352,12 @@ def _build_devis_context(request: Request, numero: str, version: int | None = No
     # Lot 6e : texte complet de la mention, stocké sur le délégataire ; montant = la ligne « Prime CEE » du devis
     context["mention_cee_titre"], context["mention_cee_texte"] = _mention_cee(
         _deleg, calculs.get("montant_cee"), calculs.get("montant_cee_lettres"))
+    # Lot 7a : délégataire ACE -> raison sociale + SIRET du sous-traitant juste après la mention (devis et facture ;
+    # le pré-devis, lui, ne nomme pas de sous-traitant).
+    context["solution_chauffage"] = lignes_solution_chauffage(prospect, state)   # Lot 7a · 3 et 4
+    context["mention_cee_sous_traitant"] = (
+        f"Sous-traitant : {sous_traitant_context.get('entreprise')} — SIRET {sous_traitant_context.get('siret') or '—'}"
+        if _est_ace(_deleg) and avec_sous_traitant and sous_traitant_context.get("entreprise") else "")
     # Mêmes clés qu'avant le Lot 2 (compatibilité) ; l'économie ECS fixe du ballon n'existe plus.
     context["economie_devis"] = {
         "facture_apres_mois": _eco_res.get("apres_mensuel") if _eco_res.get("ok") else None,
