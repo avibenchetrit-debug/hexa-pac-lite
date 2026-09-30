@@ -5181,6 +5181,104 @@ async def emettre_facture_rectificative(numero: str, request: Request) -> JSONRe
                          "mention_source": infos["mention_source"]})
 
 
+# ---- Lot 7c : ÉMETTRE LA RECTIFICATIVE DEPUIS UN APERÇU IMPORTÉ (rien n'est régénéré) ----
+# Avi importe l'aperçu PDF (« N° de facture : APERÇU — sans numéro ») ; le serveur le contrôle, MONTRE le numéro
+# qui sera attribué (étape « vérifier », rien n'est écrit), puis à la confirmation l'inscrit à la place de la marque
+# — même police, même taille, même place (services/rectificative_apercu.py) — et range la facture avec les autres.
+APERCU_MAX_OCTETS = 40 * 1024 * 1024
+
+
+def _prochain_numero_facture() -> str:
+    annee = datetime.now(PARIS_TZ).strftime("%Y")
+    counters = _read_json(COUNTERS_PATH, {"dossier": 0})
+    seq = int((counters if isinstance(counters, dict) else {}).get(f"facture_{annee}") or 0) + 1
+    return f"FA-{annee}-{seq:04d}"
+
+
+def _sans_espaces(t: str) -> str:
+    return re.sub(r"[\s\u00a0\u202f]+", " ", str(t or "")).strip()
+
+
+async def _controler_apercu_importe(request: Request, numero: str, annule: str, fichier: UploadFile) -> tuple:
+    """(facture d'origine, octets, analyse, contrôles) — ou HTTPException avec la raison, en clair."""
+    from services import rectificative_apercu as ra
+    _require_admin_session(request)
+    if not _dossier_fige(numero):
+        raise HTTPException(status_code=409, detail="Seulement sur un dossier facturé (verrouillé)")
+    rec = _facture_d_origine(numero, str(annule or "").strip())
+    if any(isinstance(r, dict) and r.get("rectifie") == rec.get("numero_facture")
+           for r in _read_factures_meta().get(numero, [])):
+        raise HTTPException(status_code=409, detail=f"La facture {rec.get('numero_facture')} a déjà une facture rectificative")
+    pdf = await fichier.read(APERCU_MAX_OCTETS + 1)
+    if len(pdf) > APERCU_MAX_OCTETS:
+        raise HTTPException(status_code=400, detail="Aperçu trop volumineux (40 Mo au plus)")
+    try:
+        a = ra.analyser(pdf)
+    except ra.ApercuInvalide as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from None
+    texte = _sans_espaces(a["texte"])
+    lead = _find_lead(numero) or {}
+    aujourd_hui = datetime.now(PARIS_TZ).strftime("%d/%m/%Y")
+    controles = [
+        ("Mention « annule et remplace la facture n° " + f"{rec.get('numero_facture')} du {rec.get('date_emission')} »",
+         "annule et remplace la facture n°" in texte and f"{rec.get('numero_facture')} du {rec.get('date_emission')}" in texte),
+        (f"Client : {str(lead.get('nom') or '').upper()}", bool(lead.get("nom")) and str(lead.get("nom")).upper() in texte.upper()),
+        (f"Ville du chantier : {lead.get('ville_chantier') or lead.get('ville') or ''}",
+         bool(lead.get("ville_chantier") or lead.get("ville")) and
+         str(lead.get("ville_chantier") or lead.get("ville")).upper() in texte.upper()),
+        (f"Date d'émission imprimée : {a['date_emission'] or 'introuvable'} (aujourd'hui : {aujourd_hui})",
+         a["date_emission"] == aujourd_hui),
+    ]
+    ko = [c for c, ok in controles if not ok]
+    if ko:
+        raise HTTPException(status_code=400, detail="Aperçu refusé — " + " ; ".join(ko))
+    return rec, pdf, a, [c for c, _ in controles]
+
+
+@app.post("/api/facture/{numero}/rectificative-apercu/verifier")
+async def verifier_rectificative_apercu(numero: str, request: Request, fichier: UploadFile = File(...),
+                                        annule: str = Form("")) -> JSONResponse:
+    """Étape 1 : contrôles + le numéro qui SERA attribué. Rien n'est écrit, aucun numéro consommé."""
+    rec, pdf, a, controles = await _controler_apercu_importe(request, numero, annule, fichier)
+    return JSONResponse({"ok": True, "numero_attribue": _prochain_numero_facture(), "annule": rec.get("numero_facture"),
+                         "pages": a["pages"], "controles": controles, "sha256": hashlib.sha256(pdf).hexdigest()})
+
+
+@app.post("/api/facture/{numero}/rectificative-apercu/emettre")
+async def emettre_rectificative_apercu(numero: str, request: Request, fichier: UploadFile = File(...),
+                                      annule: str = Form(""), numero_attendu: str = Form("")) -> JSONResponse:
+    """Étape 2 : le numéro montré à l'étape 1 est inscrit à la place de la marque ; la facture est rangée."""
+    from services import rectificative_apercu as ra
+    rec, pdf, a, controles = await _controler_apercu_importe(request, numero, annule, fichier)
+    with _facture_lock:
+        numero_facture = _prochain_numero_facture()
+        if numero_facture != str(numero_attendu or "").strip():
+            raise HTTPException(status_code=409, detail=f"Le prochain numéro est désormais {numero_facture} (et non "
+                                                        f"{numero_attendu}) : vérifiez de nouveau avant d'émettre")
+        try:
+            pdf_final = ra.tamponner(pdf, numero_facture)
+        except ra.ApercuInvalide as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from None
+        pdf_path = _facture_pdf_path(numero, numero_facture)
+        _write_pdf(pdf_path, pdf_final)
+        annee = numero_facture.split("-")[1]
+        counters = _read_json(COUNTERS_PATH, {"dossier": 0})
+        counters = counters if isinstance(counters, dict) else {"dossier": 0}
+        counters[f"facture_{annee}"] = int(numero_facture.rsplit("-", 1)[1])
+        _atomic_write_json(COUNTERS_PATH, counters)
+        meta = _read_factures_meta()
+        meta.setdefault(numero, []).append({
+            "numero_facture": numero_facture, "rectifie": rec.get("numero_facture"), "type": "rectificative",
+            "source": "apercu_importe", "numero_devis_ref": rec.get("numero_devis_ref"),
+            "version_devis": rec.get("version_devis"), "date_emission": datetime.now(PARIS_TZ).strftime("%d/%m/%Y"),
+            "date_fin_travaux": rec.get("date_fin_travaux"), "montant_ttc": rec.get("montant_ttc"),
+            "acquittee": False, "reglements": [], "controles": controles,
+            "sha256_apercu": hashlib.sha256(pdf).hexdigest(), "sha256": hashlib.sha256(pdf_final).hexdigest(),
+            "file": pdf_path, "created_at": _now_iso(), "par": (current_user(request) or {}).get("username")})
+        _atomic_write_json(FACTURES_META_PATH, meta)
+    return JSONResponse({"success": True, "numero_facture": numero_facture, "rectifie": rec.get("numero_facture")})
+
+
 # ---- Tracking d'ouverture email devis (pixel 1x1) ----
 _devis_open_lock = threading.Lock()
 _TRANSPARENT_GIF = base64.b64decode("R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7")

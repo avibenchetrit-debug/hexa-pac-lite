@@ -45,6 +45,11 @@ derrière la connexion ; `/api/...` répond 401 même pour une route inexistante
 - **Lot 7a** : mention CEE ACE exacte (montant en chiffres) + sous-traitant ; « Ancien système de chauffage déposé » et
   « Application » dans le bloc Solution chauffage (devis et facture) ; « Émettre une facture rectificative » (admin, dossier
   verrouillé ; comparée ligne à ligne au PDF d'origine avant émission, aperçu « APERÇU — sans numéro »).
+- **Lot 7c** : « 📄 Émettre la rectificative depuis un aperçu » (Documents → Factures, admin, dossier verrouillé) : l'aperçu
+  PDF importé est contrôlé, le numéro qui sera attribué est montré (`…/rectificative-apercu/verifier`, rien n'est écrit),
+  puis `…/emettre` l'inscrit à la place de « APERÇU — sans numéro » (`services/rectificative_apercu.py`, pypdf +
+  reportlab, polices reprises de l'aperçu) sans rien régénérer. PyMuPDF (AGPL) n'est volontairement PAS utilisé en
+  production ; il ne sert qu'aux tests, pour fabriquer un aperçu d'essai.
 - **Verrou « dossier facturé »** : installation finie ou facture émise → `dossier_fige` (jamais stocké), toute écriture du
   lead / du simulateur refusée en 423, fiche en lecture seule ; le devis et la note de dim servis sont ceux archivés à
   l'envoi (`data/devis/devis_meta.json`), rien n'est régénéré.
