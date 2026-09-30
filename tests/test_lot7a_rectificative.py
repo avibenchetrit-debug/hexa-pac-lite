@@ -60,6 +60,7 @@ def dossier_facture(base, monkeypatch):
     ace = dict(docs.DELEG[1], mention_titre="Mention RAI — Partenaire ACE Énergie", mention_devis=MENTION_ORIGINE)
     docs._preparer(deleg=[docs.DELEG[0], ace])
     monkeypatch.setattr(main, "lignes_solution_chauffage", lambda *a, **k: None)
+    monkeypatch.setattr(main, "ligne_regulateur", lambda *a, **k: None)          # Lot 7b : absente en juillet
     r = httpx.post(f"{base}/api/facture/{NUM}", json={"date_fin_travaux": "2026-07-30"}, timeout=120)
     assert r.status_code == 200, r.text
     monkeypatch.undo()
@@ -107,8 +108,9 @@ def test_rectificative_identique_sauf_ajouts(base, dossier_facture):
     # La mention CEE est celle de l'ORIGINALE, pas celle de l'admin d'aujourd'hui.
     assert "Texte CEE imprimé sur l'originale" in t_rect and "offerte par ACE ÉNERGIE (SIREN" not in t_rect
     # Tout le reste est identique, aux ajouts près.
-    ajouts = {"Ancien système de chauffage déposé : chaudière fioul — énergie : fioul",
-              "Application : moyenne ou haute température", "Usage : chauffage"}
+    ajouts = {"Ancien système de chauffage déposé : chaudière — énergie : fioul",
+              "Application : moyenne ou haute température", "Installation et paramétrage du régulateur"}
+    assert "Usage :" not in t_rect
     for a in ajouts:
         assert a in t_rect
     en_moins = [l for l in l_orig if l not in l_rect]

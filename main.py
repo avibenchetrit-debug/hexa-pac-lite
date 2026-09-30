@@ -43,6 +43,8 @@ from starlette.background import BackgroundTask
 from services.service_devis import (
     DEPT_ZONE,
     lignes_solution_chauffage,
+    ligne_regulateur,
+    champ_exige_ace,
     calculer_devis,
     calculer_economie_devis,
     resoudre_ballon,
@@ -4367,6 +4369,8 @@ def _build_devis_context(request: Request, numero: str, version: int | None = No
     # Lot 7a : délégataire ACE -> raison sociale + SIRET du sous-traitant juste après la mention (devis et facture ;
     # le pré-devis, lui, ne nomme pas de sous-traitant).
     context["solution_chauffage"] = lignes_solution_chauffage(prospect, state)   # Lot 7a · 3 et 4
+    context["regulateur"] = ligne_regulateur(description_specs)                  # Lot 7b · 3
+    context["champ_exige_ace"] = champ_exige_ace                                  # Lot 7b · 4
     context["mention_cee_sous_traitant"] = (
         f"Sous-traitant : {sous_traitant_context.get('entreprise')} — SIRET {sous_traitant_context.get('siret') or '—'}"
         if _est_ace(_deleg) and avec_sous_traitant and sous_traitant_context.get("entreprise") else "")
@@ -5060,7 +5064,9 @@ def _lignes_pdf(source) -> list:
         return []
 
 
-AJOUTS_RECTIFICATIVE = ("Ancien système de chauffage déposé", "Application :", "Usage :",
+# Lot 7b : EXACTEMENT les ajouts des lots 7a/7b (plus de ligne « Usage » ; + la ligne du régulateur).
+AJOUTS_RECTIFICATIVE = ("Ancien système de chauffage déposé : chaudière — énergie :", "Application :",
+                        "Installation et paramétrage du régulateur",
                         "Dépose et évacuation de l'ancienne chaudière", "Dépose et évacuation des équipements remplacés")
 
 
