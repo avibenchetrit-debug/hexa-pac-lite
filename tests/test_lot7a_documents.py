@@ -28,6 +28,8 @@ def client():
 
 def _preparer(lead=None, service="chauffage_seul", mode="sans_attente", deleg=DELEG):
     lead = dict(LEAD, **(lead or {}))
+    # Fiche jamais facturée au départ (un témoin précédent a pu l'émettre : elle serait verrouillée, 423).
+    main._atomic_write_json(main.FACTURES_META_PATH, {})
     main._atomic_write_json(main.DELEGATAIRES_PATH, deleg)
     main._atomic_write_json(main.LEADS_PATH, [lead])
     main._atomic_write_json(main._state_simulateur_path(lead["numero"]), {})
