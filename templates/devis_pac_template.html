@@ -1968,6 +1968,7 @@
     font-weight: 700;
     line-height: 1.45;
   }
+  .doc-rectificative { margin-top: 8px; font-size: 12px; font-weight: 700; color: var(--rouge); max-width: 340px; margin-left: auto; line-height: 1.4; }
   .pac-heating-note-lignes {
     margin: 5px 0 0;
     padding: 0;
@@ -3423,6 +3424,7 @@
 <div class="doc-type-value">{{ "Facture" if mode == 'facture' else ("Pré-devis" if pre_devis else "Devis") }}</div>
 <div class="doc-type-num"><span class="doc-type-num-label">N° de {{ "facture" if mode == 'facture' else ("pré-devis" if pre_devis else "devis") }} :</span> {{ numero_facture if mode == 'facture' else (("PD" + numero_devis[2:]) if pre_devis else numero_devis) }}</div>
 {% if mode == 'facture' %}<div class="doc-type-num"><span class="doc-type-num-label">Réf. devis :</span> {{ numero_devis_ref }}</div>{% endif %}
+{% if mode == 'facture' and facture_rectificative %}<div class="doc-rectificative" data-rectificative>Facture rectificative — annule et remplace la facture n° {{ facture_rectificative.numero }} du {{ facture_rectificative.date }}</div>{% endif %}
 </div>
 </header>
 <!-- INFOS -->

@@ -4908,7 +4908,7 @@ def _normaliser_reglements(rows) -> tuple[list, float]:
     return lignes, round(total, 2)
 
 
-def _render_facture_html(request: Request, numero: str, numero_facture: str, numero_devis_ref: str, date_fin_travaux: str, numero_dossier: str | None = None, acquittee: bool = False, reglements=None) -> str:
+def _render_facture_html(request: Request, numero: str, numero_facture: str, numero_devis_ref: str, date_fin_travaux: str, numero_dossier: str | None = None, acquittee: bool = False, reglements=None, surcharges: dict | None = None) -> str:
     ctx = _build_devis_context(request, numero, avec_sous_traitant=True, numero_dossier=numero_dossier)
     if ctx.get("_error_template"):
         raise HTTPException(status_code=400, detail="Champs manquants : facture impossible")
@@ -4921,6 +4921,7 @@ def _render_facture_html(request: Request, numero: str, numero_facture: str, num
     ctx["numero_devis_ref"] = numero_devis_ref
     ctx["date_fin_travaux"] = _format_date_fr(date_fin_travaux) or date_fin_travaux
     ctx["projet_apercu"] = None
+    ctx.update(surcharges or {})          # Lot 7a : facture rectificative (en-tête, mention d'origine, règlements)
     ctx.setdefault("request", request)
     return templates.env.get_template("devis_pac.html").render(ctx)
 
@@ -5001,6 +5002,134 @@ async def emettre_facture(numero: str, request: Request) -> JSONResponse:
         leads[idx]["updated_at"] = _now_iso()
         _atomic_write_json(LEADS_PATH, leads)
     return JSONResponse({"success": True, "numero_facture": numero_facture})
+
+
+# ---- Lot 7a · 7 : FACTURE RECTIFICATIVE ----
+# Exigée par le bureau de contrôle ACE sur un dossier déjà facturé : une NOUVELLE facture, dans la suite de
+# numérotation, qui « annule et remplace » l'originale. Son contenu est celui de l'originale — mêmes montants
+# (refus si le calcul d'aujourd'hui s'en écarte), même référence de devis, même date de fin de travaux, mêmes
+# règlements, MÊME mention CEE (lue dans le PDF d'origine) — plus les lignes « ancien système déposé » et
+# « application » du bloc Solution chauffage. L'originale et le devis archivé ne sont jamais touchés.
+APERCU_SANS_NUMERO = "APERÇU — sans numéro"
+
+
+def _facture_d_origine(numero: str, annule: str = "") -> dict:
+    meta = [r for r in _read_factures_meta().get(numero, []) if isinstance(r, dict)]
+    originales = [r for r in meta if not r.get("rectifie")]
+    if annule:
+        rec = next((r for r in originales if r.get("numero_facture") == annule), None)
+    else:
+        rec = originales[-1] if originales else None
+    if not rec:
+        raise HTTPException(status_code=404, detail="Facture d'origine introuvable")
+    return rec
+
+
+def _texte_pdf(path: str) -> str:
+    try:
+        from pypdf import PdfReader
+        # espaces ASCII seulement : les espaces insécables des montants (« 4 095,00 ») restent
+        return re.sub(r"[ \t\r\n]+", " ", " ".join((p.extract_text() or "") for p in PdfReader(path).pages))
+    except Exception:
+        return ""
+
+
+def _mention_cee_d_origine(rec: dict, montant_cee_lettres: str) -> tuple:
+    """(titre, texte, ligne sous-traitant, source) de la mention CEE imprimée sur la facture d'origine : lue dans son PDF ; à défaut,
+    celle en vigueur à sa date (avant les lots 6 : le texte ACE, montant en lettres)."""
+    texte = _texte_pdf(rec.get("file") or "")
+    m = re.search(r"(Mention RAI — Partenaire .+?)\s*(?:(Sous-traitant : .+? — SIRET [\d ]+?)\s+)?"
+                  r"(?=SAS |CONDITIONS DE PAIEMENT|Conditions de paiement|Page \d+ /|$)", texte)
+    if m:
+        bloc = m.group(1).strip()
+        titres = {str(d.get("mention_titre") or "") for d in _read_delegataires()} | {t for t, _ in MENTION_CEE_DEFAUT.values()}
+        titre = max((t for t in titres if t and bloc.startswith(t)), key=len, default="")
+        if titre:
+            return titre, bloc[len(titre):].strip(), (m.group(2) or "").strip(), "lue sur la facture d'origine"
+    return ("Mention RAI — Partenaire ACE Énergie",
+            MENTION_ACE_AVANT_LOT7A.replace("{montant_cee_lettres}", str(montant_cee_lettres or "")), "",
+            "reconstituée (PDF d'origine illisible) : texte ACE en vigueur à sa date")
+
+
+def _montant_depuis_texte(v) -> float:
+    return float_value(re.sub(r"[^\d,.-]", "", str(v or "")).replace(",", "."))
+
+
+def _rendu_rectificative(request: Request, numero: str, rec: dict, numero_facture: str) -> tuple:
+    """(html, infos) — infos : mention_source, montant_origine, montant_recalcule."""
+    ctx0 = _build_devis_context(request, numero, avec_sous_traitant=True, numero_dossier=_lead_numero_dossier(numero))
+    titre, texte, sous_traitant, source = _mention_cee_d_origine(rec, ctx0.get("montant_cee_lettres"))
+    regl = [x for x in (rec.get("reglements") or []) if isinstance(x, dict)] if rec.get("acquittee") else []
+    surcharges = {
+        "facture_rectificative": {"numero": rec.get("numero_facture", ""), "date": rec.get("date_emission", "")},
+        "mention_cee_titre": titre, "mention_cee_texte": texte, "mention_cee_sous_traitant": sous_traitant,
+        "reglements": regl, "reglements_total": money(sum(_montant_depuis_texte(x.get("montant")) for x in regl)),
+    }
+    html = _render_facture_html(request, numero, numero_facture, rec.get("numero_devis_ref") or "",
+                                rec.get("date_fin_travaux") or "", _lead_numero_dossier(numero),
+                                acquittee=bool(rec.get("acquittee")), reglements=None, surcharges=surcharges)
+    return html, {"mention_source": source, "montant_origine": rec.get("montant_ttc"),
+                  "montant_recalcule": _facture_montant_ttc(numero)}
+
+
+def _verifier_rectifiable(numero: str, rec: dict, infos: dict) -> None:
+    if not _dossier_fige(numero):
+        raise HTTPException(status_code=409, detail="Facture rectificative : seulement sur un dossier facturé (verrouillé)")
+    orig, recalc = infos.get("montant_origine"), infos.get("montant_recalcule")
+    if orig is None or recalc is None or abs(float_value(orig) - float_value(recalc)) > 0.005:
+        raise HTTPException(status_code=409, detail=f"Montant recalculé ({recalc}) différent de la facture d'origine "
+                                                    f"({orig}) : rectificative refusée, rien n'est émis")
+
+
+@app.get("/api/facture/{numero}/rectificative/apercu")
+async def apercu_facture_rectificative(numero: str, request: Request, annule: str = ""):
+    """Aperçu PDF « APERÇU — sans numéro » : aucun numéro consommé, rien d'écrit."""
+    _require_admin_session(request)
+    rec = _facture_d_origine(numero, annule)
+    html, infos = _rendu_rectificative(request, numero, rec, APERCU_SANS_NUMERO)
+    _verifier_rectifiable(numero, rec, infos)
+    pdf = await run_in_threadpool(_html_to_pdf_playwright, html, request)
+    return Response(pdf, media_type="application/pdf", headers={
+        "Content-Disposition": f'inline; filename="Apercu-rectificative-{rec.get("numero_facture")}.pdf"',
+        "X-Mention-Source": infos["mention_source"].encode("ascii", "ignore").decode()})
+
+
+@app.post("/api/facture/{numero}/rectificative")
+async def emettre_facture_rectificative(numero: str, request: Request) -> JSONResponse:
+    """« Émettre une facture rectificative » — admin, dossier verrouillé. Numéro GAPLESS (consommé après le PDF)."""
+    _require_admin_session(request)
+    payload = await _read_request_payload(request)
+    rec = _facture_d_origine(numero, str(payload.get("annule") or "").strip())
+    if any(isinstance(r, dict) and r.get("rectifie") == rec.get("numero_facture")
+           for r in _read_factures_meta().get(numero, [])):
+        raise HTTPException(status_code=409, detail=f"La facture {rec.get('numero_facture')} a déjà une facture rectificative")
+    annee = datetime.now(PARIS_TZ).strftime("%Y")
+    with _facture_lock:
+        counters = _read_json(COUNTERS_PATH, {"dossier": 0})
+        if not isinstance(counters, dict):
+            counters = {"dossier": 0}
+        seq = int(counters.get(f"facture_{annee}") or 0) + 1
+        numero_facture = f"FA-{annee}-{seq:04d}"
+        html, infos = _rendu_rectificative(request, numero, rec, numero_facture)
+        _verifier_rectifiable(numero, rec, infos)
+        pdf_bytes = _html_to_pdf_playwright(html, request)
+        pdf_bytes = _append_fiche_technique(pdf_bytes, numero)
+        pdf_bytes = _append_fiche_ballon(pdf_bytes, numero)
+        pdf_path = _facture_pdf_path(numero, numero_facture)
+        _write_pdf(pdf_path, pdf_bytes)
+        counters[f"facture_{annee}"] = seq
+        _atomic_write_json(COUNTERS_PATH, counters)
+        meta = _read_factures_meta()
+        meta.setdefault(numero, []).append({
+            "numero_facture": numero_facture, "rectifie": rec.get("numero_facture"), "type": "rectificative",
+            "numero_devis_ref": rec.get("numero_devis_ref"), "version_devis": rec.get("version_devis"),
+            "date_emission": datetime.now(PARIS_TZ).strftime("%d/%m/%Y"), "date_fin_travaux": rec.get("date_fin_travaux"),
+            "montant_ttc": rec.get("montant_ttc"), "acquittee": rec.get("acquittee"), "reglements": rec.get("reglements") or [],
+            "mention_source": infos["mention_source"], "file": pdf_path, "created_at": _now_iso(),
+            "par": (current_user(request) or {}).get("username")})
+        _atomic_write_json(FACTURES_META_PATH, meta)
+    return JSONResponse({"success": True, "numero_facture": numero_facture, "rectifie": rec.get("numero_facture"),
+                         "mention_source": infos["mention_source"]})
 
 
 # ---- Tracking d'ouverture email devis (pixel 1x1) ----
@@ -5904,6 +6033,9 @@ async def list_factures(numero: str) -> JSONResponse:
             "date_fin_travaux": _format_date_fr(rec.get("date_fin_travaux", "")) or rec.get("date_fin_travaux", ""),
             "montant_ttc": rec.get("montant_ttc"),
             "created_at": rec.get("created_at", ""),
+            "rectifie": rec.get("rectifie") or "",
+            "rectifiee_par": next((r.get("numero_facture") for r in meta if isinstance(r, dict)
+                                   and r.get("rectifie") and r.get("rectifie") == rec.get("numero_facture")), ""),
             "available": bool(path and os.path.exists(path)),
         })
     items.sort(key=lambda x: x.get("created_at") or "", reverse=True)

@@ -12790,14 +12790,39 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     } catch (_) { items = []; }
     if (!Array.isArray(items) || !items.length) { block.style.display = 'none'; root.innerHTML = ''; return; }
     block.style.display = '';
+    // Lot 7a : « Émettre une facture rectificative » — admin seulement (le serveur le vérifie aussi).
+    let estAdmin = false;
+    try { const me = await fetch('/api/auth/me', { cache:'no-store' }); estAdmin = me.ok && (await me.json()).role === 'admin'; } catch (_) {}
+    const rectifBtns = f => (estAdmin && !f.rectifie && !f.rectifiee_par)
+      ? `<button type="button" class="hexa-meta-card-action" data-rectif-apercu="${escapeHtml(f.numero_facture || '')}">👁 Aperçu rectificative</button>`
+        + `<button type="button" class="hexa-meta-card-action" data-rectif-emettre="${escapeHtml(f.numero_facture || '')}">🧾 Émettre une facture rectificative</button>`
+      : '';
     root.innerHTML = items.map(f => `
       <div class="docs-devis-row">
-        <div><b>${escapeHtml(f.numero_facture || '')}</b>${f.numero_devis_ref ? ` — réf. devis ${escapeHtml(f.numero_devis_ref)}` : ''}${f.acquittee ? ' <span class="fa-acq-tag">ACQUITTÉE</span>' : ''}</div>
+        <div><b>${escapeHtml(f.numero_facture || '')}</b>${f.numero_devis_ref ? ` — réf. devis ${escapeHtml(f.numero_devis_ref)}` : ''}${f.acquittee ? ' <span class="fa-acq-tag">ACQUITTÉE</span>' : ''}${f.rectifie ? ` <span class="fa-acq-tag" data-tag-rectificative>RECTIFICATIVE de ${escapeHtml(f.rectifie)}</span>` : ''}${f.rectifiee_par ? ` <span class="pv-muted" style="font-size:12px;">annulée et remplacée par ${escapeHtml(f.rectifiee_par)}</span>` : ''}</div>
         <div style="font-size:12px;color:#475569;margin-top:2px;">Émise le ${escapeHtml(f.date_emission || '—')} · Fin travaux ${escapeHtml(f.date_fin_travaux || '—')}${(f.montant_ttc !== null && f.montant_ttc !== undefined && f.montant_ttc !== '') ? ` · ${escapeHtml(String(f.montant_ttc))} € TTC` : ''}</div>
         <div class="docs-devis-actions">
           ${f.available ? `<button type="button" class="hexa-meta-card-action" data-facture-download="${escapeHtml(f.numero_facture || '')}">📥 Télécharger</button>` : '<span class="pv-muted" style="font-size:12px;">PDF indisponible</span>'}
+          ${rectifBtns(f)}
         </div>
       </div>`).join('');
+    root.querySelectorAll('[data-rectif-apercu]').forEach(btn => {
+      btn.addEventListener('click', () => window.open(`/api/facture/${encodeURIComponent(currentProspect)}/rectificative/apercu?annule=${encodeURIComponent(btn.dataset.rectifApercu)}`, '_blank'));
+    });
+    root.querySelectorAll('[data-rectif-emettre]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const orig = btn.dataset.rectifEmettre;
+        if (!window.confirm(`Émettre une facture rectificative qui annule et remplace ${orig} ? Un nouveau numéro de facture sera attribué.`)) return;
+        btn.disabled = true;
+        try {
+          const r = await fetch(`/api/facture/${encodeURIComponent(currentProspect)}/rectificative`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ annule: orig }) });
+          const j = await r.json().catch(() => ({}));
+          if (!r.ok) { alert('Facture rectificative non émise : ' + (j.detail || ('erreur ' + r.status))); btn.disabled = false; return; }
+          alert(`Facture rectificative ${j.numero_facture} émise (annule et remplace ${j.rectifie}).`);
+          refreshFacturesList();
+        } catch (e) { alert('Le serveur n’a pas répondu : rien n’a été émis.'); btn.disabled = false; }
+      });
+    });
     root.querySelectorAll('[data-facture-download]').forEach(btn => {
       btn.addEventListener('click', () => window.open(`/api/factures/${encodeURIComponent(currentProspect)}/download?numero_facture=${encodeURIComponent(btn.dataset.factureDownload)}`, '_blank'));
     });
