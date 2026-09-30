@@ -12796,6 +12796,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     const rectifBtns = f => (estAdmin && !f.rectifie && !f.rectifiee_par)
       ? `<button type="button" class="hexa-meta-card-action" data-rectif-apercu="${escapeHtml(f.numero_facture || '')}">👁 Aperçu rectificative</button>`
         + `<button type="button" class="hexa-meta-card-action" data-rectif-emettre="${escapeHtml(f.numero_facture || '')}">🧾 Émettre une facture rectificative</button>`
+        + `<button type="button" class="hexa-meta-card-action" data-rectif-import="${escapeHtml(f.numero_facture || '')}">📄 Émettre la rectificative depuis un aperçu</button>`
       : '';
     root.innerHTML = items.map(f => `
       <div class="docs-devis-row">
@@ -12808,6 +12809,9 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
       </div>`).join('');
     root.querySelectorAll('[data-rectif-apercu]').forEach(btn => {
       btn.addEventListener('click', () => window.open(`/api/facture/${encodeURIComponent(currentProspect)}/rectificative/apercu?annule=${encodeURIComponent(btn.dataset.rectifApercu)}`, '_blank'));
+    });
+    root.querySelectorAll('[data-rectif-import]').forEach(btn => {
+      btn.addEventListener('click', () => ouvrirRectifDepuisApercu(btn.dataset.rectifImport));
     });
     root.querySelectorAll('[data-rectif-emettre]').forEach(btn => {
       btn.addEventListener('click', async () => {
@@ -12828,6 +12832,72 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     });
   }
   window.refreshFacturesList = refreshFacturesList;
+
+  // Lot 7c : « Émettre la rectificative depuis un aperçu » — 1. importer le PDF et VÉRIFIER (le numéro qui sera
+  // attribué s'affiche, rien n'est écrit) ; 2. CONFIRMER (le serveur inscrit ce numéro à la place de la marque).
+  function ouvrirRectifDepuisApercu(orig) {
+    document.getElementById('rectif-apercu-overlay')?.remove();
+    const wrap = document.createElement('div');
+    wrap.id = 'rectif-apercu-overlay';
+    wrap.className = 'devis-modal-overlay';
+    wrap.innerHTML = `
+      <div class="rectif-apercu-box" role="dialog" aria-modal="true" aria-labelledby="rectif-apercu-titre">
+        <h3 id="rectif-apercu-titre">Émettre la rectificative depuis un aperçu</h3>
+        <p class="rectif-apercu-note">Facture d'origine : <b>${escapeHtml(orig)}</b>. Importez l'aperçu PDF (« N° de facture : APERÇU — sans numéro »).
+          Le serveur y inscrira le numéro de facture suivant, à la même place, dans la même police ; rien d'autre n'est modifié.</p>
+        <input type="file" accept="application/pdf" data-rectif-fichier>
+        <div class="rectif-apercu-res" data-rectif-res hidden></div>
+        <div class="rectif-apercu-actions">
+          <button type="button" class="adm-btn adm-btn-cancel" data-rectif-annuler>Annuler</button>
+          <button type="button" class="adm-btn adm-btn-ghost" data-rectif-verifier disabled>Vérifier</button>
+          <button type="button" class="adm-btn adm-btn-primary" data-rectif-confirmer hidden>Confirmer l'émission</button>
+        </div>
+      </div>`;
+    document.body.appendChild(wrap);
+    const q = sel => wrap.querySelector(sel);
+    const fichier = q('[data-rectif-fichier]'), res = q('[data-rectif-res]');
+    const verifier = q('[data-rectif-verifier]'), confirmer = q('[data-rectif-confirmer]');
+    let numeroVu = '';
+    const fermer = () => wrap.remove();
+    q('[data-rectif-annuler]').addEventListener('click', fermer);
+    const formulaire = extra => {
+      const fd = new FormData();
+      fd.append('fichier', fichier.files[0]);
+      fd.append('annule', orig);
+      Object.entries(extra || {}).forEach(([k, v]) => fd.append(k, v));
+      return fd;
+    };
+    const afficher = (html, ok) => { res.hidden = false; res.className = 'rectif-apercu-res ' + (ok ? 'ok' : 'ko'); res.innerHTML = html; };
+    fichier.addEventListener('change', () => { verifier.disabled = !fichier.files.length; confirmer.hidden = true; res.hidden = true; });
+    verifier.addEventListener('click', async () => {
+      verifier.disabled = true; confirmer.hidden = true;
+      try {
+        const r = await fetch(`/api/facture/${encodeURIComponent(currentProspect)}/rectificative-apercu/verifier`, { method: 'POST', body: formulaire() });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) { afficher('⚠ ' + escapeHtml(j.detail || ('Erreur ' + r.status)), false); return; }
+        numeroVu = j.numero_attribue;
+        afficher(`<div class="rectif-apercu-num">Numéro qui sera attribué : <b data-rectif-numero>${escapeHtml(numeroVu)}</b></div>`
+          + `<ul>${(j.controles || []).map(c => `<li>✓ ${escapeHtml(c)}</li>`).join('')}</ul>`
+          + `<div class="rectif-apercu-note">${escapeHtml(String(j.pages))} pages · annule et remplace ${escapeHtml(j.annule)}</div>`, true);
+        confirmer.textContent = `Confirmer l'émission de ${numeroVu}`;
+        confirmer.hidden = false;
+      } catch (e) { afficher('⚠ Le serveur n’a pas répondu.', false); }
+      finally { verifier.disabled = !fichier.files.length; }
+    });
+    confirmer.addEventListener('click', async () => {
+      confirmer.disabled = true;
+      try {
+        const r = await fetch(`/api/facture/${encodeURIComponent(currentProspect)}/rectificative-apercu/emettre`, { method: 'POST', body: formulaire({ numero_attendu: numeroVu }) });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) { afficher('⚠ Rien n’a été émis : ' + escapeHtml(j.detail || ('erreur ' + r.status)), false); confirmer.hidden = true; return; }
+        afficher(`✓ Facture rectificative <b data-rectif-emise>${escapeHtml(j.numero_facture)}</b> émise (annule et remplace ${escapeHtml(j.rectifie)}). Elle est dans la liste des factures du dossier.`, true);
+        confirmer.hidden = true; verifier.hidden = true; fichier.disabled = true;
+        q('[data-rectif-annuler]').textContent = 'Fermer';
+        refreshFacturesList();
+      } catch (e) { afficher('⚠ Le serveur n’a pas répondu : vérifiez la liste des factures avant de réessayer.', false); }
+      finally { confirmer.disabled = false; }
+    });
+  }
 
   function openDevisPdfViewer(version) {
     ensureViewer();
@@ -23372,6 +23442,16 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
   .devis-note-definitive[hidden] { display: none; }
   .devis-alerte-regulateur { padding: 9px 16px; background: #FEF3C7; border-bottom: 1px solid #FCD34D; color: #78350F; font-weight: 700; font-size: 13.5px; }
   .devis-alerte-regulateur[hidden] { display: none; }
+  .rectif-apercu-box { background: #fff; border-radius: 14px; padding: 20px; width: min(560px, 100%); max-height: 90vh; overflow: auto; display: grid; gap: 12px; color: #1A2233; }
+  .rectif-apercu-box h3 { margin: 0; color: #002E5A; font-size: 17px; }
+  .rectif-apercu-note { margin: 0; font-size: 13px; color: #475569; line-height: 1.5; }
+  .rectif-apercu-res { border-radius: 10px; padding: 10px 12px; font-size: 13.5px; line-height: 1.5; }
+  .rectif-apercu-res[hidden] { display: none; }
+  .rectif-apercu-res.ok { background: #ECFDF5; border: 1px solid #A7F3D0; }
+  .rectif-apercu-res.ko { background: #FEF2F2; border: 1px solid #FECACA; color: #991B1B; font-weight: 600; }
+  .rectif-apercu-res ul { margin: 6px 0; padding-left: 18px; }
+  .rectif-apercu-num { font-size: 15px; }
+  .rectif-apercu-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
   body.l5 .p-suivi-pop .fiche-statvt-top { flex-direction: column; align-items: flex-start !important; gap: 10px; border: 0; margin: 0 !important; padding: 0 !important; }
   body.l5 .p-suivi-pop .fiche-statvt-top::before { font-size: 12px; color: #002E5A; font-weight: 800; }
   body.l5 .p-suivi-pop .fiche-statvt-top > div { display: flex; gap: 8px; flex-wrap: wrap; }
