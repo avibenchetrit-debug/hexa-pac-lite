@@ -28,19 +28,19 @@ def _jeton_admin():
 
 
 # ---------------------------------------------------------------- 1. température de base = table d'avant
-# valeurs de main avant le Lot 6b (192b50f) : sous-zone du département -> TEMP_BASE_SOUS_ZONE
-@pytest.mark.parametrize("cp, sous_zone, temperature, zone_cee", [
-    ("35000", "H1C", -7, "H2"), ("49430", "H1C", -7, "H2"), ("38000", "H2B", -5, "H1"),
-    ("75002", "H1B", -8, "H1"), ("06000", "H2D", -2, "H3"), ("33000", "H2A", -4, "H2"), ("67000", "H1A", -9, "H1")])
-def test_temperature_base_table_d_avant(cp, sous_zone, temperature, zone_cee):
+# Lot 7a (30/09/2026) : la table d'avant est REMPLACÉE par la table NF P52-612/CN du guide ACE (test_lot7a_temperature.py).
+@pytest.mark.parametrize("cp, zone, temperature, zone_cee", [
+    ("35000", "Zone C", -5, "H2"), ("49430", "Zone D", -7, "H2"), ("38000", "Zone G", -10, "H1"),
+    ("75002", "Zone D", -7, "H1"), ("33000", "Zone C", -5, "H2"), ("67000", "Zone I", -15, "H1")])
+def test_temperature_base_table_nf(cp, zone, temperature, zone_cee):
     t = sd._temperature_base_notedim({"cp_chantier": cp})
-    assert (t["zone"], t["temperature"]) == (sous_zone, temperature)
+    assert (t["zone"], t["temperature"]) == (zone, temperature)
     assert sd.calculer_zone_climatique(cp) == zone_cee          # la zone CEE officielle, elle, ne bouge pas
 
 
-def test_correction_altitude_conservee():
+def test_palier_altitude_nf():
     t = sd._temperature_base_notedim({"cp_chantier": "38000", "altitude": "400"})
-    assert t["temperature"] == -6 and "altitude" in t["correction_label"]
+    assert t["temperature"] == -11 and "201-400 m" in t["correction_label"]
 
 
 # ---------------------------------------------------------------- 2. verrou « dossier facturé »
