@@ -39,7 +39,12 @@ derrière la connexion ; `/api/...` répond 401 même pour une route inexistante
 - **Délégataire CEE** : pré-devis / devis — client qui **attend** MaPrimeRénov' → mention **PICOTY** ; travaux **tout de
   suite** → mention **ACE Énergie** (textes modifiables dans l'admin, `data/delegataires.json`).
 - **Zone climatique** : la zone officielle CEE (H1/H2/H3, table du ministère) ne sert qu'à la prime ; la **puissance** utilise
-  la table de température de base d'avant (sous-zones + correction d'altitude). Ne pas toucher à l'une ni à l'autre.
+  depuis le Lot 7a, la table **NF P52-612/CN du guide ACE** (zones A à I, paliers d'altitude exacts ; départements à deux zones :
+  la plus froide, sauf le 06 : A sous 400 m, E au-dessus), `temperature_base_nf()` côté serveur et le MÊME littéral JSON côté
+  front (`tests/test_lot7a_temperature.py` compare les deux).
+- **Lot 7a** : mention CEE ACE exacte (montant en chiffres) + sous-traitant ; « Ancien système de chauffage déposé » et
+  « Application » dans le bloc Solution chauffage (devis et facture) ; « Émettre une facture rectificative » (admin, dossier
+  verrouillé ; comparée ligne à ligne au PDF d'origine avant émission, aperçu « APERÇU — sans numéro »).
 - **Verrou « dossier facturé »** : installation finie ou facture émise → `dossier_fige` (jamais stocké), toute écriture du
   lead / du simulateur refusée en 423, fiche en lecture seule ; le devis et la note de dim servis sont ceux archivés à
   l'envoi (`data/devis/devis_meta.json`), rien n'est régénéré.
