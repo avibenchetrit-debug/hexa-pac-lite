@@ -15619,11 +15619,20 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
         </div>
         <div class="devis-pdf-erreur" id="devis-pdf-erreur" role="alert" hidden><span></span><button type="button" aria-label="Masquer le message">×</button></div>
         <div class="devis-note-definitive" id="devis-note-definitive"${surNote ? '' : ' hidden'}>NOTE DÉFINITIVE — à faire signer par le client et à envoyer au délégataire</div>
+        <div class="devis-alerte-regulateur" id="devis-alerte-regulateur" role="alert" hidden>⚠ Classe du régulateur manquante dans la fiche produit : la ligne « Installation et paramétrage du régulateur » part sans classe. Le devis reste possible.</div>
         <div class="devis-modal-body"><iframe id="devis-preview-frame" title="Aperçu devis" src="${surNote ? notedimUrl : devisUrl}"></iframe></div>
         <div class="devis-modal-foot"><button type="button" class="adm-btn adm-btn-cancel" id="devis-close-bottom">Fermer</button></div>
       </div>`;
-    document.body.appendChild(wrap);
     let currentKind = surNote ? 'notedim' : 'devis';
+    // Lot 7b : « classe du régulateur manquante » — lue dans l'aperçu (même origine), dite À L'ÉCRAN seulement.
+    // ⚠ Écouteur posé AVANT l'insertion : l'aperçu peut se charger avant la ligne suivante (constaté en test).
+    const frameDevis = wrap.querySelector('#devis-preview-frame');
+    frameDevis.addEventListener('load', () => {
+      let manque = false;
+      try { manque = currentKind === 'devis' && !!frameDevis.contentDocument.querySelector('[data-regulateur-manquant]'); } catch (_) {}
+      wrap.querySelector('#devis-alerte-regulateur').hidden = !manque;
+    });
+    document.body.appendChild(wrap);
     const close = () => wrap.remove();
     document.getElementById('devis-close-btn')?.addEventListener('click', close);
     document.getElementById('devis-close-bottom')?.addEventListener('click', close);
@@ -23361,6 +23370,8 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
   }
   .devis-note-definitive { padding: 9px 16px; background: #DCFCE7; border-bottom: 1px solid #86EFAC; color: #14532D; font-weight: 800; font-size: 14px; }
   .devis-note-definitive[hidden] { display: none; }
+  .devis-alerte-regulateur { padding: 9px 16px; background: #FEF3C7; border-bottom: 1px solid #FCD34D; color: #78350F; font-weight: 700; font-size: 13.5px; }
+  .devis-alerte-regulateur[hidden] { display: none; }
   body.l5 .p-suivi-pop .fiche-statvt-top { flex-direction: column; align-items: flex-start !important; gap: 10px; border: 0; margin: 0 !important; padding: 0 !important; }
   body.l5 .p-suivi-pop .fiche-statvt-top::before { font-size: 12px; color: #002E5A; font-weight: 800; }
   body.l5 .p-suivi-pop .fiche-statvt-top > div { display: flex; gap: 8px; flex-wrap: wrap; }

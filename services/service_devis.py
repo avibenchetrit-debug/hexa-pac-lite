@@ -28,7 +28,8 @@ def lignes_solution_chauffage(prospect, state=None) -> dict:
     energie = str(value(prospect, "mode_chauffage", "chauffage_actuel", default="") or "").strip().lower()
     emetteurs = str(value(prospect, "type_emetteurs", default="") or "").strip().lower()
     service = str(value(state or {}, "service", default="chauffage_seul") or "").strip().lower()
-    ancien = (f"Ancien système de chauffage déposé : chaudière {energie} — énergie : {energie}"
+    # Lot 7b : l'énergie écrite UNE fois
+    ancien = (f"Ancien système de chauffage déposé : chaudière — énergie : {energie}"
               if energie in ENERGIES_CHAUDIERE_DEPOSEE else "")
     if emetteurs == "plancher_chauffant":
         application = "Application : basse température"
@@ -36,12 +37,31 @@ def lignes_solution_chauffage(prospect, state=None) -> dict:
         application = "Application : moyenne ou haute température"
     else:
         application = ""
-    usage = ("Usage : chauffage + eau chaude sanitaire" if service in ("chauffage_ecs", "chauffage+ecs")
-             else "Usage : chauffage")
-    return {"ancien_systeme": ancien, "application": application, "usage": usage,
+    # Lot 7b : plus de ligne « Usage » dans le bloc (déjà dans le titre du lot et la fiche produit)
+    return {"ancien_systeme": ancien, "application": application,
             "depose_induits": (f"Dépose et évacuation de l'ancienne chaudière {energie}" if ancien
                                else "Dépose et évacuation des équipements remplacés - chaudière"),
             "energie_non_mentionnee": "" if ancien else (energie or "non renseignée")}
+
+
+CHAMP_CLASSE_REGULATEUR = "Classe du régulateur (ErP)"
+#: Lot 7b — les éléments de la fiche produit exigés par ACE, mis en évidence (gras léger) sur les documents.
+CHAMPS_FICHE_EXIGES_ACE = ("Marque", "Référence EPREL", "Usage", "ETAS chauffage 35°C / 55°C", CHAMP_CLASSE_REGULATEUR)
+
+
+def champ_exige_ace(champ) -> bool:
+    c = str(champ or "").strip()
+    return any(c == x or c.startswith(x) for x in CHAMPS_FICHE_EXIGES_ACE)
+
+
+def ligne_regulateur(description_specs) -> dict:
+    """Lot 7b — Pose, « Système mis en œuvre » : « Installation et paramétrage du régulateur (classe {classe}) »,
+    classe = « Classe du régulateur (ErP) » de la fiche produit ; absente : la ligne SANS parenthèse, et
+    `manquante` (l'écran l'alerte ; le devis reste possible)."""
+    classe = next((str(s.get("valeur") or "").strip() for s in (description_specs or [])
+                   if isinstance(s, dict) and str(s.get("champ") or "").strip() == CHAMP_CLASSE_REGULATEUR), "")
+    return {"texte": "Installation et paramétrage du régulateur" + (f" (classe {classe})" if classe else ""),
+            "classe": classe, "manquante": not classe}
 
 
 TEMP_BASE_ZONE = {"H1": -7, "H2": -4, "H3": 0}

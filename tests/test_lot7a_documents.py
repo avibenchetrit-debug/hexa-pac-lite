@@ -91,8 +91,9 @@ def test_ancienne_mention_enregistree_telle_quelle_est_remplacee():
 def test_ancien_systeme_et_application_dans_la_solution_chauffage(client, quoi):
     brut = _facture() if quoi == "facture" else _devis(client, "devis")
     bloc = _texte(re.search(r'<div class="pac-heating-note">(.*?)</section>', brut, re.S).group(1))
-    assert bloc.index("BAR-TH-171") < bloc.index("Ancien système de chauffage déposé : chaudière fioul — énergie : fioul")
-    assert "Application : moyenne ou haute température" in bloc and "Usage : chauffage" in bloc
+    # Lot 7b : l'énergie écrite une seule fois ; plus de ligne « Usage » dans le bloc
+    assert bloc.index("BAR-TH-171") < bloc.index("Ancien système de chauffage déposé : chaudière — énergie : fioul")
+    assert "Application : moyenne ou haute température" in bloc and "Usage :" not in bloc
     assert "Dépose et évacuation de l'ancienne chaudière fioul" in _texte(brut)
 
 
@@ -101,7 +102,7 @@ def test_plancher_chauffant_basse_temperature_et_ecs(client):
                             _facture(lead={"type_emetteurs": "plancher_chauffant", "mode_chauffage": "gaz"},
                                      service="chauffage_ecs"), re.S).group(1))
     assert "Application : basse température" in bloc and "moyenne" not in bloc
-    assert "Usage : chauffage + eau chaude sanitaire" in bloc and "chaudière gaz — énergie : gaz" in bloc
+    assert "Usage :" not in bloc and "chaudière — énergie : gaz" in bloc
 
 
 def test_pas_de_chaudiere_inventee_hors_fioul_gaz_charbon(client):
