@@ -242,6 +242,9 @@ DEFAULT_PARAMS_FINANCEMENT = {
 # Variables remplacées à l'affichage : [civilité nom], [prénom utilisateur], [surface], [année], [année du DPE],
 # [X coût théorique], [catégorie], [aides], [MPR], [CEE], [reste à charge], [économie mensuelle], [année avis],
 # [année revenus] (et les anciennes : [prénom du client], [nom du client], [date du DPE], [classe DPE]).
+ENCART_MOINS_DE_15_ANS = "Pas de MaPrimeRénov' pour un logement de moins de 15 ans. La prime CEE reste possible."
+ENCART_MOINS_DE_2_ANS = "Logement de moins de 2 ans : pas de MaPrimeRénov' pour une pompe à chaleur air-eau."
+
 DEFAULT_SCRIPT_APPEL = {
     "etapes": {
         "1": {
@@ -311,8 +314,8 @@ DEFAULT_SCRIPT_APPEL = {
             "encarts": [
                 {"titre": "À DIRE :", "texte": "« Votre maison consomme beaucoup : c'est là que la pompe à chaleur fait la plus grosse "
                                              "différence. »", "condition": "dpe_classe=F,G"},
-                {"titre": "À SAVOIR :", "texte": "Pas de MaPrimeRénov' pour un logement de moins de 15 ans. La prime CEE reste possible.",
-                 "condition": "age<15"},
+                # Lot 7a (30/09/2026) : remplace l'encadré « logement < 15 ans »
+                {"titre": "À SAVOIR :", "texte": ENCART_MOINS_DE_2_ANS, "condition": "age<2"},
             ],
         },
         "3": {
@@ -487,7 +490,8 @@ DEFAULT_SCRIPT_APPEL = {
          "reponse": "Oui, nous sommes certifiés RGE. C'est obligatoire pour que vous puissiez toucher les aides."},
     ],
     # Lot 6i : version 3 = textes définitifs + FAQ ; une config enregistrée plus ancienne est remplacée une fois
-    "version": 3,
+    # Lot 7a : version 4 = l'encadré « moins de 2 ans » de l'étape 2 (seul changement, voir _script_appel)
+    "version": 4,
 }
 
 DEFAULT_PARAMETRES_ADMIN = {
@@ -3652,7 +3656,15 @@ def _script_appel() -> dict:
         params["script_appel"] = nouveau
         save_parametres_admin_atomic(params)
         return nouveau
-    return {"etapes": etapes, "faq": faq, "version": 3}
+    # Lot 7a : version 3 -> 4, UNE fois : l'encadré « logement de moins de 15 ans » de l'étape 2 devient
+    # « moins de 2 ans » (texte d'Avi) s'il porte encore le texte d'origine ; tout le reste de l'admin reste.
+    if int(s.get("version") or 1) < 4:
+        for c in (etapes.get("2") or {}).get("encarts") or []:
+            if isinstance(c, dict) and str(c.get("texte") or "").strip() == ENCART_MOINS_DE_15_ANS:
+                c["texte"], c["condition"] = ENCART_MOINS_DE_2_ANS, "age<2"
+        params["script_appel"] = {"etapes": etapes, "faq": faq, "version": 4}
+        save_parametres_admin_atomic(params)
+    return {"etapes": etapes, "faq": faq, "version": 4}
 
 
 ACTIONS_SCRIPT = ("rappel", "cloturer")
@@ -3697,7 +3709,7 @@ def _nettoyer_script_appel(payload) -> dict:
                for f in faq_src[:60] if isinstance(f, dict) and txt(f.get("question"), 300)]
     else:                                      # enregistrement sans FAQ (ancien écran) : celle en place reste
         faq = _script_appel().get("faq") or []
-    return {"etapes": etapes, "faq": faq, "version": 3}
+    return {"etapes": etapes, "faq": faq, "version": 4}
 
 
 @app.get("/api/script-appel")
