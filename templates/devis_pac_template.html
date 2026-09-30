@@ -60,6 +60,13 @@
       padding-left: 0 !important;
       padding-right: 0 !important;
     }
+    /* Lot 7a : LA cause du bloc « Solution chauffage » plus étroit sur le PDF. Ses voisins perdent leur retrait
+       latéral à l'impression (les marges viennent de la page) ; .legal-intro, qui le contient, gardait sa MARGE
+       d'écran de 56 px de chaque côté : bloc rentré de 56 px à gauche et à droite. */
+    .legal-intro {
+      margin-left: 0 !important;
+      margin-right: 0 !important;
+    }
     .family, .lot, .recap, .recap-grid, .recap-rac, .reglements-box, .payment-card, .subcontractor {
       page-break-inside: avoid;
       break-inside: avoid;
@@ -1961,6 +1968,16 @@
     font-weight: 700;
     line-height: 1.45;
   }
+  .doc-rectificative { margin-top: 8px; font-size: 12px; font-weight: 700; color: var(--rouge); max-width: 340px; margin-left: auto; line-height: 1.4; }
+  .pac-heating-note-lignes {
+    margin: 5px 0 0;
+    padding: 0;
+    list-style: none;
+    font-size: 11px;
+    color: var(--bleu);
+    font-weight: 600;
+    line-height: 1.5;
+  }
   .pac-heating-note-text {
     font-size: 10.5px;
     color: var(--gris-texte);
@@ -3407,6 +3424,7 @@
 <div class="doc-type-value">{{ "Facture" if mode == 'facture' else ("Pré-devis" if pre_devis else "Devis") }}</div>
 <div class="doc-type-num"><span class="doc-type-num-label">N° de {{ "facture" if mode == 'facture' else ("pré-devis" if pre_devis else "devis") }} :</span> {{ numero_facture if mode == 'facture' else (("PD" + numero_devis[2:]) if pre_devis else numero_devis) }}</div>
 {% if mode == 'facture' %}<div class="doc-type-num"><span class="doc-type-num-label">Réf. devis :</span> {{ numero_devis_ref }}</div>{% endif %}
+{% if mode == 'facture' and facture_rectificative %}<div class="doc-rectificative" data-rectificative>Facture rectificative — annule et remplace la facture n° {{ facture_rectificative.numero }} du {{ facture_rectificative.date }}</div>{% endif %}
 </div>
 </header>
 <!-- INFOS -->
@@ -3455,6 +3473,11 @@
 <div class="pac-heating-note">
 <div class="pac-heating-note-label">Solution chauffage</div>
 <div class="pac-heating-note-title">Opération n° BAR-TH-171&nbsp;&nbsp;Pompe à chaleur de type air/eau</div>
+{% if solution_chauffage %}<ul class="pac-heating-note-lignes" data-solution-chauffage>
+{% if solution_chauffage.ancien_systeme %}<li data-ancien-systeme>{{ solution_chauffage.ancien_systeme }}</li>{% endif %}
+{% if solution_chauffage.application %}<li data-application>{{ solution_chauffage.application }}</li>{% endif %}
+{% if solution_chauffage.usage %}<li data-usage>{{ solution_chauffage.usage }}</li>{% endif %}
+</ul>{% endif %}
 <div class="pac-heating-note-text">Mise en place d’une pompe à chaleur (PAC) de type air/eau pour le chauffage ou pour le chauffage et la production d’eau chaude sanitaire.</div>
 </div>
 </section>
@@ -3488,7 +3511,7 @@
 </div>
 <div class="sub-line">
 <div class="sub-line-header"><span class="sub-line-name">Travaux induits</span><span class="sub-line-qt">{{ qt_travaux_induits }}</span><span class="sub-line-pu">{{ prix_travaux_induits_ht }}</span><span class="sub-line-tva">{{ tva_taux }}</span><span class="sub-line-total">{{ prix_travaux_induits_ttc }}</span></div>
-<div class="specs"><div class="specs-block"><div class="specs-block-title">Travaux induits</div><ul class="specs-list"><li>Protection et sécurisation des zones d'intervention</li><li>Création ou adaptation des passages techniques</li><li>Reprises localisées d'étanchéité et de calfeutrement</li><li>Adaptation ponctuelle des réseaux et équipements existants</li><li>Dépose et évacuation des équipements remplacés - chaudière</li></ul></div><div class="specs-block"><div class="specs-block-title">Non inclus</div><ul class="specs-list"><li>Renforcement ou mise en conformité complète de l'installation électrique</li><li>Modification des émetteurs ou réseaux hors descriptif</li><li>Travaux de maçonnerie ou de couverture lourde</li><li>Prestations de décoration et reprises complètes de finition</li></ul></div></div>
+<div class="specs"><div class="specs-block"><div class="specs-block-title">Travaux induits</div><ul class="specs-list"><li>Protection et sécurisation des zones d'intervention</li><li>Création ou adaptation des passages techniques</li><li>Reprises localisées d'étanchéité et de calfeutrement</li><li>Adaptation ponctuelle des réseaux et équipements existants</li><li>{{ solution_chauffage.depose_induits if solution_chauffage else "Dépose et évacuation des équipements remplacés - chaudière" }}</li></ul></div><div class="specs-block"><div class="specs-block-title">Non inclus</div><ul class="specs-list"><li>Renforcement ou mise en conformité complète de l'installation électrique</li><li>Modification des émetteurs ou réseaux hors descriptif</li><li>Travaux de maçonnerie ou de couverture lourde</li><li>Prestations de décoration et reprises complètes de finition</li></ul></div></div>
 </div>
 <div class="lot-subtotal"><span class="lot-subtotal-label">Sous-total lot</span><div class="lot-subtotal-amounts"><span class="ht"><span class="label">HT</span>{{ total_ht }}</span><span class="ttc"><span class="label">TTC</span>{{ total_ttc }}</span></div></div>
 </div>
@@ -3694,7 +3717,7 @@
 <strong>Condition MaPrimeRénov'</strong><br>
 Dans le cas où l'aide notifiée au client est inférieure au montant de l'aide prévisionnelle, l'usager n'est pas lié par le devis et l'entreprise s'engage à proposer un devis rectificatif. Le client conserve alors un droit de rétractation d'une durée de quatorze jours à partir de la date de présentation du devis rectificatif. L'aide MaPrimeRénov' est conditionnelle et soumise à la conformité des pièces justificatives et informations déclarées par le bénéficiaire. En cas de fausse déclaration, de manoeuvre frauduleuse ou de changement du projet de travaux subventionné, le bénéficiaire s'expose au retrait et au reversement de tout ou partie de l'aide. Les services de l'ANAH pourront faire procéder à tout contrôle des engagements et sanctionner le bénéficiaire et son mandataire éventuel des manquements constatés.<br><br>
 <strong>{{ mention_cee_titre or "Mention RAI — Partenaire ACE Énergie" }}</strong><br>
-{% if mention_cee_texte %}{{ mention_cee_texte }}{% else %}« La présente offre comprend une Prime d'un montant de {{ montant_cee_lettres }} euros, qui vous est offerte par ACE ÉNERGIE (SIREN : 848 595 336) dans le cadre de son rôle actif et incitatif, au titre du dispositif des certificats d'économies d'énergie »{% endif %}
+{% if mention_cee_texte %}{{ mention_cee_texte }}{% else %}« La présente offre comprend une prime de {{ montant_cee }} € offerte par ACE ÉNERGIE (SIREN : 848 595 336) dans le cadre du dispositif des CEE »{% endif %}{% if mention_cee_sous_traitant %}<br><span data-mention-sous-traitant>{{ mention_cee_sous_traitant }}</span>{% endif %}
 </div>
 </section>
 

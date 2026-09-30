@@ -12790,14 +12790,39 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     } catch (_) { items = []; }
     if (!Array.isArray(items) || !items.length) { block.style.display = 'none'; root.innerHTML = ''; return; }
     block.style.display = '';
+    // Lot 7a : « Émettre une facture rectificative » — admin seulement (le serveur le vérifie aussi).
+    let estAdmin = false;
+    try { const me = await fetch('/api/auth/me', { cache:'no-store' }); estAdmin = me.ok && (await me.json()).role === 'admin'; } catch (_) {}
+    const rectifBtns = f => (estAdmin && !f.rectifie && !f.rectifiee_par)
+      ? `<button type="button" class="hexa-meta-card-action" data-rectif-apercu="${escapeHtml(f.numero_facture || '')}">👁 Aperçu rectificative</button>`
+        + `<button type="button" class="hexa-meta-card-action" data-rectif-emettre="${escapeHtml(f.numero_facture || '')}">🧾 Émettre une facture rectificative</button>`
+      : '';
     root.innerHTML = items.map(f => `
       <div class="docs-devis-row">
-        <div><b>${escapeHtml(f.numero_facture || '')}</b>${f.numero_devis_ref ? ` — réf. devis ${escapeHtml(f.numero_devis_ref)}` : ''}${f.acquittee ? ' <span class="fa-acq-tag">ACQUITTÉE</span>' : ''}</div>
+        <div><b>${escapeHtml(f.numero_facture || '')}</b>${f.numero_devis_ref ? ` — réf. devis ${escapeHtml(f.numero_devis_ref)}` : ''}${f.acquittee ? ' <span class="fa-acq-tag">ACQUITTÉE</span>' : ''}${f.rectifie ? ` <span class="fa-acq-tag" data-tag-rectificative>RECTIFICATIVE de ${escapeHtml(f.rectifie)}</span>` : ''}${f.rectifiee_par ? ` <span class="pv-muted" style="font-size:12px;">annulée et remplacée par ${escapeHtml(f.rectifiee_par)}</span>` : ''}</div>
         <div style="font-size:12px;color:#475569;margin-top:2px;">Émise le ${escapeHtml(f.date_emission || '—')} · Fin travaux ${escapeHtml(f.date_fin_travaux || '—')}${(f.montant_ttc !== null && f.montant_ttc !== undefined && f.montant_ttc !== '') ? ` · ${escapeHtml(String(f.montant_ttc))} € TTC` : ''}</div>
         <div class="docs-devis-actions">
           ${f.available ? `<button type="button" class="hexa-meta-card-action" data-facture-download="${escapeHtml(f.numero_facture || '')}">📥 Télécharger</button>` : '<span class="pv-muted" style="font-size:12px;">PDF indisponible</span>'}
+          ${rectifBtns(f)}
         </div>
       </div>`).join('');
+    root.querySelectorAll('[data-rectif-apercu]').forEach(btn => {
+      btn.addEventListener('click', () => window.open(`/api/facture/${encodeURIComponent(currentProspect)}/rectificative/apercu?annule=${encodeURIComponent(btn.dataset.rectifApercu)}`, '_blank'));
+    });
+    root.querySelectorAll('[data-rectif-emettre]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const orig = btn.dataset.rectifEmettre;
+        if (!window.confirm(`Émettre une facture rectificative qui annule et remplace ${orig} ? Un nouveau numéro de facture sera attribué.`)) return;
+        btn.disabled = true;
+        try {
+          const r = await fetch(`/api/facture/${encodeURIComponent(currentProspect)}/rectificative`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ annule: orig }) });
+          const j = await r.json().catch(() => ({}));
+          if (!r.ok) { alert('Facture rectificative non émise : ' + (j.detail || ('erreur ' + r.status))); btn.disabled = false; return; }
+          alert(`Facture rectificative ${j.numero_facture} émise (annule et remplace ${j.rectifie}).`);
+          refreshFacturesList();
+        } catch (e) { alert('Le serveur n’a pas répondu : rien n’a été émis.'); btn.disabled = false; }
+      });
+    });
     root.querySelectorAll('[data-facture-download]').forEach(btn => {
       btn.addEventListener('click', () => window.open(`/api/factures/${encodeURIComponent(currentProspect)}/download?numero_facture=${encodeURIComponent(btn.dataset.factureDownload)}`, '_blank'));
     });
@@ -13120,18 +13145,12 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
   let DEPT_ZONE_BACKEND = null;  // table reglementaire dept->zone, chargee depuis /api/zones-departements (source unique backend)
 
   const TEMP_BASE_ZONE = { H1: -7, H2: -4, H3: 0 };
-  const TEMP_BASE_SOUS_ZONE = { H1A: -9, H1B: -8, H1C: -7, H2A: -4, H2B: -5, H2C: -3, H2D: -2, H3: 0 };
-  const TEMP_BASE_CP = {};
-  const DEPT_SOUS_ZONE = {
-    '01':'H1A','03':'H1A','05':'H1A','07':'H1A','10':'H1A','21':'H1A','25':'H1A','39':'H1A','42':'H1A','43':'H1A','45':'H1A','51':'H1A','52':'H1A','54':'H1A','55':'H1A','57':'H1A','58':'H1A','67':'H1A','68':'H1A','69':'H1A','70':'H1A','71':'H1A','73':'H1A','74':'H1A','88':'H1A','89':'H1A','90':'H1A',
-    '02':'H1B','08':'H1B','14':'H1B','18':'H1B','27':'H1B','28':'H1B','36':'H1B','41':'H1B','50':'H1B','53':'H1B','59':'H1B','60':'H1B','61':'H1B','62':'H1B','75':'H1B','76':'H1B','77':'H1B','78':'H1B','80':'H1B','91':'H1B','92':'H1B','93':'H1B','94':'H1B','95':'H1B',
-    '22':'H1C','29':'H1C','35':'H1C','44':'H1C','49':'H1C','56':'H1C','72':'H1C','85':'H1C',
-    '17':'H2A','24':'H2A','33':'H2A','37':'H2A','79':'H2A','86':'H2A',
-    '16':'H2B','19':'H2B','23':'H2B','26':'H2B','38':'H2B','46':'H2B','47':'H2B','48':'H2B','63':'H2B','81':'H2B','82':'H2B','87':'H2B',
-    '09':'H2C','11':'H2C','12':'H2C','15':'H2C','31':'H2C','32':'H2C','40':'H2C','64':'H2C','65':'H2C',
-    '04':'H2D','06':'H2D','13':'H2D','30':'H2D','34':'H2D','66':'H2D','83':'H2D','84':'H2D',
-    '2A':'H3','2B':'H3','971':'H3','972':'H3','973':'H3','974':'H3','976':'H3'
-  };
+  // Lot 7a : table NF P52-612/CN du guide ACE (annexe 1) — MÊME littéral que services/service_devis.py (un témoin compare).
+  const ZONES_TEMP_NF = {"A": [-2, -4, -6, -8, -10, -12, -14, -16, -18, -20], "B": [-4, -5, -6, -7, -8, -9, -10], "C": [-5, -6, -7, -8, -9, -10, -11, -12, -13, -14, -15], "D": [-7, -8, -9, -11, -13, -14, -15], "E": [-8, -9, -11, -13, -15, -17, -19, -21, -23, -25, -27], "F": [-9, -10, -11, -12, -13], "G": [-10, -11, -13, -14, -17, -19, -21, -23, -24, -25, -29], "H": [-12, -13, -15, -17, -19, -21, -23, -24], "I": [-15, -15, -19, -21, -23, -24, -25]};
+  const DEPT_ZONE_NF = {"2A": "A", "2B": "A", "20": "A", "06": "A", "22": "B", "29": "B", "56": "B", "35": "C", "44": "C", "85": "C", "16": "C", "17": "C", "24": "C", "33": "C", "40": "C", "47": "C", "32": "C", "64": "C", "65": "C", "31": "C", "09": "C", "82": "C", "81": "C", "11": "C", "34": "C", "30": "C", "13": "C", "83": "C", "66": "C", "14": "D", "27": "D", "76": "D", "61": "D", "60": "D", "95": "D", "78": "D", "91": "D", "77": "D", "75": "D", "92": "D", "93": "D", "94": "D", "28": "D", "45": "D", "41": "D", "72": "D", "53": "D", "49": "D", "37": "D", "18": "D", "79": "D", "86": "D", "36": "D", "02": "D", "50": "D", "46": "D", "12": "D", "07": "D", "26": "D", "84": "D", "03": "E", "23": "E", "87": "E", "63": "E", "19": "E", "15": "E", "43": "E", "48": "E", "04": "E", "59": "F", "62": "F", "80": "F", "08": "G", "51": "G", "10": "G", "89": "G", "58": "G", "21": "G", "71": "G", "39": "G", "01": "G", "69": "G", "42": "G", "74": "G", "73": "G", "38": "G", "05": "G", "55": "H", "52": "H", "70": "H", "25": "H", "57": "I", "54": "I", "67": "I", "68": "I", "88": "I", "90": "I"};
+  const DEPTS_DEUX_ZONES_NF = ["06", "11", "17", "33", "40", "44", "50", "66", "83", "85"];
+  const PALIERS_NF = ["0-200", "201-400", "401-600", "601-800", "801-1000", "1001-1200", "1201-1400", "1401-1600", "1601-1800", "1801-2000", "2001-2200"];
+  const SEUIL_06_M = 400;
   const COEF_G = {
     toit: { tres_bien: 0.00, bien: 0.10, isole: 0.20, peu: 0.35, non: 0.50 },
     mur: { tres_bien: 0.00, bien: 0.15, isole: 0.30, peu: 0.55, non: 0.80 },
@@ -13415,45 +13434,31 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     return (DEPT_ZONE_BACKEND && DEPT_ZONE_BACKEND[dept]) || 'H1';   // Corse : « 20 » (table officielle)
   }
 
-  // Lot 6b : température de base de la zone OFFICIELLE du département du CP (table du serveur, source unique) :
-  // H1 −7 °C, H2 −4 °C, H3 0 °C. Les sous-zones et la zone écrite dans le DPE ne servent plus au calcul.
+  // Lot 7a : température de base NF P52-612/CN (zone A à I du département, palier d'altitude exact de la table ;
+  // au-delà du dernier palier : la dernière valeur). 06 : A sous 400 m, E au-dessus (altitude inconnue : E).
+  // Réplique exacte de temperature_base_nf() du serveur.
   function temperatureExterieureBase(state){
-    // Lot 6c : table d'avant (sous-zone du département) remise telle quelle ; la zone CEE officielle ne sert qu'à la prime
     const cp = String(state.cp_chantier || '').replace(/\D/g, '').slice(0, 5);
-    let info;
-    if (cp && Object.prototype.hasOwnProperty.call(TEMP_BASE_CP, cp)) {
-      info = { temperature: TEMP_BASE_CP[cp], source: 'cp', zone: state.zone_detail || state.zone || '' };
-    } else {
-      const dept = cp.startsWith('97') || cp.startsWith('976') ? cp.slice(0, 3) : cp.slice(0, 2);
-      if (dept && DEPT_SOUS_ZONE[dept]) {
-      const z = DEPT_SOUS_ZONE[dept];
-        info = { temperature: TEMP_BASE_SOUS_ZONE[z], source: 'departement', zone: z };
-      }
-    }
-    if (!info) {
-      const zDetail = normaliserZone(state.zone_detail);
-      if (zDetail && TEMP_BASE_SOUS_ZONE[zDetail] != null) {
-        info = { temperature: TEMP_BASE_SOUS_ZONE[zDetail], source: 'zone', zone: zDetail };
-      }
-    }
-    if (!info) {
-      const z = zonePrincipale(state.zone);
-      if (z && TEMP_BASE_ZONE[z] != null) {
-        info = { temperature: TEMP_BASE_ZONE[z], source: 'zone', zone: z };
-      }
-    }
-    if (!info) {
-      info = { temperature: -7, source: 'defaut', zone: 'H1' };
-    }
+    const dept = cp.startsWith('97') ? cp.slice(0, 3) : cp.slice(0, 2);
     const altitude = state.altitude == null || state.altitude === '' ? null : Number(state.altitude);
-    const correction = Number.isFinite(altitude) && altitude > 200 ? ((altitude - 200) / 100) * 0.5 : 0;
+    const alt = Number.isFinite(altitude) ? altitude : null;
+    let zone = DEPT_ZONE_NF[dept] || null;
+    if (dept === '06') zone = (alt != null && alt < SEUIL_06_M) ? 'A' : 'E';
+    if (!zone) {
+      const t = dept.startsWith('97') ? 0 : -7;
+      return { temperature: t, temperature_brute: t, zone: 'hors table', source: 'hors_table', altitude: alt, palier: '',
+               deux_zones: false, hors_table: true, correction_altitude: 0, altitude_corrigee: false };
+    }
+    const valeurs = ZONES_TEMP_NF[zone];
+    const a = alt || 0;
+    const brut = a <= 200 ? 0 : Math.ceil((a - 200) / 200);
+    const i = Math.min(brut, valeurs.length - 1);
+    const palier = brut === i ? PALIERS_NF[i] + ' m' : 'au-delà de ' + PALIERS_NF[i].split('-')[1] + ' m (dernière valeur de la table)';
+    const t = valeurs[i];
     return {
-      ...info,
-      temperature_brute: info.temperature,
-      temperature: info.temperature - correction,
-      altitude,
-      correction_altitude: correction,
-      altitude_corrigee: correction > 0
+      temperature: t, temperature_brute: valeurs[0], zone: zone, source: 'nf_p52_612', altitude: alt, palier: palier,
+      deux_zones: DEPTS_DEUX_ZONES_NF.includes(dept), hors_table: false,
+      correction_altitude: valeurs[0] - t, altitude_corrigee: i > 0
     };
   }
 
@@ -13508,6 +13513,8 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
       p_pac_w,
       facteur_securite: FACTEUR_SECURITE_DIM,
       zone_dimensionnement: tempInfo.zone,
+      palier_nf: tempInfo.palier,
+      deux_zones: tempInfo.deux_zones,
       temp_source: tempInfo.source,
       iso_toit,
       iso_mur,
@@ -15434,10 +15441,9 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     const zoneLabel = dim.zone_dimensionnement || state.zone_detail || state.zone || 'H1';
     const surfaceHab = Number.isFinite(Number(state.surface_habitable)) ? state.surface_habitable : 0;
     const altitudeLabel = Number.isFinite(Number(dim.altitude)) ? fmt0(dim.altitude) : '—';
-    const altitudeLine = dim.altitude_corrigee
-      ? `Altitude : ${altitudeLabel} m → correction T_ext de -${fmt1(dim.correction_altitude)}°C`
-      : `Altitude : ${altitudeLabel} m (pas de correction)`;
-    const tempLabel = `${String(dim.t_ext_base).replace('.', ',')}°C${dim.altitude_corrigee ? ' (corrigée altitude)' : ''}`;
+    const altitudeLine = `Altitude : ${altitudeLabel} m (palier ${dim.palier_nf || '—'}, table NF P52-612/CN)`
+      + (dim.deux_zones ? ' — ⚠ département à deux zones, vérifier' : '');
+    const tempLabel = `${String(dim.t_ext_base).replace('.', ',')}°C (zone ${dim.zone_dimensionnement})`;
     const ecsLine = state.service === 'chauffage_ecs' || state.service === 'chauffage+ecs'
       ? `<p>Réserve ECS : ${fmt0(dim.p_ecs_w)} W</p>`
       : '';

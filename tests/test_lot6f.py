@@ -56,7 +56,7 @@ def test_config_ancienne_remplacee_une_fois_puis_admin_garde(client):
     # Lot 6i : les textes définitifs remplacent tout le script (étape 1 comprise), une seule fois
     assert s["etapes"]["1"]["intro"].startswith("Bonjour [civilité nom]") and len(s["faq"]) == 13
     stocke = main.load_parametres_admin()["script_appel"]
-    assert stocke["version"] == 3 and stocke["etapes"]["1"]["intro"].startswith("Bonjour [civilité nom]")
+    assert stocke["version"] == 4 and stocke["etapes"]["1"]["intro"].startswith("Bonjour [civilité nom]")
     # ensuite, une modification de l'admin reste (plus de remplacement)
     s["etapes"]["2"]["intro"] = "Intro modifiée."
     s["faq"] = [{"question": "Q ?", "reponse": "R."}]

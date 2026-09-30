@@ -18,6 +18,32 @@ TYPE_EMETTEURS_LABELS = {
     "convecteurs_electriques": "Convecteurs électriques",
 }
 
+# Lot 7a (30/09/2026) — exigé par le bureau de contrôle ACE, dans le bloc « Solution chauffage » du devis ET
+# de la facture, sous le libellé BAR-TH-171 : l'ancien système DÉPOSÉ (chaudière fioul / gaz / charbon : rien
+# d'autre n'est écrit), le type d'application (termes EXACTS d'ACE, deux cas) et l'usage.
+ENERGIES_CHAUDIERE_DEPOSEE = ("fioul", "gaz", "charbon")
+
+
+def lignes_solution_chauffage(prospect, state=None) -> dict:
+    energie = str(value(prospect, "mode_chauffage", "chauffage_actuel", default="") or "").strip().lower()
+    emetteurs = str(value(prospect, "type_emetteurs", default="") or "").strip().lower()
+    service = str(value(state or {}, "service", default="chauffage_seul") or "").strip().lower()
+    ancien = (f"Ancien système de chauffage déposé : chaudière {energie} — énergie : {energie}"
+              if energie in ENERGIES_CHAUDIERE_DEPOSEE else "")
+    if emetteurs == "plancher_chauffant":
+        application = "Application : basse température"
+    elif emetteurs.startswith("radiateurs"):
+        application = "Application : moyenne ou haute température"
+    else:
+        application = ""
+    usage = ("Usage : chauffage + eau chaude sanitaire" if service in ("chauffage_ecs", "chauffage+ecs")
+             else "Usage : chauffage")
+    return {"ancien_systeme": ancien, "application": application, "usage": usage,
+            "depose_induits": (f"Dépose et évacuation de l'ancienne chaudière {energie}" if ancien
+                               else "Dépose et évacuation des équipements remplacés - chaudière"),
+            "energie_non_mentionnee": "" if ancien else (energie or "non renseignée")}
+
+
 TEMP_BASE_ZONE = {"H1": -7, "H2": -4, "H3": 0}
 # Zone climatique H1 / H2 / H3 par département : répartition OFFICIELLE utilisée par les fiches d'opérations
 # standardisées CEE (dont BAR-TH-171 « Pompe à chaleur de type air/eau », facteur de zone H1 1,2 · H2 1 · H3 0,7).
@@ -89,20 +115,53 @@ def calculer_zone_climatique(cp, zone=""):
     return normalize_zone(zone, cp)
 
 
-# Température extérieure de base par SOUS-ZONE — répliquée à l'identique du front
-# (temperatureExterieureBase) pour que la note (document) == l'aperçu (modal).
-TEMP_BASE_SOUS_ZONE = {"H1A": -9, "H1B": -8, "H1C": -7, "H2A": -4, "H2B": -5, "H2C": -3, "H2D": -2, "H3": 0}
-TEMP_BASE_CP = {}  # override par code postal — vide (identique au front)
-DEPT_SOUS_ZONE = {
-    "01": "H1A", "03": "H1A", "05": "H1A", "07": "H1A", "10": "H1A", "21": "H1A", "25": "H1A", "39": "H1A", "42": "H1A", "43": "H1A", "45": "H1A", "51": "H1A", "52": "H1A", "54": "H1A", "55": "H1A", "57": "H1A", "58": "H1A", "67": "H1A", "68": "H1A", "69": "H1A", "70": "H1A", "71": "H1A", "73": "H1A", "74": "H1A", "88": "H1A", "89": "H1A", "90": "H1A",
-    "02": "H1B", "08": "H1B", "14": "H1B", "18": "H1B", "27": "H1B", "28": "H1B", "36": "H1B", "41": "H1B", "50": "H1B", "53": "H1B", "59": "H1B", "60": "H1B", "61": "H1B", "62": "H1B", "75": "H1B", "76": "H1B", "77": "H1B", "78": "H1B", "80": "H1B", "91": "H1B", "92": "H1B", "93": "H1B", "94": "H1B", "95": "H1B",
-    "22": "H1C", "29": "H1C", "35": "H1C", "44": "H1C", "49": "H1C", "56": "H1C", "72": "H1C", "85": "H1C",
-    "17": "H2A", "24": "H2A", "33": "H2A", "37": "H2A", "79": "H2A", "86": "H2A",
-    "16": "H2B", "19": "H2B", "23": "H2B", "26": "H2B", "38": "H2B", "46": "H2B", "47": "H2B", "48": "H2B", "63": "H2B", "81": "H2B", "82": "H2B", "87": "H2B",
-    "09": "H2C", "11": "H2C", "12": "H2C", "15": "H2C", "31": "H2C", "32": "H2C", "40": "H2C", "64": "H2C", "65": "H2C",
-    "04": "H2D", "06": "H2D", "13": "H2D", "30": "H2D", "34": "H2D", "66": "H2D", "83": "H2D", "84": "H2D",
-    "2A": "H3", "2B": "H3", "971": "H3", "972": "H3", "973": "H3", "974": "H3", "976": "H3",
-}
+# LOT 7a (30/09/2026) — TEMPÉRATURE EXTÉRIEURE DE BASE : table NF P52-612/CN du guide ACE (annexe 1),
+# exigée par le bureau de contrôle. Zone A à I par département, puis palier d'altitude EXACT de la table
+# (0-200 / 201-400 / … / 2001-2200 m). Au-delà du dernier palier donné pour une zone : la dernière valeur.
+# RÉPLIQUÉE À L'IDENTIQUE dans le front (templates/index.html, même littéral JSON) : la note (document) == l'aperçu ;
+# un témoin compare les deux. La zone CEE officielle (DEPT_ZONE, H1/H2/H3) ne sert toujours QU'À la prime.
+ZONES_TEMP_NF = {"A": [-2, -4, -6, -8, -10, -12, -14, -16, -18, -20], "B": [-4, -5, -6, -7, -8, -9, -10], "C": [-5, -6, -7, -8, -9, -10, -11, -12, -13, -14, -15], "D": [-7, -8, -9, -11, -13, -14, -15], "E": [-8, -9, -11, -13, -15, -17, -19, -21, -23, -25, -27], "F": [-9, -10, -11, -12, -13], "G": [-10, -11, -13, -14, -17, -19, -21, -23, -24, -25, -29], "H": [-12, -13, -15, -17, -19, -21, -23, -24], "I": [-15, -15, -19, -21, -23, -24, -25]}
+DEPT_ZONE_NF = {"2A": "A", "2B": "A", "20": "A", "06": "A", "22": "B", "29": "B", "56": "B", "35": "C", "44": "C", "85": "C", "16": "C", "17": "C", "24": "C", "33": "C", "40": "C", "47": "C", "32": "C", "64": "C", "65": "C", "31": "C", "09": "C", "82": "C", "81": "C", "11": "C", "34": "C", "30": "C", "13": "C", "83": "C", "66": "C", "14": "D", "27": "D", "76": "D", "61": "D", "60": "D", "95": "D", "78": "D", "91": "D", "77": "D", "75": "D", "92": "D", "93": "D", "94": "D", "28": "D", "45": "D", "41": "D", "72": "D", "53": "D", "49": "D", "37": "D", "18": "D", "79": "D", "86": "D", "36": "D", "02": "D", "50": "D", "46": "D", "12": "D", "07": "D", "26": "D", "84": "D", "03": "E", "23": "E", "87": "E", "63": "E", "19": "E", "15": "E", "43": "E", "48": "E", "04": "E", "59": "F", "62": "F", "80": "F", "08": "G", "51": "G", "10": "G", "89": "G", "58": "G", "21": "G", "71": "G", "39": "G", "01": "G", "69": "G", "42": "G", "74": "G", "73": "G", "38": "G", "05": "G", "55": "H", "52": "H", "70": "H", "25": "H", "57": "I", "54": "I", "67": "I", "68": "I", "88": "I", "90": "I"}
+# Départements à DEUX zones dans la table : la plus froide est retenue (83, 44, 85, 17, 33, 40, 66, 11 -> C ;
+# 50 -> D), sauf le 06 (décision d'Avi, 30/09/2026) : A sous 400 m (littoral), E à partir de 400 m
+# (arrière-pays) — altitude inconnue : E. La note de dim le DIT : « département à deux zones, vérifier ».
+DEPTS_DEUX_ZONES_NF = ["06", "11", "17", "33", "40", "44", "50", "66", "83", "85"]
+SEUIL_06_M = 400
+PALIERS_NF = ["0-200", "201-400", "401-600", "601-800", "801-1000", "1001-1200", "1201-1400", "1401-1600", "1601-1800", "1801-2000", "2001-2200"]
+
+
+def _dept_du_cp(cp) -> str:
+    cp = "".join(c for c in str(cp or "") if c.isdigit())[:5]
+    return cp[:3] if cp.startswith("97") else cp[:2]
+
+
+def temperature_base_nf(cp, altitude=None) -> dict:
+    """Température de base NF P52-612/CN : `{temperature, zone, palier, altitude, deux_zones, hors_table}`.
+    `altitude` : mètres, ou None / "" si inconnue (compte alors comme 0-200 m, sauf la règle du 06)."""
+    dept = _dept_du_cp(cp)
+    alt = None
+    if altitude not in (None, ""):
+        try:
+            alt = float(str(altitude).replace(",", "."))
+        except ValueError:
+            alt = None
+    zone = DEPT_ZONE_NF.get(dept)
+    if dept == "06":
+        zone = "A" if (alt is not None and alt < SEUIL_06_M) else "E"
+    if zone is None:
+        # Hors table (outre-mer, CP inconnu) : pas de valeur NF ; l'ancienne base de zone, et la note le dit.
+        return {"temperature": 0 if dept.startswith("97") else -7, "zone": "hors table", "palier": "",
+                "altitude": alt or 0, "deux_zones": False, "hors_table": True}
+    valeurs = ZONES_TEMP_NF[zone]
+    a = alt or 0
+    brut = 0 if a <= 200 else int(-(-(a - 200) // 200))
+    i = min(brut, len(valeurs) - 1)
+    palier = f"{PALIERS_NF[i]} m" if brut == i else f"au-delà de {PALIERS_NF[i].split('-')[1]} m (dernière valeur de la table)"
+    return {"temperature": valeurs[i], "zone": zone, "palier": palier, "altitude": a,
+            "deux_zones": dept in DEPTS_DEUX_ZONES_NF, "hors_table": False}
+
+
+MENTION_DEUX_ZONES = "département à deux zones, vérifier"
 
 
 def _fmt_fr_num(x):
@@ -116,48 +175,17 @@ def _fmt_fr_num(x):
     return f"{f:g}".replace(".", ",")
 
 
-def _normaliser_sous_zone(z):
-    raw = str(z or "").strip().upper().replace(" ", "")
-    if not raw:
-        return ""
-    for sz in ("H1A", "H1B", "H1C", "H2A", "H2B", "H2C", "H2D"):
-        if raw.startswith(sz):
-            return sz
-    if raw.startswith("H1"):
-        return "H1"
-    if raw.startswith("H2"):
-        return "H2"
-    if raw.startswith("H3"):
-        return "H3"
-    return ""
-
-
 def _temperature_base_notedim(prospect):
-    # Lot 6c : table d'avant (sous-zone du département) remise telle quelle. La zone CEE officielle (DEPT_ZONE,
-    # H1/H2/H3) ne sert QU'À la prime CEE, jamais au dimensionnement.
-    cp = "".join(c for c in str(value(prospect, "cp_chantier", "code_postal_chantier", "cp", default="") or "") if c.isdigit())[:5]
-    info = None
-    if cp and cp in TEMP_BASE_CP:
-        info = {"temperature": TEMP_BASE_CP[cp], "zone": _normaliser_sous_zone(value(prospect, "zone_climatique_chantier", "zone_climatique", default="")) or "H1"}
+    # Lot 7a : table NF P52-612/CN (guide ACE, annexe 1) — la MÊME que l'aperçu du simulateur.
+    cp = value(prospect, "cp_chantier", "code_postal_chantier", "cp", default="")
+    t = temperature_base_nf(cp, value(prospect, "altitude", default=None))
+    if t["hors_table"]:
+        label = "hors table NF, à vérifier"
     else:
-        dept = cp[:3] if cp.startswith("97") else cp[:2]
-        if dept and dept in DEPT_SOUS_ZONE:
-            z = DEPT_SOUS_ZONE[dept]
-            info = {"temperature": TEMP_BASE_SOUS_ZONE[z], "zone": z}
-    if info is None:
-        z_detail = _normaliser_sous_zone(value(prospect, "zone_climatique_chantier", "zone_climatique", default=""))
-        if z_detail and z_detail in TEMP_BASE_SOUS_ZONE:
-            info = {"temperature": TEMP_BASE_SOUS_ZONE[z_detail], "zone": z_detail}
-    if info is None:
-        z = normalize_zone("", cp)
-        if z in TEMP_BASE_ZONE:
-            info = {"temperature": TEMP_BASE_ZONE[z], "zone": z}
-    if info is None:
-        info = {"temperature": -7, "zone": "H1"}
-    altitude = float_value(value(prospect, "altitude", default=0), 0)
-    correction = ((altitude - 200) / 100) * 0.5 if altitude > 200 else 0
-    correction_label = f"correction altitude -{number_fr(correction)} °C" if correction > 0 else "sans correction"
-    return {"temperature": info["temperature"] - correction, "zone": info["zone"], "altitude": altitude, "correction_label": correction_label}
+        label = f"palier {t['palier']}" + (f" — {MENTION_DEUX_ZONES}" if t["deux_zones"] else "")
+    return {"temperature": t["temperature"], "zone": ("Zone " + t["zone"]) if not t["hors_table"] else "Hors table NF",
+            "altitude": t["altitude"], "correction_label": label, "deux_zones": t["deux_zones"],
+            "mention_deux_zones": MENTION_DEUX_ZONES if t["deux_zones"] else ""}
 
 
 def get_prix_pac_for_devis(prospect, state_simulateur, catalogue):
@@ -916,6 +944,7 @@ def calculer_notedim(prospect, state_simulateur, catalogue_pac):
         "volume_chauffe": _fmt_fr_num(int(volume + 0.5)),
         "altitude": number_fr(altitude, 0),
         "correction_altitude_label": correction_label,
+        "mention_deux_zones": _temp["mention_deux_zones"],
         "temperature_consigne": "20",
         "delta_t": _fmt_fr_num(delta_t),
         "service": "Chauffage + ECS" if service_ecs else "Chauffage seul",

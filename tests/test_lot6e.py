@@ -25,6 +25,10 @@ ACE = ("« La présente offre comprend une Prime d'un montant de {l} euros, qui 
        "dans le cadre de son rôle actif et incitatif, au titre du dispositif des certificats d'économies d'énergie »")
 
 
+ACE_LOT7A = ("« La présente offre comprend une prime de {m} € offerte par ACE ÉNERGIE (SIREN : 848 595 336) dans le cadre "
+             "du dispositif des CEE »")
+
+
 @pytest.fixture
 def client():
     return TestClient(main.app)
@@ -53,10 +57,10 @@ def test_attente_mention_picoty_montant_de_la_ligne_cee(client, variante):
 
 
 @pytest.mark.parametrize("variante", ["devis", "pre_devis"])
-def test_tout_de_suite_mention_ace_inchangee(client, variante):
-    t = _texte(client, "sans_attente", variante)
-    ctx = main._build_devis_context(None, LEAD["numero"])
-    assert "Mention RAI — Partenaire ACE Énergie " + ACE.format(l=ctx["montant_cee_lettres"]) in t
+def test_tout_de_suite_mention_ace(client, variante):
+    # Lot 7a : texte exigé par ACE, montant en chiffres = la ligne « Prime CEE » (test_lot7a_documents.py)
+    t = _texte(client, "sans_attente", variante).replace(" ", " ")
+    assert "Mention RAI — Partenaire ACE Énergie " + ACE_LOT7A.format(m=_ligne_cee(t)) in t
     assert "PICOTY" not in t
 
 

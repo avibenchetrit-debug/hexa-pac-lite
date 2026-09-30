@@ -41,7 +41,7 @@ def params_vierges():
 # ---------------------------------------------------------------- script d'appel
 def test_script_appel_par_defaut(client):
     s = client.get("/api/script-appel").json()
-    assert sorted(s["etapes"]) == ["1", "2", "3", "4", "5", "6"] and s["version"] == 3
+    assert sorted(s["etapes"]) == ["1", "2", "3", "4", "5", "6"] and s["version"] == 4   # Lot 7a
     e1 = s["etapes"]["1"]
     # Lot 6i : textes définitifs
     assert e1["intro"].startswith("Bonjour [civilité nom], [prénom utilisateur] de la société Hexa-Rénov'.")

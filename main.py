@@ -42,6 +42,7 @@ from starlette.background import BackgroundTask
 
 from services.service_devis import (
     DEPT_ZONE,
+    lignes_solution_chauffage,
     calculer_devis,
     calculer_economie_devis,
     resoudre_ballon,
@@ -241,6 +242,9 @@ DEFAULT_PARAMS_FINANCEMENT = {
 # Variables remplacées à l'affichage : [civilité nom], [prénom utilisateur], [surface], [année], [année du DPE],
 # [X coût théorique], [catégorie], [aides], [MPR], [CEE], [reste à charge], [économie mensuelle], [année avis],
 # [année revenus] (et les anciennes : [prénom du client], [nom du client], [date du DPE], [classe DPE]).
+ENCART_MOINS_DE_15_ANS = "Pas de MaPrimeRénov' pour un logement de moins de 15 ans. La prime CEE reste possible."
+ENCART_MOINS_DE_2_ANS = "Logement de moins de 2 ans : pas de MaPrimeRénov' pour une pompe à chaleur air-eau."
+
 DEFAULT_SCRIPT_APPEL = {
     "etapes": {
         "1": {
@@ -310,8 +314,8 @@ DEFAULT_SCRIPT_APPEL = {
             "encarts": [
                 {"titre": "À DIRE :", "texte": "« Votre maison consomme beaucoup : c'est là que la pompe à chaleur fait la plus grosse "
                                              "différence. »", "condition": "dpe_classe=F,G"},
-                {"titre": "À SAVOIR :", "texte": "Pas de MaPrimeRénov' pour un logement de moins de 15 ans. La prime CEE reste possible.",
-                 "condition": "age<15"},
+                # Lot 7a (30/09/2026) : remplace l'encadré « logement < 15 ans »
+                {"titre": "À SAVOIR :", "texte": ENCART_MOINS_DE_2_ANS, "condition": "age<2"},
             ],
         },
         "3": {
@@ -486,7 +490,8 @@ DEFAULT_SCRIPT_APPEL = {
          "reponse": "Oui, nous sommes certifiés RGE. C'est obligatoire pour que vous puissiez toucher les aides."},
     ],
     # Lot 6i : version 3 = textes définitifs + FAQ ; une config enregistrée plus ancienne est remplacée une fois
-    "version": 3,
+    # Lot 7a : version 4 = l'encadré « moins de 2 ans » de l'étape 2 (seul changement, voir _script_appel)
+    "version": 4,
 }
 
 DEFAULT_PARAMETRES_ADMIN = {
@@ -1077,12 +1082,21 @@ MENTION_CEE_DEFAUT = {
                "situé rue André et Guy PICOTY – BP1 23300 LA SOUTERRAINE. Représentée par ECAIR, société au capital social "
                "de 132 970,00 €, immatriculée au RCS de Bobigny sous le n° 952 862 670, dont le siège social est situé "
                "5 rue Pleyel, 93200 SAINT-DENIS, en qualité de mandataire, pour la somme de {montant_cee} euros."),
-    # texte ACE d'avant le Lot 6e, à l'identique (montant en lettres)
+    # Lot 7a (30/09/2026) : texte EXACT exigé par ACE, montant en chiffres (= la ligne « Prime CEE » du devis)
     "ACE": ("Mention RAI — Partenaire ACE Énergie",
-            "« La présente offre comprend une Prime d'un montant de {montant_cee_lettres} euros, qui vous est offerte par "
-            "ACE ÉNERGIE (SIREN : 848 595 336) dans le cadre de son rôle actif et incitatif, au titre du dispositif des "
-            "certificats d'économies d'énergie »"),
+            "« La présente offre comprend une prime de {montant_cee} € offerte par ACE ÉNERGIE (SIREN : 848 595 336) "
+            "dans le cadre du dispositif des CEE »"),
 }
+# L'ancien texte ACE (montant en lettres) : une mention enregistrée TELLE QUELLE dans l'admin est remplacée par
+# le nouveau texte (une seule fois) ; une mention modifiée à la main reste celle de l'admin.
+MENTION_ACE_AVANT_LOT7A = (
+    "« La présente offre comprend une Prime d'un montant de {montant_cee_lettres} euros, qui vous est offerte par "
+    "ACE ÉNERGIE (SIREN : 848 595 336) dans le cadre de son rôle actif et incitatif, au titre du dispositif des "
+    "certificats d'économies d'énergie »")
+
+
+def _est_ace(d: dict) -> bool:
+    return bool(re.match(r"^ACE\b", str((d or {}).get("nom") or "").strip().upper()))
 
 
 def _mention_cee_defaut(d: dict) -> tuple:
@@ -1127,6 +1141,8 @@ def _read_delegataires():
             titre, texte = _mention_cee_defaut(d)
             d.setdefault("mention_titre", titre)
             d.setdefault("mention_devis", texte)
+        if str(d.get("mention_devis") or "").strip() == MENTION_ACE_AVANT_LOT7A:
+            d["mention_devis"] = MENTION_CEE_DEFAUT["ACE"][1]          # Lot 7a : texte exigé par ACE
         out.append(d)
     if not any(usage_delegataire(d) == "tout_de_suite" for d in out):
         out.append({"nom": "ACE", "mwh_precaire": "", "mwh_classique": "", "actif": False, "usage": "tout_de_suite",
@@ -3640,7 +3656,15 @@ def _script_appel() -> dict:
         params["script_appel"] = nouveau
         save_parametres_admin_atomic(params)
         return nouveau
-    return {"etapes": etapes, "faq": faq, "version": 3}
+    # Lot 7a : version 3 -> 4, UNE fois : l'encadré « logement de moins de 15 ans » de l'étape 2 devient
+    # « moins de 2 ans » (texte d'Avi) s'il porte encore le texte d'origine ; tout le reste de l'admin reste.
+    if int(s.get("version") or 1) < 4:
+        for c in (etapes.get("2") or {}).get("encarts") or []:
+            if isinstance(c, dict) and str(c.get("texte") or "").strip() == ENCART_MOINS_DE_15_ANS:
+                c["texte"], c["condition"] = ENCART_MOINS_DE_2_ANS, "age<2"
+        params["script_appel"] = {"etapes": etapes, "faq": faq, "version": 4}
+        save_parametres_admin_atomic(params)
+    return {"etapes": etapes, "faq": faq, "version": 4}
 
 
 ACTIONS_SCRIPT = ("rappel", "cloturer")
@@ -3685,7 +3709,7 @@ def _nettoyer_script_appel(payload) -> dict:
                for f in faq_src[:60] if isinstance(f, dict) and txt(f.get("question"), 300)]
     else:                                      # enregistrement sans FAQ (ancien écran) : celle en place reste
         faq = _script_appel().get("faq") or []
-    return {"etapes": etapes, "faq": faq, "version": 3}
+    return {"etapes": etapes, "faq": faq, "version": 4}
 
 
 @app.get("/api/script-appel")
@@ -4340,6 +4364,12 @@ def _build_devis_context(request: Request, numero: str, version: int | None = No
     # Lot 6e : texte complet de la mention, stocké sur le délégataire ; montant = la ligne « Prime CEE » du devis
     context["mention_cee_titre"], context["mention_cee_texte"] = _mention_cee(
         _deleg, calculs.get("montant_cee"), calculs.get("montant_cee_lettres"))
+    # Lot 7a : délégataire ACE -> raison sociale + SIRET du sous-traitant juste après la mention (devis et facture ;
+    # le pré-devis, lui, ne nomme pas de sous-traitant).
+    context["solution_chauffage"] = lignes_solution_chauffage(prospect, state)   # Lot 7a · 3 et 4
+    context["mention_cee_sous_traitant"] = (
+        f"Sous-traitant : {sous_traitant_context.get('entreprise')} — SIRET {sous_traitant_context.get('siret') or '—'}"
+        if _est_ace(_deleg) and avec_sous_traitant and sous_traitant_context.get("entreprise") else "")
     # Mêmes clés qu'avant le Lot 2 (compatibilité) ; l'économie ECS fixe du ballon n'existe plus.
     context["economie_devis"] = {
         "facture_apres_mois": _eco_res.get("apres_mensuel") if _eco_res.get("ok") else None,
@@ -4878,7 +4908,7 @@ def _normaliser_reglements(rows) -> tuple[list, float]:
     return lignes, round(total, 2)
 
 
-def _render_facture_html(request: Request, numero: str, numero_facture: str, numero_devis_ref: str, date_fin_travaux: str, numero_dossier: str | None = None, acquittee: bool = False, reglements=None) -> str:
+def _render_facture_html(request: Request, numero: str, numero_facture: str, numero_devis_ref: str, date_fin_travaux: str, numero_dossier: str | None = None, acquittee: bool = False, reglements=None, surcharges: dict | None = None) -> str:
     ctx = _build_devis_context(request, numero, avec_sous_traitant=True, numero_dossier=numero_dossier)
     if ctx.get("_error_template"):
         raise HTTPException(status_code=400, detail="Champs manquants : facture impossible")
@@ -4891,6 +4921,7 @@ def _render_facture_html(request: Request, numero: str, numero_facture: str, num
     ctx["numero_devis_ref"] = numero_devis_ref
     ctx["date_fin_travaux"] = _format_date_fr(date_fin_travaux) or date_fin_travaux
     ctx["projet_apercu"] = None
+    ctx.update(surcharges or {})          # Lot 7a : facture rectificative (en-tête, mention d'origine, règlements)
     ctx.setdefault("request", request)
     return templates.env.get_template("devis_pac.html").render(ctx)
 
@@ -4971,6 +5002,177 @@ async def emettre_facture(numero: str, request: Request) -> JSONResponse:
         leads[idx]["updated_at"] = _now_iso()
         _atomic_write_json(LEADS_PATH, leads)
     return JSONResponse({"success": True, "numero_facture": numero_facture})
+
+
+# ---- Lot 7a · 7 : FACTURE RECTIFICATIVE ----
+# Exigée par le bureau de contrôle ACE sur un dossier déjà facturé : une NOUVELLE facture, dans la suite de
+# numérotation, qui « annule et remplace » l'originale. Son contenu est celui de l'originale — mêmes montants
+# (refus si le calcul d'aujourd'hui s'en écarte), même référence de devis, même date de fin de travaux, mêmes
+# règlements, MÊME mention CEE (lue dans le PDF d'origine) — plus les lignes « ancien système déposé » et
+# « application » du bloc Solution chauffage. L'originale et le devis archivé ne sont jamais touchés.
+APERCU_SANS_NUMERO = "APERÇU — sans numéro"
+
+
+def _facture_d_origine(numero: str, annule: str = "") -> dict:
+    meta = [r for r in _read_factures_meta().get(numero, []) if isinstance(r, dict)]
+    originales = [r for r in meta if not r.get("rectifie")]
+    if annule:
+        rec = next((r for r in originales if r.get("numero_facture") == annule), None)
+    else:
+        rec = originales[-1] if originales else None
+    if not rec:
+        raise HTTPException(status_code=404, detail="Facture d'origine introuvable")
+    return rec
+
+
+def _texte_pdf(path: str) -> str:
+    try:
+        from pypdf import PdfReader
+        # espaces ASCII seulement : les espaces insécables des montants (« 4 095,00 ») restent
+        return re.sub(r"[ \t\r\n]+", " ", " ".join((p.extract_text() or "") for p in PdfReader(path).pages))
+    except Exception:
+        return ""
+
+
+def _mention_cee_d_origine(rec: dict, montant_cee_lettres: str) -> tuple:
+    """(titre, texte, ligne sous-traitant, source) de la mention CEE imprimée sur la facture d'origine : lue dans son PDF ; à défaut,
+    celle en vigueur à sa date (avant les lots 6 : le texte ACE, montant en lettres)."""
+    texte = _texte_pdf(rec.get("file") or "")
+    m = re.search(r"(Mention RAI — Partenaire .+?)\s*(?:(Sous-traitant : .+? — SIRET [\d ]+?)\s+)?"
+                  r"(?=SAS |CONDITIONS DE PAIEMENT|Conditions de paiement|Page \d+ /|$)", texte)
+    if m:
+        bloc = m.group(1).strip()
+        titres = {str(d.get("mention_titre") or "") for d in _read_delegataires()} | {t for t, _ in MENTION_CEE_DEFAUT.values()}
+        titre = max((t for t in titres if t and bloc.startswith(t)), key=len, default="")
+        if titre:
+            return titre, bloc[len(titre):].strip(), (m.group(2) or "").strip(), "lue sur la facture d'origine"
+    return ("Mention RAI — Partenaire ACE Énergie",
+            MENTION_ACE_AVANT_LOT7A.replace("{montant_cee_lettres}", str(montant_cee_lettres or "")), "",
+            "reconstituée (PDF d'origine illisible) : texte ACE en vigueur à sa date")
+
+
+def _lignes_pdf(source) -> list:
+    try:
+        from pypdf import PdfReader
+        r = PdfReader(io.BytesIO(source) if isinstance(source, (bytes, bytearray)) else source)
+        return [re.sub(r"[ \t]+", " ", l).strip() for pg in r.pages for l in (pg.extract_text() or "").splitlines() if l.strip()]
+    except Exception:
+        return []
+
+
+AJOUTS_RECTIFICATIVE = ("Ancien système de chauffage déposé", "Application :", "Usage :",
+                        "Dépose et évacuation de l'ancienne chaudière", "Dépose et évacuation des équipements remplacés")
+
+
+def _differences_avec_l_originale(rec: dict, pdf_rectificative: bytes, numero_facture: str) -> list | None:
+    """Les lignes qui diffèrent entre la facture d'origine et la rectificative, HORS ajouts prévus (numéro, date
+    d'émission, mention en tête, ancien système / application / usage, ligne de dépose, pagination).
+    None si le PDF d'origine est illisible (la comparaison n'a pas pu se faire)."""
+    orig = _lignes_pdf(rec.get("file") or "")
+    if not orig:
+        return None
+    neuf = _lignes_pdf(pdf_rectificative)
+    aujourd_hui = datetime.now(PARIS_TZ).strftime("%d/%m/%Y")
+
+    def prevu(l, dates):
+        return (re.fullmatch(r"(.* )?Page \d+ / \d+", l) or any(a in l for a in AJOUTS_RECTIFICATIVE)
+                or rec.get("numero_facture", "") in l or numero_facture in l or "rectificative" in l.lower()
+                or "annule et remplace" in l or any(d and d in l and ("émission" in l or l == d) for d in dates))
+    en_moins = [l for l in orig if l not in neuf and not prevu(l, [rec.get("date_emission", "")])]
+    en_plus = [l for l in neuf if l not in orig and not prevu(l, [aujourd_hui])]
+    return [f"− {l}" for l in en_moins] + [f"+ {l}" for l in en_plus]
+
+
+def _montant_depuis_texte(v) -> float:
+    return float_value(re.sub(r"[^\d,.-]", "", str(v or "")).replace(",", "."))
+
+
+def _rendu_rectificative(request: Request, numero: str, rec: dict, numero_facture: str) -> tuple:
+    """(html, infos) — infos : mention_source, montant_origine, montant_recalcule."""
+    ctx0 = _build_devis_context(request, numero, avec_sous_traitant=True, numero_dossier=_lead_numero_dossier(numero))
+    titre, texte, sous_traitant, source = _mention_cee_d_origine(rec, ctx0.get("montant_cee_lettres"))
+    regl = [x for x in (rec.get("reglements") or []) if isinstance(x, dict)] if rec.get("acquittee") else []
+    surcharges = {
+        "facture_rectificative": {"numero": rec.get("numero_facture", ""), "date": rec.get("date_emission", "")},
+        "mention_cee_titre": titre, "mention_cee_texte": texte, "mention_cee_sous_traitant": sous_traitant,
+        "reglements": regl, "reglements_total": money(sum(_montant_depuis_texte(x.get("montant")) for x in regl)),
+    }
+    html = _render_facture_html(request, numero, numero_facture, rec.get("numero_devis_ref") or "",
+                                rec.get("date_fin_travaux") or "", _lead_numero_dossier(numero),
+                                acquittee=bool(rec.get("acquittee")), reglements=None, surcharges=surcharges)
+    return html, {"mention_source": source, "montant_origine": rec.get("montant_ttc"),
+                  "montant_recalcule": _facture_montant_ttc(numero)}
+
+
+def _verifier_rectifiable(numero: str, rec: dict, infos: dict) -> None:
+    if not _dossier_fige(numero):
+        raise HTTPException(status_code=409, detail="Facture rectificative : seulement sur un dossier facturé (verrouillé)")
+    orig, recalc = infos.get("montant_origine"), infos.get("montant_recalcule")
+    if orig is None or recalc is None or abs(float_value(orig) - float_value(recalc)) > 0.005:
+        raise HTTPException(status_code=409, detail=f"Montant recalculé ({recalc}) différent de la facture d'origine "
+                                                    f"({orig}) : rectificative refusée, rien n'est émis")
+
+
+@app.get("/api/facture/{numero}/rectificative/apercu")
+async def apercu_facture_rectificative(numero: str, request: Request, annule: str = ""):
+    """Aperçu PDF « APERÇU — sans numéro » : aucun numéro consommé, rien d'écrit."""
+    _require_admin_session(request)
+    rec = _facture_d_origine(numero, annule)
+    html, infos = _rendu_rectificative(request, numero, rec, APERCU_SANS_NUMERO)
+    _verifier_rectifiable(numero, rec, infos)
+    pdf = await run_in_threadpool(_html_to_pdf_playwright, html, request)
+    ecarts = _differences_avec_l_originale(rec, pdf, APERCU_SANS_NUMERO)
+    return Response(pdf, media_type="application/pdf", headers={
+        "Content-Disposition": f'inline; filename="Apercu-rectificative-{rec.get("numero_facture")}.pdf"',
+        "X-Mention-Source": infos["mention_source"].encode("ascii", "ignore").decode(),
+        "X-Ecarts-Originale": "non compare (PDF d'origine illisible)" if ecarts is None else str(len(ecarts))})
+
+
+@app.post("/api/facture/{numero}/rectificative")
+async def emettre_facture_rectificative(numero: str, request: Request) -> JSONResponse:
+    """« Émettre une facture rectificative » — admin, dossier verrouillé. Numéro GAPLESS (consommé après le PDF)."""
+    _require_admin_session(request)
+    payload = await _read_request_payload(request)
+    rec = _facture_d_origine(numero, str(payload.get("annule") or "").strip())
+    if any(isinstance(r, dict) and r.get("rectifie") == rec.get("numero_facture")
+           for r in _read_factures_meta().get(numero, [])):
+        raise HTTPException(status_code=409, detail=f"La facture {rec.get('numero_facture')} a déjà une facture rectificative")
+    annee = datetime.now(PARIS_TZ).strftime("%Y")
+    with _facture_lock:
+        counters = _read_json(COUNTERS_PATH, {"dossier": 0})
+        if not isinstance(counters, dict):
+            counters = {"dossier": 0}
+        seq = int(counters.get(f"facture_{annee}") or 0) + 1
+        numero_facture = f"FA-{annee}-{seq:04d}"
+        html, infos = _rendu_rectificative(request, numero, rec, numero_facture)
+        _verifier_rectifiable(numero, rec, infos)
+        pdf_bytes = _html_to_pdf_playwright(html, request)
+        pdf_bytes = _append_fiche_technique(pdf_bytes, numero)
+        pdf_bytes = _append_fiche_ballon(pdf_bytes, numero)
+        # « Contenu IDENTIQUE à l'originale » : comparé ligne à ligne au PDF d'origine ; tout écart hors ajouts
+        # prévus (ex. sous-traitant ou fiche produit modifiés depuis dans l'admin) -> refus, rien n'est émis.
+        ecarts = _differences_avec_l_originale(rec, pdf_bytes, numero_facture)
+        if ecarts is None:
+            raise HTTPException(status_code=409, detail="PDF de la facture d'origine illisible : comparaison impossible, "
+                                                        "rectificative refusée")
+        if ecarts:
+            raise HTTPException(status_code=409, detail="La rectificative différerait de l'originale au-delà des ajouts "
+                                                        "prévus — rien n'est émis : " + " | ".join(ecarts[:8]))
+        pdf_path = _facture_pdf_path(numero, numero_facture)
+        _write_pdf(pdf_path, pdf_bytes)
+        counters[f"facture_{annee}"] = seq
+        _atomic_write_json(COUNTERS_PATH, counters)
+        meta = _read_factures_meta()
+        meta.setdefault(numero, []).append({
+            "numero_facture": numero_facture, "rectifie": rec.get("numero_facture"), "type": "rectificative",
+            "numero_devis_ref": rec.get("numero_devis_ref"), "version_devis": rec.get("version_devis"),
+            "date_emission": datetime.now(PARIS_TZ).strftime("%d/%m/%Y"), "date_fin_travaux": rec.get("date_fin_travaux"),
+            "montant_ttc": rec.get("montant_ttc"), "acquittee": rec.get("acquittee"), "reglements": rec.get("reglements") or [],
+            "mention_source": infos["mention_source"], "file": pdf_path, "created_at": _now_iso(),
+            "par": (current_user(request) or {}).get("username")})
+        _atomic_write_json(FACTURES_META_PATH, meta)
+    return JSONResponse({"success": True, "numero_facture": numero_facture, "rectifie": rec.get("numero_facture"),
+                         "mention_source": infos["mention_source"]})
 
 
 # ---- Tracking d'ouverture email devis (pixel 1x1) ----
@@ -5874,6 +6076,9 @@ async def list_factures(numero: str) -> JSONResponse:
             "date_fin_travaux": _format_date_fr(rec.get("date_fin_travaux", "")) or rec.get("date_fin_travaux", ""),
             "montant_ttc": rec.get("montant_ttc"),
             "created_at": rec.get("created_at", ""),
+            "rectifie": rec.get("rectifie") or "",
+            "rectifiee_par": next((r.get("numero_facture") for r in meta if isinstance(r, dict)
+                                   and r.get("rectifie") and r.get("rectifie") == rec.get("numero_facture")), ""),
             "available": bool(path and os.path.exists(path)),
         })
     items.sort(key=lambda x: x.get("created_at") or "", reverse=True)

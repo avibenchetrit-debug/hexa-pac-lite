@@ -709,8 +709,14 @@
       </div>
       <div class="param-row">
         <span class="param-label">T° extérieure de base</span>
-        <span class="param-value">{{ temperature_base }} <span class="param-unit">°C ({{ zone_climatique }})</span></span>
+        <span class="param-value">{{ temperature_base }} <span class="param-unit">°C ({{ zone_climatique }} · NF P52-612/CN)</span></span>
       </div>
+      {% if mention_deux_zones %}
+      <div class="param-row" data-deux-zones>
+        <span class="param-label">Zone de température</span>
+        <span class="param-value" style="color:#B54708;">⚠ {{ mention_deux_zones|capitalize }}</span>
+      </div>
+      {% endif %}
       <div class="param-row">
         <span class="param-label">Altitude du chantier</span>
         <span class="param-value">{{ altitude }} <span class="param-unit">m ({{ correction_altitude_label }})</span></span>
