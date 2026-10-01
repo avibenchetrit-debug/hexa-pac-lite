@@ -6,6 +6,38 @@
        Les positions calculées en JS à partir de coordonnées écran se divisent par hexaZoom(). -->
   <style id="hexa-zoom">@media screen { html { zoom: 0.9; } }</style>
   <script>window.hexaZoom = function () { var z = parseFloat(getComputedStyle(document.documentElement).zoom); return z > 0 ? z : 1; };</script>
+  <!-- Lot 8a : plus de flash à l'ouverture d'une fiche (ancienne présentation, puis fiche vide, puis la bonne étape).
+       La fiche reste masquée (place gardée) jusqu'à ce que hexaFicheReveler() soit appelé pour CETTE fiche.
+       Masquée par l'OPACITÉ du conteneur, pas par visibility : les champs ont « transition: 0.15s » (toutes
+       propriétés) et rejouaient la transition de visibilité au dévoilement (texte des champs absent 150 ms). -->
+  <style id="hexa-fiche-attente-css">html.hexa-fiche-attente .hexa-page-pending { opacity: 0 !important; pointer-events: none !important; }</style>
+  <script>
+  (function () {
+    var root = document.documentElement, filet = null;
+    window.hexaFicheMasquer = function (numero) {
+      window.hexaFicheAttendue = String(numero || '');
+      root.classList.add('hexa-fiche-attente');
+      clearTimeout(filet);
+      filet = setTimeout(function () { window.hexaFicheReveler(true); }, 3000);
+    };
+    function montrer() { clearTimeout(filet); root.classList.remove('hexa-fiche-attente'); }
+    window.hexaFicheReveler = function (force) {
+      if (!root.classList.contains('hexa-fiche-attente')) return;
+      if (force) { montrer(); return; }
+      var attendue = window.hexaFicheAttendue;
+      var ouvert = String((document.body && document.body.dataset.prospectNumero) || '');
+      if (attendue && ouvert !== attendue) return;                         // pas encore CETTE fiche
+      // et les polices chargées : sinon le texte des champs reste invisible un instant (police pas encore là)
+      var polices = (document.fonts && document.fonts.ready) || Promise.resolve();
+      polices.then(function () {
+        if (window.hexaFicheAttendue !== attendue) return;                 // une autre fiche a été demandée entre-temps
+        requestAnimationFrame(montrer);
+      });
+    };
+    var m = /^\/prospect\/([^\/?#]+)/.exec(location.pathname);
+    if (m) { try { window.hexaFicheMasquer(decodeURIComponent(m[1])); } catch (e) { window.hexaFicheMasquer(m[1]); } }
+  })();
+  </script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#E2214B">
@@ -20518,6 +20550,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     const numero = (p && p.numero) ? String(p.numero).trim() : '';
     if(!numero) return;
     const wasOnFiche = !document.body.classList.contains('hexa-view-prospects') && !!String(document.body.dataset.prospectNumero||'').trim();
+    if (String(document.body.dataset.prospectNumero||'').trim() !== numero && typeof window.hexaFicheMasquer === 'function') window.hexaFicheMasquer(numero);
     // Changement de prospect : repartir propre — fermer tous les panneaux ouverts
     // Ordre important : simulateur d'abord (sinon le wrap closeAllPanels le rouvre via rAF)
     if (typeof window.fermerSimulationsDrawer === 'function') window.fermerSimulationsDrawer();
@@ -20532,6 +20565,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
       hydrateProspectForm(lead);
     } catch (err) {
       if (opts.strict) {
+        window.hexaFicheReveler?.(true);
         if (String(err && err.message || '').includes('404')) { hexaFail404(numero); return; }
         toastMsg('Erreur de chargement, réessayez', '#B91C1C');
         return;
@@ -22080,11 +22114,13 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     const fiche = [1, 2, 3, 4].find(n => manquantsEtape(n).length > 0);
     if (!memeLead) { techOuvert = false; allerEtape(numero ? (fiche || etapeCourante) : 1); }
     else allerEtape(etapeCourante, { garderDefilement: true });
+    // Lot 8a : l'étape affichée est déjà la bonne (sauf fiche complète : saut vers 5 / 6 après le simulateur) -> on montre
+    if (memeLead || !numero || fiche) window.hexaFicheReveler?.();
     const monte = typeof window.hexaSimMonter === 'function' ? window.hexaSimMonter(numero || null, { garder: memeLead }) : Promise.resolve();
     Promise.resolve(monte).then(() => {
       if (memeLead || !numero || fiche) { majEtapes(); return; }
       allerEtape([2, 5, 6].find(n => etatEtape(n) !== 'ok') || 6);
-    });
+    }).finally(() => { window.hexaFicheReveler?.(); });
     setTimeout(ajusterHauteur, 300);    // après le rendu du statut / des relances
   }
   let dernierNumero = null, activite = false;
