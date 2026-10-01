@@ -999,6 +999,20 @@ def _migrate_catalogue_pac_schema():
     _read_catalogue_pac()
 
 
+def _migrate_catalogue_regulateur() -> dict:
+    """Démarrage, idempotent : « Classe du régulateur (ErP) » puis « Contribution à l'efficacité saisonnière (%) »
+    juste après « Alimentation » dans chaque fiche PAC (valeurs du Master si absentes ou vides ; une valeur déjà
+    saisie est gardée et seulement replacée). Écrit (avec sauvegarde) seulement si quelque chose change.
+    Rend {réf: champs encore sans valeur}."""
+    from services.catalogue_regulateur import migrer_catalogue
+    catalogue, change, manques = migrer_catalogue(_read_catalogue_pac())
+    if change:
+        _write_catalogue_pac(catalogue)
+    if manques:
+        print(f"[catalogue] régulateur / contribution sans valeur : {manques}")
+    return manques
+
+
 def _admin_payload_with_m3():
     admin = load_parametres_admin()
     baremes = _read_json(BAREMES_PATH, {})
@@ -1865,6 +1879,7 @@ async def startup_event():
         )
     _init_storage()
     _migrate_leads_schema()
+    _migrate_catalogue_regulateur()
     _admin_password()
     start_backup_scheduler(DATA_DIR)
     start_relances_scheduler()

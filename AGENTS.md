@@ -57,6 +57,11 @@ derrière la connexion ; `/api/...` répond 401 même pour une route inexistante
   en page d'origine (`facture_mise_en_page_avant_lot7d`), sinon elle ne serait plus identique ligne à ligne. « Application :
   haute température » (radiateurs) / « basse température » (plancher chauffant). ETAS 35 / 55 : les deux valeurs, seule celle
   qui compte en gras 700 (radiateurs → 55 °C, plancher → 35 °C, `etas_html`), l'autre en normal.
+- **Catalogue — régulateur** (`services/catalogue_regulateur.py`) : au démarrage (`_migrate_catalogue_regulateur`,
+  idempotente, écrit avec sauvegarde seulement si besoin), chaque fiche PAC porte « Classe du régulateur (ErP) » puis
+  « Contribution à l'efficacité saisonnière (%) » juste après « Alimentation ». Ligne absente / vide : valeur du Master
+  (`VALEURS_MASTER`, par n° EPREL, relevée dans hexa-simulateur-2) ; valeur déjà saisie : gardée, seulement replacée.
+  Sans équivalent certain : rien n'est inventé (journal `[catalogue] … sans valeur`).
 - **Verrou « dossier facturé »** : installation finie ou facture émise → `dossier_fige` (jamais stocké), toute écriture du
   lead / du simulateur refusée en 423, fiche en lecture seule ; le devis et la note de dim servis sont ceux archivés à
   l'envoi (`data/devis/devis_meta.json`), rien n'est régénéré.
