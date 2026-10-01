@@ -109,7 +109,7 @@ def test_rectificative_identique_sauf_ajouts(base, dossier_facture):
     assert "Texte CEE imprimé sur l'originale" in t_rect and "offerte par ACE ÉNERGIE (SIREN" not in t_rect
     # Tout le reste est identique, aux ajouts près.
     ajouts = {"Ancien système de chauffage déposé : chaudière — énergie : fioul",
-              "Application : moyenne ou haute température", "Installation et paramétrage du régulateur"}
+              "Application : haute température", "Installation et paramétrage du régulateur"}
     assert "Usage :" not in t_rect
     for a in ajouts:
         assert a in t_rect

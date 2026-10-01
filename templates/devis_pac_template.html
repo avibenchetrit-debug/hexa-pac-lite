@@ -1972,6 +1972,9 @@
   .ace-exige, .ace-exige .doc-type-num-label, .ace-exige .infos-label, .ace-exige .infos-value,
   .ace-exige td, .pac-specs-table tr.ace-exige td.pac-specs-champ, .ace-exige .key, .ace-exige .val { font-weight: 600 !important; }
   .pac-heating-note-title .ace-exige { font-weight: inherit !important; }
+  /* Lot 7d : ETAS 35 °C / 55 °C — les deux valeurs, SEULE celle qui compte en gras (700) ; l'autre en normal. */
+  .pac-specs-table tr td.pac-specs-valeur.etas-valeurs { font-weight: 400 !important; }
+  .pac-specs-table tr td.pac-specs-valeur.etas-valeurs .etas-compte { font-weight: 700 !important; }
   .doc-rectificative { margin-top: 8px; font-size: 12px; font-weight: 700; color: var(--rouge); max-width: 340px; margin-left: auto; line-height: 1.4; }
   .pac-heating-note-lignes {
     margin: 5px 0 0;
@@ -3452,10 +3455,13 @@
 <div class="infos-col">
 <div class="infos-col-title">Dossier</div>
 <div class="infos-row ace-exige" data-ace="date"><span class="infos-label">Date d'émission</span><span class="infos-value">{{ date_emission }}</span></div>
-{% if mode != 'facture' %}<div class="infos-row"><span class="infos-label">Durée de validité</span><span class="infos-value">{{ date_validite }}</span></div>{% endif %}
+{#- Lot 7d : aucune date de chantier imprimée (ni début ni fin) ; 12 lignes de chaque côté. La facture prend « Réf. devis »
+    à la place de « Durée de validité ». Exception : la rectificative d'une facture émise AVANT le lot 7d garde sa mise en
+    page d'origine (« Fin travaux », pas de « Réf. devis » ici), sinon elle ne serait plus identique ligne à ligne. #}
+{% if mode != 'facture' %}<div class="infos-row"><span class="infos-label">Durée de validité</span><span class="infos-value">{{ date_validite }}</span></div>
+{% elif not facture_mise_en_page_avant_lot7d %}<div class="infos-row" data-ref-devis><span class="infos-label">Réf. devis</span><span class="infos-value">{{ numero_devis_ref }}</span></div>{% endif %}
 <div class="infos-row"><span class="infos-label">Visite technique</span><span class="infos-value">{{ date_visite_technique }}</span></div>
-{% if mode != 'facture' %}<div class="infos-row"><span class="infos-label">Début travaux</span><span class="infos-value">{{ date_debut_travaux }}</span></div>{% endif %}
-{% if mode == 'facture' %}<div class="infos-row"><span class="infos-label">Fin travaux</span><span class="infos-value">{{ date_fin_travaux }}</span></div>{% endif %}
+{% if mode == 'facture' and facture_mise_en_page_avant_lot7d %}<div class="infos-row"><span class="infos-label">Fin travaux</span><span class="infos-value">{{ date_fin_travaux }}</span></div>{% endif %}
 <div class="infos-row"><span class="infos-label">Adresse chantier</span><span class="infos-value">{{ adresse_chantier }}</span></div>
 <div class="infos-row"><span class="infos-label">CP chantier</span><span class="infos-value">{{ cp_chantier }}</span></div>
 <div class="infos-row"><span class="infos-label">Ville chantier</span><span class="infos-value">{{ ville_chantier }}</span></div>
@@ -3498,7 +3504,7 @@
 <table class="pac-specs-table">
 <tbody>
 {% for spec in description_specs %}
-<tr{% if champ_exige_ace and champ_exige_ace(spec.champ) %} class="ace-exige" data-ace="fiche"{% endif %}><td class="pac-specs-champ">{{ spec.champ }}</td><td class="pac-specs-valeur">{{ spec.valeur }}</td></tr>
+<tr{% if champ_exige_ace and champ_exige_ace(spec.champ) %} class="ace-exige" data-ace="fiche"{% endif %}><td class="pac-specs-champ">{{ spec.champ }}</td>{% if est_champ_etas and est_champ_etas(spec.champ) and etas_qui_compte %}<td class="pac-specs-valeur etas-valeurs">{{ etas_html(spec.valeur, etas_qui_compte) }}</td>{% else %}<td class="pac-specs-valeur">{{ spec.valeur }}</td>{% endif %}</tr>
 {% endfor %}
 </tbody>
 </table>
@@ -3528,7 +3534,7 @@
 {% if ballon_description_specs and ballon_description_specs|length > 0 %}
 <table class="pac-specs-table"><tbody>
 {% for spec in ballon_description_specs %}
-<tr{% if champ_exige_ace and champ_exige_ace(spec.champ) %} class="ace-exige" data-ace="fiche"{% endif %}><td class="pac-specs-champ">{{ spec.champ }}</td><td class="pac-specs-valeur">{{ spec.valeur }}</td></tr>
+<tr{% if champ_exige_ace and champ_exige_ace(spec.champ) %} class="ace-exige" data-ace="fiche"{% endif %}><td class="pac-specs-champ">{{ spec.champ }}</td>{% if est_champ_etas and est_champ_etas(spec.champ) and etas_qui_compte %}<td class="pac-specs-valeur etas-valeurs">{{ etas_html(spec.valeur, etas_qui_compte) }}</td>{% else %}<td class="pac-specs-valeur">{{ spec.valeur }}</td>{% endif %}</tr>
 {% endfor %}
 </tbody></table>
 {% endif %}
@@ -3729,7 +3735,7 @@ Dans le cas où l'aide notifiée au client est inférieure au montant de l'aide 
 <div class="section-title">Conditions de paiement</div>
 {% if mode == 'facture' %}
 <div class="payment-grid">
-<div class="payment-card"><div class="payment-card-content"><div class="payment-card-title">Échéance de paiement</div><div class="payment-card-text"><strong>Solde intégral exigible à réception de la présente facture.</strong> Travaux achevés le {{ date_fin_travaux }}.</div></div></div>
+<div class="payment-card"><div class="payment-card-content"><div class="payment-card-title">Échéance de paiement</div><div class="payment-card-text"><strong>Solde intégral exigible à réception de la présente facture.</strong>{% if facture_mise_en_page_avant_lot7d %} Travaux achevés le {{ date_fin_travaux }}.{% endif %}</div></div></div>
 <div class="payment-card"><div class="payment-card-content"><div class="payment-card-title">Pénalités de retard</div><div class="payment-card-text">Tout retard de paiement entraîne de plein droit des pénalités égales à trois fois le taux d'intérêt légal, exigibles sans rappel préalable (art. L441-10 du Code de commerce).</div></div></div>
 <div class="payment-card"><div class="payment-card-content"><div class="payment-card-title">Indemnité forfaitaire</div><div class="payment-card-text">Une indemnité forfaitaire pour frais de recouvrement de <strong>40 €</strong> est due en cas de retard de paiement (art. L441-10 et D441-5 du Code de commerce).</div></div></div>
 </div>

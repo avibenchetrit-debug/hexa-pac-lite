@@ -45,6 +45,9 @@ from services.service_devis import (
     lignes_solution_chauffage,
     ligne_regulateur,
     champ_exige_ace,
+    est_champ_etas,
+    etas_html,
+    etas_valeur_qui_compte,
     calculer_devis,
     calculer_economie_devis,
     resoudre_ballon,
@@ -4371,6 +4374,9 @@ def _build_devis_context(request: Request, numero: str, version: int | None = No
     context["solution_chauffage"] = lignes_solution_chauffage(prospect, state)   # Lot 7a · 3 et 4
     context["regulateur"] = ligne_regulateur(description_specs)                  # Lot 7b · 3
     context["champ_exige_ace"] = champ_exige_ace                                  # Lot 7b · 4
+    # Lot 7d · 3 : ETAS 35 / 55 — seule la valeur qui compte (émetteurs) en gras
+    context["etas_qui_compte"] = etas_valeur_qui_compte(prospect)
+    context["etas_html"], context["est_champ_etas"] = etas_html, est_champ_etas
     context["mention_cee_sous_traitant"] = (
         f"Sous-traitant : {sous_traitant_context.get('entreprise')} — SIRET {sous_traitant_context.get('siret') or '—'}"
         if _est_ace(_deleg) and avec_sous_traitant and sous_traitant_context.get("entreprise") else "")
@@ -4912,6 +4918,11 @@ def _normaliser_reglements(rows) -> tuple[list, float]:
     return lignes, round(total, 2)
 
 
+# Lot 7d : facture sans date de chantier (ni « Fin travaux » ni « Travaux achevés le … »), « Réf. devis » dans le bloc
+# DOSSIER. Les factures émises avant n'ont pas cette marque : leur rectificative garde la mise en page d'origine.
+MISE_EN_PAGE_FACTURE = "lot7d"
+
+
 def _render_facture_html(request: Request, numero: str, numero_facture: str, numero_devis_ref: str, date_fin_travaux: str, numero_dossier: str | None = None, acquittee: bool = False, reglements=None, surcharges: dict | None = None) -> str:
     ctx = _build_devis_context(request, numero, avec_sous_traitant=True, numero_dossier=numero_dossier)
     if ctx.get("_error_template"):
@@ -4995,6 +5006,7 @@ async def emettre_facture(numero: str, request: Request) -> JSONResponse:
             "reglements": _normaliser_reglements(reglements)[0] if acquittee else [],
             "file": pdf_path,
             "created_at": now,
+            "mise_en_page": MISE_EN_PAGE_FACTURE,
         }
         meta.setdefault(numero, []).append(record)
         _atomic_write_json(FACTURES_META_PATH, meta)
@@ -5100,6 +5112,7 @@ def _rendu_rectificative(request: Request, numero: str, rec: dict, numero_factur
     regl = [x for x in (rec.get("reglements") or []) if isinstance(x, dict)] if rec.get("acquittee") else []
     surcharges = {
         "facture_rectificative": {"numero": rec.get("numero_facture", ""), "date": rec.get("date_emission", "")},
+        "facture_mise_en_page_avant_lot7d": rec.get("mise_en_page") != MISE_EN_PAGE_FACTURE,
         "mention_cee_titre": titre, "mention_cee_texte": texte, "mention_cee_sous_traitant": sous_traitant,
         "reglements": regl, "reglements_total": money(sum(_montant_depuis_texte(x.get("montant")) for x in regl)),
     }
@@ -5175,6 +5188,7 @@ async def emettre_facture_rectificative(numero: str, request: Request) -> JSONRe
             "date_emission": datetime.now(PARIS_TZ).strftime("%d/%m/%Y"), "date_fin_travaux": rec.get("date_fin_travaux"),
             "montant_ttc": rec.get("montant_ttc"), "acquittee": rec.get("acquittee"), "reglements": rec.get("reglements") or [],
             "mention_source": infos["mention_source"], "file": pdf_path, "created_at": _now_iso(),
+            **({"mise_en_page": rec["mise_en_page"]} if rec.get("mise_en_page") else {}),
             "par": (current_user(request) or {}).get("username")})
         _atomic_write_json(FACTURES_META_PATH, meta)
     return JSONResponse({"success": True, "numero_facture": numero_facture, "rectifie": rec.get("numero_facture"),
@@ -5274,7 +5288,8 @@ async def emettre_rectificative_apercu(numero: str, request: Request, fichier: U
             "date_fin_travaux": rec.get("date_fin_travaux"), "montant_ttc": rec.get("montant_ttc"),
             "acquittee": False, "reglements": [], "controles": controles,
             "sha256_apercu": hashlib.sha256(pdf).hexdigest(), "sha256": hashlib.sha256(pdf_final).hexdigest(),
-            "file": pdf_path, "created_at": _now_iso(), "par": (current_user(request) or {}).get("username")})
+            "file": pdf_path, "created_at": _now_iso(), "par": (current_user(request) or {}).get("username"),
+            **({"mise_en_page": rec["mise_en_page"]} if rec.get("mise_en_page") else {})})
         _atomic_write_json(FACTURES_META_PATH, meta)
     return JSONResponse({"success": True, "numero_facture": numero_facture, "rectifie": rec.get("numero_facture")})
 

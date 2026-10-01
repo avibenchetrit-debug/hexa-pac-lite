@@ -94,6 +94,8 @@ def test_les_12_elements_en_gras_leger_meme_couleur(quoi):
               return {out, fiche_marquees: lignes.filter(tr => tr.classList.contains('ace-exige')).length, fiche_total: lignes.length};
             }""", FICHE)
             for m in mesures["out"]:
+                if "etas-valeurs" in m["nom"]:       # Lot 7d : valeur d'ETAS — seule celle qui compte en 700 (test_lot7d)
+                    continue
                 assert m["poids"] == "600", (media, m)
                 assert m["couleur"] == m["couleur_sans"], (media, m)
             assert mesures["fiche_total"] == len(FICHE) and mesures["fiche_marquees"] == len(FICHE)
