@@ -34,7 +34,7 @@ def lignes_solution_chauffage(prospect, state=None) -> dict:
     if emetteurs == "plancher_chauffant":
         application = "Application : basse température"
     elif emetteurs.startswith("radiateurs"):
-        application = "Application : moyenne ou haute température"
+        application = "Application : haute température"            # Lot 7d : termes demandés
     else:
         application = ""
     # Lot 7b : plus de ligne « Usage » dans le bloc (déjà dans le titre du lot et la fiche produit)
@@ -52,6 +52,38 @@ CHAMPS_FICHE_EXIGES_ACE = ("Marque", "Référence EPREL", "Usage", "ETAS chauffa
 def champ_exige_ace(champ) -> bool:
     c = str(champ or "").strip()
     return any(c == x or c.startswith(x) for x in CHAMPS_FICHE_EXIGES_ACE)
+
+
+def etas_valeur_qui_compte(prospect) -> str:
+    """Lot 7d — la valeur d'ETAS qui compte selon les émetteurs : plancher chauffant (basse température) -> « 35 » ;
+    radiateurs (haute température) -> « 55 » ; autre / non renseigné -> « » (aucune mise en gras)."""
+    emetteurs = str(value(prospect, "type_emetteurs", default="") or "").strip().lower()
+    if emetteurs == "plancher_chauffant":
+        return "35"
+    if emetteurs.startswith("radiateurs"):
+        return "55"
+    return ""
+
+
+def est_champ_etas(champ) -> bool:
+    return str(champ or "").strip().upper().startswith("ETAS CHAUFFAGE 35")
+
+
+def etas_html(valeur, qui_compte) -> str:
+    """Lot 7d — « 178 / 151 » : les deux valeurs gardées, SEULE celle qui compte en gras (font-weight 700).
+    HTML échappé ; valeur hors format « a / b » ou émetteur inconnu : le texte tel quel."""
+    from markupsafe import Markup, escape
+    texte = str(valeur or "")
+    parts = texte.split("/")
+    if qui_compte not in ("35", "55") or len(parts) != 2 or not all(p.strip() for p in parts):
+        return Markup(escape(texte))
+    a, b = parts
+    gras = '<strong class="etas-compte" data-etas="{}">{}</strong>'
+    if qui_compte == "35":
+        a = a[:len(a) - len(a.lstrip())] + str(Markup(gras).format(qui_compte, a.strip())) + a[len(a.rstrip()):]
+        return Markup(f"{a}/{escape(b)}")
+    b = b[:len(b) - len(b.lstrip())] + str(Markup(gras).format(qui_compte, b.strip())) + b[len(b.rstrip()):]
+    return Markup(f"{escape(a)}/{b}")
 
 
 def ligne_regulateur(description_specs) -> dict:

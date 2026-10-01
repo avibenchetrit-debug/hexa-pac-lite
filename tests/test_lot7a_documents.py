@@ -95,7 +95,7 @@ def test_ancien_systeme_et_application_dans_la_solution_chauffage(client, quoi):
     bloc = _texte(re.search(r'<div class="pac-heating-note">(.*?)</section>', brut, re.S).group(1))
     # Lot 7b : l'énergie écrite une seule fois ; plus de ligne « Usage » dans le bloc
     assert bloc.index("BAR-TH-171") < bloc.index("Ancien système de chauffage déposé : chaudière — énergie : fioul")
-    assert "Application : moyenne ou haute température" in bloc and "Usage :" not in bloc
+    assert "Application : haute température" in bloc and "Usage :" not in bloc
     assert "Dépose et évacuation de l'ancienne chaudière fioul" in _texte(brut)
 
 
@@ -103,7 +103,7 @@ def test_plancher_chauffant_basse_temperature_et_ecs(client):
     bloc = _texte(re.search(r'<div class="pac-heating-note">(.*?)</section>',
                             _facture(lead={"type_emetteurs": "plancher_chauffant", "mode_chauffage": "gaz"},
                                      service="chauffage_ecs"), re.S).group(1))
-    assert "Application : basse température" in bloc and "moyenne" not in bloc
+    assert "Application : basse température" in bloc and "haute" not in bloc
     assert "Usage :" not in bloc and "chaudière — énergie : gaz" in bloc
 
 

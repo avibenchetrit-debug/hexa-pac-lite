@@ -50,6 +50,13 @@ derrière la connexion ; `/api/...` répond 401 même pour une route inexistante
   puis `…/emettre` l'inscrit à la place de « APERÇU — sans numéro » (`services/rectificative_apercu.py`, pypdf +
   reportlab, polices reprises de l'aperçu) sans rien régénérer. PyMuPDF (AGPL) n'est volontairement PAS utilisé en
   production ; il ne sert qu'aux tests, pour fabriquer un aperçu d'essai.
+- **Lot 7d** : documents imprimés (devis, pré-devis, facture ; écran et PDF) SANS date de chantier — ni « Début travaux », ni
+  « Fin travaux », ni « Travaux achevés le … » ; bloc identité 12 / 12 lignes alignées (la facture met « Réf. devis » dans
+  DOSSIER). Le CRM garde la date de fin de travaux (saisie à la génération, enregistrée, affichée dans Documents → Factures).
+  Les nouvelles factures portent `"mise_en_page": "lot7d"` ; la rectificative d'une facture SANS cette marque garde la mise
+  en page d'origine (`facture_mise_en_page_avant_lot7d`), sinon elle ne serait plus identique ligne à ligne. « Application :
+  haute température » (radiateurs) / « basse température » (plancher chauffant). ETAS 35 / 55 : les deux valeurs, seule celle
+  qui compte en gras 700 (radiateurs → 55 °C, plancher → 35 °C, `etas_html`), l'autre en normal.
 - **Verrou « dossier facturé »** : installation finie ou facture émise → `dossier_fige` (jamais stocké), toute écriture du
   lead / du simulateur refusée en 423, fiche en lecture seule ; le devis et la note de dim servis sont ceux archivés à
   l'envoi (`data/devis/devis_meta.json`), rien n'est régénéré.
