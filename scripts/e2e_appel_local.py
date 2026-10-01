@@ -216,6 +216,7 @@ with sync_playwright() as p:
         pg.wait_for_timeout(1500)
         mode_mpr("attente")
         h_att = mention("pre_devis")
+        h_att_devis = mention("devis")
         mode_mpr("sans_attente")
         h_sans = mention("pre_devis")
         mode_mpr("attente")
@@ -224,11 +225,18 @@ with sync_playwright() as p:
         pg.wait_for_selector("#devis-pdf-btn", timeout=30000)
         titre = pg.inner_text(".devis-modal-title")
         import html as _h
-        txt = lambda h: re.sub(r"\s+", " ", _h.unescape(re.sub(r"<[^>]+>", " ", h)))
+        # Le texte LU par le client : sans les feuilles de style ni les scripts (un commentaire CSS « exigés par ACE »
+        # du lot 7b faisait croire à une mention ACE sur le pré-devis en attente MPR).
+        txt = lambda h: re.sub(r"\s+", " ", _h.unescape(re.sub(r"<[^>]+>", " ", re.sub(r"<(style|script)\b.*?</\1>", " ", h, flags=re.S))))
         qui = lambda h: [x for x in ("PICOTY", "ACE ÉNERGIE", "Picoty", "ACE Énergie") if x in txt(h)]
         etat["mention"] = (qui(h_att), qui(h_sans), pg.request.get(f"{BASE}/api/simulateur/{etat['n']}/state").json().get("mode_mpr"))
         assert "Picoty" in txt(h_att) and "ACE" not in txt(h_att), f"attente : PICOTY attendu, trouvé {etat['mention']}"
         assert "ACE" in txt(h_sans) and "Picoty" not in txt(h_sans), f"tout de suite : ACE attendu, trouvé {etat['mention']}"
+        for nom, h in (("pré-devis", h_att), ("devis", h_att_devis)):        # PICOTY : montant CEE du document
+            t = txt(h)
+            assert "Partenaire Picoty" in t and "ACE" not in t, f"attente, {nom} : PICOTY seul attendu"
+            ligne = re.search(r"Prime CEE - ([\d  ]+,\d\d) €", t).group(1)
+            assert f"pour la somme de {ligne} euros" in t, f"attente, {nom} : montant PICOTY ≠ ligne Prime CEE ({ligne})"
         lire_ecran(pg, "fenêtre du pré-devis")
         return f"{titre} ; attente MPR → PICOTY, tout de suite → ACE"
     etape("7. Voir le devis (pré-devis, PICOTY / ACE)", s7)
