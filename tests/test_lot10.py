@@ -87,6 +87,6 @@ def test_volume_cee_present_et_coherent(categorie, mode, deleg, tarif, type_prix
         ctx["pre_devis"] = quoi == "pre_devis"
         html = main.templates.env.get_template("devis_pac.html").render(ctx)
     t = docs._texte(html)
-    attendu = "Volume CEE : " + f"{volume:,}".replace(",", " ") + f" kWh cumac ({type_prix})"
-    assert attendu in t, re.findall(r"Volume CEE[^)]*\)", t)
-    assert t.index("Estimation aide Prime CEE") < t.index("Volume CEE :")
+    attendu = f"Volume CEE ({type_prix}) " + f"{volume:,}".replace(",", " ") + " kWh cumac"
+    assert attendu in t, re.findall(r"Volume CEE.{0,60}", t)
+    assert t.index("Estimation aide Prime CEE") < t.index("Volume CEE (")
