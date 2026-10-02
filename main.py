@@ -41,6 +41,7 @@ from services.economies import (
 from starlette.background import BackgroundTask
 
 from services.service_devis import (
+    calculer_cee_bar_th_171,
     DEPT_ZONE,
     lignes_solution_chauffage,
     ligne_regulateur,
@@ -3463,6 +3464,8 @@ async def marge_du_dossier(numero: str, request: Request) -> JSONResponse:
     if isinstance(payload, dict):
         state.update({k: v for k, v in payload.items() if k != "numero"})
     admin = _admin_payload_with_m3()
+    if _dossier_fige(numero):                         # Lot 9c : dossier facturé -> montants réellement facturés
+        return JSONResponse(_marge_dossier_facture(numero, prospect, catalogue, admin))
     calc = calculer_devis(prospect, state, admin, catalogue)
     modele = find_modele(catalogue, state.get("modele_pac_id") or state.get("modele_pac"))
     ballon = None
@@ -3474,6 +3477,53 @@ async def marge_du_dossier(numero: str, request: Request) -> JSONResponse:
     res["modele"] = (modele or {}).get("ref", "")
     res["ballon"] = (ballon or {}).get("nom", "") if ballon else ""
     return JSONResponse(res)
+
+
+def _marge_dossier_facture(numero: str, prospect: dict, catalogue: list, admin: dict) -> dict:
+    """Lot 9c — dossier facturé (verrouillé), lecture seule : prix de vente HT, prime CEE et MPR du devis ARCHIVÉ auquel se
+    réfère la facture la plus récente (à défaut, lus dans le PDF de la facture), délégataire nommé sur ce document ;
+    CEE supplémentaire = valorisation actuelle de ce délégataire − prime facturée ; coûts = coûts ACTUELS de l'admin
+    (marge indicative). Rien n'est écrit ni régénéré : l'état du dossier est celui figé à la facturation."""
+    from services.marges import marge_dossier
+    from services.marges_archive import montants_du_document, texte_html
+    state = dict(_load_state_simulateur(numero, prospect, catalogue) or {})
+    factures = [r for r in (_read_factures_meta().get(numero) or []) if isinstance(r, dict)]
+    facture = factures[-1] if factures else {}
+    montants, source = None, ""
+    items = [x for x in _sent_devis_items(numero) if isinstance(x, dict)]
+    ref = facture.get("numero_devis_ref")
+    devis = next((x for x in reversed(items) if ref and x.get("numero_devis") == ref), None) or _devis_archive_fige(numero, "devis")
+    if devis and devis.get("html_file") and os.path.exists(devis["html_file"]):
+        montants = montants_du_document(texte_html(_read_text(devis["html_file"])))
+        source = f"devis archivé {devis.get('numero_devis', '')}".strip()
+    if not montants and facture.get("file") and os.path.exists(facture["file"]):
+        montants = montants_du_document(_texte_pdf(facture["file"]))
+        source = f"facture {facture.get('numero_facture', '')}".strip()
+    if not montants:                                   # archive illisible : calcul actuel, signalé comme tel
+        calc = calculer_devis(prospect, state, admin, catalogue)
+        mode = mode_cee(prospect, state, admin)
+        montants = {"total_ht": calc.get("recap_total_ht"), "total_ttc": calc.get("total_ttc"), "cee": calc.get("montant_cee"),
+                    "mpr": calc.get("montant_mpr"), "delegataire": "PICOTY" if mode == "attente" else "ACE"}
+        source = "archive illisible : calcul actuel du dossier"
+    deleg = montants.get("delegataire") or ("PICOTY" if mode_cee(prospect, state, admin) == "attente" else "ACE")
+    mode = "attente" if deleg == "PICOTY" else "tout_de_suite"
+    valorisation = float((calculer_cee_bar_th_171(prospect, state, admin, mode) or {}).get("montant") or 0)
+    calc = {"recap_total_ht": montants["total_ht"], "montant_mpr": montants["mpr"], "montant_cee": montants["cee"],
+            "_cee_conserve": round(valorisation - float(montants["cee"] or 0), 2)}
+    modele = find_modele(catalogue, state.get("modele_pac_id") or state.get("modele_pac"))
+    ballon = None
+    choisi = resoudre_ballon(state, admin)
+    if choisi:
+        ballon = next((b for b in ((admin.get("ballon_thermo") or {}).get("modeles") or [])
+                       if isinstance(b, dict) and b.get("ref") == choisi.get("ref")), dict(choisi))
+    res = marge_dossier(calc, modele, ballon, admin.get("params") or {}, mode)
+    ecart_ttc = None
+    if facture.get("montant_ttc") not in (None, "") and montants.get("total_ttc") is not None:
+        ecart_ttc = round(float(montants["total_ttc"]) - float(facture["montant_ttc"]), 2)
+    res.update({"modele": (modele or {}).get("ref", ""), "ballon": (ballon or {}).get("nom", "") if ballon else "",
+                "indicative": True, "source": source, "facture": facture.get("numero_facture", ""),
+                "total_ttc_facture": facture.get("montant_ttc"), "ecart_ttc": ecart_ttc, "valorisation_cee": valorisation})
+    return res
 
 
 @app.post("/api/admin/marges/export")
