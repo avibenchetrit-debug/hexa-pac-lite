@@ -5889,6 +5889,45 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
   .bloc7-section--visite .bloc7-section-body.open { display: block; }
 </style>
 
+
+<style id="hexa-lot9-css">
+  /* Lot 9 : régie masquée (données gardées) tant que « Réactiver la régie » est éteint */
+  body:not(.regie-active) .regie-only, body:not(.regie-active) .adm-rg, body:not(.regie-active) .header-option2,
+  body:not(.regie-active) .sub-header-option2, body:not(.regie-active) #pv-regie,
+  body:not(.regie-active) option[value="Régie commerciale"], body:not(.regie-active) option[value="Régie"] { display: none !important; }
+  /* Catalogue PAC : les colonnes de marge sont dans la page « Marges » */
+  .adm-models-table .adm-col-marge, .adm-models-table td.adm-num.adm-col-marge { display: none !important; }
+  /* Filtres (catalogue et marges) */
+  .adm-filtres { display: grid; gap: 8px; margin: 10px 0 12px; padding: 12px; border: 1px solid #E1E5EB; border-radius: 10px; background: #F8FAFC; }
+  .adm-f-recherche { width: 100%; height: 36px; padding: 0 12px; border: 1px solid #CBD5E1; border-radius: 8px; font: inherit; font-size: 14px; }
+  .adm-f-ligne { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+  .adm-f-lab { min-width: 80px; font-size: 12px; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: .04em; }
+  .adm-f-btn { height: 30px; padding: 0 12px; border: 1px solid #CBD5E1; border-radius: 15px; background: #fff; font: inherit; font-size: 13px; cursor: pointer; color: #1E293B; }
+  .adm-f-btn.on { background: #002E5A; border-color: #002E5A; color: #fff; }
+  .adm-f-sep { width: 14px; }
+  .adm-f-pied { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 13px; color: #334155; }
+  .adm-f-reset { border: 0; background: none; color: #B91C1C; font: inherit; font-size: 13px; text-decoration: underline; cursor: pointer; }
+  /* Page Marges */
+  .adm-marges-mention { margin: 0 0 6px; padding: 10px 12px; border-left: 4px solid #F59E0B; background: #FFFBEB; color: #78350F; font-size: 13px; border-radius: 6px; }
+  .adm-marges-params { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px 14px; margin: 10px 0; }
+  .adm-marges-table td, .adm-marges-table th { white-space: nowrap; }
+  .adm-marges .adm-table-wrap { overflow-x: auto; }
+  .adm-marges-table td:last-child, .adm-marges-table th:last-child { white-space: normal; min-width: 215px; }
+  .adm-marges-table textarea.adm-pos { width: 100% !important; min-width: 205px !important; max-width: none !important; }
+  .adm-marges-table .adm-pos { display: block; width: 240px; min-height: 38px; padding: 4px 8px; border: 1px solid #CBD5E1; border-radius: 6px; font: inherit; font-size: 12px; line-height: 1.3; resize: vertical; }
+  .adm-marges-table .adm-neg { color: #B91C1C; }
+  .adm-marges-barre { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; margin: 10px 0; }
+  .adm-regie-switch { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: #334155; }
+  /* Fiche, étape 6 : marge du dossier (admin seulement) */
+  .p6-marge-dossier { margin: 10px 0 0; border: 1px solid #E1E5EB; border-radius: 10px; background: #fff; font-size: 13px; }
+  .p6-marge-dossier > summary { cursor: pointer; padding: 9px 12px; font-weight: 700; color: #002E5A; list-style: revert; }
+  .p6-marge-dossier .p6-md-resume { font-weight: 600; color: #0D6B3B; margin-left: 6px; }
+  .p6-marge-dossier table { width: 100%; border-collapse: collapse; }
+  .p6-marge-dossier td { padding: 4px 12px; border-top: 1px solid #F1F5F9; }
+  .p6-marge-dossier td:last-child { text-align: right; font-weight: 600; white-space: nowrap; }
+  .p6-marge-dossier tr.p6-md-total td { font-weight: 800; color: #002E5A; border-top: 2px solid #E1E5EB; }
+  .p6-marge-dossier .p6-md-note { padding: 6px 12px 10px; color: #64748B; font-size: 11.5px; }
+</style>
 </head>
 <body class="hexa-has-topbar" data-prospect-numero="">
 
@@ -12498,7 +12537,8 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     const resultat = `
           <div id="sim-dynamic">${renderDynamic(c, r, energieLbl, creditLine, totalApres, delta, phraseRoi)}</div>
           <div class="l4s-arguments${state.arguments_ouverts ? ' is-open' : ''}" id="sim-arguments">${renderArguments(c, r, energieLbl, phraseRoi)}</div>
-          <div class="l4-cache" aria-hidden="true"><div class="l4s-contexte" id="sim-contexte">${pastillesContexte(anahLabel, ceeLabel)}</div></div>`;
+          <div class="l4-cache" aria-hidden="true"><div class="l4s-contexte" id="sim-contexte">${pastillesContexte(anahLabel, ceeLabel)}</div></div>
+          ${margeDossierHTML()}`;
     const barre = `
           <button type="button" class="p6-btn p6-btn--prec" data-p6-go="5">← Besoin</button>
           <button type="button" class="p6-btn p6-btn--bleu" id="sim-arguments-btn" aria-expanded="${state.arguments_ouverts ? 'true' : 'false'}">Arguments</button>
@@ -13040,6 +13080,51 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
   // proposition : gauche (PAC + paiement) et droite (résultat + barre de boutons) de l'étape 6
   const HOTES_SIM = { surface: 'p-sim-surf', iso: 'p-sim-2', aides: 'p-sim-4', besoin: 'p-sim-5', pac: 'p-sim-6a', fin: 'p-sim-6b',
                       resultat: 'p-sim-6r-corps', barre: 'p-sim-6r-barre' };
+
+  // ═══════════ Lot 9 · 4 : « Marge du dossier » — ADMIN seulement (le serveur refuse aussi tout autre compte) ═══════════
+  const estAdmin = () => !!(window.HEXA_SESSION && window.HEXA_SESSION.role === 'admin');
+  let margeOuverte = false, derniereMarge = null, margeSeq = 0, margeTimer = null;
+  const eurMd = (n) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(Math.round(+n || 0));
+  const pctMd = (n) => new Intl.NumberFormat('fr-FR', { style: 'percent', maximumFractionDigits: 1 }).format(+n || 0);
+  function corpsMarge(d){
+    if (!d) return '<div class="p6-md-note">Calcul…</div>';
+    const l = (lab, v) => `<tr><td>${lab}</td><td>${v}</td></tr>`;
+    const ecairLab = d.delegataire === 'PICOTY' ? `Frais ECAIR (${String(Math.round(d.taux_ecair * 1000) / 10).replace('.', ',')} % de la MPR, PICOTY)` : 'Frais ECAIR (ACE : 0)';
+    return `<table>
+      ${l('Prix de vente HT', eurMd(d.ht))}${l('Achat HT' + (d.ballon ? ' (PAC + ballon)' : ''), '− ' + eurMd(d.achat))}
+      ${l('Pose + accessoires', '− ' + eurMd(d.pose_acc))}${l('Coût de revient', eurMd(d.cout_revient))}
+      ${l('Marge brute', eurMd(d.marge_brute) + ' · ' + pctMd(d.marge_brute_pct))}
+      ${l('Frais de dossier (VT + COFRAC + urba)', '− ' + eurMd(d.frais_dossier))}${l('Acquisition', '− ' + eurMd(d.acquisition))}
+      ${l(`CEE supplémentaire réel (${d.delegataire})`, '+ ' + eurMd(d.cee_supplementaire))}${l(ecairLab, '− ' + eurMd(d.frais_ecair))}
+      <tr class="p6-md-total"><td>Marge nette réelle du dossier</td><td>${eurMd(d.marge_nette)} · ${pctMd(d.marge_nette_pct)}</td></tr>
+    </table><div class="p6-md-note">Visible par les administrateurs seulement. CEE supplémentaire = valorisation du délégataire − prime CEE affichée sur le devis.</div>`;
+  }
+  function margeDossierHTML(){
+    if (!estAdmin() || !state.numero) return '';
+    const resume = derniereMarge ? `${eurMd(derniereMarge.marge_nette)} · ${pctMd(derniereMarge.marge_nette_pct)}` : '';
+    return `<details class="p6-marge-dossier" id="sim-marge-dossier"${margeOuverte ? ' open' : ''}>
+      <summary>Marge du dossier <span class="p6-md-resume" id="sim-marge-resume">${resume}</span></summary>
+      <div id="sim-marge-corps">${corpsMarge(derniereMarge)}</div></details>`;
+  }
+  function majMargeDossier(){
+    const el = document.getElementById('sim-marge-dossier');
+    if (el && !el.dataset.lie) { el.dataset.lie = '1'; el.addEventListener('toggle', () => { margeOuverte = el.open; }); }
+    if (!estAdmin() || !state.numero || !el) return;
+    clearTimeout(margeTimer);
+    margeTimer = setTimeout(async () => {
+      const seq = ++margeSeq, numero = state.numero;
+      try {
+        const r = await fetch(`/api/admin/marge-dossier/${encodeURIComponent(numero)}`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(simulatorPayload()) });
+        if (!r.ok || seq !== margeSeq || numero !== state.numero) return;
+        derniereMarge = await r.json();
+        const corps = document.getElementById('sim-marge-corps'), res = document.getElementById('sim-marge-resume');
+        if (corps) corps.innerHTML = corpsMarge(derniereMarge);
+        if (res) res.textContent = `${eurMd(derniereMarge.marge_nette)} · ${pctMd(derniereMarge.marge_nette_pct)}`;
+      } catch (_) {}
+    }, 250);
+  }
+
   async function refresh(){
     const seq = ++__renderSeq;
     const content=document.getElementById('sim-drawer-content');
@@ -13081,6 +13166,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
       }
     }
     if (typeof window !== 'undefined' && typeof window.hexaParcoursMaj === 'function') window.hexaParcoursMaj();
+    majMargeDossier();
   }
 
 
@@ -14871,12 +14957,11 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
       cession_eur: 2500,       // marge de cession par défaut (€)
       cession_pct: 0.20,       // marge de cession par défaut (% du catalogue HT)
       plafond_pct: 0.60,       // plafond prix de vente régie = catalogue TTC + 60%
-      frais_ecair_pct: 12      // miroir interne pour le calcul de marge Admin
+      frais_ecair_pct: 12.5    // Lot 9 : seule source (12,5 % de la MPR, dossiers PICOTY)
     },
     prix_vente_devis: {
       prix_pose_ht: 3500,
       prix_travaux_induits_ht: 1200,
-      frais_ecair_pct: 12
     },
     ballon_thermo: {
       modeles: [
@@ -14910,7 +14995,6 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
       if (!cfg) cfg = JSON.parse(JSON.stringify(DEFAULT));
       if (ADMIN_PARAMS_CACHE?.params) cfg.params = Object.assign({}, DEFAULT.params, ADMIN_PARAMS_CACHE.params || {});
       cfg.prix_vente_devis = Object.assign({}, DEFAULT.prix_vente_devis, cfg.prix_vente_devis || {}, ADMIN_PARAMS_CACHE?.prix_vente_devis || {});
-      cfg.params.frais_ecair_pct = Number(cfg.prix_vente_devis.frais_ecair_pct ?? cfg.params.frais_ecair_pct ?? 12);
       cfg.sous_traitants = Array.isArray(ADMIN_PARAMS_CACHE?.sous_traitants) ? ADMIN_PARAMS_CACHE.sous_traitants : (Array.isArray(cfg.sous_traitants) ? cfg.sous_traitants : DEFAULT.sous_traitants);
       // Les modeles ne viennent JAMAIS du localStorage : seule la liste serveur fait foi.
       // Un localStorage porteur d'une liste filtree redevenait sinon le payload du POST.
@@ -14920,7 +15004,8 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     // prix d'achat toujours en entier
     if (cfg.models) cfg.models.forEach(m=>{ if(m.achat!=null) m.achat=Math.round(m.achat); if(m.ttc!=null) m.ttc=Math.round(m.ttc); });
     cfg.prix_vente_devis = Object.assign({}, DEFAULT.prix_vente_devis, cfg.prix_vente_devis || {});
-    cfg.params.frais_ecair_pct = Number(cfg.prix_vente_devis.frais_ecair_pct ?? cfg.params.frais_ecair_pct ?? 12);
+    delete cfg.prix_vente_devis.frais_ecair_pct;                       // Lot 9 : plus d'ancienne copie
+    if (cfg.params.frais_ecair_pct == null || cfg.params.frais_ecair_pct === '') cfg.params.frais_ecair_pct = 12.5;
     cfg.ballon_thermo = Object.assign({}, DEFAULT.ballon_thermo, cfg.ballon_thermo || {}, ADMIN_PARAMS_CACHE?.ballon_thermo || {});
     return cfg;
   }
@@ -14940,7 +15025,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     const ttc = +m.ttc||0;                       // prix catalogue TTC
     const ht = ttc/(1+p.tva);                    // prix catalogue HT
     const cout = (+m.achat||0) + (+p.pose||0) + (+p.acc||0);   // coût de revient (produit + pose + acc)
-    const fraisEcairPct = ((p.frais_ecair_pct !== undefined ? +p.frais_ecair_pct : 12) || 0) / 100;
+    const fraisEcairPct = ((p.frais_ecair_pct !== undefined ? +p.frais_ecair_pct : 12.5) || 0) / 100;
     const montantMpr = 5000;                     // estimation TMO conservatrice pour le coût interne ECAIR
     const fraisEcair = montantMpr * fraisEcairPct;
     const coutAvecEcair = cout + fraisEcair;
@@ -15002,6 +15087,214 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
              txNet2: ht>0?net2/ht:0 };   // marge nette opt2 en % du HT catalogue (base commune)
   }
 
+
+  // ═══════════ Lot 9 : filtres du catalogue (catalogue PAC et page Marges) ═══════════
+  const MARQUE_PREFIXE = { ATL: 'ATLANTIC', DAI: 'DAIKIN', ARI: 'ARISTON', THA: 'THALEOS' };
+  function marqueDe(m){
+    if (m && m.marque) return String(m.marque).toUpperCase();
+    const sp = ((m && m.description_specs) || []).find(x => x && String(x.champ || '').trim() === 'Marque');
+    if (sp && sp.valeur) return String(sp.valeur).toUpperCase();
+    const pre = String((m && m.ref) || '').split('-')[0].toUpperCase();
+    return MARQUE_PREFIXE[pre] || pre || 'AUTRE';
+  }
+  const capMarque = (s) => String(s || '').charAt(0) + String(s || '').slice(1).toLowerCase();
+  const sansAccent = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  const FILTRE_TRANCHES = [
+    { k: 'le6', l: '≤ 6 kW', t: x => x > 0 && x < 7 }, { k: '8-10', l: '8–10 kW', t: x => x >= 7 && x < 11 },
+    { k: '12', l: '12 kW', t: x => x >= 11 && x < 13 }, { k: '14', l: '14 kW', t: x => x >= 13 && x < 15 },
+    { k: '15-16', l: '15–16 kW', t: x => x >= 15 && x < 18 }, { k: '18p', l: '18 kW et +', t: x => x >= 18 } ];
+  function infosFiltre(m){
+    const p35 = Number(m.puiss35 ?? m.puiss_chauf ?? m.puissance_kw ?? 0) || 0;
+    return { marque: marqueDe(m), tranche: (FILTRE_TRANCHES.find(t => t.t(p35)) || {}).k || '',
+             duo: (/DUO/i.test(m.ref || '') || /ECS/i.test(m.usage || '')) ? 'oui' : 'non',
+             phase: (/TRI/i.test(m.ref || '') || /tri/i.test(m.alim || '')) ? 'tri' : 'mono',
+             texte: sansAccent([m.ref, m.nom, marqueDe(m)].join(' ')) };
+  }
+  function attrsFiltre(m){
+    const f = infosFiltre(m);
+    return `data-f-marque="${adminEscape(f.marque)}" data-f-tranche="${f.tranche}" data-f-duo="${f.duo}" data-f-phase="${f.phase}" data-f-texte="${adminEscape(f.texte)}"`;
+  }
+  function filtresHTML(scope, models){
+    const marques = Array.from(new Set((models || []).map(marqueDe))).sort();
+    const bouton = (f, v, l) => `<button type="button" class="adm-f-btn" data-f="${f}" data-v="${adminEscape(v)}">${adminEscape(l)}</button>`;
+    return `<div class="adm-filtres" data-filtres="${scope}">
+      <input type="search" class="adm-f-recherche" placeholder="Rechercher : référence, nom, marque…" aria-label="Rechercher un modèle">
+      <div class="adm-f-ligne"><span class="adm-f-lab">Marque</span>${marques.map(mq => bouton('marque', mq, capMarque(mq))).join('')}</div>
+      <div class="adm-f-ligne"><span class="adm-f-lab">Puissance</span>${FILTRE_TRANCHES.map(t => bouton('tranche', t.k, t.l)).join('')}</div>
+      <div class="adm-f-ligne"><span class="adm-f-lab">DUO</span>${bouton('duo', 'oui', 'DUO')}${bouton('duo', 'non', 'Non DUO')}
+        <span class="adm-f-sep"></span><span class="adm-f-lab">Phase</span>${bouton('phase', 'mono', 'Monophasé')}${bouton('phase', 'tri', 'Triphasé')}</div>
+      <div class="adm-f-pied"><span class="adm-f-compteur" aria-live="polite"></span><button type="button" class="adm-f-reset">Réinitialiser les filtres</button></div>
+    </div>`;
+  }
+  const FILTRE_VIDE = () => ({ q: '', marque: [], tranche: [], duo: [], phase: [] });
+  function etatFiltres(scope){
+    try { return Object.assign(FILTRE_VIDE(), JSON.parse(sessionStorage.getItem('hexa-filtres-' + scope) || '{}')); } catch(_) { return FILTRE_VIDE(); }
+  }
+  function appliquerFiltres(scope){
+    const f = etatFiltres(scope);
+    const q = sansAccent(f.q).trim().split(/\s+/).filter(Boolean);
+    const table = document.querySelector(`[data-filtre-table="${scope}"]`);
+    if (!table) return;
+    const lignes = Array.from(table.querySelectorAll('tbody tr[data-f-marque]'));
+    let vus = 0;
+    lignes.forEach(tr => {
+      const d = tr.dataset;
+      const ok = q.every(m => d.fTexte.includes(m)) && (!f.marque.length || f.marque.includes(d.fMarque))
+        && (!f.tranche.length || f.tranche.includes(d.fTranche)) && (!f.duo.length || f.duo.includes(d.fDuo))
+        && (!f.phase.length || f.phase.includes(d.fPhase));
+      tr.hidden = !ok; if (ok) vus++;
+      const sim = document.getElementById('adm-simrow-' + d.i); if (sim && !ok) sim.hidden = true;
+    });
+    // en-têtes de groupe sans ligne visible : masqués
+    Array.from(table.querySelectorAll('tbody tr.adm-grp')).forEach(g => {
+      let n = g.nextElementSibling, visible = false;
+      while (n && !n.classList.contains('adm-grp')) { if (n.dataset.fMarque && !n.hidden) { visible = true; break; } n = n.nextElementSibling; }
+      g.hidden = !visible;
+    });
+    const box = document.querySelector(`.adm-filtres[data-filtres="${scope}"]`);
+    if (box) {
+      box.querySelector('.adm-f-compteur').textContent = `${vus} modèle${vus > 1 ? 's' : ''} affiché${vus > 1 ? 's' : ''} sur ${lignes.length}`;
+      box.querySelectorAll('.adm-f-btn').forEach(b => b.classList.toggle('on', (f[b.dataset.f] || []).includes(b.dataset.v)));
+      const inp = box.querySelector('.adm-f-recherche'); if (inp && document.activeElement !== inp) inp.value = f.q || '';
+    }
+  }
+  function bindFiltres(scope){
+    const box = document.querySelector(`.adm-filtres[data-filtres="${scope}"]`);
+    if (!box) return;
+    const ecrire = (f) => { try { sessionStorage.setItem('hexa-filtres-' + scope, JSON.stringify(f)); } catch(_) {} appliquerFiltres(scope); };
+    box.querySelector('.adm-f-recherche').addEventListener('input', e => { const f = etatFiltres(scope); f.q = e.target.value; ecrire(f); });
+    box.querySelectorAll('.adm-f-btn').forEach(b => b.addEventListener('click', () => {
+      const f = etatFiltres(scope), l = f[b.dataset.f] || (f[b.dataset.f] = []);
+      const i = l.indexOf(b.dataset.v); if (i >= 0) l.splice(i, 1); else l.push(b.dataset.v);
+      ecrire(f);
+    }));
+    box.querySelector('.adm-f-reset').addEventListener('click', () => ecrire(FILTRE_VIDE()));
+    appliquerFiltres(scope);
+  }
+
+  // ═══════════ Lot 9 : page « Marges » (mêmes valeurs que le catalogue et les paramètres : une seule source) ═══════════
+  // Même calcul que services/marges.py (hors CEE supplémentaire et hors frais ECAIR : ils dépendent du dossier).
+  function margeModele(m, p){
+    const t = (+p.tva > 0) ? +p.tva : 0.055;
+    const ttc = +m.ttc || 0, ht = ttc / (1 + t), achat = +m.achat || 0;
+    const poseAcc = (+p.pose || 0) + (+p.acc || 0);
+    const fd = (+p.vt1 || 0) + (+p.cofrac1 || 0) + (+p.urba1 || 0);
+    const acq = (+p.conv > 0) ? (+p.lead || 0) / (+p.conv) : 0;
+    const cout = achat + poseAcc, brute = ht - cout, nette = brute - fd - acq;
+    return { ttc, ht, achat, poseAcc, fd, acq, cout, brute, brutePct: ht ? brute / ht : 0, nette, nettePct: ht ? nette / ht : 0 };
+  }
+  const MENTION_MARGES = "Marges hors CEE supplémentaire : la part de valorisation CEE récupérée en plus de la prime affichée varie selon chaque dossier (revenus, surface, zone, délégataire). Voir la marge réelle sur la fiche du dossier.";
+  function renderMarges(c, p){
+    const champ = (lab, f, val, unite, cls) => `<div class="adm-field"><span class="adm-lab">${lab}</span><span class="adm-euro"><input type="text" inputmode="decimal" class="adm-p ${cls || ''}" data-p="${f}" value="${val}"><i>${unite}</i></span></div>`;
+    const params = `<div class="adm-marges-params">
+        ${champ('Pose HT', 'pose', fmtE(p.pose), '€', 'adm-money')}
+        ${champ('Accessoires HT', 'acc', fmtE(p.acc), '€', 'adm-money')}
+        ${champ('Visite technique', 'vt1', fmtE(p.vt1), '€', 'adm-money')}
+        ${champ('COFRAC', 'cofrac1', fmtE(p.cofrac1), '€', 'adm-money')}
+        ${champ('Urbanisme', 'urba1', fmtE(p.urba1), '€', 'adm-money')}
+        ${champ("Coût d'un lead HT", 'lead', fmtE(p.lead), '€', 'adm-money')}
+        ${champ('Taux de transformation', 'conv', ((+p.conv || 0) * 100).toFixed(1), '%')}
+        ${champ('TVA', 'tva', ((+p.tva || 0) * 100).toFixed(1), '%')}
+        ${champ('Frais ECAIR (dossiers PICOTY)', 'frais_ecair_pct', String(p.frais_ecair_pct ?? 12.5).replace('.', ','), '% MPR')}
+        <div class="adm-field"><span class="adm-lab">Acquisition (lead ÷ transformation)</span><b id="adm-marges-acq">${eur((+p.conv > 0) ? (+p.lead || 0) / (+p.conv) : 0)}</b></div>
+      </div>`;
+    const groupes = {};
+    (c.models || []).forEach((m, i) => { (groupes[marqueDe(m)] = groupes[marqueDe(m)] || []).push({ m, i }); });
+    let lignes = '';
+    Object.keys(groupes).sort().forEach(mq => {
+      lignes += `<tr class="adm-grp"><td colspan="11">${adminEscape(capMarque(mq))} <span class="adm-grp-note">— ${groupes[mq].length} modèle${groupes[mq].length > 1 ? 's' : ''}</span></td></tr>`;
+      groupes[mq].forEach(({ m, i }) => {
+        lignes += `<tr data-i="${i}" class="adm-marge-row" ${attrsFiltre(m)}>
+          <td class="adm-ref">${adminEscape(m.ref)}<small>${adminEscape(m.nom || '')}</small></td>
+          <td><span class="adm-euro"><input type="text" inputmode="numeric" class="adm-in" data-f="ttc" value="${fmtE(m.ttc)}"><i>€</i></span></td>
+          <td class="adm-num" data-c="ht"></td>
+          <td><span class="adm-euro"><input type="text" inputmode="numeric" class="adm-in" data-f="achat" value="${fmtE(m.achat)}"><i>€</i></span></td>
+          <td class="adm-num" data-c="poseAcc"></td><td class="adm-num" data-c="fd"></td><td class="adm-num" data-c="acq"></td>
+          <td class="adm-num" data-c="cout"></td><td class="adm-num adm-strong" data-c="brute"></td>
+          <td class="adm-num adm-strong" data-c="nette"></td>
+          <td><textarea class="adm-pos" rows="2" data-f="positionnement_marche" aria-label="Positionnement marché">${adminEscape(m.positionnement_marche || '')}</textarea></td>
+        </tr>`;
+      });
+    });
+    return `<div class="adm-bloc adm-marges" data-bloc-id="marges">
+      <h2 class="adm-bloc-title" style="padding:4px 0 6px">Marges</h2>
+      <p class="adm-marges-mention">${MENTION_MARGES}</p>
+      <p class="adm-section-help">Frais ECAIR : 12,5 % de la MaPrimeRénov' préfinancée, dossiers PICOTY seulement (0 pour ACE) — déduits dans la marge du dossier (fiche, étape 6).</p>
+      ${params}
+      <div class="adm-marges-barre">
+        <label class="adm-regie-switch"><input type="checkbox" class="adm-p" data-p="regie_active" ${p.regie_active ? 'checked' : ''}> Réactiver la régie</label>
+        <span><button type="button" class="adm-btn" id="adm-marges-export">⬇ Export Excel</button>
+        <button type="button" class="adm-btn-save" id="adm-marges-save">Enregistrer</button></span>
+      </div>
+      ${filtresHTML('marges', c.models)}
+      <div class="adm-table-wrap"><table class="adm-table adm-marges-table" data-filtre-table="marges"><thead><tr>
+        <th>Modèle</th><th>Prix vente TTC</th><th>Prix vente HT</th><th>Achat HT</th><th>Pose + accessoires</th>
+        <th>Frais de dossier</th><th>Acquisition</th><th>Coût de revient</th><th>Marge brute</th>
+        <th>Marge nette Hexa</th><th>Positionnement marché</th></tr></thead>
+        <tbody id="adm-marges-tbody">${lignes}</tbody></table></div>
+    </div>`;
+  }
+  function recalcMarges(){
+    const c = window.HexaConfig; if (!c) return; const p = c.params;
+    const acqEl = document.getElementById('adm-marges-acq'); if (acqEl) acqEl.textContent = eur((+p.conv > 0) ? (+p.lead || 0) / (+p.conv) : 0);
+    document.querySelectorAll('#adm-marges-tbody tr.adm-marge-row').forEach(tr => {
+      const m = c.models[+tr.dataset.i]; if (!m) return;
+      const r = margeModele(m, p);
+      tr.querySelectorAll('[data-c]').forEach(td => {
+        const k = td.dataset.c, v = r[k];
+        td.textContent = (k === 'brute' || k === 'nette') ? `${eur(v)} · ${pct(r[k + 'Pct'])}` : eur(v);
+        td.classList.toggle('adm-neg', (k === 'brute' || k === 'nette') && v < 0);
+      });
+    });
+    // le même modèle peut être affiché dans le catalogue et dans Marges : valeurs alignées (champ en cours de saisie excepté)
+    document.querySelectorAll('tr[data-i] .adm-in').forEach(inp => {
+      if (inp === document.activeElement) return;
+      const m = c.models[+inp.closest('tr').dataset.i]; if (!m) return;
+      const v = Math.round(+m[inp.dataset.f] || 0); inp.value = v ? new Intl.NumberFormat('fr-FR').format(v) : '';
+    });
+  }
+  function lignesExportMarges(){
+    const c = window.HexaConfig, p = c.params;
+    const entetes = ['Marque', 'Référence', 'Nom', 'Prix vente TTC', 'Prix vente HT', 'Achat HT', 'Pose + accessoires', 'Frais de dossier',
+                     'Acquisition', 'Coût de revient', 'Marge brute (€)', 'Marge brute (%)', 'Marge nette Hexa (€)', 'Marge nette Hexa (%)', 'Positionnement marché'];
+    const r2 = (x) => Math.round((+x || 0) * 100) / 100;
+    const lignes = Array.from(document.querySelectorAll('#adm-marges-tbody tr.adm-marge-row')).filter(tr => !tr.hidden).map(tr => {
+      const m = c.models[+tr.dataset.i], r = margeModele(m, p);
+      return [capMarque(marqueDe(m)), m.ref, m.nom || '', r2(r.ttc), r2(r.ht), r2(r.achat), r2(r.poseAcc), r2(r.fd), r2(r.acq), r2(r.cout),
+              r2(r.brute), Math.round(r.brutePct * 1000) / 10, r2(r.nette), Math.round(r.nettePct * 1000) / 10, m.positionnement_marche || ''];
+    });
+    return { entetes, lignes };
+  }
+  async function exporterMarges(){
+    try {
+      const r = await fetch('/api/admin/marges/export', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(lignesExportMarges()) });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const blob = await r.blob(), a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = (r.headers.get('Content-Disposition') || '').match(/filename="([^"]+)"/)?.[1] || 'marges.xlsx';
+      document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+    } catch (e) { adminToast('❌ Export impossible : ' + e.message, '#B91C1C'); }
+  }
+  function bindMarges(){
+    document.querySelectorAll('#adm-marges-tbody .adm-pos').forEach(inp => inp.addEventListener('input', () => {
+      const m = window.HexaConfig.models[+inp.closest('tr').dataset.i]; if (m) m.positionnement_marche = inp.value;
+    }));
+    document.querySelectorAll('.adm-p[data-p="regie_active"]').forEach(cb => cb.addEventListener('change', async () => {
+      window.HexaConfig.params.regie_active = cb.checked;
+      document.body.classList.toggle('regie-active', cb.checked);
+      await saveAdminParamsServer();
+      adminToast(cb.checked ? '✓ Régie réactivée' : '✓ Régie masquée', '#0D6B3B');
+    }));
+    document.getElementById('adm-marges-save')?.addEventListener('click', async () => {
+      saveConfig(false);
+      await saveCatalogueAdmin();
+    });
+    document.getElementById('adm-marges-export')?.addEventListener('click', exporterMarges);
+    bindFiltres('marges'); bindFiltres('catalogue');
+    recalcMarges();
+  }
+  window.hexaMargeModele = margeModele;          // tests : même calcul que services/marges.py
+
   // ---- Rendu de l'overlay ----
   function render(){
     const c = loadConfig(); const p = c.params;
@@ -15026,7 +15319,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     order.forEach(k=>{
       const _net1s = groups[k].map(({m}) => calcModel(m,p).net1).filter(v => typeof v === 'number' && isFinite(v));
       const _avgNet1 = _net1s.length ? Math.round(_net1s.reduce((s,v)=>s+v,0) / _net1s.length) : null;
-      rowsHTML += `<tr class="adm-grp"><td colspan="11">Puissance ${k} kW${_avgNet1 != null ? ' · marge nette moy. Option 1 : ' + eur(_avgNet1) : ''}
+      rowsHTML += `<tr class="adm-grp"><td colspan="11">Puissance ${k} kW
         <span class="adm-grp-note">— ${groups[k].length} modèle${groups[k].length>1?'s':''} · TRI = triphasé, sinon monophasé</span></td></tr>`;
       groups[k].forEach(({m,i})=>{
         const r = calcModel(m,p);
@@ -15040,15 +15333,15 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
         // Bulle i Option 2 : prix de cession
         const tip2 = `Prix de cession ${eurTip(r.cession)} = Coût ${eurTip(r.cout)} + Visite ${eurTip(p.vt2)} + COFRAC ${eurTip(p.cofrac2)} + Urbanisme ${eurTip(p.urba2)} + Marge cession ${eurTip(r.margeCession)}. Ma marge nette garantie = ${eurTip(r.net2)}. (Frais ECAIR 12% sur MPR déjà déduits.)`;
         const cessTip = r.cessionForced ? 'Prix de cession forcé pour ce produit. Cliquez sur ↺ pour revenir à la marge globale.' : `Calculé : base ${eurTip(r.baseCession)} + marge globale ${eurTip(r.margeCessionDefaut)}. Vous pouvez forcer une autre valeur.`;
-        rowsHTML += `<tr data-i="${i}">
+        rowsHTML += `<tr data-i="${i}" ${attrsFiltre(m)}>
           <td class="adm-ref col-modele">${m.ref} ${phase}${ecs}<small>${m.nom||''}</small>${(Number(m.puiss35 ?? m.puissance_kw) > 0 && Number(m.ttc ?? m.prix_ttc) > 0) ? '' : '<small style="color:#B45309;display:block">⚠ Incomplet — non proposé dans le simulateur</small>'}<button type="button" class="adm-pac-desc-btn" data-i="${i}" title="Description technique pour le devis">📝</button><button type="button" class="adm-del" data-i="${i}" title="Supprimer">×</button><div class="adm-gamme"><span class="adm-gamme-lbl">Gamme</span><input type="text" class="adm-gamme-in" data-i="${i}" placeholder="—"><span class="adm-gamme-badge">auto</span><button type="button" class="adm-fiche-btn" data-i="${i}" title="Fiche technique fabricant (PDF) — par gamme">📎</button></div></td>
           <td><span class="adm-euro"><input type="text" inputmode="numeric" class="adm-in" data-f="ttc" value="${ferow(m.ttc)}"><i>€</i></span></td>
           <td class="adm-num col-calc">${eur(r.ht)}</td>
           <td><span class="adm-euro"><input type="text" inputmode="numeric" class="adm-in" data-f="achat" value="${ferow(m.achat)}"><i>€</i></span></td>
-          <td class="adm-num col-calc">${eur(r.pose)}</td>
-          <td class="adm-num col-calc">${eur(r.cout)}</td>
-          <td class="adm-num adm-strong col-marge-brute"><div class="cell-stack"><span class="cell-amount">${eur(r.brute)}</span><span class="cell-pct">${pct(r.txBrut)}</span><span class="cell-tools"></span></div></td>
-          <td class="adm-num adm-net1 col-marge-net1"><div class="cell-stack"><span class="cell-amount cell-amount-net1">${eur(r.net1)}</span><span class="cell-pct">${pct(r.txNet1)}</span><span class="cell-tools"><span class="adm-tip" data-tip="${tip1.replace(/"/g,'&quot;')}">i</span><button type="button" class="adm-eq-btn" data-eq="${i}" title="Point d'équilibre Option 1 vs Option 2">⚖</button></span></div></td>
+          <td class="adm-num col-calc adm-col-marge">${eur(r.pose)}</td>
+          <td class="adm-num col-calc adm-col-marge">${eur(r.cout)}</td>
+          <td class="adm-num adm-strong col-marge-brute adm-col-marge"><div class="cell-stack"><span class="cell-amount">${eur(r.brute)}</span><span class="cell-pct">${pct(r.txBrut)}</span><span class="cell-tools"></span></div></td>
+          <td class="adm-num adm-net1 col-marge-net1 adm-col-marge"><div class="cell-stack"><span class="cell-amount cell-amount-net1">${eur(r.net1)}</span><span class="cell-pct">${pct(r.txNet1)}</span><span class="cell-tools"><span class="adm-tip" data-tip="${tip1.replace(/"/g,'&quot;')}">i</span><button type="button" class="adm-eq-btn" data-eq="${i}" title="Point d'équilibre Option 1 vs Option 2">⚖</button></span></div></td>
           <td class="adm-cess adm-rg col-cession ${r.cessionForced?'is-forced':''} ${r.cessionTropHaute?'is-toohigh':''}">
             <span class="adm-euro"><input type="text" inputmode="numeric" class="adm-in adm-cess-in" data-f="cession_forcee" data-i="${i}" value="${ferow(r.cession)}"><i>€</i></span>
             <button type="button" class="adm-cess-reset" data-i="${i}" title="Revenir à la marge globale" ${r.cessionForced?'':'hidden'}>↺</button>
@@ -15069,15 +15362,11 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
       </div>
       <p class="adm-opt2-note adm-section-help">
         Ces valeurs sont vos COÛTS INTERNES (ce que vous payez aux sous-traitants).
-        Elles servent uniquement au calcul de votre marge dans le tableau ci-dessous.
+        Pose, accessoires, TVA, frais de dossier et frais ECAIR : onglet « Marges ».
         Elles ne sont jamais affichées au client.
       </p>
       <div class="adm-params">
-        <div class="adm-field"><span class="adm-lab">Coût pose HT (calcul marge)</span><span class="adm-euro"><input type="text" inputmode="numeric" class="adm-p adm-money" data-p="pose" value="${fmtE(p.pose)}"><i>€</i></span></div>
-        <div class="adm-field"><span class="adm-lab">Coût accessoires HT (calcul marge)</span><span class="adm-euro"><input type="text" inputmode="numeric" class="adm-p adm-money" data-p="acc" value="${fmtE(p.acc)}"><i>€</i></span></div>
         <div class="adm-field"><span class="adm-lab">Coût pose ballon HT (calcul marge)</span><span class="adm-euro"><input type="text" inputmode="numeric" class="adm-p adm-money" data-p="cout_pose_ballon" value="${fmtE(p.cout_pose_ballon != null ? p.cout_pose_ballon : 600)}"><i>€</i></span></div>
-        <div class="adm-field"><span class="adm-lab">Frais ECAIR (% sur MPR)</span><span class="adm-euro"><input type="number" id="adm-frais-ecair-pct" value="${adminEscape(c.prix_vente_devis?.frais_ecair_pct ?? 12)}" step="0.1" min="0" max="100"><i>%</i></span></div>
-        <div class="adm-field"><span class="adm-lab">TVA (5,5% par défaut)</span><span class="adm-euro"><input type="text" inputmode="decimal" class="adm-p" data-p="tva" value="${(p.tva*100).toFixed(1)}"><i>%</i></span></div>
       </div>
       <div class="adm-actions"><button type="button" class="adm-btn-save" data-save-sous-bloc="1-1">Enregistrer</button></div>`;
     const venteHexa = `
@@ -15096,22 +15385,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
         <div class="adm-actions"><button type="button" class="adm-btn-save" id="btn-save-prix-vente-devis">Enregistrer</button></div>
       </div>`;
     const optionsCommerciales = `
-      <div class="adm-tabs">
-        <button type="button" class="adm-tab active" data-tab="option1">Option 1 — Vente directe</button>
-        <button type="button" class="adm-tab" data-tab="option2">Option 2 — Régie</button>
-      </div>
-      <div class="adm-tab-content active" data-content="option1">
-        <div class="adm-card adm-opt1">
-          <div class="adm-card-h">Option 1 — j'achète mes leads</div>
-          <div class="adm-field adm-field-row"><span class="adm-lab">Prix lead HT</span><span class="adm-euro"><input type="text" inputmode="numeric" class="adm-p adm-money" data-p="lead" value="${fmtE(p.lead)}"><i>€</i></span></div>
-          <div class="adm-field adm-field-row"><span class="adm-lab">Taux conversion</span><span class="adm-euro"><input type="text" inputmode="decimal" class="adm-p" data-p="conv" value="${(p.conv*100).toFixed(1)}"><i>%</i></span></div>
-          <div class="adm-cac">CAC <span class="adm-tip adm-tip-dark" data-tip="CAC = Coût d'Acquisition Client. Combien me coûte un client signé. Calcul : prix d'un lead ÷ taux de conversion. Ex : 30 € ÷ 5 % = 600 € pour obtenir une signature.">i</span> : <b id="adm-cac">${eur(cac(p))}</b></div>
-          <div class="adm-field adm-field-row"><span class="adm-lab">Visite technique</span><span class="adm-euro"><input type="text" inputmode="numeric" class="adm-p adm-money" data-p="vt1" value="${fmtE(p.vt1)}"><i>€</i></span></div>
-          <div class="adm-field adm-field-row"><span class="adm-lab">COFRAC</span><span class="adm-euro"><input type="text" inputmode="numeric" class="adm-p adm-money" data-p="cofrac1" value="${fmtE(p.cofrac1)}"><i>€</i></span></div>
-          <div class="adm-field adm-field-row"><span class="adm-lab">Urbanisme</span><span class="adm-euro"><input type="text" inputmode="numeric" class="adm-p adm-money" data-p="urba1" value="${fmtE(p.urba1)}"><i>€</i></span></div>
-        </div>
-      </div>
-      <div class="adm-tab-content" data-content="option2" hidden>
+      <div class="adm-tab-content regie-only" data-content="option2">
         <div class="adm-card adm-opt2">
           <div class="adm-card-h">Option 2 — régie (prix de cession)</div>
           <p class="adm-opt2-note">Je cède la PAC à la régie à un prix plancher qui garantit ma marge. La régie revend au prix qu'elle veut et garde le surplus.</p>
@@ -15126,17 +15400,18 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
       </div>
       <div class="adm-actions"><button type="button" class="adm-btn-save" data-save-sous-bloc="5-1">Enregistrer</button></div>`;
     const modelesMarges = `
-      <div class="adm-table-wrap adm-models-table-wrapper"><table class="adm-table adm-models-table"><thead><tr class="adm-head-group"><th rowspan="2">Modèle</th><th rowspan="2">Prix vente TTC</th><th rowspan="2">Prix vente HT</th><th rowspan="2">Achat HT</th><th rowspan="2">Pose + access.</th><th rowspan="2">Coût de revient</th><th rowspan="2" class="header-option1">Marge brute</th><th rowspan="2" class="adm-th1 header-option1">Marge nette Hexa<br>Option 1</th><th colspan="3" class="adm-grp-regie header-option2">RÉGIE — Option 2</th></tr><tr><th class="adm-th2 sub-header-option2">Prix de cession</th><th class="adm-th2 sub-header-option2">Marge nette Hexa</th><th class="adm-th2b sub-header-option2">Commission régie</th></tr></thead><tbody id="adm-tbody">${rowsHTML}</tbody></table></div>
+      <div class="adm-table-wrap adm-models-table-wrapper">${filtresHTML('catalogue', c.models)}<table class="adm-table adm-models-table" data-filtre-table="catalogue"><thead><tr class="adm-head-group"><th rowspan="2">Modèle</th><th rowspan="2">Prix vente TTC</th><th rowspan="2">Prix vente HT</th><th rowspan="2">Achat HT</th><th rowspan="2" class="adm-col-marge">Pose + access.</th><th rowspan="2" class="adm-col-marge">Coût de revient</th><th rowspan="2" class="header-option1 adm-col-marge">Marge brute</th><th rowspan="2" class="adm-th1 header-option1 adm-col-marge">Marge nette Hexa<br>Option 1</th><th colspan="3" class="adm-grp-regie header-option2">RÉGIE — Option 2</th></tr><tr><th class="adm-th2 sub-header-option2">Prix de cession</th><th class="adm-th2 sub-header-option2">Marge nette Hexa</th><th class="adm-th2b sub-header-option2">Commission régie</th></tr></thead><tbody id="adm-tbody">${rowsHTML}</tbody></table></div>
       <div class="adm-add-row"><button type="button" class="adm-btn adm-btn-add" id="adm-add">+ Ajouter une pompe à chaleur</button><button type="button" class="adm-btn" id="adm-import-xlsx" style="margin-left:8px">Importer un Excel (ajout / mise à jour)</button><input type="file" id="adm-import-file" accept=".xlsx" style="display:none"></div>
       <div id="adm-import-apercu" style="display:none;margin:8px 0;padding:10px;border:1px solid #d4d4d8;border-radius:6px;background:#fafafa"></div>
-      <div class="adm-legend"><div class="adm-legend-row"><span class="adm-dot adm-dot1"></span><span>Option 1 — vente directe : marge brute − CAC − visite − COFRAC − urbanisme.</span></div><div class="adm-legend-row"><span class="adm-dot adm-dot2"></span><span>Option 2 — prix de cession : marge garantie au-dessus de (coût + visite + COFRAC + urbanisme). La régie revend au-dessus et garde le surplus ; la colonne « Commission régie » montre ce qu'elle gagne si elle revend à ton prix catalogue.</span></div><div class="adm-legend-row"><span>Marges théoriques — calculées sur un MPR forfaitaire de 5 000 € (estimation commune à tous les modèles), pas un calcul réel par prospect.</span></div></div>
+      <div class="adm-legend regie-only"><div class="adm-legend-row"><span class="adm-dot adm-dot1"></span><span>Option 1 — vente directe : marge brute − CAC − visite − COFRAC − urbanisme.</span></div><div class="adm-legend-row"><span class="adm-dot adm-dot2"></span><span>Option 2 — prix de cession : marge garantie au-dessus de (coût + visite + COFRAC + urbanisme). La régie revend au-dessus et garde le surplus ; la colonne « Commission régie » montre ce qu'elle gagne si elle revend à ton prix catalogue.</span></div><div class="adm-legend-row"><span>Marges théoriques — calculées sur un MPR forfaitaire de 5 000 € (estimation commune à tous les modèles), pas un calcul réel par prospect.</span></div></div>
       <div class="adm-actions"><button type="button" class="adm-btn-save" id="adm-save-catalogue">Enregistrer</button></div>`;
     const admB1 = admBloc('1','1. Réglages généraux',admSousBloc('1-1','1.1 Coût Hexa',coutHexa)+admSousBloc('1-2','1.2 Vente Hexa',venteHexa));
     const admB2 = admBloc('2','2. MPR',admSousBloc('2-1','2.1 Forfait MPR',renderMprFields())+admSousBloc('2-2','2.2 Plafonds réglementaires',renderPlafondsSection())+admSousBloc('2-3','2.3 Barèmes ANAH (plafonds RFR)',renderBaremesAnahSection()));
     const admB3 = admBloc('3','3. CEE',admSousBloc('3-1','3.1 Formule BAR-TH-171 (PAC Air-Eau)',renderFormuleBarSection())+admSousBloc('3-2','3.2 Bonification CEE',renderBonificationFields())+admSousBloc('3-3','3.3 Délégataires CEE',renderDelegatairesFields()));
     const admB4 = admBloc('4','4. Sous-traitants',renderSousTraitantsSection());
-    const admB5_1 = admBloc('5-1','Options commerciales',optionsCommerciales);
-    const admB5_2 = admBloc('5-2','Modèles et marges nettes',modelesMarges);
+    const admB5_1 = '<div class="regie-only">' + admBloc('5-1','Régie — prix de cession',optionsCommerciales) + '</div>';
+    const admMarges = renderMarges(c, p);
+    const admB5_2 = admBloc('5-2','Modèles (catalogue PAC)',modelesMarges);
     const admB5_3 = admBloc('5-3','Ballon thermodynamique',renderBallonThermoFields());
     const admB6 = admBloc('6','6. Modèles email',renderEmailsFields());
     const admB7 = admBloc('7','7. Corbeille des leads','<div id="adm-trash" class="adm-trash-empty">Chargement...</div>');
@@ -15164,7 +15439,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
           </div>
           <div class="adm-roottabs" id="adm-roottabs">
             <button class="adm-roottab active" data-roottab="general">Général</button>
-            <button class="adm-roottab" data-roottab="marge">Marge</button>
+            <button class="adm-roottab" data-roottab="marge">Marges</button>
             <button class="adm-roottab" data-roottab="mpr">MPR</button>
             <button class="adm-roottab" data-roottab="cee">CEE</button>
             <button class="adm-roottab" data-roottab="catalogue">Catalogue PAC</button>
@@ -15176,7 +15451,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
           </div>
           <div class="adm-body">
             <div class="adm-rootpanel" data-rootpanel="general">${admB1}${admB4}</div>
-            <div class="adm-rootpanel" data-rootpanel="marge" hidden>${admB5_1}</div>
+            <div class="adm-rootpanel" data-rootpanel="marge" hidden>${admMarges}${admB5_1}</div>
             <div class="adm-rootpanel" data-rootpanel="mpr" hidden>${admB2}</div>
             <div class="adm-rootpanel" data-rootpanel="cee" hidden>${admB3}</div>
             <div class="adm-rootpanel" data-rootpanel="catalogue" hidden>${admB5_2}${admB9}</div>
@@ -15192,6 +15467,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
 
   // ---- Recalcul des lignes sans tout reconstruire (préserve les curseurs) ----
   function recalc(){
+    try { recalcMarges(); } catch (e) { console.warn('recalcMarges', e); }
     const c = window.HexaConfig; const p = c.params;
     const cacEl = document.getElementById('adm-cac'); if (cacEl) cacEl.textContent = eur(cac(p));
     const eurTip = n => eur(n);
@@ -15227,9 +15503,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     cfg.prix_vente_devis = {
       prix_pose_ht: parseFloat(document.getElementById('adm-prix-vente-pose-ht')?.value || '3500') || 3500,
       prix_travaux_induits_ht: parseFloat(document.getElementById('adm-prix-vente-travaux-ht')?.value || '1200') || 1200,
-      frais_ecair_pct: parseFloat(document.getElementById('adm-frais-ecair-pct')?.value || '12') || 0
     };
-    cfg.params.frais_ecair_pct = cfg.prix_vente_devis.frais_ecair_pct;
     window.HexaConfig = cfg;
     try { localStorage.setItem(LS_KEY, JSON.stringify(cfg)); } catch(_){}
     await saveAdminParamsServer();
@@ -15777,8 +16051,6 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     document.getElementById('btn-save-sous-traitants')?.addEventListener('click', saveSousTraitants);
     document.querySelector('[data-save-sous-bloc="1-1"]')?.addEventListener('click', async ()=>{
       const cfg = window.HexaConfig || loadConfig();
-      cfg.prix_vente_devis = Object.assign({}, cfg.prix_vente_devis || {}, { frais_ecair_pct: Number(document.getElementById('adm-frais-ecair-pct')?.value || 0) });
-      cfg.params.frais_ecair_pct = cfg.prix_vente_devis.frais_ecair_pct;
       const url = document.getElementById('adm-script-url')?.value || '';
       const r = await fetch('/api/admin/config', { method:'POST', headers: window.adminHeaders(), body: JSON.stringify({ script_notion_url:url }) });
       await saveAdminParamsServer();
@@ -15790,6 +16062,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
       adminToast('✓ Paramètres enregistrés', '#0D6B3B');
     });
     document.getElementById('adm-save-catalogue')?.addEventListener('click', saveCatalogueAdmin);
+    bindMarges();
     document.querySelectorAll('.adm-tab').forEach(tab => {
       tab.addEventListener('click', function() {
         const target = this.dataset.tab;
@@ -18381,6 +18654,9 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     window.HEXA_SESSION = { user: _s.user, role: _s.role };
     try { localStorage.setItem('hexa_user', _s.user || ''); } catch(_){}
     document.body.classList.toggle('hexa-role-commercial', _s.role !== 'admin');
+    // Lot 9 : régie masquée sauf si « Réactiver la régie » (paramètre admin, lisible par tous les comptes)
+    fetch('/api/admin/params', { cache: 'no-store' }).then(r => r.ok ? r.json() : null)
+      .then(d => { document.body.classList.toggle('regie-active', !!(d && d.params && d.params.regie_active)); }).catch(() => {});
     const view=buildView();
     if(view) document.body.appendChild(view);
     bindView(); renderRows();
