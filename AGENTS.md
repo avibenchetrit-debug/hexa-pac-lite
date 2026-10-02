@@ -68,6 +68,11 @@ derrière la connexion ; `/api/...` répond 401 même pour une route inexistante
   éditeur, étiquettes…), 7 fonctions Python (dont `_html_to_pdf` WeasyPrint et `_generate_devis_pdf` ReportLab),
   les dépendances `weasyprint` et `pydyf`, la copie `apercu-fiche-complete (7).html`. Une classe construite à la volée
   (`'prefixe-' + x`, `` `prefixe-${x}` ``, `x + '-suffixe'`) compte comme utilisée.
+- **Lot 8e (vitesse)** : réponses compressées (`GZipMiddleware`, index ~1,1 Mo -> ~270 Ko transférés) ; polices de la page
+  servies par l'appli (`static/fonts/`, mêmes fichiers que Google Fonts, Inter préchargée) ; une lecture GET déjà EN COURS
+  de `/api/catalogue-pac`, `/api/admin/m3` ou `/api/zones-departements` est partagée (jamais de cache après la réponse) ;
+  après l'affichage d'une fiche, les polices Google du devis sont mises en cache en arrière-plan (« Voir le devis »).
+  Les documents (devis, facture, note de dim) chargent toujours leurs polices chez Google : inchangés.
 - **Verrou « dossier facturé »** : installation finie ou facture émise → `dossier_fige` (jamais stocké), toute écriture du
   lead / du simulateur refusée en 423, fiche en lecture seule ; le devis et la note de dim servis sont ceux archivés à
   l'envoi (`data/devis/devis_meta.json`), rien n'est régénéré.

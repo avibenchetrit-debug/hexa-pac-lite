@@ -558,6 +558,9 @@ PARIS_TZ = ZoneInfo("Europe/Paris")
 # Serve static assets (CSS/JS/images) under /static.
 os.makedirs(STATIC_DIR, exist_ok=True)
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+# Lot 8e : réponses compressées (gzip) quand le navigateur l'accepte ; contenu identique, transfert ~5x plus léger.
+from starlette.middleware.gzip import GZipMiddleware  # noqa: E402
+app.add_middleware(GZipMiddleware, minimum_size=1024)
 
 
 # ============ ENFORCEMENT AUTH (Lot 2) — middleware global ============
