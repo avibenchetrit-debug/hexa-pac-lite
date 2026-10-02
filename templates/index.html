@@ -5927,6 +5927,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
   .p6-marge-dossier td:last-child { text-align: right; font-weight: 600; white-space: nowrap; }
   .p6-marge-dossier tr.p6-md-total td { font-weight: 800; color: #002E5A; border-top: 2px solid #E1E5EB; }
   .p6-marge-dossier .p6-md-note { padding: 6px 12px 10px; color: #64748B; font-size: 11.5px; }
+  .p6-marge-dossier .p6-md-indicative { color: #92400E; background: #FFFBEB; border-top: 1px solid #FDE68A; }
 </style>
 </head>
 <body class="hexa-has-topbar" data-prospect-numero="">
@@ -13097,7 +13098,9 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
       ${l('Frais de dossier (VT + COFRAC + urba)', '− ' + eurMd(d.frais_dossier))}${l('Acquisition', '− ' + eurMd(d.acquisition))}
       ${l(`CEE supplémentaire réel (${d.delegataire})`, '+ ' + eurMd(d.cee_supplementaire))}${l(ecairLab, '− ' + eurMd(d.frais_ecair))}
       <tr class="p6-md-total"><td>Marge nette réelle du dossier</td><td>${eurMd(d.marge_nette)} · ${pctMd(d.marge_nette_pct)}</td></tr>
-    </table><div class="p6-md-note">Visible par les administrateurs seulement. CEE supplémentaire = valorisation du délégataire − prime CEE affichée sur le devis.</div>`;
+    </table>${d.indicative ? `<div class="p6-md-note p6-md-indicative"><b>Marge indicative : calculée avec les coûts actuels de l'admin.</b>
+      Dossier facturé — montants lus dans le ${String(d.source || '').replace(/</g, '&lt;')}${d.facture ? ' (facture ' + String(d.facture).replace(/</g, '&lt;') + ')' : ''}${d.ecart_ttc ? ` · écart de ${eurMd(d.ecart_ttc)} avec le TTC de la facture` : ''}.</div>` : ''}
+    <div class="p6-md-note">Visible par les administrateurs seulement. CEE supplémentaire = valorisation du délégataire − prime CEE ${d.indicative ? 'facturée' : 'affichée sur le devis'}.</div>`;
   }
   function margeDossierHTML(){
     if (!estAdmin() || !state.numero) return '';

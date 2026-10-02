@@ -87,6 +87,10 @@ derrière la connexion ; `/api/...` répond 401 même pour une route inexistante
   `positionnement*` (`_sans_couts_modele`) et `m3` retire le coût d'achat des ballons. Le tarif €/MWh des délégataires
   reste lisible (décision : il sert au calcul de la prime CEE à l'écran). L'état de la régie est lu dans `m3`.
   `E2E_ROLE=commercial E2E_AUTH=1 python scripts/e2e_appel_local.py` : parcours complet en commercial, contrôle actif.
+- **Lot 9c** : « Marge du dossier » aussi sur un dossier facturé (admin, lecture seule, `_marge_dossier_facture`) :
+  prix de vente HT, prime CEE, MPR et délégataire lus dans le devis ARCHIVÉ auquel se réfère la facture la plus récente
+  (`services/marges_archive.py` ; à défaut le PDF de la facture ; sinon calcul actuel, signalé), coûts actuels de l'admin,
+  mention « Marge indicative : calculée avec les coûts actuels de l'admin ». Aucun état envoyé n'est pris en compte.
 - **Verrou « dossier facturé »** : installation finie ou facture émise → `dossier_fige` (jamais stocké), toute écriture du
   lead / du simulateur refusée en 423, fiche en lecture seule ; le devis et la note de dim servis sont ceux archivés à
   l'envoi (`data/devis/devis_meta.json`), rien n'est régénéré.
