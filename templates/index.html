@@ -10884,7 +10884,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
           ${champ('echeance_jours', 'Échéance (jours)', f0.echeance_jours, nombre)}
           ${champ('ref_appel', 'Réf. appel à facturation', f0.ref_appel)}
           ${champ('ref_contrat', 'Réf. contrat', f0.ref_contrat)}
-          ${f0.quote_parts_express ? `<label class="fcee-check"><input type="checkbox" data-k="option_express"> Traitement Express (${escapeHtml(f0.quote_parts_express)})</label>` : ''}
+          ${f0.quote_parts_express ? `<label class="fcee-check"><input type="checkbox" data-k="option_express"${f0.option_express ? ' checked' : ''}> Traitement Express (${escapeHtml(f0.quote_parts_express)})</label>` : ''}
         </div></fieldset>
         <fieldset><legend>Opération</legend><div class="fcee-grille">
           ${champ('ref_operation', 'Réf. opération', f0.ref_operation)}${champ('fiche', 'Fiche', f0.fiche)}${champ('fiche_libelle', 'Libellé fiche', f0.fiche_libelle)}
@@ -10900,7 +10900,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
         <div class="fcee-recap" data-fcee-recap></div></fieldset>
         <fieldset><legend>Mentions</legend>
           <label class="fcee-champ"><span>Phrase de bas de page (solde)</span><textarea data-k="mention_solde" rows="2">${escapeHtml(f0.mention_solde || '')}</textarea></label>
-          <label class="fcee-champ" data-fcee-express-ligne hidden><span>Ligne Traitement Express</span><input data-k="mention_express" type="text" value="${escapeHtml(f0.mention_express || '')}"></label>
+          <label class="fcee-champ" data-fcee-express-ligne${f0.option_express ? '' : ' hidden'}><span>Ligne Traitement Express</span><input data-k="mention_express" type="text" value="${escapeHtml(f0.mention_express || '')}"></label>
         </fieldset>
         <div class="fcee-res" data-fcee-res hidden></div>
         <div class="rectif-apercu-actions">
@@ -15011,7 +15011,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
   }
   function renderDelegatairesFields(){
     const cfg = M3_ADMIN || {};
-    const delegataires = cfg.delegataires || [{nom:'PICOTY', mwh_precaire:12.5, mwh_classique:7.2, actif:true}];
+    const delegataires = cfg.delegataires || [{nom:'PICOTY', mwh_precaire:12.7, mwh_classique:7.2, actif:true}];
     return `<div class="adm-card">
       <div id="adm-delegataires-list">
         ${delegataires.map((d,i)=>`<div class="adm-field adm-field-row adm-delegataire-row" data-i="${i}">
