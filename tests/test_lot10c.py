@@ -4,11 +4,24 @@ corrigés d'après la doc Ariston « Doc Pro Nimbus Plus Net R32 » (mêmes grou
 idempotente, import Excel aligné ; une valeur ressaisie ensuite n'est jamais réécrasée."""
 import copy
 
+import pytest
+
 import main
 import test_lot9 as l9
 from services import import_catalogue_pac as imp
 
 POIDS, DIM = imp.POIDS_EXT, imp.DIM_EXT
+
+
+@pytest.fixture(autouse=True)
+def _donnees_restaurees():
+    """Catalogue, paramètres, fiches et factures sont partagés par toute la suite : remis en l'état après chaque test
+    (sinon les tests suivants — lot 6i, rectificative — héritent d'un catalogue de 5 Ariston DUO)."""
+    chemins = (main.CATALOGUE_PATH, main.PARAMETRES_ADMIN_PATH, main.LEADS_PATH, main.FACTURES_META_PATH, main.DELEGATAIRES_PATH)
+    sauve = {c: open(c, "rb").read() for c in chemins if main.os.path.exists(c)}
+    yield
+    for c, octets in sauve.items():
+        open(c, "wb").write(octets)
 
 
 def _duo(ref, poids, dims="1106 x 1016 x 380"):
