@@ -115,6 +115,10 @@ derrière la connexion ; `/api/...` répond 401 même pour une route inexistante
   factures) ; une facture de solde reprend de l'acompte émis dans le CRM tarif, contrat, volume, délégataire, destinataire
   (`REPRIS_DE_L_ACOMPTE`), quote-part = 100 % − acompte (acompte hors CRM : saisie manuelle). Tarif précarité PICOTY
   12,5 -> 12,7 €/MWhc par `_migrate_lot11b`, une seule fois (marque `params.tarif_picoty_lot11b`).
+- **Lot 11c** : « Importer une facture déjà émise » (`/api/admin/facture-cee/{numero}/importer`) : PDF rangé tel quel
+  (`importee`, `sha256_pdf`), numéro réservé (doublon refusé, `_numeros_fa_cee`), compteur FA-CEE inchangé (les numéros
+  réservés sont sautés à l'émission) ; montants de l'opération = montants de la facture ramenés à 100 % ; compte comme un
+  acompte émis pour le solde.
 - **Verrou « dossier facturé »** : installation finie ou facture émise → `dossier_fige` (jamais stocké), toute écriture du
   lead / du simulateur refusée en 423, fiche en lecture seule ; le devis et la note de dim servis sont ceux archivés à
   l'envoi (`data/devis/devis_meta.json`), rien n'est régénéré.
