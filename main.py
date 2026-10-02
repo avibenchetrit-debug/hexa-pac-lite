@@ -518,11 +518,12 @@ DEFAULT_PARAMETRES_ADMIN = {
         "cession_eur": 2500,
         "cession_pct": 0.20,
         "plafond_pct": 0.60,
+        "frais_ecair_pct": 12.5,   # Lot 9 : seule source (12,5 % de la MPR, dossiers PICOTY seulement)
+        "regie_active": False,     # Lot 9 : régie masquée (données gardées) ; « Réactiver la régie » dans l'admin
     },
     "prix_vente_devis": {
         "prix_pose_ht": 3500,
         "prix_travaux_induits_ht": 1200,
-        "frais_ecair_pct": 12,
     },
     "ballon_thermo": {
         "modeles": [
@@ -912,6 +913,8 @@ def save_parametres_admin_atomic(payload):
     if not isinstance(existing, dict):
         existing = {}
     data = _deep_merge_defaults(payload, existing)
+    if isinstance(data.get("prix_vente_devis"), dict):          # Lot 9 : frais ECAIR = params.frais_ecair_pct seul
+        data["prix_vente_devis"].pop("frais_ecair_pct", None)
     sous_traitants = data.get("sous_traitants")
     if not isinstance(sous_traitants, list) or not sous_traitants:
         data["sous_traitants"] = [dict(DEFAULT_SOUS_TRAITANTS[0])]
@@ -995,6 +998,36 @@ def _read_catalogue_pac():
 
 def _migrate_catalogue_pac_schema():
     _read_catalogue_pac()
+
+
+def _migrate_lot9() -> None:
+    """Lot 9, au démarrage, idempotent : frais ECAIR corrigés à 12,5 % UNE fois (marque frais_ecair_lot9 : une valeur
+    changée ensuite dans l'admin n'est jamais réécrasée), une seule source (params) ; « Positionnement marché »
+    pré-rempli sur les modèles qui n'en ont pas (jamais réécrit ensuite). Aucun prix modifié."""
+    from services.marges import positionnement_defaut
+    brut = _read_json(PARAMETRES_ADMIN_PATH, {})
+    if isinstance(brut, dict):
+        params = brut.setdefault("params", {}) if isinstance(brut.get("params", {}), dict) else None
+        pvd = brut.get("prix_vente_devis") if isinstance(brut.get("prix_vente_devis"), dict) else {}
+        change = False
+        if params is not None and not params.get("frais_ecair_lot9"):
+            params["frais_ecair_pct"] = 12.5
+            params["frais_ecair_lot9"] = True
+            change = True
+        if "frais_ecair_pct" in pvd:
+            pvd.pop("frais_ecair_pct", None)
+            change = True
+        if change:
+            _atomic_write_json(PARAMETRES_ADMIN_PATH, brut)
+    catalogue = _read_catalogue_pac()
+    neuf, change = [], False
+    for m in catalogue:
+        if isinstance(m, dict) and "positionnement_marche" not in m:
+            m = dict(m, positionnement_marche=positionnement_defaut(m))
+            change = True
+        neuf.append(m)
+    if change:
+        _write_catalogue_pac(neuf)
 
 
 def _migrate_catalogue_regulateur() -> dict:
@@ -1878,6 +1911,7 @@ async def startup_event():
     _init_storage()
     _migrate_leads_schema()
     _migrate_catalogue_regulateur()
+    _migrate_lot9()
     _admin_password()
     start_backup_scheduler(DATA_DIR)
     start_relances_scheduler()
@@ -3382,6 +3416,64 @@ def get_admin_m3() -> JSONResponse:
             "script_appel": _script_appel(),
         }
     )
+
+
+@app.post("/api/admin/marge-dossier/{numero}")
+async def marge_du_dossier(numero: str, request: Request) -> JSONResponse:
+    """Lot 9 · 4 — « Marge du dossier » (étape 6) : ADMIN seulement. Calculée sur l'état du simulateur envoyé (non
+    enregistré) avec le calcul du devis existant ; rien n'est écrit, aucun prix ni calcul client modifié."""
+    _require_admin_session(request)
+    from services.marges import marge_dossier
+    prospect = _find_lead(numero)
+    if not prospect:
+        raise HTTPException(status_code=404, detail="Prospect introuvable")
+    prospect = _lead_for_response(prospect)
+    payload = await _read_request_payload(request)
+    catalogue = _read_catalogue_pac()
+    state = dict(_load_state_simulateur(numero, prospect, catalogue) or {})
+    if isinstance(payload, dict):
+        state.update({k: v for k, v in payload.items() if k != "numero"})
+    admin = _admin_payload_with_m3()
+    calc = calculer_devis(prospect, state, admin, catalogue)
+    modele = find_modele(catalogue, state.get("modele_pac_id") or state.get("modele_pac"))
+    ballon = None
+    choisi = resoudre_ballon(state, admin)
+    if choisi:
+        ballon = next((b for b in ((admin.get("ballon_thermo") or {}).get("modeles") or [])
+                       if isinstance(b, dict) and b.get("ref") == choisi.get("ref")), dict(choisi))
+    res = marge_dossier(calc, modele, ballon, admin.get("params") or {}, mode_cee(prospect, state, admin))
+    res["modele"] = (modele or {}).get("ref", "")
+    res["ballon"] = (ballon or {}).get("nom", "") if ballon else ""
+    return JSONResponse(res)
+
+
+@app.post("/api/admin/marges/export")
+async def export_marges(request: Request):
+    """Lot 9 · 1 — export Excel de la page Marges, avec les lignes affichées (filtres appliqués). ADMIN seulement."""
+    _require_admin_session(request)
+    from openpyxl import Workbook
+    from openpyxl.styles import Font
+    payload = await _read_request_payload(request)
+    entetes = payload.get("entetes") if isinstance(payload, dict) else None
+    lignes = payload.get("lignes") if isinstance(payload, dict) else None
+    if not isinstance(entetes, list) or not isinstance(lignes, list):
+        raise HTTPException(status_code=400, detail="entetes et lignes attendus")
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Marges"
+    ws.append([str(e) for e in entetes])
+    for c in ws[1]:
+        c.font = Font(bold=True)
+    for l in lignes:
+        if isinstance(l, list):
+            ws.append([v if isinstance(v, (int, float)) else ("" if v is None else str(v)) for v in l])
+    for col in ws.columns:
+        ws.column_dimensions[col[0].column_letter].width = min(48, max(10, *(len(str(c.value or "")) + 2 for c in col)))
+    flux = io.BytesIO()
+    wb.save(flux)
+    nom = f"marges_{datetime.now(PARIS_TZ).strftime('%Y-%m-%d')}.xlsx"
+    return Response(flux.getvalue(), media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    headers={"Content-Disposition": f'attachment; filename="{nom}"'})
 
 
 @app.get("/api/admin/params")
