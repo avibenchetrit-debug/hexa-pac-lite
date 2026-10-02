@@ -1016,7 +1016,16 @@ def _migrate_catalogue_pac_schema():
     _read_catalogue_pac()
 
 
-LIBELLES_CORRIGES_LOT10 = {"Classe énergétique chauffage 35°C / 55°C (kW)": "Classe énergétique chauffage 35°C / 55°C"}
+LIBELLES_CORRIGES_LOT10 = {
+    "Classe énergétique chauffage 35°C / 55°C (kW)": "Classe énergétique chauffage 35°C / 55°C",
+    # Lot 10b : signalements corrigés (valeurs inchangées)
+    "Classe éner. chauffage 35°C / 55°C (kW)": "Classe énergétique chauffage 35°C / 55°C",
+    "Volume ballon ECS / Profil soutirage": "Volume ballon ECS (L) / Profil soutirage",
+    # une seule valeur = poids de l'UNITÉ EXTÉRIEURE (doc. Ariston : 83 kg groupe 80, 119 kg groupe 150 ; un module
+    # intérieur DUO à ballon de 180 L pèse bien plus « en fonction »)
+    "Poids module ext. / int. en fonction (kg)": "Poids module ext. en fonction (kg)",
+    "Poids à vide unité extérieure(kg)": "Poids à vide unité extérieure (kg)",
+}
 
 
 def _migrate_lot10() -> list:
@@ -1034,7 +1043,22 @@ def _migrate_lot10() -> list:
         neuf.append(m)
     if corriges:
         _write_catalogue_pac(neuf)
-        print(f"[catalogue] lot 10 : libellé « Classe énergétique … (kW) » corrigé sur {len(corriges)} modèle(s) : {corriges}")
+        print(f"[catalogue] lot 10 : libellés de fiche produit corrigés sur {len(corriges)} modèle(s) : {corriges}")
+    # Lot 10b : mêmes corrections dans la fiche des ballons (paramètres admin)
+    brut = _read_json(PARAMETRES_ADMIN_PATH, {})
+    bt = brut.get("ballon_thermo") if isinstance(brut, dict) else None
+    if isinstance(bt, dict) and isinstance(bt.get("modeles"), list):
+        ballons = []
+        for b in bt["modeles"]:
+            specs = b.get("description_specs") if isinstance(b, dict) else None
+            if isinstance(specs, list) and any(isinstance(x, dict) and x.get("champ") in LIBELLES_CORRIGES_LOT10 for x in specs):
+                b["description_specs"] = [dict(x, champ=LIBELLES_CORRIGES_LOT10[x["champ"]])
+                                          if isinstance(x, dict) and x.get("champ") in LIBELLES_CORRIGES_LOT10 else x for x in specs]
+                ballons.append(b.get("ref", ""))
+        if ballons:
+            _atomic_write_json(PARAMETRES_ADMIN_PATH, brut)
+            print(f"[catalogue] lot 10b : libellés de fiche ballon corrigés : {ballons}")
+            corriges = corriges + ballons
     return corriges
 
 
@@ -5131,7 +5155,10 @@ def _lignes_pdf(source) -> list:
 AJOUTS_RECTIFICATIVE = ("Ancien système de chauffage déposé : chaudière — énergie :", "Application :",
                         "Installation et paramétrage du régulateur",
                         "Dépose et évacuation de l'ancienne chaudière", "Dépose et évacuation des équipements remplacés",
-                        "Volume CEE :", "Classe énergétique chauffage 35°C / 55°C")   # Lot 10
+                        "Volume CEE :", "Classe énergétique chauffage 35°C / 55°C",   # Lot 10
+                        "Volume ballon ECS (L) / Profil soutirage", "Volume ballon ECS / Profil soutirage",   # Lot 10b
+                        "Poids module ext. en fonction (kg)", "Poids module ext. / int. en fonction (kg)",
+                        "Poids à vide unité extérieure", "Classe éner. chauffage")
 
 
 def _differences_avec_l_originale(rec: dict, pdf_rectificative: bytes, numero_facture: str) -> list | None:

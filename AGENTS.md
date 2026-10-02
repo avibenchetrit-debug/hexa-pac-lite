@@ -95,6 +95,10 @@ derrière la connexion ; `/api/...` répond 401 même pour une route inexistante
   (`_migrate_lot10` au démarrage, et à l'import Excel). Ligne « Volume CEE : X kWh cumac (précaire / classique) » sous la
   prime CEE des devis, pré-devis et factures = kWh cumac × bonification de la valorisation (`volume_cee`). Pour la
   rectificative d'une facture d'avant, ces deux lignes sont des différences prévues.
+- **Lot 10b** : 4 libellés de fiche produit corrigés (mêmes `LIBELLES_CORRIGES_LOT10`, catalogue + fiche des ballons +
+  import Excel) : « Classe éner. … (kW) » -> « Classe énergétique chauffage 35°C / 55°C » ; « Volume ballon ECS (L) /
+  Profil soutirage » ; « Poids module ext. / int. en fonction (kg) » -> « Poids module ext. en fonction (kg) » (poids de
+  l'unité extérieure d'après la doc Ariston) ; « Poids à vide unité extérieure (kg) ». Valeurs inchangées.
 - **Verrou « dossier facturé »** : installation finie ou facture émise → `dossier_fige` (jamais stocké), toute écriture du
   lead / du simulateur refusée en 423, fiche en lecture seule ; le devis et la note de dim servis sont ceux archivés à
   l'envoi (`data/devis/devis_meta.json`), rien n'est régénéré.

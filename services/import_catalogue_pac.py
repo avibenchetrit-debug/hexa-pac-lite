@@ -58,7 +58,13 @@ def _cell_text(v):
 
 
 # Lot 10 : une classe énergétique n'est pas en kW (le fichier fournisseur porte encore « (kW) »)
-LIBELLES_CORRIGES = {"Classe énergétique chauffage 35°C / 55°C (kW)": "Classe énergétique chauffage 35°C / 55°C"}
+LIBELLES_CORRIGES = {
+    "Classe énergétique chauffage 35°C / 55°C (kW)": "Classe énergétique chauffage 35°C / 55°C",
+    "Classe éner. chauffage 35°C / 55°C (kW)": "Classe énergétique chauffage 35°C / 55°C",           # Lot 10b
+    "Volume ballon ECS / Profil soutirage": "Volume ballon ECS (L) / Profil soutirage",
+    "Poids module ext. / int. en fonction (kg)": "Poids module ext. en fonction (kg)",
+    "Poids à vide unité extérieure(kg)": "Poids à vide unité extérieure (kg)",
+}
 
 
 def _spec_label(a):

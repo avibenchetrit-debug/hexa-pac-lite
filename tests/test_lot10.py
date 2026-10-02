@@ -29,14 +29,12 @@ def test_migration_libelle_corrige_valeurs_inchangees_idempotente():
     l9._preparer()
     _catalogue_avec_libelle_faux()
     corriges = main._migrate_lot10()
-    assert sorted(corriges) == sorted(m["ref"] for i, m in enumerate(l9.CATALOGUE) if i != 2)
+    assert sorted(corriges) == sorted(m["ref"] for m in l9.CATALOGUE)       # lot 10b : le libellé abrégé aussi
     for m in main._read_catalogue_pac():
         champs = {s["champ"]: s["valeur"] for s in m["description_specs"]}
         assert FAUX not in champs
-        if m["ref"] != l9.CATALOGUE[2]["ref"]:
-            assert champs[JUSTE] == "A+++ / A++"
-        else:
-            assert champs[ABREGE] == "A+++ / A+"                 # libellé abrégé : signalé, pas modifié
+        assert ABREGE not in champs
+        assert champs[JUSTE] == ("A+++ / A+" if m["ref"] == l9.CATALOGUE[2]["ref"] else "A+++ / A++")   # valeurs inchangées
     avant = open(main.CATALOGUE_PATH, "rb").read()
     assert main._migrate_lot10() == [] and open(main.CATALOGUE_PATH, "rb").read() == avant
 
