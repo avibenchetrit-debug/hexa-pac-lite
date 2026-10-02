@@ -99,6 +99,9 @@ derrière la connexion ; `/api/...` répond 401 même pour une route inexistante
   import Excel) : « Classe éner. … (kW) » -> « Classe énergétique chauffage 35°C / 55°C » ; « Volume ballon ECS (L) /
   Profil soutirage » ; « Poids module ext. / int. en fonction (kg) » -> « Poids module ext. en fonction (kg) » (poids de
   l'unité extérieure d'après la doc Ariston) ; « Poids à vide unité extérieure (kg) ». Valeurs inchangées.
+- **Lot 10c** : groupes extérieurs des Ariston DUO (poids du module extérieur, dimensions) corrigés d'après la doc
+  Ariston « Doc Pro Nimbus Plus Net R32 » (`CORRECTIONS_ARISTON_DUO` dans services/import_catalogue_pac.py, appliqué à
+  la migration `_migrate_lot10c` et à l'import Excel ; seulement si la valeur est encore l'ancienne valeur fausse).
 - **Verrou « dossier facturé »** : installation finie ou facture émise → `dossier_fige` (jamais stocké), toute écriture du
   lead / du simulateur refusée en 423, fiche en lecture seule ; le devis et la note de dim servis sont ceux archivés à
   l'envoi (`data/devis/devis_meta.json`), rien n'est régénéré.

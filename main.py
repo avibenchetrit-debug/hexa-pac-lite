@@ -1062,6 +1062,19 @@ def _migrate_lot10() -> list:
     return corriges
 
 
+def _migrate_lot10c() -> list:
+    """Lot 10c, au démarrage, idempotent : groupes extérieurs des Ariston DUO (poids, dimensions) corrigés d'après la doc
+    Ariston « Doc Pro Nimbus Plus Net R32 » (services/import_catalogue_pac.CORRECTIONS_ARISTON_DUO). Rend les réf. corrigées."""
+    import copy
+    from services.import_catalogue_pac import corriger_groupes_exterieurs_ariston
+    catalogue = copy.deepcopy(_read_catalogue_pac())
+    corriges = [m.get("ref", "") for m in catalogue if isinstance(m, dict) and corriger_groupes_exterieurs_ariston(m)]
+    if corriges:
+        _write_catalogue_pac(catalogue)
+        print(f"[catalogue] lot 10c : groupes extérieurs Ariston DUO corrigés : {corriges}")
+    return corriges
+
+
 def _migrate_lot9() -> None:
     """Lot 9, au démarrage, idempotent : frais ECAIR corrigés à 12,5 % UNE fois (marque frais_ecair_lot9 : une valeur
     changée ensuite dans l'admin n'est jamais réécrasée), une seule source (params) ; « Positionnement marché »
@@ -1975,6 +1988,7 @@ async def startup_event():
     _migrate_catalogue_regulateur()
     _migrate_lot9()
     _migrate_lot10()
+    _migrate_lot10c()
     _admin_password()
     start_backup_scheduler(DATA_DIR)
     start_relances_scheduler()
@@ -5158,7 +5172,8 @@ AJOUTS_RECTIFICATIVE = ("Ancien système de chauffage déposé : chaudière — 
                         "Volume CEE :", "Classe énergétique chauffage 35°C / 55°C",   # Lot 10
                         "Volume ballon ECS (L) / Profil soutirage", "Volume ballon ECS / Profil soutirage",   # Lot 10b
                         "Poids module ext. en fonction (kg)", "Poids module ext. / int. en fonction (kg)",
-                        "Poids à vide unité extérieure", "Classe éner. chauffage")
+                        "Poids à vide unité extérieure", "Classe éner. chauffage",
+                        "Dimensions groupe extérieur (HxLxP) (mm)")                 # Lot 10c
 
 
 def _differences_avec_l_originale(rec: dict, pdf_rectificative: bytes, numero_facture: str) -> list | None:
