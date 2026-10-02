@@ -590,6 +590,21 @@ def _auth_is_admin_only(method: str, path: str) -> bool:
     return False
 
 
+# Lot 9b — ce qui permet de calculer une marge est réservé aux comptes admin (côté serveur). Un commercial ne reçoit
+# que ce dont le parcours a besoin : prix de vente, caractéristiques techniques, de quoi calculer les aides.
+_CHAMP_MODELE_RESERVE = re.compile(r"^(achat|prix_achat.*|cout.*|cession.*|surplus.*|marge.*|taux_marge.*|positionnement.*)$")
+
+
+def _est_admin(request: Request) -> bool:
+    """Compte admin connecté. Sans compte (AUTH_ENFORCE=0, développement local) : tout est servi, comme avant."""
+    u = current_user(request)
+    return (u or {}).get("role") == "admin" if u else os.environ.get("AUTH_ENFORCE", "1") == "0"
+
+
+def _sans_couts_modele(m):
+    return {k: v for k, v in m.items() if not _CHAMP_MODELE_RESERVE.match(str(k))} if isinstance(m, dict) else m
+
+
 def _auth_is_html_page(method: str, path: str) -> bool:
     if method not in ("GET", "HEAD"):
         return False
@@ -2146,9 +2161,11 @@ def get_zones_departements() -> JSONResponse:
 
 
 @app.get("/api/catalogue-pac")
-def get_catalogue_pac() -> JSONResponse:
+def get_catalogue_pac(request: Request) -> JSONResponse:
     # Corps inchange (la liste brute) pour rester compatible ; la version part en en-tete.
     models = _read_catalogue_pac()
+    if not _est_admin(request):                       # Lot 9b : prix d'achat et champs de marge réservés aux admins
+        models = [_sans_couts_modele(m) for m in models]
     return JSONResponse(models, headers={"X-Catalogue-Version": _catalogue_version()})
 
 
@@ -3392,8 +3409,18 @@ async def echanges_ajax(numero: str, request: Request) -> JSONResponse:
     return JSONResponse({"ok": True, "count": len(echanges.get(numero, []))})
 
 
+def _ballon_thermo_pour(request: Request) -> dict:
+    """Lot 9b : le coût d'achat des ballons (cout_fourniture_ht) est réservé aux admins ; le prix de vente reste."""
+    bt = load_parametres_admin().get("ballon_thermo", {})
+    if _est_admin(request) or not isinstance(bt, dict):
+        return bt
+    bt = dict(bt)
+    bt["modeles"] = [_sans_couts_modele(m) for m in (bt.get("modeles") or [])]
+    return bt
+
+
 @app.get("/api/admin/m3")
-def get_admin_m3() -> JSONResponse:
+def get_admin_m3(request: Request) -> JSONResponse:
     baremes = _read_json(BAREMES_PATH, {})
     if not isinstance(baremes, dict):
         baremes = {}
@@ -3412,8 +3439,10 @@ def get_admin_m3() -> JSONResponse:
             "params_eco_energie": load_parametres_admin().get("params_eco_energie", DEFAULT_PARAMS_ECO_ENERGIE),
             "params_financement": load_parametres_admin().get("params_financement", DEFAULT_PARAMS_FINANCEMENT),
             "marques": load_parametres_admin().get("marques", DEFAULT_MARQUES),
-            "ballon_thermo": load_parametres_admin().get("ballon_thermo", {}),
+            "ballon_thermo": _ballon_thermo_pour(request),
             "script_appel": _script_appel(),
+            # Lot 9b : l'état de la régie, lu par l'écran de tous les comptes (provenance « Régie commerciale »)
+            "regie_active": bool((load_parametres_admin().get("params") or {}).get("regie_active")),
         }
     )
 

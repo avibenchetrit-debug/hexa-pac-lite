@@ -18654,9 +18654,9 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     window.HEXA_SESSION = { user: _s.user, role: _s.role };
     try { localStorage.setItem('hexa_user', _s.user || ''); } catch(_){}
     document.body.classList.toggle('hexa-role-commercial', _s.role !== 'admin');
-    // Lot 9 : régie masquée sauf si « Réactiver la régie » (paramètre admin, lisible par tous les comptes)
-    fetch('/api/admin/params', { cache: 'no-store' }).then(r => r.ok ? r.json() : null)
-      .then(d => { document.body.classList.toggle('regie-active', !!(d && d.params && d.params.regie_active)); }).catch(() => {});
+    // Lot 9 / 9b : régie masquée sauf si « Réactiver la régie » (état lu dans m3, lisible par tous les comptes)
+    fetch('/api/admin/m3', { cache: 'no-store' }).then(r => r.ok ? r.json() : null)
+      .then(d => { document.body.classList.toggle('regie-active', !!(d && d.regie_active)); }).catch(() => {});
     const view=buildView();
     if(view) document.body.appendChild(view);
     bindView(); renderRows();
