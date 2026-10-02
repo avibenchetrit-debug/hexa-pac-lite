@@ -3627,7 +3627,7 @@ body.comments-panel-open {
 .docs-devis-title{ cursor:pointer; user-select:none; }
 .docs-devis-title::before{ content:'▾'; display:inline-block; width:14px; color:#64748B; font-size:11px; }
 .docs-devis-block.is-collapsed .docs-devis-title::before{ content:'▸'; }
-.docs-devis-block.is-collapsed #docs-devis-list, .docs-devis-block.is-collapsed #docs-factures-list{ display:none; }
+.docs-devis-block.is-collapsed #docs-devis-list, .docs-devis-block.is-collapsed #docs-factures-list, .docs-devis-block.is-collapsed #docs-fcee-list{ display:none; }
 .docs-devis-actions{ display:flex; gap:6px; flex-wrap:wrap; }
 .docs-notedim-row{ display:flex; flex-wrap:wrap; align-items:center; gap:6px; padding-top:8px; border-top:1px solid #EDF2F7; margin-top:2px; }
 .docs-notedim-label{ font-size:11px; color:#888; width:100%; margin-bottom:2px; }
@@ -10162,6 +10162,10 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
           <div class="docs-devis-title" id="docs-factures-title" onclick="toggleFacturesEnvoyees()">🧾 Factures</div>
           <div id="docs-factures-list"></div>
         </div>
+        <div class="docs-devis-block is-collapsed" id="docs-fcee-block" style="display:none">
+          <div class="docs-devis-title" id="docs-fcee-title" onclick="this.parentElement.classList.toggle('is-collapsed')">🏦 Factures délégataire</div>
+          <div id="docs-fcee-list"></div>
+        </div>
         <button type="button" class="docs-nav-back" id="docs-nav-back" style="display:none;">‹ Retour</button>
         <nav id="docs-breadcrumb" class="docs-breadcrumb"></nav>
         <div id="docs-view-root"><div id="docs-cat-list" class="docs-folder-list"></div></div>
@@ -10803,6 +10807,179 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
   }
   window.refreshFacturesList = refreshFacturesList;
 
+  // ── Lot 11 : « Factures délégataire » (admin seulement ; le serveur refuse aussi un compte commercial). Facture CEE
+  // adressée au délégataire (ACE ; MRA GROUPE / ECAIR pour PICOTY), série FA-CEE distincte des factures client.
+  const FCEE_TYPES = { acompte: 'Acompte', solde: 'Solde', totalite: 'Totalité' };
+  const fceeEuros = v => (Number(v) || 0).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
+  const fceeDate = iso => iso ? String(iso).slice(0, 10).split('-').reverse().join('/') : '—';
+  async function refreshFacturesDelegataire() {
+    const block = document.getElementById('docs-fcee-block');
+    const root = document.getElementById('docs-fcee-list');
+    if (!block || !root || !currentProspect) return;
+    let estAdmin = false;
+    try { const me = await fetch('/api/auth/me', { cache:'no-store' }); estAdmin = me.ok && (await me.json()).role === 'admin'; } catch (_) {}
+    if (!estAdmin) { block.style.display = 'none'; root.innerHTML = ''; return; }
+    let data = null;
+    try { const r = await fetch(`/api/admin/facture-cee/${encodeURIComponent(currentProspect)}`, { cache:'no-store' }); data = r.ok ? await r.json() : null; } catch (_) {}
+    if (!data) { block.style.display = 'none'; return; }
+    block.style.display = '';
+    const factures = (data.factures || []).slice().reverse();
+    if (factures.some(f => f.en_retard)) block.classList.remove('is-collapsed');
+    root.innerHTML = `<div class="docs-devis-actions"><button type="button" class="hexa-meta-card-action" data-fcee-ouvrir>🏦 Facturer le délégataire</button></div>`
+      + (factures.length ? factures.map(f => {
+        const etat = f.statut === 'payee'
+          ? `<span class="fcee-tag fcee-payee">Payée le ${escapeHtml(fceeDate(f.date_paiement))}</span>`
+          : (f.en_retard ? `<span class="fcee-tag fcee-retard" data-fcee-retard>Impayée — échue le ${escapeHtml(fceeDate(f.echeance))}</span>`
+                         : `<span class="fcee-tag fcee-envoyee">Envoyée</span>`);
+        return `<div class="docs-devis-row${f.en_retard ? ' fcee-row-retard' : ''}" data-fcee-row="${escapeHtml(f.numero_facture)}">
+          <div><b>${escapeHtml(f.numero_facture)}</b> — ${escapeHtml(FCEE_TYPES[f.type] || '')} ${escapeHtml(String(f.quote_part).replace('.', ','))} % · ${escapeHtml(f.destinataire_nom || '')} ${etat}</div>
+          <div style="font-size:12px;color:#475569;margin-top:2px;">Date ${escapeHtml(fceeDate(f.date_facture))} · échéance ${escapeHtml(fceeDate(f.echeance))} · ${escapeHtml(fceeEuros(f.net_a_payer))} net à payer${f.ref_appel ? ` · appel ${escapeHtml(f.ref_appel)}` : ''}</div>
+          <div class="docs-devis-actions fcee-suivi">
+            ${f.available ? `<button type="button" class="hexa-meta-card-action" data-fcee-pdf="${escapeHtml(f.numero_facture)}">📥 Ouvrir</button>` : '<span class="pv-muted" style="font-size:12px;">PDF indisponible</span>'}
+            <select data-fcee-statut aria-label="Suivi de ${escapeHtml(f.numero_facture)}"><option value="envoyee"${f.statut !== 'payee' ? ' selected' : ''}>Envoyée</option><option value="payee"${f.statut === 'payee' ? ' selected' : ''}>Payée</option></select>
+            <input type="date" data-fcee-date-paiement value="${escapeHtml(f.date_paiement || '')}" aria-label="Date de paiement"${f.statut === 'payee' ? '' : ' hidden'}>
+            <button type="button" class="hexa-meta-card-action" data-fcee-suivi-ok>Enregistrer</button>
+          </div>
+        </div>`;
+      }).join('') : '<div class="pv-muted" style="font-size:12px;margin-top:6px;">Aucune facture délégataire pour ce dossier.</div>');
+    root.querySelector('[data-fcee-ouvrir]')?.addEventListener('click', () => ouvrirFactureDelegataire(data));
+    root.querySelectorAll('[data-fcee-pdf]').forEach(b => b.addEventListener('click', () =>
+      window.open(`/api/admin/facture-cee/${encodeURIComponent(currentProspect)}/download?numero_facture=${encodeURIComponent(b.dataset.fceePdf)}`, '_blank')));
+    root.querySelectorAll('[data-fcee-row]').forEach(row => {
+      const sel = row.querySelector('[data-fcee-statut]'), dp = row.querySelector('[data-fcee-date-paiement]');
+      sel?.addEventListener('change', () => { dp.hidden = sel.value !== 'payee'; if (!dp.hidden && !dp.value) dp.value = new Date().toISOString().slice(0, 10); });
+      row.querySelector('[data-fcee-suivi-ok]')?.addEventListener('click', async () => {
+        const r = await fetch(`/api/admin/facture-cee/${encodeURIComponent(currentProspect)}/suivi`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ numero_facture: row.dataset.fceeRow, statut: sel.value, date_paiement: dp.value }) });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) { alert('Suivi non enregistré : ' + (j.detail || ('erreur ' + r.status))); return; }
+        refreshFacturesDelegataire();
+      });
+    });
+  }
+  window.refreshFacturesDelegataire = refreshFacturesDelegataire;
+
+  function ouvrirFactureDelegataire(data) {
+    document.getElementById('fcee-overlay')?.remove();
+    const f0 = data.formulaire || {}, deja = data.factures || [];
+    const dest = f0.destinataire || {};
+    const champ = (k, lab, val, attrs) => `<label class="fcee-champ"><span>${lab}</span><input data-k="${k}" value="${escapeHtml(val ?? '')}" ${attrs || 'type="text"'}></label>`;
+    const champD = (k, lab) => `<label class="fcee-champ"><span>${lab}</span><input data-dest="${k}" type="text" value="${escapeHtml(dest[k] || '')}"></label>`;
+    const nombre = 'type="text" inputmode="decimal"';
+    const wrap = document.createElement('div');
+    wrap.id = 'fcee-overlay';
+    wrap.className = 'devis-modal-overlay';
+    wrap.innerHTML = `
+      <div class="fcee-box" role="dialog" aria-modal="true" aria-labelledby="fcee-titre">
+        <h3 id="fcee-titre">Facturer le délégataire — ${escapeHtml(f0.delegataire === 'PICOTY' ? 'ECAIR (mandataire de PICOTY)' : (f0.delegataire || ''))}</h3>
+        <p class="fcee-note">Pré-rempli d'après le ${escapeHtml(f0.source || 'dossier')}. Tout est modifiable. Prochain numéro : <b data-fcee-prochain>${escapeHtml(data.prochain_numero || '')}</b> (attribué à l'émission seulement).</p>
+        <fieldset><legend>Destinataire</legend><div class="fcee-grille">
+          ${champD('raison_sociale', 'Raison sociale')}${champD('forme', 'Forme')}${champD('nom_commercial', 'Nom commercial')}
+          ${champD('adresse', 'Adresse')}${champD('immatriculation', 'SIREN / RCS')}${champD('tva', 'N° TVA intracom.')}${champD('mandataire', 'Mandataire')}
+        </div></fieldset>
+        <fieldset><legend>Facture</legend><div class="fcee-grille">
+          <label class="fcee-champ"><span>Type</span><select data-k="type">${Object.entries(FCEE_TYPES).map(([k, v]) => `<option value="${k}"${f0.type === k ? ' selected' : ''}>${v}</option>`).join('')}</select></label>
+          ${champ('quote_part', 'Quote-part (%)', f0.quote_part, nombre)}
+          ${champ('date_facture', 'Date de facture', f0.date_facture, 'type="date"')}
+          ${champ('echeance_jours', 'Échéance (jours)', f0.echeance_jours, nombre)}
+          ${champ('ref_appel', 'Réf. appel à facturation', f0.ref_appel)}
+          ${champ('ref_contrat', 'Réf. contrat', f0.ref_contrat)}
+          ${f0.quote_parts_express ? `<label class="fcee-check"><input type="checkbox" data-k="option_express"> Traitement Express (${escapeHtml(f0.quote_parts_express)})</label>` : ''}
+        </div></fieldset>
+        <fieldset><legend>Opération</legend><div class="fcee-grille">
+          ${champ('ref_operation', 'Réf. opération', f0.ref_operation)}${champ('fiche', 'Fiche', f0.fiche)}${champ('fiche_libelle', 'Libellé fiche', f0.fiche_libelle)}
+          ${champ('beneficiaire', 'Bénéficiaire', f0.beneficiaire)}${champ('adresse_travaux', 'Adresse des travaux', f0.adresse_travaux)}
+          ${champ('volume_precaire_mwh', 'Volume précaire (MWh cumac)', f0.volume_precaire_mwh, nombre)}${champ('volume_classique_mwh', 'Volume classique (MWh cumac)', f0.volume_classique_mwh, nombre)}
+          ${champ('prix_precaire', 'Prix précaire (€/MWhc)', f0.prix_precaire, nombre)}${champ('prix_classique', 'Prix classique (€/MWhc)', f0.prix_classique, nombre)}
+        </div></fieldset>
+        <fieldset><legend>Montants de l'opération (HT)</legend><div class="fcee-grille">
+          ${champ('prime_operation', 'Prime bénéficiaire (devis signé)', f0.prime_operation, nombre)}
+          ${champ('commission_operation', 'Commission (vide = valorisation − prime)', f0.commission_operation, nombre)}
+          ${champ('taux_tva', 'TVA commission (%)', f0.taux_tva, nombre)}
+        </div>
+        <div class="fcee-recap" data-fcee-recap></div></fieldset>
+        <fieldset><legend>Mentions</legend>
+          <label class="fcee-champ"><span>Phrase de bas de page (solde)</span><textarea data-k="mention_solde" rows="2">${escapeHtml(f0.mention_solde || '')}</textarea></label>
+          <label class="fcee-champ" data-fcee-express-ligne hidden><span>Ligne Traitement Express</span><input data-k="mention_express" type="text" value="${escapeHtml(f0.mention_express || '')}"></label>
+        </fieldset>
+        <div class="fcee-res" data-fcee-res hidden></div>
+        <div class="rectif-apercu-actions">
+          <button type="button" class="adm-btn adm-btn-cancel" data-fcee-annuler>Annuler</button>
+          <button type="button" class="adm-btn adm-btn-ghost" data-fcee-apercu>👁 Aperçu</button>
+          <button type="button" class="adm-btn adm-btn-primary" data-fcee-emettre>🧾 Émettre ${escapeHtml(data.prochain_numero || '')}</button>
+        </div>
+      </div>`;
+    document.body.appendChild(wrap);
+    const q = sel => wrap.querySelector(sel);
+    const num = v => { const n = parseFloat(String(v ?? '').replace(/[\s\u00a0\u202f€]/g, '').replace(',', '.')); return isFinite(n) ? n : 0; };
+    const r2 = v => Math.round((v + Number.EPSILON) * 100) / 100;
+    const lire = () => {
+      const f = { delegataire: f0.delegataire, destinataire: {} };
+      wrap.querySelectorAll('[data-k]').forEach(el => { f[el.dataset.k] = el.type === 'checkbox' ? el.checked : el.value; });
+      wrap.querySelectorAll('[data-dest]').forEach(el => { f.destinataire[el.dataset.dest] = el.value; });
+      return f;
+    };
+    const recap = () => {
+      const f = lire(), pct = num(f.quote_part);
+      const valo = r2(num(f.volume_precaire_mwh) * num(f.prix_precaire) + num(f.volume_classique_mwh) * num(f.prix_classique));
+      const prime = r2(num(f.prime_operation));
+      const comm = String(f.commission_operation || '').trim() === '' ? r2(valo - prime) : r2(num(f.commission_operation));
+      const pHT = r2(prime * pct / 100), cHT = r2(comm * pct / 100), tva = r2(cHT * (String(f.taux_tva || '').trim() === '' ? 20 : num(f.taux_tva)) / 100);
+      q('[data-k="commission_operation"]').placeholder = fceeEuros(r2(valo - prime));
+      q('[data-fcee-recap]').innerHTML = `Valorisation ${fceeEuros(valo)} · commission opération ${fceeEuros(comm)}<br>`
+        + `Prime ${fceeEuros(pHT)} (TVA non applicable) · Commission ${fceeEuros(cHT)} HT + TVA ${fceeEuros(tva)}<br>`
+        + `<b>Total HT ${fceeEuros(r2(pHT + cHT))} · TVA ${fceeEuros(tva)} · Net à payer <span data-fcee-net>${fceeEuros(r2(pHT + cHT + tva))}</span></b>`;
+    };
+    const partsDe = t => String(t || '').replace(/,/g, '.').replace(/%/g, '').split('/').map(x => parseFloat(x)).filter(x => x > 0);
+    const proposer = (quoteParts) => {
+      const p = partsDe(quoteParts);
+      const acomptes = deja.filter(x => x.type === 'acompte').map(x => Number(x.quote_part) || 0);
+      let type = 'totalite', pct = p[0] || 100;
+      if (p.length > 1) { if (acomptes.length) { type = 'solde'; pct = Math.max(0, 100 - acomptes.reduce((a, b) => a + b, 0)); } else { type = 'acompte'; pct = p[0]; } }
+      q('[data-k="type"]').value = type;
+      q('[data-k="quote_part"]').value = String(pct);
+      const acompte = (deja.filter(x => x.type === 'acompte').slice(-1)[0] || {}).numero_facture || '';
+      q('[data-k="mention_solde"]').value = type === 'acompte'
+        ? `Le solde de ${String(r2(100 - pct)).replace('.', ',')} % de l'opération fera l'objet d'une facture distincte à réception de l'appel à facturation de solde.`
+        : (type === 'solde' && acompte ? `Solde de l'opération après la facture d'acompte ${acompte}.` : '');
+    };
+    q('[data-k="option_express"]')?.addEventListener('change', e => {
+      q('[data-fcee-express-ligne]').hidden = !e.target.checked;
+      proposer(e.target.checked ? f0.quote_parts_express : f0.quote_parts);
+      recap();
+    });
+    wrap.addEventListener('input', recap);
+    wrap.addEventListener('change', recap);
+    recap();
+    const res = q('[data-fcee-res]');
+    const afficher = (html, ok) => { res.hidden = false; res.className = 'fcee-res ' + (ok ? 'ok' : 'ko'); res.innerHTML = html; };
+    q('[data-fcee-annuler]').addEventListener('click', () => wrap.remove());
+    q('[data-fcee-apercu]').addEventListener('click', async () => {
+      const fen = window.open('', '_blank');
+      try {
+        const r = await fetch(`/api/admin/facture-cee/${encodeURIComponent(currentProspect)}/apercu`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(lire()) });
+        if (!r.ok) { fen?.close(); const j = await r.json().catch(() => ({})); afficher('⚠ ' + escapeHtml(j.detail || ('Erreur ' + r.status)), false); return; }
+        const url = URL.createObjectURL(await r.blob());
+        if (fen) fen.location = url; else window.open(url, '_blank');
+      } catch (e) { fen?.close(); afficher('⚠ Le serveur n’a pas répondu.', false); }
+    });
+    q('[data-fcee-emettre]').addEventListener('click', async () => {
+      if (!window.confirm(`Émettre la facture ${data.prochain_numero || ''} ? Elle sera numérotée, enregistrée dans les documents du dossier et verrouillée.`)) return;
+      const b = q('[data-fcee-emettre]');
+      b.disabled = true;
+      try {
+        const r = await fetch(`/api/admin/facture-cee/${encodeURIComponent(currentProspect)}/emettre`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(lire()) });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) { afficher('⚠ Rien n’a été émis : ' + escapeHtml(j.detail || ('erreur ' + r.status)), false); b.disabled = false; return; }
+        afficher(`✓ Facture <b data-fcee-emise>${escapeHtml(j.numero_facture)}</b> émise et verrouillée. Elle est dans « Factures délégataire ».`, true);
+        b.hidden = true; q('[data-fcee-apercu]').hidden = true; q('[data-fcee-annuler]').textContent = 'Fermer';
+        wrap.querySelectorAll('input, select, textarea').forEach(el => { el.disabled = true; });
+        refreshFacturesDelegataire();
+        window.open(`/api/admin/facture-cee/${encodeURIComponent(currentProspect)}/download?numero_facture=${encodeURIComponent(j.numero_facture)}`, '_blank');
+      } catch (e) { afficher('⚠ Le serveur n’a pas répondu : vérifiez la liste avant de réessayer.', false); b.disabled = false; }
+    });
+  }
+
   // Lot 7c : « Émettre la rectificative depuis un aperçu » — 1. importer le PDF et VÉRIFIER (le numéro qui sera
   // attribué s'affiche, rien n'est écrit) ; 2. CONFIRMER (le serveur inscrit ce numéro à la place de la marque).
   function ouvrirRectifDepuisApercu(orig) {
@@ -11069,6 +11246,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     await refreshDevisList();
     refreshNrpRelances();
     refreshFacturesList();
+    refreshFacturesDelegataire();
     await loadCategories();
     await refreshStatus();
     navToRoot();
@@ -14813,6 +14991,24 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
       <div class="adm-actions"><button type="button" class="adm-btn-save" id="adm-save-bonif">Enregistrer</button></div>
     </div>`;
   }
+  // Lot 11 : coordonnées de facturation du délégataire (facture CEE « Facturer le délégataire »)
+  const ADM_DEL_FACT = [['raison_sociale','Raison sociale','ex. ACE ENERGIE / MRA GROUPE'], ['forme','Forme','ex. SAS'],
+    ['nom_commercial','Nom commercial','ex. ECAIR'], ['adresse','Adresse','ex. 24 rue Marbeuf, 75008 Paris'],
+    ['immatriculation','SIREN / RCS','ex. SIREN 848 595 336'], ['tva','N° TVA intracommunautaire','ex. FR68 848 595 336'],
+    ['mandataire','Mandataire','ex. Mandataire de PICOTY'], ['contrat','Réf. contrat','ex. HXR-CTT00002'],
+    ['quote_parts','Quote-parts','60/40 = acompte 60 % puis solde 40 % · 100 = une facture'],
+    ['quote_parts_express','Quote-parts Traitement Express','ex. 40/60 (vide = pas d’option)'],
+    ['mention_express','Ligne Traitement Express','ex. Option Traitement Express : 200 € HT par dossier, facturée par ECAIR']];
+  function admDelFacturationHTML(f){
+    return `<details class="adm-del-fact"><summary>Facturation du délégataire (facture CEE)</summary><div class="adm-del-fact-grille">`
+      + ADM_DEL_FACT.map(([k, lab, ph]) => `<div class="adm-del-fact-champ"><div class="adm-del-fact-lab">${lab}</div><input type="text" data-del-fact="${k}" value="${adminEscape(f[k] || '')}" placeholder="${adminEscape(ph)}" aria-label="${adminEscape(lab)}"></div>`).join('')
+      + `</div></details>`;
+  }
+  function admDelFacturation(row){
+    const out = {};
+    row.querySelectorAll('[data-del-fact]').forEach(i => { out[i.dataset.delFact] = String(i.value || '').trim(); });
+    return out;
+  }
   function renderDelegatairesFields(){
     const cfg = M3_ADMIN || {};
     const delegataires = cfg.delegataires || [{nom:'PICOTY', mwh_precaire:12.5, mwh_classique:7.2, actif:true}];
@@ -14829,6 +15025,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
             <textarea class="adm-del-mention-texte" rows="4" placeholder="Mention CEE du devis et du pré-devis">${adminEscape(d.mention_devis || '')}</textarea>
             <p class="adm-opt2-note">Mention CEE du devis et du pré-devis quand ce délégataire est utilisé. Variables : {montant_cee} = prime CEE du devis (ex. 11 893,80) · {montant_cee_lettres} = la même en lettres.</p>
           </div>
+          ${admDelFacturationHTML(d.facturation || {})}
           <button type="button" class="adm-btn adm-btn-danger adm-del-remove">Supprimer</button>
         </div>`).join('')}
       </div>
@@ -16426,7 +16623,8 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
         actif: !!row.querySelector('.adm-del-actif')?.checked,
         usage: row.querySelector('.adm-del-usage')?.value || '',
         mention_titre: row.querySelector('.adm-del-mention-titre')?.value || '',
-        mention_devis: row.querySelector('.adm-del-mention-texte')?.value || ''
+        mention_devis: row.querySelector('.adm-del-mention-texte')?.value || '',
+        facturation: admDelFacturation(row)
       }));
       const r = await fetch('/api/admin/m3', { method:'POST', headers: window.adminHeaders(), body: JSON.stringify({ delegataires }) });
       if (r.ok) { M3_ADMIN.delegataires = delegataires; adminToast('✓ Paramètres enregistrés', '#0D6B3B'); window.dispatchEvent(new CustomEvent('hexa-config-changed')); }
@@ -16455,7 +16653,8 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
         actif: !!row.querySelector('.adm-del-actif')?.checked,
         usage: row.querySelector('.adm-del-usage')?.value || '',
         mention_titre: row.querySelector('.adm-del-mention-titre')?.value || '',
-        mention_devis: row.querySelector('.adm-del-mention-texte')?.value || ''
+        mention_devis: row.querySelector('.adm-del-mention-texte')?.value || '',
+        facturation: admDelFacturation(row)
       }));
       const modeles_email = Array.from(document.querySelectorAll('[data-email-i]')).map((card,i)=>({
         id: 'modele_' + (i+1),
@@ -20218,6 +20417,14 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
   .adm-delegataire-row > .adm-del-remove { grid-row: 1; grid-column: 6; }
   .adm-del-mention { grid-row: 2; grid-column: 2 / -1; display: flex; flex-direction: column; gap: 6px; margin: 0 0 10px; }
   .adm-del-mention textarea { width: 100%; font: inherit; font-size: 12.5px; }
+  /* Lot 11 : coordonnées de facturation du délégataire */
+  .adm-del-fact { grid-row: 3; grid-column: 2 / -1; margin: 0 0 12px; border: 1px solid #E2E8F0; border-radius: 8px; padding: 6px 10px; background: #F8FAFC; }
+  .adm-del-fact > summary { cursor: pointer; font-size: 12.5px; font-weight: 700; color: #002E5A; }
+  .adm-del-fact-grille { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px 12px; margin-top: 8px; }
+  .adm-del-fact-champ { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+  .adm-del-fact-lab { font-size: 11.5px; color: #475569; font-weight: 600; }
+  .adm-del-fact-champ:last-child { grid-column: 1 / -1; }
+  .adm-card .adm-del-fact-grille input[type=text] { width: 100%; text-align: left; font: inherit; font-size: 12.5px; box-sizing: border-box; }
   .p6-note-ecs { font-size: 13px; line-height: 18px; color: #334155; }   /* Lot 6d : phrase simple, plus d'alerte orange */
   .p6-fige-bandeau { display: none; flex: none; margin-left: auto; height: 24px; line-height: 22px; padding: 0 12px; border-radius: 12px;
     background: #FEF3C7; color: #92400E; border: 1px solid #F59E0B; font-size: 12px; font-weight: 800; white-space: nowrap; }
@@ -21313,6 +21520,28 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
   .devis-note-definitive[hidden] { display: none; }
   .devis-alerte-regulateur { padding: 9px 16px; background: #FEF3C7; border-bottom: 1px solid #FCD34D; color: #78350F; font-weight: 700; font-size: 13.5px; }
   .devis-alerte-regulateur[hidden] { display: none; }
+  /* Lot 11 : factures délégataire */
+  .fcee-tag { display: inline-block; margin-left: 6px; padding: 1px 8px; border-radius: 10px; font-size: 11px; font-weight: 800; vertical-align: 1px; }
+  .fcee-envoyee { background: #E0F2FE; color: #075985; }
+  .fcee-payee { background: #DCFCE7; color: #166534; }
+  .fcee-retard { background: #FEE2E2; color: #B91C1C; }
+  .docs-devis-row.fcee-row-retard { border-left: 3px solid #DC2626; padding-left: 8px; background: #FEF2F2; }
+  .fcee-suivi { align-items: center; flex-wrap: wrap; }
+  .fcee-suivi select, .fcee-suivi input[type=date] { font: inherit; font-size: 12px; height: 28px; }
+  .fcee-box { background: #fff; border-radius: 14px; padding: 20px; width: min(860px, 100%); max-height: 92vh; overflow: auto; display: grid; gap: 10px; color: #1A2233; }
+  .fcee-box h3 { margin: 0; font-size: 17px; color: #002E5A; }
+  .fcee-note { margin: 0; font-size: 12.5px; color: #475569; }
+  .fcee-box fieldset { border: 1px solid #E2E8F0; border-radius: 10px; padding: 8px 12px 10px; margin: 0; min-width: 0; }
+  .fcee-box legend { font-size: 12px; font-weight: 800; color: #002E5A; padding: 0 4px; }
+  .fcee-grille { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px 12px; }
+  .fcee-champ { display: flex; flex-direction: column; gap: 3px; font-size: 11.5px; color: #475569; min-width: 0; }
+  .fcee-champ input, .fcee-champ select, .fcee-champ textarea { font: inherit; font-size: 13px; color: #1A2233; padding: 5px 7px; border: 1px solid #CBD5E1; border-radius: 6px; min-width: 0; }
+  .fcee-check { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; color: #002E5A; }
+  .fcee-recap { margin-top: 8px; padding: 8px 10px; background: #F1F5F9; border-radius: 8px; font-size: 12.5px; line-height: 1.6; }
+  .fcee-res { padding: 8px 10px; border-radius: 8px; font-size: 13px; }
+  .fcee-res.ok { background: #DCFCE7; color: #166534; }
+  .fcee-res.ko { background: #FEE2E2; color: #B91C1C; }
+  @media (max-width: 640px) { .fcee-box { padding: 14px; } .fcee-grille { grid-template-columns: 1fr; } }
   .rectif-apercu-box { background: #fff; border-radius: 14px; padding: 20px; width: min(560px, 100%); max-height: 90vh; overflow: auto; display: grid; gap: 12px; color: #1A2233; }
   .rectif-apercu-box h3 { margin: 0; color: #002E5A; font-size: 17px; }
   .rectif-apercu-note { margin: 0; font-size: 13px; color: #475569; line-height: 1.5; }

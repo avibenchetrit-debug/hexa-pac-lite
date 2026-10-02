@@ -75,7 +75,7 @@ from services.service_devis import (
     _format_date_fr,
 )
 from services.backup_github import start_backup_scheduler
-from services import dpe_audit, valeur_dvf
+from services import dpe_audit, facture_cee, valeur_dvf
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 TEMPLATES_DIR = os.path.join(BASE_DIR, "templates")
@@ -100,6 +100,9 @@ DEVIS_DIR = os.path.join(DATA_DIR, "devis")
 DEVIS_META_PATH = os.path.join(DEVIS_DIR, "devis_meta.json")
 FACTURES_DIR = os.path.join(DATA_DIR, "factures")
 FACTURES_META_PATH = os.path.join(FACTURES_DIR, "factures_meta.json")
+# Lot 11 : factures CEE au délégataire (série FA-CEE, distincte des factures client)
+FACTURES_CEE_META_PATH = os.path.join(FACTURES_DIR, "factures_cee_meta.json")
+FACTURES_CEE_DIR = os.path.join(FACTURES_DIR, "cee")
 FICHES_DIR = os.path.join(DATA_DIR, "fiches_techniques")
 FICHES_INDEX_PATH = os.path.join(FICHES_DIR, "index.json")
 REPO_CATALOGUE_PATH = os.path.join(REPO_DATA_DIR, "catalogue_pac.json")
@@ -1198,15 +1201,26 @@ def _read_echanges():
     return echanges if isinstance(echanges, dict) else {}
 
 
+# Lot 11 : contrat cadre ECAIR, annexe 2 (RAI), mot pour mot ; [•] = {montant_cee}.
+MENTION_RAI_PICOTY_CONTRAT = (
+    "« Prime liée à la valorisation des certificats d’économies d’énergie versée par PICOTY, société au capital social "
+    "de 1 548 360,00 €, immatriculée au RCS de Guéret sous le n°777 347 386, dont le siège social est situé rue André et "
+    "Guy PICOTY – BP1 23300 LA SOUTERRAINE. Représentée par ECAIR, société au capital social de 132 970,00 €, "
+    "immatriculée au RCS de Bobigny sous le n° 952862670, dont le siège social est situé 5 RUE PLEYEL, 93200 SAINT-DENIS, "
+    "en qualité de mandataire, pour la somme de {montant_cee} euros »")
+# Le texte PICOTY d'avant le lot 11 : enregistré TEL QUEL dans l'admin, il est remplacé par celui du contrat.
+MENTION_PICOTY_AVANT_LOT11 = (
+    "Prime liée à la valorisation des certificats d'économies d'énergie versée par PICOTY, société au capital "
+    "social de 1 548 360,00 €, immatriculée au RCS de Guéret sous le n° 777 347 386, dont le siège social est "
+    "situé rue André et Guy PICOTY – BP1 23300 LA SOUTERRAINE. Représentée par ECAIR, société au capital social "
+    "de 132 970,00 €, immatriculée au RCS de Bobigny sous le n° 952 862 670, dont le siège social est situé "
+    "5 rue Pleyel, 93200 SAINT-DENIS, en qualité de mandataire, pour la somme de {montant_cee} euros.")
+
 # Lot 6e : mention CEE obligatoire du devis et du pré-devis, par délégataire (Admin → Délégataires CEE, modifiable).
 # Variables : {montant_cee} = prime CEE du devis en chiffres (« 11 893,80 ») ; {montant_cee_lettres} = en lettres.
 MENTION_CEE_DEFAUT = {
-    "PICOTY": ("Mention RAI — Partenaire Picoty",
-               "Prime liée à la valorisation des certificats d'économies d'énergie versée par PICOTY, société au capital "
-               "social de 1 548 360,00 €, immatriculée au RCS de Guéret sous le n° 777 347 386, dont le siège social est "
-               "situé rue André et Guy PICOTY – BP1 23300 LA SOUTERRAINE. Représentée par ECAIR, société au capital social "
-               "de 132 970,00 €, immatriculée au RCS de Bobigny sous le n° 952 862 670, dont le siège social est situé "
-               "5 rue Pleyel, 93200 SAINT-DENIS, en qualité de mandataire, pour la somme de {montant_cee} euros."),
+    # Lot 11 : texte EXACT de l'annexe 2 du contrat ECAIR (« strictement et sans modification »), guillemets compris
+    "PICOTY": ("Mention RAI — Partenaire Picoty", MENTION_RAI_PICOTY_CONTRAT),
     # Lot 7a (30/09/2026) : texte EXACT exigé par ACE, montant en chiffres (= la ligne « Prime CEE » du devis)
     "ACE": ("Mention RAI — Partenaire ACE Énergie",
             "« La présente offre comprend une prime de {montant_cee} € offerte par ACE ÉNERGIE (SIREN : 848 595 336) "
@@ -1268,10 +1282,17 @@ def _read_delegataires():
             d.setdefault("mention_devis", texte)
         if str(d.get("mention_devis") or "").strip() == MENTION_ACE_AVANT_LOT7A:
             d["mention_devis"] = MENTION_CEE_DEFAUT["ACE"][1]          # Lot 7a : texte exigé par ACE
+        if str(d.get("mention_devis") or "").strip() == MENTION_PICOTY_AVANT_LOT11:
+            d["mention_devis"] = MENTION_RAI_PICOTY_CONTRAT              # Lot 11 : texte du contrat ECAIR
+        # Lot 11 : coordonnées de facturation (facture CEE au délégataire), pré-remplies tant que l'admin ne les a pas saisies
+        enreg = d.get("facturation") if isinstance(d.get("facturation"), dict) else {}
+        d["facturation"] = {**facture_cee.facturation_par_defaut(d.get("nom")),
+                            **{k: v for k, v in enreg.items() if k in facture_cee.CHAMPS_FACTURATION}}
         out.append(d)
     if not any(usage_delegataire(d) == "tout_de_suite" for d in out):
         out.append({"nom": "ACE", "mwh_precaire": "", "mwh_classique": "", "actif": False, "usage": "tout_de_suite",
-                    "mention_titre": MENTION_CEE_DEFAUT["ACE"][0], "mention_devis": MENTION_CEE_DEFAUT["ACE"][1]})
+                    "mention_titre": MENTION_CEE_DEFAUT["ACE"][0], "mention_devis": MENTION_CEE_DEFAUT["ACE"][1],
+                    "facturation": facture_cee.facturation_par_defaut("ACE")})
     return out
 
 
@@ -4249,6 +4270,12 @@ async def post_admin_m3(request: Request) -> JSONResponse:
     _atomic_write_json(BAREMES_PATH, baremes)
     if isinstance(payload.get("delegataires"), list):
         delegataires = payload["delegataires"] or DEFAULT_DELEGATAIRES
+        # Lot 11 : une ligne envoyée sans coordonnées de facturation garde celles déjà enregistrées
+        avant = {str(d.get("nom") or "").strip().upper(): d.get("facturation") for d in _read_json(DELEGATAIRES_PATH, [])
+                 if isinstance(d, dict) and isinstance(d.get("facturation"), dict)}
+        for d in delegataires:
+            if isinstance(d, dict) and not isinstance(d.get("facturation"), dict) and str(d.get("nom") or "").strip().upper() in avant:
+                d["facturation"] = avant[str(d.get("nom") or "").strip().upper()]
         if not any(d.get("actif") for d in delegataires):
             delegataires[0]["actif"] = True
         _atomic_write_json(DELEGATAIRES_PATH, delegataires)
@@ -6274,6 +6301,214 @@ def stats_relances() -> JSONResponse:
             par_lead[numero] = {"pre_devis": pre, "devis": dev}
     return JSONResponse({"par_lead": par_lead})
 
+
+# ============ Lot 11 · FACTURE CEE AU DÉLÉGATAIRE (ACE ; ECAIR pour PICOTY) ============
+# Admin seulement (routes /api/admin/ : refus côté serveur pour un compte commercial, contrôlé aussi ici). Série
+# FA-CEE-AAAA-NNNN distincte des factures client, numéro GAPLESS (consommé après un PDF réussi). Une facture émise est
+# verrouillée : seul son suivi (envoyée / payée, date de paiement) change ensuite. Rien d'autre du dossier n'est touché.
+def _read_factures_cee_meta() -> dict:
+    meta = _read_json(FACTURES_CEE_META_PATH, {})
+    return meta if isinstance(meta, dict) else {}
+
+
+def _factures_cee(numero: str) -> list:
+    return [r for r in (_read_factures_cee_meta().get(numero) or []) if isinstance(r, dict)]
+
+
+def _delegataire_par_cle(cle: str) -> dict:
+    return next((d for d in _read_delegataires() if facture_cee.cle_delegataire(d.get("nom")) == cle), {}) or {}
+
+
+_VOLUME_CEE_IMPRIME = re.compile("Volume CEE \\((classique|précaire)\\) ([\\d   ]+) kWh cumac")
+
+
+def _facture_cee_preremplissage(numero: str) -> dict:
+    """Valeurs proposées (toutes modifiables) : prime CEE du devis signé (le devis de la facture client, à défaut le
+    dernier devis envoyé), délégataire nommé dans sa mention RAI, volume CEE imprimé sur ce devis (à défaut calculé),
+    prix unitaire du délégataire (Admin), coordonnées de facturation du délégataire."""
+    from services.marges_archive import montants_du_document, texte_html
+    prospect = _find_lead(numero)
+    if not prospect:
+        raise HTTPException(status_code=404, detail="Prospect introuvable")
+    prospect = _lead_for_response(prospect)
+    catalogue = _read_catalogue_pac()
+    admin = _admin_payload_with_m3()
+    state = dict(_load_state_simulateur(numero, prospect, catalogue) or {})
+    items = [x for x in _sent_devis_items(numero) if isinstance(x, dict)]
+    factures = [r for r in (_read_factures_meta().get(numero) or []) if isinstance(r, dict)]
+    ref = (factures[-1] if factures else {}).get("numero_devis_ref")
+    devis = next((x for x in reversed(items) if ref and x.get("numero_devis") == ref), None) or (items[-1] if items else None)
+    montants, texte, source = None, "", ""
+    if devis and devis.get("html_file") and os.path.exists(devis["html_file"]):
+        texte = re.sub(r"\s+", " ", texte_html(_read_text(devis["html_file"])))
+        montants = montants_du_document(texte)
+        source = f"devis {devis.get('numero_devis', '')}".strip()
+    if not montants:
+        calc = calculer_devis(prospect, state, admin, catalogue)
+        montants = {"cee": calc.get("montant_cee"), "delegataire": "PICOTY" if mode_cee(prospect, state, admin) == "attente" else "ACE"}
+        source = "calcul actuel du dossier (aucun devis envoyé lisible)"
+    cle = montants.get("delegataire") or ("PICOTY" if mode_cee(prospect, state, admin) == "attente" else "ACE")
+    deleg = _delegataire_par_cle(cle)
+    fact = dict(deleg.get("facturation") or facture_cee.facturation_par_defaut(cle))
+    vol = _VOLUME_CEE_IMPRIME.search(texte)
+    if vol:
+        type_vol, kwhc = vol.group(1), float(re.sub(r"\D", "", vol.group(2)) or 0)
+    else:
+        d = (calculer_cee_bar_th_171(prospect, state, admin, "attente" if cle == "PICOTY" else "tout_de_suite") or {}).get("details") or {}
+        type_vol, kwhc = str(d.get("type_prix") or "précaire"), round(float(d.get("kwhc") or 0) * float(d.get("bonification") or 1))
+    deja = _factures_cee(numero)
+    type_, pct = facture_cee.type_et_pourcentage(fact.get("quote_parts"), deja)
+    acompte = next((f.get("numero_facture") for f in reversed(deja) if f.get("type") == "acompte"), "")
+    cp_ville = " ".join(x for x in (str(prospect.get("cp_chantier") or prospect.get("code_postal_chantier") or "").strip(),
+                                    str(prospect.get("ville_chantier") or prospect.get("ville") or "").strip()) if x)
+    adresse = ", ".join(x for x in (str(prospect.get("adresse_chantier") or prospect.get("adresse") or "").strip(), cp_ville) if x)
+    mwh = round(kwhc / 1000, 3)
+    return {
+        "delegataire": cle, "source": source, "numero_devis": (devis or {}).get("numero_devis", ""),
+        "type": type_, "quote_part": pct, "quote_parts": fact.get("quote_parts") or "100",
+        "quote_parts_express": fact.get("quote_parts_express") or "", "option_express": False,
+        "mention_express": fact.get("mention_express") or "",
+        "date_facture": datetime.now(PARIS_TZ).strftime("%Y-%m-%d"), "echeance_jours": facture_cee.ECHEANCE_JOURS,
+        "ref_appel": "", "ref_contrat": fact.get("contrat") or "", "ref_operation": "",
+        "fiche": facture_cee.FICHE, "fiche_libelle": facture_cee.FICHE_LIBELLE,
+        "beneficiaire": " ".join(x for x in (str(prospect.get("nom") or "").strip().upper(), str(prospect.get("prenom") or "").strip()) if x),
+        "adresse_travaux": adresse,
+        "volume_precaire_mwh": mwh if type_vol == "précaire" else 0,
+        "volume_classique_mwh": mwh if type_vol != "précaire" else 0,
+        "prix_precaire": float_value(deleg.get("mwh_precaire"), 0), "prix_classique": float_value(deleg.get("mwh_classique"), 0),
+        "prime_operation": round(float(montants.get("cee") or 0), 2), "commission_operation": "",
+        "taux_tva": facture_cee.TAUX_TVA_COMMISSION,
+        "destinataire": {k: fact.get(k, "") for k in facture_cee.CHAMPS_DESTINATAIRE},
+        "mention_solde": facture_cee.mention_solde_defaut(type_, pct, acompte), "acompte_numero": acompte,
+    }
+
+
+_FACTURE_CEE_CHAMPS = ("type", "quote_part", "date_facture", "echeance_jours", "ref_appel", "ref_contrat", "ref_operation", "fiche",
+                       "fiche_libelle", "beneficiaire", "adresse_travaux", "volume_precaire_mwh", "volume_classique_mwh",
+                       "prix_precaire", "prix_classique", "prime_operation", "commission_operation", "taux_tva", "mention_solde",
+                       "mention_express", "option_express", "delegataire")
+
+
+def _facture_cee_formulaire(payload: dict) -> dict:
+    payload = payload if isinstance(payload, dict) else {}
+    f = {k: payload.get(k) for k in _FACTURE_CEE_CHAMPS}
+    f["option_express"] = str(f.get("option_express")).strip().lower() in ("1", "true", "oui", "on")
+    dest = payload.get("destinataire") if isinstance(payload.get("destinataire"), dict) else {}
+    f["destinataire"] = {k: str(dest.get(k) or "").strip() for k in facture_cee.CHAMPS_DESTINATAIRE}
+    return {k: (v.strip() if isinstance(v, str) else v) for k, v in f.items()}
+
+
+def _facture_cee_html(f: dict, numero_facture: str) -> str:
+    return templates.env.get_template("facture_cee.html").render(facture_cee.contexte(f, numero_facture))
+
+
+def _facture_cee_numero_suivant(counters: dict, annee: str) -> tuple:
+    seq = max(int(counters.get(f"facture_cee_{annee}") or 0), int(facture_cee.DEJA_EMISES.get(annee) or 0)) + 1
+    return seq, f"{facture_cee.SERIE}-{annee}-{seq:04d}"
+
+
+def _facture_cee_item(rec: dict) -> dict:
+    aujourd_hui = datetime.now(PARIS_TZ).strftime("%Y-%m-%d")
+    payee = rec.get("statut") == "payee"
+    item = {k: rec.get(k) for k in ("numero_facture", "type", "quote_part", "delegataire", "destinataire_nom", "ref_appel",
+                                    "ref_operation", "date_facture", "echeance", "statut", "date_paiement", "net_a_payer",
+                                    "created_at", "created_by")}
+    item["available"] = bool(rec.get("file") and os.path.exists(rec["file"]))
+    item["en_retard"] = (not payee) and bool(rec.get("echeance")) and aujourd_hui > str(rec.get("echeance"))
+    return item
+
+
+@app.get("/api/admin/facture-cee/{numero}")
+async def facture_cee_preremplir(numero: str, request: Request) -> JSONResponse:
+    _require_admin_session(request)
+    counters = _read_json(COUNTERS_PATH, {})
+    return JSONResponse({"formulaire": _facture_cee_preremplissage(numero),
+                         "factures": [_facture_cee_item(r) for r in _factures_cee(numero)],
+                         "prochain_numero": _facture_cee_numero_suivant(counters if isinstance(counters, dict) else {},
+                                                                        datetime.now(PARIS_TZ).strftime("%Y"))[1]})
+
+
+@app.post("/api/admin/facture-cee/{numero}/apercu")
+async def facture_cee_apercu(numero: str, request: Request) -> Response:
+    """Aperçu PDF (APERÇU, sans numéro) : rien n'est écrit, aucun numéro consommé."""
+    _require_admin_session(request)
+    if not _find_lead(numero):
+        raise HTTPException(status_code=404, detail="Prospect introuvable")
+    f = _facture_cee_formulaire(await _read_request_payload(request))
+    err = facture_cee.erreurs(f, pour_emettre=False)
+    if err:
+        raise HTTPException(status_code=400, detail=" ".join(err))
+    from services.pdf_chromium import html_vers_pdf, OPTIONS_SANS_PIED
+    pdf = await run_in_threadpool(html_vers_pdf, _facture_cee_html(f, ""), OPTIONS_SANS_PIED)
+    return Response(pdf, media_type="application/pdf", headers={"Content-Disposition": 'inline; filename="apercu-facture-cee.pdf"'})
+
+
+@app.post("/api/admin/facture-cee/{numero}/emettre")
+async def facture_cee_emettre(numero: str, request: Request) -> JSONResponse:
+    user = _require_admin_session(request)
+    if not _find_lead(numero):
+        raise HTTPException(status_code=404, detail="Prospect introuvable")
+    f = _facture_cee_formulaire(await _read_request_payload(request))
+    err = facture_cee.erreurs(f, pour_emettre=True)
+    if err:
+        raise HTTPException(status_code=400, detail=" ".join(err))
+    from services.pdf_chromium import html_vers_pdf, OPTIONS_SANS_PIED
+    annee = facture_cee.date_iso(f.get("date_facture")).strftime("%Y")
+    with _facture_lock:
+        counters = _read_json(COUNTERS_PATH, {"dossier": 0})
+        if not isinstance(counters, dict):
+            counters = {"dossier": 0}
+        seq, numero_facture = _facture_cee_numero_suivant(counters, annee)
+        pdf = html_vers_pdf(_facture_cee_html(f, numero_facture), OPTIONS_SANS_PIED)       # AVANT tout commit
+        dest = f["destinataire"].get("nom_commercial") or f["destinataire"].get("raison_sociale") or ""
+        nom = re.sub(r"[^A-Za-z0-9_.-]+", "_", f"{numero_facture}_{dest}_{f.get('ref_operation') or numero}").strip("_") + ".pdf"
+        path = _write_pdf(os.path.join(FACTURES_CEE_DIR, re.sub(r"[^A-Za-z0-9_-]", "_", numero), nom), pdf)
+        counters[f"facture_cee_{annee}"] = seq
+        _atomic_write_json(COUNTERS_PATH, counters)
+        c = facture_cee.calculer(f)
+        rec = {"numero_facture": numero_facture, "type": f.get("type"), "quote_part": c["quote_part"],
+               "delegataire": facture_cee.cle_delegataire(f.get("delegataire")), "destinataire_nom": dest,
+               "ref_appel": f.get("ref_appel"), "ref_operation": f.get("ref_operation"), "date_facture": f.get("date_facture"),
+               "echeance": facture_cee.echeance(f.get("date_facture"), f.get("echeance_jours")),
+               "statut": "envoyee", "date_paiement": "", "net_a_payer": c["net_a_payer"], "montants": c, "formulaire": f,
+               "file": path, "created_at": _now_iso(), "created_by": (user or {}).get("username", ""), "verrouillee": True}
+        meta = _read_factures_cee_meta()
+        meta.setdefault(numero, []).append(rec)
+        _atomic_write_json(FACTURES_CEE_META_PATH, meta)
+    return JSONResponse({"success": True, "numero_facture": numero_facture, "facture": _facture_cee_item(rec)})
+
+
+@app.post("/api/admin/facture-cee/{numero}/suivi")
+async def facture_cee_suivi(numero: str, request: Request) -> JSONResponse:
+    """Suivi : « Envoyée » ou « Payée » (avec la date de paiement). Le PDF et les montants ne changent jamais."""
+    _require_admin_session(request)
+    payload = await _read_request_payload(request)
+    statut = str(payload.get("statut") or "").strip()
+    if statut not in ("envoyee", "payee"):
+        raise HTTPException(status_code=400, detail="Statut inconnu (envoyée ou payée)")
+    date_paiement = str(payload.get("date_paiement") or "").strip()[:10]
+    if statut == "payee" and not re.match(r"^\d{4}-\d{2}-\d{2}$", date_paiement):
+        raise HTTPException(status_code=400, detail="Renseignez la date de paiement")
+    with _facture_lock:
+        meta = _read_factures_cee_meta()
+        rec = next((r for r in (meta.get(numero) or []) if isinstance(r, dict)
+                    and r.get("numero_facture") == str(payload.get("numero_facture") or "")), None)
+        if not rec:
+            raise HTTPException(status_code=404, detail="Facture introuvable")
+        rec["statut"], rec["date_paiement"] = statut, (date_paiement if statut == "payee" else "")
+        rec["suivi_maj"] = _now_iso()
+        _atomic_write_json(FACTURES_CEE_META_PATH, meta)
+    return JSONResponse({"success": True, "facture": _facture_cee_item(rec)})
+
+
+@app.get("/api/admin/facture-cee/{numero}/download")
+async def facture_cee_download(numero: str, numero_facture: str, request: Request):
+    _require_admin_session(request)
+    rec = next((r for r in _factures_cee(numero) if r.get("numero_facture") == numero_facture), None)
+    if not rec or not rec.get("file") or not os.path.exists(rec["file"]):
+        raise HTTPException(status_code=404, detail="Facture introuvable")
+    return FileResponse(rec["file"], media_type="application/pdf", filename=os.path.basename(rec["file"]),
+                        content_disposition_type="inline")
 
 @app.get("/api/factures/{numero}/list")
 async def list_factures(numero: str) -> JSONResponse:

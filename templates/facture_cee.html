@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Facture {{ numero }}</title>
+<style>
+  /* Lot 11 : mise en page de FA-CEE-2026-0001 (mesures relevées sur le PDF, en points). */
+  @page { size: A4; margin: 0; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body { font-family: Arial, "Liberation Sans", Helvetica, sans-serif; color: #1f2a37; font-size: 7.2pt; line-height: 1.4;
+         -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .page { position: relative; width: 595.3pt; height: 841.9pt; padding: 39.8pt 39.5pt 0 39.8pt; overflow: hidden; }
+  .entete { display: flex; justify-content: space-between; align-items: flex-start; height: 49.8pt; }
+  .logo { height: 29pt; width: auto; display: block; margin-top: 0.2pt; }
+  .titre { text-align: right; }
+  .titre h1 { margin: 1pt 0 0; font-size: 16.5pt; line-height: 1.15; font-weight: 700; color: #002e5a; letter-spacing: 0.01em; }
+  .titre .num { margin-top: 5.2pt; font-size: 8.2pt; font-weight: 700; color: #e2214b; }
+  .num.apercu { letter-spacing: 0.02em; }
+  .parties { display: flex; justify-content: space-between; }
+  .carte { width: 252pt; border: 0.75pt solid #e1e5eb; border-radius: 4pt; padding: 7.6pt 10pt 8pt; }
+  .parties .carte { height: 101.3pt; }
+  .lab { font-size: 6pt; font-weight: 700; color: #8a92a0; text-transform: uppercase; letter-spacing: 0.09em; }
+  .carte .nom { margin-top: 3.4pt; font-size: 7.9pt; font-weight: 700; color: #002e5a; }
+  .carte .lignes { margin-top: 1.5pt; line-height: 10.2pt; }
+  .infos { display: flex; margin-top: 11.2pt; min-height: 30.8pt; border: 0.75pt solid #e1e5eb; border-radius: 4pt; }
+  .infos > div { flex: 1 1 0; padding: 4.6pt 8pt 3pt; }
+  .infos > div + div { border-left: 0.75pt solid #e1e5eb; }
+  .infos .k { font-size: 6pt; color: #8a92a0; text-transform: uppercase; letter-spacing: 0.08em; }
+  .infos .v { margin-top: 1.2pt; font-size: 7.5pt; font-weight: 700; color: #002e5a; }
+  .nature { margin-top: 10.9pt; background: #f4f6f9; border-radius: 4pt; padding: 7pt 10pt 6.4pt; }
+  .nature table { border-collapse: collapse; }
+  .nature td { padding: 0; height: 14pt; vertical-align: top; }
+  .nature td.k { width: 76pt; color: #8a92a0; }
+  .nature b { color: #002e5a; }
+  table.lignes { width: 100%; margin-top: 9pt; border-collapse: collapse; table-layout: fixed; }
+  table.lignes th { background: #002e5a; color: #fff; font-size: 6.2pt; font-weight: 700; text-transform: uppercase;
+                    letter-spacing: 0.04em; text-align: right; padding: 0 4pt; height: 28.6pt; line-height: 9pt; }
+  table.lignes th:first-child { text-align: left; }
+  table.lignes td { padding: 6pt 4pt 0; height: 43pt; vertical-align: top; text-align: right; border-bottom: 0.75pt solid #e1e5eb; }
+  table.lignes td:first-child { text-align: left; }
+  td .t { font-weight: 700; color: #002e5a; }
+  td .s { margin-top: 2.8pt; font-size: 6.5pt; color: #6b7480; line-height: 9pt; padding-right: 30pt; }
+  .bas-tableau { display: flex; justify-content: space-between; align-items: flex-start; margin-top: 7.5pt; }
+  table.recap { width: 201.7pt; border-collapse: collapse; font-size: 6.6pt; table-layout: fixed; }
+  table.recap th { background: #f4f6f9; color: #4a5567; font-weight: 700; height: 17.3pt; padding: 0 4pt; text-align: right; }
+  table.recap td { height: 18pt; padding: 0 4pt; text-align: right; border-bottom: 0.75pt solid #e1e5eb; }
+  table.recap th:first-child, table.recap td:first-child { text-align: left; padding-left: 6pt; }
+  .totaux { width: 172.6pt; }
+  .totaux .l { display: flex; justify-content: space-between; height: 18pt; padding: 0 0 0 8pt; align-items: center; }
+  .totaux .l span:first-child { color: #4a5567; }
+  .totaux .l span:last-child { padding-right: 8.5pt; }
+  .net { display: flex; height: 24.7pt; margin-top: 0.8pt; background: #002e5a; color: #fff; font-size: 8.6pt; font-weight: 700; }
+  .net span { display: flex; align-items: center; }
+  .net span:first-child { width: 96.8pt; padding-left: 8pt; }
+  .net span:last-child { flex: 1; justify-content: flex-end; padding-right: 8.5pt; border-left: 0.75pt solid rgba(255,255,255,0.18); }
+  .mentions { margin-top: 9pt; background: #fff7f9; border-left: 2.2pt solid #e2214b; padding: 5.8pt 10pt 5pt 8pt;
+              font-size: 6.8pt; line-height: 10.8pt; min-height: 33pt; }
+  .reglement { display: flex; justify-content: space-between; margin-top: 9.4pt; }
+  .reglement .carte { min-height: 121.5pt; padding-top: 7.8pt; }
+  .rib { margin-top: 5pt; border-collapse: collapse; }
+  .rib td { padding: 0 0 0 1pt; vertical-align: middle; height: 14.6pt; line-height: 10.5pt; }
+  .rib td.k { width: 63pt; padding-right: 12pt; color: #8a92a0; }
+  .rib .iban { font-size: 7.9pt; font-weight: 700; color: #002e5a; }
+  .cond { margin-top: 4pt; font-size: 6.1pt; line-height: 8.6pt; color: #6b7480; }
+  .cond p { margin: 0 0 2pt; }
+  .notes { margin-top: 8pt; font-size: 6.1pt; color: #6b7480; line-height: 9.5pt; }
+  .pied { position: absolute; left: 39.8pt; right: 40.3pt; top: 783.8pt; border-top: 0.75pt solid #e1e5eb; padding-top: 4pt;
+          text-align: center; font-size: 5.5pt; color: #8a92a0; }
+  .filigrane { position: absolute; left: 0; right: 0; top: 380pt; text-align: center; font-size: 72pt; font-weight: 700;
+               color: rgba(226, 33, 75, 0.07); transform: rotate(-28deg); pointer-events: none; }
+</style>
+</head>
+<body>
+<div class="page">
+  {% if apercu %}<div class="filigrane" data-apercu>APERÇU</div>{% endif %}
+  <div class="entete">
+    {% include "_logo_hexa.svg" %}
+    <div class="titre">
+      <h1>{{ titre }}</h1>
+      <div class="num{% if apercu %} apercu{% endif %}" data-numero>{% if apercu %}{{ numero }}{% else %}N° {{ numero }}{% endif %}</div>
+    </div>
+  </div>
+
+  <div class="parties">
+    <div class="carte">
+      <div class="lab">Émetteur (vendeur)</div>
+      <div class="nom">{{ emetteur.nom }}</div>
+      <div class="lignes">{% for l in emetteur.lignes %}<div>{{ l }}</div>{% endfor %}</div>
+    </div>
+    <div class="carte">
+      <div class="lab">Client (acheteur)</div>
+      <div class="nom" data-client>{{ client_nom }}</div>
+      <div class="lignes">{% for l in client_lignes %}<div>{{ l }}</div>{% endfor %}</div>
+    </div>
+  </div>
+
+  <div class="infos">
+    <div><div class="k">Date de facture</div><div class="v">{{ date_facture }}</div></div>
+    <div><div class="k">Échéance</div><div class="v">{{ echeance }}</div></div>
+    <div><div class="k">Réf. appel à facturation</div><div class="v">{{ ref_appel }}</div></div>
+    <div><div class="k">Réf. contrat</div><div class="v">{{ ref_contrat }}</div></div>
+  </div>
+
+  <div class="nature">
+    <table>
+      <tr><td class="k">Nature</td><td>{{ nature }}</td></tr>
+      <tr><td class="k">Référence opération</td><td><b>{{ ref_operation }}</b> · {{ fiche }}</td></tr>
+      <tr><td class="k">Bénéficiaire</td><td>{{ beneficiaire }}</td></tr>
+      <tr><td class="k">Volume CEE</td><td>{{ volume }}</td></tr>
+    </table>
+  </div>
+
+  <table class="lignes">
+    <colgroup><col style="width:150.7pt"><col style="width:102.7pt"><col style="width:48.8pt"><col style="width:50.2pt">
+      <col style="width:57pt"><col style="width:52.6pt"><col style="width:54pt"></colgroup>
+    <tr><th>Désignation</th><th>Montant total<br>opération HT</th><th>Quote-<br>part</th><th>Montant<br>HT</th><th>TVA</th>
+      <th>Montant<br>TVA</th><th>Montant<br>TTC</th></tr>
+    {% for l in lignes %}
+    <tr><td><div class="t">{{ l.titre }}</div><div class="s">{{ l.sous }}</div></td><td>{{ l.total }}</td><td>{{ l.pct }}</td>
+      <td>{{ l.ht }}</td><td>{{ l.tva_taux }}</td><td>{{ l.tva }}</td><td>{{ l.ttc }}</td></tr>
+    {% endfor %}
+  </table>
+
+  <div class="bas-tableau">
+    <table class="recap">
+      <colgroup><col style="width:66pt"><col style="width:43.4pt"><col style="width:39.8pt"><col style="width:52.5pt"></colgroup>
+      <tr><th>Récapitulatif TVA</th><th>Base HT</th><th>Taux</th><th>Montant TVA</th></tr>
+      {% for r in recap %}<tr><td>{{ r.lib }}</td><td>{{ r.base }}</td><td>{{ r.taux }}</td><td>{{ r.tva }}</td></tr>{% endfor %}
+    </table>
+    <div class="totaux">
+      <div class="l"><span>Total HT</span><span>{{ total_ht }}</span></div>
+      <div class="l"><span>Total TVA</span><span>{{ total_tva }}</span></div>
+      <div class="l"><span>Total TTC</span><span>{{ total_ttc }}</span></div>
+      <div class="net"><span>NET À PAYER</span><span data-net>{{ net_a_payer }}</span></div>
+    </div>
+  </div>
+
+  <div class="mentions">{% for m in mention_tva %}<div>{{ m }}</div>{% endfor %}</div>
+
+  <div class="reglement">
+    <div class="carte">
+      <div class="lab">Règlement par virement</div>
+      <table class="rib">
+        <tr><td class="k">Titulaire</td><td>{{ rib.titulaire }}</td></tr>
+        <tr><td class="k">IBAN</td><td class="iban">{{ rib.iban }}</td></tr>
+        <tr><td class="k">BIC</td><td>{{ rib.bic }}</td></tr>
+        <tr><td class="k">Banque</td><td>{{ rib.banque }}</td></tr>
+        <tr><td class="k">Libellé à indiquer</td><td data-libelle>{{ libelle_virement }}</td></tr>
+      </table>
+    </div>
+    <div class="carte">
+      <div class="lab">Conditions de paiement</div>
+      <div class="cond">{% for c in conditions %}<p>{{ c }}</p>{% endfor %}</div>
+    </div>
+  </div>
+
+  {% if notes_bas %}<div class="notes">{% for n in notes_bas %}<div>{{ n }}</div>{% endfor %}</div>{% endif %}
+
+  <div class="pied">{{ pied }}</div>
+</div>
+</body>
+</html>
