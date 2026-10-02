@@ -42,14 +42,14 @@ def _boites(pdf: bytes):
     return boite("Opération n°"), boite("Numéro de dossier"), boite("Fourniture")
 
 
-@pytest.mark.parametrize("quoi", ["devis", "facture"])
+@pytest.mark.parametrize("quoi", ["devis", "pre_devis", "facture"])        # Lot 8c : le pré-devis aussi
 def test_solution_chauffage_meme_largeur_que_ses_voisins(requete, quoi):
     docs._preparer()
     if quoi == "facture":
         html = main._render_facture_html(None, docs.LEAD["numero"], "FA-2099-0001", "DE2099-0001-1", "2026-07-30")
     else:
         html = main.templates.env.get_template("devis_pac.html").render(
-            main._build_devis_context(None, docs.LEAD["numero"], avec_sous_traitant=True))
+            main._build_devis_context(None, docs.LEAD["numero"], avec_sous_traitant=(quoi == "devis")))
     note, dessus, dessous = _boites(main._html_to_pdf_playwright(html, requete))
     for voisin in (dessus, dessous):
         assert abs(note.x0 - voisin.x0) < 1 and abs(note.x1 - voisin.x1) < 1, (note, voisin)
