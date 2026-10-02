@@ -111,6 +111,10 @@ derrière la connexion ; `/api/...` répond 401 même pour une route inexistante
   PDF dans `factures/cee/`), seul le suivi envoyée / payée change. Mise en page = FA-CEE-2026-0001 (sans le pied de page
   commun : `OPTIONS_SANS_PIED`). Mention RAI PICOTY = annexe 2 du contrat ECAIR mot pour mot (`MENTION_RAI_PICOTY_CONTRAT`),
   devis / pré-devis / factures neufs seulement ; les documents archivés ne sont jamais régénérés.
+- **Lot 11b** : tarif et contrat du formulaire = ceux de l'admin pour le délégataire (changement appliqué aux nouvelles
+  factures) ; une facture de solde reprend de l'acompte émis dans le CRM tarif, contrat, volume, délégataire, destinataire
+  (`REPRIS_DE_L_ACOMPTE`), quote-part = 100 % − acompte (acompte hors CRM : saisie manuelle). Tarif précarité PICOTY
+  12,5 -> 12,7 €/MWhc par `_migrate_lot11b`, une seule fois (marque `params.tarif_picoty_lot11b`).
 - **Verrou « dossier facturé »** : installation finie ou facture émise → `dossier_fige` (jamais stocké), toute écriture du
   lead / du simulateur refusée en 423, fiche en lecture seule ; le devis et la note de dim servis sont ceux archivés à
   l'envoi (`data/devis/devis_meta.json`), rien n'est régénéré.

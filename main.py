@@ -113,7 +113,7 @@ DOCUMENTS_DIR = os.path.join(DATA_DIR, "documents")
 CATALOGUE_BACKUP_DIR = os.path.join(DATA_DIR, "backups", "catalogue")
 
 DEFAULT_DELEGATAIRES = [
-    {"nom": "PICOTY", "mwh_precaire": 12.50, "mwh_classique": 7.20, "actif": True}
+    {"nom": "PICOTY", "mwh_precaire": 12.70, "mwh_classique": 7.20, "actif": True}   # Lot 11b : contrat ECAIR
 ]
 DEFAULT_MODELES_EMAIL = [
     {
@@ -1065,6 +1065,31 @@ def _migrate_lot10() -> list:
     return corriges
 
 
+def _migrate_lot11b() -> bool:
+    """Lot 11b, au démarrage, UNE fois (marque params.tarif_picoty_lot11b : une valeur changée ensuite dans l'admin n'est
+    jamais réécrasée) : tarif précarité PICOTY 12,5 -> 12,7 €/MWhc (contrat ECAIR, annexe financière). Classique inchangé.
+    Seuls les nouveaux calculs changent : devis, factures et documents archivés ne sont jamais régénérés."""
+    brut = _read_json(PARAMETRES_ADMIN_PATH, {})
+    if not isinstance(brut, dict):
+        return False
+    params = brut.setdefault("params", {}) if isinstance(brut.get("params", {}), dict) else None
+    if params is None or params.get("tarif_picoty_lot11b"):
+        return False
+    delegataires = _read_json(DELEGATAIRES_PATH, None)
+    change = False
+    if isinstance(delegataires, list):
+        for d in delegataires:
+            if isinstance(d, dict) and facture_cee.cle_delegataire(d.get("nom")) == "PICOTY" and float_value(d.get("mwh_precaire"), 0) == 12.5:
+                d["mwh_precaire"] = 12.7
+                change = True
+        if change:
+            _atomic_write_json(DELEGATAIRES_PATH, delegataires)
+            print("[cee] lot 11b : tarif précarité PICOTY 12,5 -> 12,7 €/MWhc")
+    params["tarif_picoty_lot11b"] = True
+    _atomic_write_json(PARAMETRES_ADMIN_PATH, brut)
+    return change
+
+
 def _migrate_lot10c() -> list:
     """Lot 10c, au démarrage, idempotent : groupes extérieurs des Ariston DUO (poids, dimensions) corrigés d'après la doc
     Ariston « Doc Pro Nimbus Plus Net R32 » (services/import_catalogue_pac.CORRECTIONS_ARISTON_DUO). Rend les réf. corrigées."""
@@ -2010,6 +2035,7 @@ async def startup_event():
     _migrate_lot9()
     _migrate_lot10()
     _migrate_lot10c()
+    _migrate_lot11b()
     _admin_password()
     start_backup_scheduler(DATA_DIR)
     start_relances_scheduler()
@@ -6363,7 +6389,7 @@ def _facture_cee_preremplissage(numero: str) -> dict:
                                     str(prospect.get("ville_chantier") or prospect.get("ville") or "").strip()) if x)
     adresse = ", ".join(x for x in (str(prospect.get("adresse_chantier") or prospect.get("adresse") or "").strip(), cp_ville) if x)
     mwh = round(kwhc / 1000, 3)
-    return {
+    out = {
         "delegataire": cle, "source": source, "numero_devis": (devis or {}).get("numero_devis", ""),
         "type": type_, "quote_part": pct, "quote_parts": fact.get("quote_parts") or "100",
         "quote_parts_express": fact.get("quote_parts_express") or "", "option_express": False,
@@ -6381,6 +6407,18 @@ def _facture_cee_preremplissage(numero: str) -> dict:
         "destinataire": {k: fact.get(k, "") for k in facture_cee.CHAMPS_DESTINATAIRE},
         "mention_solde": facture_cee.mention_solde_defaut(type_, pct, acompte), "acompte_numero": acompte,
     }
+    # Lot 11b : solde d'un acompte émis dans le CRM -> mêmes tarif, contrat, volume, délégataire et destinataire que
+    # l'acompte (pas le tarif actuel de l'admin) ; quote-part = 100 % − acompte(s). Acompte hors CRM : rien d'automatique.
+    rec = next((f for f in reversed(deja) if f.get("type") == "acompte" and isinstance(f.get("formulaire"), dict)), None)
+    if rec:
+        for k in facture_cee.REPRIS_DE_L_ACOMPTE:
+            if k in rec["formulaire"]:
+                out[k] = rec["formulaire"][k]
+        out["delegataire"] = facture_cee.cle_delegataire(out.get("delegataire")) or cle
+        pe = (_delegataire_par_cle(out["delegataire"]).get("facturation") or {}).get("quote_parts_express") or ""
+        out.update(quote_parts_express=pe if out.get("option_express") else out["quote_parts_express"],
+                   source=f"facture d'acompte {acompte}")
+    return out
 
 
 _FACTURE_CEE_CHAMPS = ("type", "quote_part", "date_facture", "echeance_jours", "ref_appel", "ref_contrat", "ref_operation", "fiche",

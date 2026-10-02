@@ -76,12 +76,18 @@ def type_et_pourcentage(quote_parts, deja: list) -> tuple:
     """Type et % proposés : 1re facture = acompte (ou totalité si une seule part) ; ensuite le solde restant.
     `deja` = factures déjà émises pour l'opération (types et %)."""
     p = parts(quote_parts)
+    acomptes = [float(f.get("quote_part") or 0) for f in deja if f.get("type") == "acompte"]
+    if acomptes:                                     # Lot 11b : un acompte émis dans le CRM -> le solde restant
+        return "solde", round(max(0.0, 100.0 - sum(acomptes)), 2)
     if len(p) == 1:
         return "totalite", p[0]
-    acomptes = [float(f.get("quote_part") or 0) for f in deja if f.get("type") == "acompte"]
-    if not acomptes:
-        return "acompte", p[0]
-    return "solde", round(max(0.0, 100.0 - sum(acomptes)), 2)
+    return "acompte", p[0]
+
+
+# Lot 11b : ce que la facture de solde reprend de la facture d'acompte émise dans le CRM (toujours modifiable ensuite)
+REPRIS_DE_L_ACOMPTE = ("delegataire", "prix_precaire", "prix_classique", "ref_contrat", "volume_precaire_mwh", "volume_classique_mwh",
+                       "destinataire", "option_express", "mention_express", "ref_operation", "fiche", "fiche_libelle",
+                       "beneficiaire", "adresse_travaux", "prime_operation", "commission_operation", "taux_tva")
 
 
 def _f(v) -> float:
