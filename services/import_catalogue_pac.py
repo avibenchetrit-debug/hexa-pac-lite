@@ -133,8 +133,44 @@ def _parse_sheet(ws, warnings):
                 for r in spec_rows
             ],
         }
+        corriger_groupes_exterieurs_ariston(model)           # Lot 10c : même correction qu'à la migration
         out.append(model)
     return out
+
+
+# Lot 10c — groupes extérieurs des Ariston Nimbus COMPACT (DUO). Source : Ariston, « Doc Pro Nimbus Plus Net R32 »
+# (BD 03 2023), tableau UNITÉ EXTÉRIEURE : poids 83 kg (groupe 80, réf. 3301888), 111 kg (120 / 120 T, réf. 3302222 /
+# 3302223), 119 kg (150 / 150 T, réf. 3302224 / 3302225) ; dimensions 1016 x 1106 x 380 (80) et 1016 x 1506 x 380
+# (120 et 150). Les DUO utilisent les mêmes groupes extérieurs (80 / 120 / 150 S NET). Une valeur n'est corrigée que si
+# elle est encore l'ancienne valeur fausse (une valeur ressaisie ensuite n'est jamais réécrasée).
+POIDS_EXT = "Poids module ext. en fonction (kg)"
+DIM_EXT = "Dimensions groupe extérieur (HxLxP) (mm)"
+_DIM_120_150 = ("1106 x 1016 x 380", "1506 x 1016 x 380")
+CORRECTIONS_ARISTON_DUO = {
+    "ARI-NIMBUS-NET-R32-DUO-12": {POIDS_EXT: ("83", "111"), DIM_EXT: _DIM_120_150},
+    "ARI-NIMBUS-NET-R32-DUO-15": {DIM_EXT: _DIM_120_150},                    # poids 119 déjà juste
+    "ARI-NIMBUS-NET-R32-DUO-12 TRI": {POIDS_EXT: (None, "111"), DIM_EXT: _DIM_120_150},   # None : ligne absente
+    "ARI-NIMBUS-NET-R32-DUO-15 TRI": {POIDS_EXT: ("83", "119"), DIM_EXT: _DIM_120_150},
+}
+
+
+def corriger_groupes_exterieurs_ariston(model: dict) -> bool:
+    """Applique CORRECTIONS_ARISTON_DUO à un modèle (en place). True si quelque chose a changé. Idempotent."""
+    regles = CORRECTIONS_ARISTON_DUO.get(str(model.get("ref") or "").strip())
+    specs = model.get("description_specs")
+    if not regles or not isinstance(specs, list):
+        return False
+    change = False
+    for champ, (ancien, nouveau) in regles.items():
+        ligne = next((s for s in specs if isinstance(s, dict) and str(s.get("champ") or "").strip() == champ), None)
+        if ligne is not None and str(ligne.get("valeur") or "").strip() == ancien:
+            ligne["valeur"] = nouveau
+            change = True
+        elif ligne is None and ancien is None:                       # ligne absente : placée avant les dimensions
+            i = next((k for k, s in enumerate(specs) if isinstance(s, dict) and s.get("champ") == DIM_EXT), len(specs))
+            specs.insert(i, {"champ": champ, "valeur": nouveau})
+            change = True
+    return change
 
 
 def parse_catalogue_xlsx_report(source):
