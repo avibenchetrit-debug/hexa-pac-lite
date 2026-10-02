@@ -16,7 +16,7 @@ from datetime import date, timedelta
 
 REPO = sys.argv[1] if len(sys.argv) > 1 else os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TMP = tempfile.mkdtemp(prefix="hexa-e2e-")
-os.environ.update(DATA_DIR=TMP, USERS_PATH=os.path.join(TMP, "users.json"), AUTH_ENFORCE="0", RESEND_API_KEY="cle-factice-locale")
+os.environ.update(DATA_DIR=TMP, USERS_PATH=os.path.join(TMP, "users.json"), AUTH_ENFORCE=os.environ.get("E2E_AUTH", "0"), RESEND_API_KEY="cle-factice-locale")
 os.environ.pop("RAILWAY_ENVIRONMENT", None)
 os.chdir(REPO)
 sys.path.insert(0, REPO)
@@ -47,7 +47,7 @@ valeur_dvf.prix_m2 = lambda *a, **k: {"ok": True, "prix_m2": 10500, "q1": 9250, 
 main._atomic_write_json(main.DELEGATAIRES_PATH, [{"nom": "PICOTY", "mwh_precaire": 12.5, "mwh_classique": 7.2, "actif": False},
                                                  {"nom": "ACE", "mwh_precaire": 14, "mwh_classique": 7.5, "actif": True}])
 main._write_users([{"id": "testeur", "username": "testeur", "password_hash": main._hash_password("essai-local"),
-                    "role": "admin", "actif": True, "cree_at": main._now_iso(), "visibilite": "tous"}])
+                    "role": os.environ.get("E2E_ROLE", "admin"), "actif": True, "cree_at": main._now_iso(), "visibilite": "tous"}])
 
 with socket.socket() as so:
     so.bind(("127.0.0.1", 0))
@@ -114,6 +114,10 @@ with sync_playwright() as p:
     pg.goto(BASE + "/login")
     pg.fill("#username", "testeur"); pg.fill("#password", "essai-local"); pg.click("#login-btn")
     pg.wait_for_url(lambda u: "/login" not in u)
+    # Contrôle d'accès actif (E2E_AUTH=1) : le cookie de session est « Secure » ; Chromium l'envoie à 127.0.0.1 en http,
+    # pas le client de requêtes de Playwright (vérifications du script) -> même cookie, sans Secure, pour celui-ci.
+    if os.environ.get("E2E_AUTH") == "1":
+        ctx.add_cookies([dict(c, secure=False) for c in ctx.cookies() if c["name"] == main.SESSION_COOKIE])
     etat = {}
 
     def aller(n):

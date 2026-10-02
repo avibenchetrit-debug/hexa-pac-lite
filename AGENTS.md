@@ -81,6 +81,12 @@ derrière la connexion ; `/api/...` répond 401 même pour une route inexistante
   polices chargées avant d'imprimer, cache par empreinte SHA-256 du HTML final (+ version du rendu) : tout changement
   du HTML régénère ; un PDF sans police Inter n'est jamais mis en cache. Libellés de fiche produit jamais coupés
   (sauf rectificative d'une facture d'avant le lot 8f : `specs_libelles_tronques`, marque `mise_en_page` = `lot8f`).
+- **Lot 9b (droits)** : ce qui permet de calculer une marge est réservé aux admins côté serveur. Toutes les routes
+  `/api/admin/*` refusent un commercial (403), sauf les lectures du parcours `m3`, `marques`, `config`. Pour un
+  commercial, `GET /api/catalogue-pac` retire `achat`, `cout*`, `cession*`, `surplus*`, `marge*`, `taux_marge*`,
+  `positionnement*` (`_sans_couts_modele`) et `m3` retire le coût d'achat des ballons. Le tarif €/MWh des délégataires
+  reste lisible (décision : il sert au calcul de la prime CEE à l'écran). L'état de la régie est lu dans `m3`.
+  `E2E_ROLE=commercial E2E_AUTH=1 python scripts/e2e_appel_local.py` : parcours complet en commercial, contrôle actif.
 - **Verrou « dossier facturé »** : installation finie ou facture émise → `dossier_fige` (jamais stocké), toute écriture du
   lead / du simulateur refusée en 423, fiche en lecture seule ; le devis et la note de dim servis sont ceux archivés à
   l'envoi (`data/devis/devis_meta.json`), rien n'est régénéré.
