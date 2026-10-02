@@ -514,6 +514,17 @@ def calculer_cee_bar_th_171(prospect, state_simulateur, admin_params, mode=None)
     }
 
 
+def volume_cee(prospect, state_simulateur, admin_params) -> dict:
+    """Lot 10 — le volume qui sert à calculer la prime CEE : kWh cumac × bonification (mêmes arguments que calculer_cee,
+    donc même délégataire / même mode). 0 si la prime n'est pas calculable."""
+    r = calculer_cee_bar_th_171(prospect, state_simulateur, admin_params)
+    if r.get("erreur"):
+        return {"volume_cee_kwhc": 0, "volume_cee_type": ""}
+    d = r.get("details") or {}
+    return {"volume_cee_kwhc": round(float(d.get("kwhc") or 0) * float(d.get("bonification") or 1)),
+            "volume_cee_type": str(d.get("type_prix") or "")}
+
+
 def calculer_cee(prospect, state_simulateur, admin_params, with_bonification=True):
     """Calcule le montant CEE avec la formule BAR-TH-171."""
     result = calculer_cee_bar_th_171(prospect, state_simulateur, admin_params)
@@ -666,6 +677,7 @@ def calculer_devis(prospect, state_simulateur, admin_params, catalogue_pac):
         "montant_cee_lettres": nombre_en_lettres_euros(montant_cee),
         "reste_a_charge": reste_a_charge,
         "_cee_conserve": result_plafonds["cee_conserve"],
+        **volume_cee(prospect, state_simulateur, admin_params),        # Lot 10 : affiché sur devis / pré-devis / facture
         "_details_plafonds": result_plafonds["details"],
         "categorie_CEE_label": "Précaire" if categorie_revenu == "tres_modeste" else "Classique",
         "categorie_revenu_label": LABELS_ANAH.get(categorie_revenu, ""),

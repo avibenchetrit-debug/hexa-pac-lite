@@ -1016,6 +1016,28 @@ def _migrate_catalogue_pac_schema():
     _read_catalogue_pac()
 
 
+LIBELLES_CORRIGES_LOT10 = {"Classe énergétique chauffage 35°C / 55°C (kW)": "Classe énergétique chauffage 35°C / 55°C"}
+
+
+def _migrate_lot10() -> list:
+    """Lot 10, au démarrage, idempotent : libellé faux de la fiche produit (une classe énergétique n'est pas en kW)
+    renommé ; valeurs inchangées ; rien d'autre. Rend la liste des modèles corrigés."""
+    catalogue = _read_catalogue_pac()
+    neuf, corriges = [], []
+    for m in catalogue:
+        specs = m.get("description_specs") if isinstance(m, dict) else None
+        if isinstance(specs, list) and any(isinstance(x, dict) and x.get("champ") in LIBELLES_CORRIGES_LOT10 for x in specs):
+            m = dict(m, description_specs=[dict(x, champ=LIBELLES_CORRIGES_LOT10[x["champ"]])
+                                           if isinstance(x, dict) and x.get("champ") in LIBELLES_CORRIGES_LOT10 else x
+                                           for x in specs])
+            corriges.append(m.get("ref", ""))
+        neuf.append(m)
+    if corriges:
+        _write_catalogue_pac(neuf)
+        print(f"[catalogue] lot 10 : libellé « Classe énergétique … (kW) » corrigé sur {len(corriges)} modèle(s) : {corriges}")
+    return corriges
+
+
 def _migrate_lot9() -> None:
     """Lot 9, au démarrage, idempotent : frais ECAIR corrigés à 12,5 % UNE fois (marque frais_ecair_lot9 : une valeur
     changée ensuite dans l'admin n'est jamais réécrasée), une seule source (params) ; « Positionnement marché »
@@ -1928,6 +1950,7 @@ async def startup_event():
     _migrate_leads_schema()
     _migrate_catalogue_regulateur()
     _migrate_lot9()
+    _migrate_lot10()
     _admin_password()
     start_backup_scheduler(DATA_DIR)
     start_relances_scheduler()
@@ -5107,7 +5130,8 @@ def _lignes_pdf(source) -> list:
 # Lot 7b : EXACTEMENT les ajouts des lots 7a/7b (plus de ligne « Usage » ; + la ligne du régulateur).
 AJOUTS_RECTIFICATIVE = ("Ancien système de chauffage déposé : chaudière — énergie :", "Application :",
                         "Installation et paramétrage du régulateur",
-                        "Dépose et évacuation de l'ancienne chaudière", "Dépose et évacuation des équipements remplacés")
+                        "Dépose et évacuation de l'ancienne chaudière", "Dépose et évacuation des équipements remplacés",
+                        "Volume CEE :", "Classe énergétique chauffage 35°C / 55°C")   # Lot 10
 
 
 def _differences_avec_l_originale(rec: dict, pdf_rectificative: bytes, numero_facture: str) -> list | None:
@@ -5121,7 +5145,7 @@ def _differences_avec_l_originale(rec: dict, pdf_rectificative: bytes, numero_fa
     aujourd_hui = datetime.now(PARIS_TZ).strftime("%d/%m/%Y")
 
     def prevu(l, dates):
-        return (re.fullmatch(r"(.* )?Page \d+ / \d+", l) or any(a in l for a in AJOUTS_RECTIFICATIVE)
+        return (re.fullmatch(r"(.* )?Page \d+ / \d+", l) or any(a in l for a in AJOUTS_RECTIFICATIVE) or l.strip() == "(kW)"
                 or rec.get("numero_facture", "") in l or numero_facture in l or "rectificative" in l.lower()
                 or "annule et remplace" in l or any(d and d in l and ("émission" in l or l == d) for d in dates))
     en_moins = [l for l in orig if l not in neuf and not prevu(l, [rec.get("date_emission", "")])]

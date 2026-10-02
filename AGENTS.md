@@ -91,6 +91,10 @@ derrière la connexion ; `/api/...` répond 401 même pour une route inexistante
   prix de vente HT, prime CEE, MPR et délégataire lus dans le devis ARCHIVÉ auquel se réfère la facture la plus récente
   (`services/marges_archive.py` ; à défaut le PDF de la facture ; sinon calcul actuel, signalé), coûts actuels de l'admin,
   mention « Marge indicative : calculée avec les coûts actuels de l'admin ». Aucun état envoyé n'est pris en compte.
+- **Lot 10** : libellé de fiche produit « Classe énergétique chauffage 35°C / 55°C (kW) » renommé sans « (kW) »
+  (`_migrate_lot10` au démarrage, et à l'import Excel). Ligne « Volume CEE : X kWh cumac (précaire / classique) » sous la
+  prime CEE des devis, pré-devis et factures = kWh cumac × bonification de la valorisation (`volume_cee`). Pour la
+  rectificative d'une facture d'avant, ces deux lignes sont des différences prévues.
 - **Verrou « dossier facturé »** : installation finie ou facture émise → `dossier_fige` (jamais stocké), toute écriture du
   lead / du simulateur refusée en 423, fiche en lecture seule ; le devis et la note de dim servis sont ceux archivés à
   l'envoi (`data/devis/devis_meta.json`), rien n'est régénéré.

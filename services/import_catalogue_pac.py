@@ -57,8 +57,13 @@ def _cell_text(v):
     return str(v).strip()
 
 
+# Lot 10 : une classe énergétique n'est pas en kW (le fichier fournisseur porte encore « (kW) »)
+LIBELLES_CORRIGES = {"Classe énergétique chauffage 35°C / 55°C (kW)": "Classe énergétique chauffage 35°C / 55°C"}
+
+
 def _spec_label(a):
     lbl = str(a).strip()
+    lbl = LIBELLES_CORRIGES.get(lbl, lbl)
     return "Technologie" if lbl.lower() == "techno" else lbl
 
 
