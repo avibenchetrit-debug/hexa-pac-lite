@@ -9,7 +9,7 @@ Minimal FastAPI app that serves a single HTML page and a health check, deployabl
 - Run the dev server (hot reload): `uvicorn main:app --reload --host 0.0.0.0 --port 8000`. App is then at `http://localhost:8000`.
 - Smoke check: `curl localhost:8000/health` returns `{"status":"ok"}`; `GET /` returns the HTML page (200).
 - The page is served by reading `templates/index.html` raw and returning it as-is (no Jinja templating), so HTML/JS curly braces are preserved verbatim.
-- **`templates/index.html` is the ONLY source of truth for the front.** Edit it directly. `apercu-fiche-complete (7).html` at the repo root is an obsolete snapshot: it is no longer served, no longer kept in sync, and must NOT be copied over `templates/index.html` (doing so would wipe every fix made since).
+- **`templates/index.html` is the ONLY source of truth for the front.** Edit it directly. (The old snapshot `apercu-fiche-complete (7).html` was removed in Lot 8d: never served, out of date.)
 - The fiche's ECS field is `select[name="ecs"]` (id `ecs`), NOT `gestion_ecs`: block 7 is rebuilt at load time and the original `<select name="gestion_ecs">` no longer exists in the live DOM; saved leads store it under `ecs` too.
 - Static assets are served from `static/` under `/static`; app data lives in `data/`. Both are kept in git via `.gitkeep`.
 - Production/Railway uses the `Dockerfile` + `railway.json` (start command `uvicorn main:app --host 0.0.0.0 --port $PORT`). For local dev use the `--reload` command above instead.
@@ -62,6 +62,12 @@ derrière la connexion ; `/api/...` répond 401 même pour une route inexistante
   « Contribution à l'efficacité saisonnière (%) » juste après « Alimentation ». Ligne absente / vide : valeur du Master
   (`VALEURS_MASTER`, par n° EPREL, relevée dans hexa-simulateur-2) ; valeur déjà saisie : gardée, seulement replacée.
   Sans équivalent certain : rien n'est inventé (journal `[catalogue] … sans valeur`).
+- **Lot 8d (nettoyage)** : retirés car jamais appelés (preuve : aucune référence dans le code, les modèles, les e-mails
+  ni les tests ; écrans identiques au pixel sur 34 vues ; documents identiques au banc de 10 fiches) — 44 fonctions et
+  10 variables JS d'`index.html`, 667 règles CSS sans élément correspondant (anciennes barres latérale / du haut, thème,
+  éditeur, étiquettes…), 7 fonctions Python (dont `_html_to_pdf` WeasyPrint et `_generate_devis_pdf` ReportLab),
+  les dépendances `weasyprint` et `pydyf`, la copie `apercu-fiche-complete (7).html`. Une classe construite à la volée
+  (`'prefixe-' + x`, `` `prefixe-${x}` ``, `x + '-suffixe'`) compte comme utilisée.
 - **Verrou « dossier facturé »** : installation finie ou facture émise → `dossier_fige` (jamais stocké), toute écriture du
   lead / du simulateur refusée en 423, fiche en lecture seule ; le devis et la note de dim servis sont ceux archivés à
   l'envoi (`data/devis/devis_meta.json`), rien n'est régénéré.

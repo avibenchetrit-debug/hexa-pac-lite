@@ -141,7 +141,3 @@ def parse_catalogue_xlsx_report(source):
     return models, warnings
 
 
-def parse_catalogue_xlsx(source):
-    """Renvoie la liste de modèles au format catalogue (9 champs + description_specs)."""
-    models, _ = parse_catalogue_xlsx_report(source)
-    return models

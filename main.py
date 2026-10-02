@@ -792,11 +792,6 @@ def current_user(request: Request):
     return {"username": user.get("username"), "role": user.get("role", "commercial")}
 
 
-def _public_devis_url(request: Request, numero: str) -> str:
-    base = str(request.base_url).rstrip("/")
-    if base.startswith("http://"):
-        base = "https://" + base[len("http://"):]
-    return f"{base}/devis-public/{numero}/{_sign_devis_token(numero)}"
 
 
 def _sign_devis_token_v(numero: str, version) -> str:
@@ -2025,12 +2020,6 @@ def _find_lead(numero: str) -> dict | None:
     return None
 
 
-def _money(value) -> str:
-    try:
-        amount = float(value or 0)
-    except (TypeError, ValueError):
-        amount = 0
-    return f"{amount:,.2f}".replace(",", " ").replace(".", ",") + " €"
 
 
 def _float_value(value, default=0.0):
@@ -2040,9 +2029,6 @@ def _float_value(value, default=0.0):
         return default
 
 
-def _active_delegataire():
-    delegataires = _read_delegataires()
-    return next((d for d in delegataires if d.get("actif")), delegataires[0] if delegataires else DEFAULT_DELEGATAIRES[0])
 
 
 def _next_devis_version(numero: str) -> int:
@@ -2059,125 +2045,6 @@ def _devis_path(numero: str, version: int) -> str:
     return os.path.join(DEVIS_DIR, f"{numero}_v{version}.pdf")
 
 
-def _devis_context(numero: str) -> dict:
-    lead = _find_lead(numero)
-    if not lead:
-        raise HTTPException(status_code=404, detail="Prospect introuvable")
-    catalogue = _read_json(CATALOGUE_PAC_PATH, DEFAULT_CATALOGUE_PAC)
-    if not isinstance(catalogue, list):
-        catalogue = DEFAULT_CATALOGUE_PAC
-    service = "Chauffage + ECS"
-    phase = str(lead.get("phase_electrique") or "monophase")
-    wants_tri = "tri" in phase.lower()
-    compatibles = []
-    for model in catalogue:
-        nom_ref = f"{model.get('nom','')} {model.get('ref','')}".upper()
-        if "DUO" not in nom_ref:
-            continue
-        if wants_tri and "TRI" not in nom_ref:
-            continue
-        if not wants_tri and "TRI" in nom_ref:
-            continue
-        puissance = _float_value(model.get("puiss_chauf") or model.get("puiss35") or model.get("puissance_kw"))
-        if puissance > 0:
-            compatibles.append((puissance, model))
-    compatibles.sort(key=lambda item: item[0])
-    modele = compatibles[0][1] if compatibles else (catalogue[0] if catalogue else {})
-    puissance = _float_value(modele.get("puiss_chauf") or modele.get("puiss35") or modele.get("puissance_kw"), 9)
-    prix_ttc = _float_value(modele.get("ttc") or modele.get("prix_ttc"), 14990)
-    baremes = _read_json(BAREMES_PATH, {})
-    forfaits = baremes.get("forfaits_mpr") if isinstance(baremes, dict) else {}
-    if not isinstance(forfaits, dict):
-        forfaits = {}
-    categorie = str(lead.get("categorie") or "modeste")
-    mpr = _float_value(forfaits.get(categorie), {"tres_modeste": 5000, "modeste": 4000, "intermediaire": 3000, "superieur": 0}.get(categorie, 4000))
-    # Lot 6b : délégataire selon le choix de démarrage (même règle que le devis)
-    _st = load_state_simulateur(numero) or {}
-    delegataire = choisir_delegataire(_read_delegataires(), mode_cee(lead, _st, {"forfaits_mpr": forfaits}), categorie)[0] or _active_delegataire()
-    mwh = max(_float_value(lead.get("surface_logement_m2"), 90) / 10, 1)
-    cee_unitaire = _float_value(delegataire.get("mwh_precaire" if categorie == "tres_modeste" else "mwh_classique"), 7.2)
-    cee = round(mwh * cee_unitaire * 10, 2)
-    bonif = baremes.get("bonification_cee", {"actif": True, "multiplicateur": 5}) if isinstance(baremes, dict) else {"actif": True, "multiplicateur": 5}
-    if isinstance(bonif, dict) and bonif.get("actif", True):
-        cee *= int(bonif.get("multiplicateur") or 5)
-    reste = max(prix_ttc - mpr - cee, 0)
-    mensualite_10 = reste / 120 if reste else 0
-    surface_chauffee = round(_float_value(lead.get("surface_logement_m2"), 100) * 0.9)
-    return {
-        "lead": lead,
-        "numero": numero,
-        "modele": modele.get("nom") or modele.get("ref") or "ATLANTIC ALFÉA EXCELLIA S DUO 9",
-        "puissance": puissance,
-        "prix_ttc": prix_ttc,
-        "mpr": mpr,
-        "cee": cee,
-        "reste": reste,
-        "mensualite_10": mensualite_10,
-        "service": service,
-        "phase": "Triphasé" if wants_tri else "Monophasé",
-        "surface_chauffee": surface_chauffee,
-        "zone": calculer_zone_climatique(lead.get("code_postal_chantier") or lead.get("cp_chantier") or ""),
-        "delegataire": delegataire.get("nom", "PICOTY"),
-        "categorie": categorie,
-    }
-
-
-def _generate_devis_pdf(numero: str) -> bytes:
-    from reportlab.lib import colors
-    from reportlab.lib.pagesizes import A4
-    from reportlab.lib.styles import getSampleStyleSheet
-    from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
-
-    ctx = _devis_context(numero)
-    lead = ctx["lead"]
-    buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=36, leftMargin=36, topMargin=36, bottomMargin=36)
-    styles = getSampleStyleSheet()
-    story = []
-    header = Table(
-        [[Paragraph("<b>Hexa-Rénov'</b>", styles["Title"]), Paragraph(f"<font color='white'>{numero}</font>", styles["Normal"])]],
-        colWidths=[350, 150],
-        rowHeights=[60],
-    )
-    header.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#002E5A")),
-        ("TEXTCOLOR", (0, 0), (-1, -1), colors.white),
-        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-        ("ALIGN", (1, 0), (1, 0), "RIGHT"),
-    ]))
-    story.append(header)
-    story.append(Paragraph(f"Date d'édition : {_now_iso().split('T')[0]}", styles["Normal"]))
-    story.append(Spacer(1, 12))
-    client = f"{lead.get('civilite','')} {lead.get('nom','')} {lead.get('prenom','')}".strip()
-    adresse = " ".join(str(lead.get(k, "")).strip() for k in ("adresse_chantier", "code_postal_chantier", "ville_chantier") if lead.get(k))
-    story.append(Table([[Paragraph(f"<b>CLIENT</b><br/>{client}<br/>{adresse}<br/>{lead.get('telephone','')} | {lead.get('email','')}", styles["Normal"])]], colWidths=[500], style=[("BOX", (0, 0), (-1, -1), 0.5, colors.grey), ("PADDING", (0, 0), (-1, -1), 8)]))
-    story.append(Spacer(1, 12))
-    story.append(Paragraph("<b>INSTALLATION POMPE À CHALEUR AIR/EAU</b>", styles["Heading2"]))
-    story.append(Paragraph(f"Modèle : {ctx['modele']}<br/>Puissance : {ctx['puissance']:.1f} kW<br/>Service : {ctx['service']}<br/>Phase : {ctx['phase']}<br/>Surface chauffée : {ctx['surface_chauffee']} m²<br/>Zone climatique : {ctx['zone']}", styles["Normal"]))
-    story.append(Spacer(1, 12))
-    rows = [
-        ["Désignation", "Montant TTC"],
-        ["Fourniture et pose PAC", _money(ctx["prix_ttc"])],
-        [f"MaPrimeRénov' (catégorie {ctx['categorie']})", "-" + _money(ctx["mpr"])],
-        [f"Prime CEE ({ctx['delegataire']} classique)", "-" + _money(ctx["cee"] / 5 if ctx["cee"] else 0)],
-        ["Bonification CEE (coup de pouce x5)", "-" + _money(ctx["cee"] - (ctx["cee"] / 5 if ctx["cee"] else 0))],
-        ["RESTE À CHARGE TTC", _money(ctx["reste"])],
-    ]
-    table = Table(rows, colWidths=[360, 140])
-    table.setStyle(TableStyle([
-        ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
-        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#EEF2F7")),
-        ("FONTNAME", (0, -1), (-1, -1), "Helvetica-Bold"),
-        ("ALIGN", (1, 0), (1, -1), "RIGHT"),
-    ]))
-    story.append(table)
-    story.append(Spacer(1, 12))
-    story.append(Table([["Durée", "Mensualité"], ["5 ans", _money(ctx["reste"] / 60) + "/mois"], ["7 ans", _money(ctx["reste"] / 84) + "/mois"], ["10 ans", _money(ctx["mensualite_10"]) + "/mois"]], colWidths=[250, 250], style=[("GRID", (0, 0), (-1, -1), 0.5, colors.grey), ("ALIGN", (1, 0), (1, -1), "RIGHT")]))
-    story.append(Spacer(1, 24))
-    story.append(Paragraph("Hexa-Rénov' SAS — Asnières-sur-Seine (92)<br/>SIRET : [à compléter]<br/>RCS Nanterre<br/>Devis valable 30 jours à compter de la date d'édition", styles["Normal"]))
-    story.append(Paragraph(f"<font size='8'>Document généré le {_now_iso()} via le simulateur Hexa-Rénov'</font>", styles["Normal"]))
-    doc.build(story)
-    return buffer.getvalue()
 
 
 # ---------------------------------------------------------------------------
@@ -4516,12 +4383,6 @@ def _render_notedim_html(request: Request, numero: str) -> str:
     return templates.env.get_template(name).render(ctx)
 
 
-def _html_to_pdf(html_content: str, request: Request) -> bytes:
-    try:
-        from weasyprint import HTML
-    except Exception as exc:  # noqa: BLE001
-        raise HTTPException(status_code=500, detail=f"WeasyPrint indisponible: {exc}") from exc
-    return HTML(string=html_content, base_url=str(request.base_url)).write_pdf()
 
 
 def _html_to_pdf_playwright(html_content: str, request: Request) -> bytes:
