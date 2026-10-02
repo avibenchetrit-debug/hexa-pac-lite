@@ -14515,7 +14515,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     const res = (typeof selectionnerParNiveau === 'function') ? selectionnerParNiveau(note, state) : { ok:false, niveaux:[] };
     if (!res.ok || !res.niveaux.length) {
       return '<div class="sim-section-label">Votre PAC recommandée</div>'
-        + '<div class="sim-cards-fallback"><strong>⚠ Aucune PAC bien dimensionnée</strong>'
+        + '<div class="sim-cards-fallback p6-alerte-dim"><strong>⚠ Aucune PAC bien dimensionnée</strong>'
         + 'pour une puissance de ' + noteFmt + ' kW. Ajustez le dimensionnement (isolation, surface), '
         + 'ou <a href="#" class="sim-voir-tous">voir tous les modèles</a>.</div>';
     }
@@ -14717,10 +14717,19 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
         + `<span class="p6-pgam" style="color:${COUL_GAMME[nd.key] || '#5A6675'}">${escA(nd.label.toUpperCase())}</span>`
         + `<span class="p6-pmod">${escA(m.label || m.nom)}</span><span class="p6-pprix">${eur(m.prix_ttc)} TTC</span></button>`;
     }).join('');
+    // Lot 8c : énergie sans chaudière fioul / gaz / charbon -> pas de ligne « ancien système » sur le devis (dit à l'écran)
+    function sansAncienSysteme() {
+      const sel = document.querySelector('#form-prospect [name="mode_chauffage"]');
+      const v = String((sel && sel.value) || '').trim().toLowerCase();
+      if (!v || ['fioul', 'gaz', 'charbon'].includes(v)) return '';
+      const o = sel.options ? Array.from(sel.options).find(x => x.value === sel.value) : null;
+      return escA((o && o.textContent.trim()) || v);
+    }
     const pac = `
           <div class="p6-sec">1 · LA POMPE À CHALEUR <span class="p6-sec-sub">· puissance nécessaire <b id="sim-puissance-reco">${kw} kW</b>${ecsDuo ? ' · modèles DUO' : ''}</span></div>
           ${niv.ok ? `<div class="p6-g p6-g3 p6-pacs p6-imp">${cartesPac}</div>`
-            : `<div class="p6-alerte">Aucune PAC bien dimensionnée pour ${kw} kW : ajustez l'isolation ou la surface, ou <a href="#" class="sim-voir-tous">voir tous les modèles</a>.</div>`}
+            : `<div class="p6-alerte p6-alerte-dim">Aucune PAC bien dimensionnée pour ${kw} kW : ajustez l'isolation ou la surface, ou <a href="#" class="sim-voir-tous">voir tous les modèles</a>.</div>`}
+          ${sansAncienSysteme() ? `<div class="p6-aide" id="p6-sans-ancien-systeme">Pas de ligne « Ancien système de chauffage déposé » sur le devis : pas de chaudière fioul / gaz / charbon déposée (énergie : ${sansAncienSysteme()}).</div>` : ''}
           <div class="p6-pac-ligne">
             <span class="p6-pac-lib">Prix TTC posé <i>(modifiable)</i></span>
             <span class="sim-pnl-edit"><input type="text" inputmode="numeric" id="sim-prix" value="${nbFr(state.prix_pac || 0)}"><em>€</em></span>
@@ -23659,6 +23668,10 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
   .p6-seg { height: 42px; border-radius: 8px; font-size: 14px; font-weight: 600; border: 1px solid var(--p6-fieldb); background: var(--p6-field); color: var(--p6-txt);
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 8px; font-family: inherit; cursor: pointer; }
   .p6-seg.on { border-color: var(--p6-navy); background: var(--p6-navy); color: #fff; font-weight: 700; }
+  /* Lot 8c : « Non » à sa largeur, « Oui · prix » prend le reste et passe à la ligne plutôt que d'être coupé */
+  .p6-segs-2:has([data-ballon6]) { grid-template-columns: auto minmax(0, 1fr); }
+  .p6-seg[data-ballon6] { white-space: normal; text-overflow: clip; height: auto; min-height: 42px; line-height: 1.15; padding: 4px 12px; }
+  body.p6-fige .p6-alerte-dim { display: none !important; }
   .p6-segs-3 .p6-seg { font-size: 12.5px; padding: 0 6px; }
   .p6-seg:disabled { opacity: .45; cursor: default; }
   body.l6 #sim-ballon-inadapte { border-color: #B45309; }
@@ -23906,7 +23919,8 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
   body.l6 .p-carte-tete .p-carte-ligne { flex: none; }
   body.l6 .p-carte-titre { font-size: 18px; white-space: nowrap; }
   body.l6 .p-carte-tete .p6-legende { margin-left: auto; min-width: 0; flex: 0 1 auto; padding: 4px 10px; gap: 10px; font-size: 11px; }
-  .p6-legende > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .p6-legende > span:last-child { overflow: visible; text-overflow: clip; white-space: normal; line-height: 1.3; }
+  body.l6 .p-carte-tete .p6-legende { flex: 0 1 auto; }
   body.l6 .p6-legende .p6-hl { width: 20px; height: 12px; box-shadow: 0 0 0 3px #FFE08A; }
   body.l6[data-p6-etape="1"] .p-carte-tete .p6-legende { display: none; }
   body.l6[data-p6-etape="6"] .p6-legende-hote { display: none; }
@@ -23973,6 +23987,8 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
   #sim-dynamic { gap: 6px; }
   .p6-tete6 { flex-wrap: nowrap; align-items: center; }
   .p6-tete6 .p6-legende { margin-left: auto; min-width: 0; padding: 3px 8px; gap: 8px; font-size: 10.5px; }
+  .p6-tete6 { min-width: 0; }
+  .p6-tete6 .p6-legende { flex: 0 1 auto !important; }   /* Lot 8c : rétrécit et passe à la ligne, jamais coupée */
   .p6-titre6 { font-size: 18px; white-space: nowrap; }
   .p6-pcard, body.l6 .p6-pcard.sim-mod-row { padding: 5px 9px; }
   .p6-pcard.on, body.l6 .p6-pcard.sim-mod-row.on { padding: 3px 7px; }
