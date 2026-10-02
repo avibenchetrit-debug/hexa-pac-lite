@@ -73,6 +73,14 @@ derrière la connexion ; `/api/...` répond 401 même pour une route inexistante
   de `/api/catalogue-pac`, `/api/admin/m3` ou `/api/zones-departements` est partagée (jamais de cache après la réponse) ;
   après l'affichage d'une fiche, les polices Google du devis sont mises en cache en arrière-plan (« Voir le devis »).
   Les documents (devis, facture, note de dim) chargent toujours leurs polices chez Google : inchangés.
+- **Routes conservées volontairement** (appelées par aucun écran, mais gardées : gain nul, usage possible hors écran,
+  ex. purge automatique) : `POST /api/auth/change-password`, `GET /api/admin/fiches-ballon/view`,
+  `GET /api/admin/fiches-techniques/view`, `GET /api/admin/storage-status`, `POST /api/admin/purge-echanges-orphelins`,
+  `POST /prospect/ajax`, `POST /prospect/{numero}/ajax`. Ne pas les supprimer sans accord.
+- **Lot 8f (PDF)** : `services/pdf_chromium.py` — un Chromium réutilisé (fil dédié ; relancé et PDF refait s'il plante),
+  polices chargées avant d'imprimer, cache par empreinte SHA-256 du HTML final (+ version du rendu) : tout changement
+  du HTML régénère ; un PDF sans police Inter n'est jamais mis en cache. Libellés de fiche produit jamais coupés
+  (sauf rectificative d'une facture d'avant le lot 8f : `specs_libelles_tronques`, marque `mise_en_page` = `lot8f`).
 - **Verrou « dossier facturé »** : installation finie ou facture émise → `dossier_fige` (jamais stocké), toute écriture du
   lead / du simulateur refusée en 423, fiche en lecture seule ; le devis et la note de dim servis sont ceux archivés à
   l'envoi (`data/devis/devis_meta.json`), rien n'est régénéré.

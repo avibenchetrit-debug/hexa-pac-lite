@@ -21215,6 +21215,8 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
   /* Lot 8c : « Non » à sa largeur, « Oui · prix » prend le reste et passe à la ligne plutôt que d'être coupé */
   .p6-segs-2:has([data-ballon6]) { grid-template-columns: auto minmax(0, 1fr); }
   .p6-seg[data-ballon6] { white-space: normal; text-overflow: clip; height: auto; min-height: 42px; line-height: 1.15; padding: 4px 12px; }
+  /* Lot 8f : emplacements du ballon jamais coupés non plus (passent à la ligne) */
+  .p6-seg[data-emplacement6] { white-space: normal; text-overflow: clip; height: auto; min-height: 42px; line-height: 1.15; padding: 4px 8px; }
   body.p6-fige .p6-alerte-dim { display: none !important; }
   .p6-segs-3 .p6-seg { font-size: 12.5px; padding: 0 6px; }
   .p6-seg:disabled { opacity: .45; cursor: default; }

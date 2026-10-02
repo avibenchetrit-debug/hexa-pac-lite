@@ -1845,6 +1845,9 @@
     width: 38%;
     padding-right: 12px;
   }
+  /* Lot 8f : un libellé de fiche produit n'est jamais coupé (« … ») : il passe à la ligne. Exception : la rectificative
+     d'une facture émise avant le lot 8f garde le rendu d'origine (classe specs-tronques), identique ligne à ligne. */
+  .pac-specs-table:not(.specs-tronques) td.pac-specs-champ { white-space: normal; overflow: visible; text-overflow: clip; }
   .pac-specs-table td.pac-specs-valeur {
     color: var(--noir, #1f2937);
     font-weight: 600;
@@ -3501,7 +3504,7 @@
 <div class="pac-desc-title">{{ modele_pac }}</div>
 {% endif %}
 {% if description_specs and description_specs|length > 0 %}
-<table class="pac-specs-table">
+<table class="pac-specs-table{% if specs_libelles_tronques %} specs-tronques{% endif %}">
 <tbody>
 {% for spec in description_specs %}
 <tr{% if champ_exige_ace and champ_exige_ace(spec.champ) %} class="ace-exige" data-ace="fiche"{% endif %}><td class="pac-specs-champ">{{ spec.champ }}</td>{% if est_champ_etas and est_champ_etas(spec.champ) and etas_qui_compte %}<td class="pac-specs-valeur etas-valeurs">{{ etas_html(spec.valeur, etas_qui_compte) }}</td>{% else %}<td class="pac-specs-valeur">{{ spec.valeur }}</td>{% endif %}</tr>
@@ -3532,7 +3535,7 @@
 <div class="pac-desc-block">
 {% if ballon_nom %}<div class="pac-desc-title">{{ ballon_nom }}</div>{% endif %}
 {% if ballon_description_specs and ballon_description_specs|length > 0 %}
-<table class="pac-specs-table"><tbody>
+<table class="pac-specs-table{% if specs_libelles_tronques %} specs-tronques{% endif %}"><tbody>
 {% for spec in ballon_description_specs %}
 <tr{% if champ_exige_ace and champ_exige_ace(spec.champ) %} class="ace-exige" data-ace="fiche"{% endif %}><td class="pac-specs-champ">{{ spec.champ }}</td>{% if est_champ_etas and est_champ_etas(spec.champ) and etas_qui_compte %}<td class="pac-specs-valeur etas-valeurs">{{ etas_html(spec.valeur, etas_qui_compte) }}</td>{% else %}<td class="pac-specs-valeur">{{ spec.valeur }}</td>{% endif %}</tr>
 {% endfor %}
