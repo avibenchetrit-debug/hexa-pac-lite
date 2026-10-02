@@ -102,6 +102,15 @@ derrière la connexion ; `/api/...` répond 401 même pour une route inexistante
 - **Lot 10c** : groupes extérieurs des Ariston DUO (poids du module extérieur, dimensions) corrigés d'après la doc
   Ariston « Doc Pro Nimbus Plus Net R32 » (`CORRECTIONS_ARISTON_DUO` dans services/import_catalogue_pac.py, appliqué à
   la migration `_migrate_lot10c` et à l'import Excel ; seulement si la valeur est encore l'ancienne valeur fausse).
+- **Lot 11 — facture CEE au délégataire** (`services/facture_cee.py`, `templates/facture_cee.html`, routes
+  `/api/admin/facture-cee/{numero}[/apercu|/emettre|/suivi|/download]`, admin seulement) : Documents → « Factures
+  délégataire » → « Facturer le délégataire ». Destinataire selon le délégataire du devis signé (ACE ENERGIE ; MRA GROUPE
+  / ECAIR mandataire de PICOTY), coordonnées et quote-parts dans Admin → CEE → Délégataires (`facturation`, défauts
+  `FACTURATION_DEFAUT`). Série `FA-CEE-AAAA-NNNN` (compteur `facture_cee_AAAA`, distinct des factures client ; 0001 émise
+  hors application → `DEJA_EMISES`), numéro consommé après un PDF réussi, facture verrouillée (`factures/factures_cee_meta.json`,
+  PDF dans `factures/cee/`), seul le suivi envoyée / payée change. Mise en page = FA-CEE-2026-0001 (sans le pied de page
+  commun : `OPTIONS_SANS_PIED`). Mention RAI PICOTY = annexe 2 du contrat ECAIR mot pour mot (`MENTION_RAI_PICOTY_CONTRAT`),
+  devis / pré-devis / factures neufs seulement ; les documents archivés ne sont jamais régénérés.
 - **Verrou « dossier facturé »** : installation finie ou facture émise → `dossier_fige` (jamais stocké), toute écriture du
   lead / du simulateur refusée en 423, fiche en lecture seule ; le devis et la note de dim servis sont ceux archivés à
   l'envoi (`data/devis/devis_meta.json`), rien n'est régénéré.

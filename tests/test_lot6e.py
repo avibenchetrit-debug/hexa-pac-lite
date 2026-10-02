@@ -16,11 +16,12 @@ LEAD = {"numero": "PR-06260", "civilite": "Madame", "nom": "Mention", "prenom": 
         "nombre_personnes": "4", "cout_energetique_mensuel_eur": "400", "cout_energie_source": "reel"}
 DELEG = [{"nom": "PICOTY", "mwh_precaire": 12.5, "mwh_classique": 7.2, "actif": False},
          {"nom": "ACE", "mwh_precaire": 14, "mwh_classique": 7.5, "actif": True}]
-PICOTY = ("Prime liée à la valorisation des certificats d'économies d'énergie versée par PICOTY, société au capital social de "
-          "1 548 360,00 €, immatriculée au RCS de Guéret sous le n° 777 347 386, dont le siège social est situé rue André et Guy "
+# Lot 11 : texte EXACT de l'annexe 2 du contrat ECAIR (guillemets, apostrophes typographiques, « n°777 », « 952862670 »)
+PICOTY = ("« Prime liée à la valorisation des certificats d’économies d’énergie versée par PICOTY, société au capital social de "
+          "1 548 360,00 €, immatriculée au RCS de Guéret sous le n°777 347 386, dont le siège social est situé rue André et Guy "
           "PICOTY – BP1 23300 LA SOUTERRAINE. Représentée par ECAIR, société au capital social de 132 970,00 €, immatriculée au RCS "
-          "de Bobigny sous le n° 952 862 670, dont le siège social est situé 5 rue Pleyel, 93200 SAINT-DENIS, en qualité de "
-          "mandataire, pour la somme de {m} euros.")
+          "de Bobigny sous le n° 952862670, dont le siège social est situé 5 RUE PLEYEL, 93200 SAINT-DENIS, en qualité de "
+          "mandataire, pour la somme de {m} euros »")
 ACE = ("« La présente offre comprend une Prime d'un montant de {l} euros, qui vous est offerte par ACE ÉNERGIE (SIREN : 848 595 336) "
        "dans le cadre de son rôle actif et incitatif, au titre du dispositif des certificats d'économies d'énergie »")
 

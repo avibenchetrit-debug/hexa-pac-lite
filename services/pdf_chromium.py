@@ -100,12 +100,12 @@ class _Moteur:
                     pass
             pw = navigateur = None
 
-        def imprimer(html):
+        def imprimer(html, options):
             page = contexte.new_page()                # une page par document (rien ne passe de l'un à l'autre)
             try:
                 page.set_content(html, wait_until="load")          # feuilles de style et images chargées
                 inter = page.evaluate(ATTENDRE_POLICES)            # puis toutes les polices
-                return page.pdf(**OPTIONS), bool(inter)
+                return page.pdf(**(options or OPTIONS)), bool(inter)
             finally:
                 page.close()
 
@@ -114,7 +114,7 @@ class _Moteur:
             if job is None:
                 fermer()
                 return
-            html, futur = job
+            html, options, futur = job
             if html is _PANNE:                       # tests : le Chromium réutilisé « plante » (il est fermé)
                 try:
                     navigateur.close()
@@ -129,19 +129,19 @@ class _Moteur:
                     elif not navigateur.is_connected():   # le Chromium réutilisé est tombé : un neuf
                         stats["relances"] += 1
                         lancer()
-                    res = imprimer(html)
+                    res = imprimer(html, options)
                 except Exception:  # noqa: BLE001  — navigateur réutilisé en panne : un neuf, une seconde fois
                     stats["relances"] += 1
                     lancer()
-                    res = imprimer(html)
+                    res = imprimer(html, options)
                 futur.set_result(res)
             except BaseException as exc:  # noqa: BLE001
                 futur.set_exception(exc)
 
-    def pdf(self, html: str):
+    def pdf(self, html: str, options=None):
         self._demarrer()
         futur = concurrent.futures.Future()
-        self._file.put((html, futur))
+        self._file.put((html, options, futur))
         return futur.result()
 
     def arreter(self):
@@ -158,18 +158,23 @@ def simuler_panne():
     """Tests : ferme le Chromium réutilisé comme s'il avait planté (le PDF suivant doit passer par le repli)."""
     _moteur._demarrer()
     futur = concurrent.futures.Future()
-    _moteur._file.put((_PANNE, futur))
+    _moteur._file.put((_PANNE, None, futur))
     futur.result()
 atexit.register(_moteur.arreter)
 
 
-def html_vers_pdf(html: str) -> bytes:
-    k = cle(html)
+# Lot 11 : document à sa propre mise en page (facture délégataire) — pas de pied de page commun, marges du document.
+OPTIONS_SANS_PIED = dict(format="A4", print_background=True, prefer_css_page_size=True,
+                         margin={"top": "0", "bottom": "0", "left": "0", "right": "0"})
+
+
+def html_vers_pdf(html: str, options: dict | None = None) -> bytes:
+    k = cle(html) if options is None else cle(html + "|options|" + repr(sorted(options.items())))
     pdf = _du_cache(k)
     if pdf is not None:
         stats["cache"] += 1
         return pdf
-    pdf, inter = _moteur.pdf(html)
+    pdf, inter = _moteur.pdf(html, options)
     stats["generes"] += 1
     if inter:
         _en_cache(k, pdf)
