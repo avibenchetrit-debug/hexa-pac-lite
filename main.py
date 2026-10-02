@@ -4389,38 +4389,14 @@ def _render_notedim_html(request: Request, numero: str) -> str:
 
 
 def _html_to_pdf_playwright(html_content: str, request: Request) -> bytes:
-    """Génère un PDF fidèle au HTML via Chromium (Playwright), rendu navigateur réel."""
+    """PDF fidèle au HTML via Chromium (Playwright). Lot 8f : Chromium réutilisé (relancé s'il plante), polices
+    chargées avant d'imprimer, cache par empreinte du HTML final (services/pdf_chromium.py)."""
     try:
-        from playwright.sync_api import sync_playwright
+        import playwright.sync_api  # noqa: F401
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(status_code=500, detail=f"Playwright indisponible: {exc}") from exc
-
-    base_url = str(request.base_url)
-
-    def _run() -> bytes:
-        with sync_playwright() as p:
-            browser = p.chromium.launch(args=["--no-sandbox"])
-            try:
-                page = browser.new_page()
-                # base_url résout les chemins relatifs (CSS, images) comme dans le navigateur.
-                # set_content() de Playwright 1.49 n'accepte pas base_url -> on ne le passe pas ici.
-                page.set_content(html_content, wait_until="networkidle")
-                pdf_bytes = page.pdf(
-                    format="A4",
-                    print_background=True,
-                    display_header_footer=True,
-                    header_template="<span></span>",
-                    footer_template="""<div style="width:100%; box-sizing:border-box; padding:0 24px; font-family:'Inter',Helvetica,Arial,sans-serif;"><table style="width:100%; border:0; border-collapse:collapse;"><tr><td style="text-align:left; vertical-align:bottom; font-size:7px; color:#6B7480; line-height:1.45;"><div><strong style="color:#002E5A;">SAS HEXA RÉNOV'</strong> · 58 Rue de la Sablière, 92600 Asnières-sur-Seine · RCS Nanterre 845 229 152 · SIRET 845 229 152 00028 · TVA FR 89 845 229 152</div><div>RGE CertiRénov' n° CR-2025-92-0052 · Assurance Décennale &amp; RC Pro — MIC Insurance n° AXE2502159 · Validité : 19/03/2026 au 18/03/2027</div><div>info@hexa-renov.fr · 09 70 70 25 11</div></td><td style="text-align:right; vertical-align:bottom; white-space:nowrap; font-size:8px; color:#9AA3AE; padding-left:12px;">Page <span class="pageNumber"></span> / <span class="totalPages"></span></td></tr></table></div>""",
-                    margin={"top": "0", "bottom": "1.4cm", "left": "0", "right": "0"},
-                )
-            finally:
-                browser.close()
-            return pdf_bytes
-
-    # Playwright sync doit tourner hors de la boucle asyncio de FastAPI : on l'isole dans un thread.
-    import concurrent.futures
-    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as ex:
-        return ex.submit(_run).result()
+    from services.pdf_chromium import html_vers_pdf
+    return html_vers_pdf(html_content)
 
 
 def _write_pdf(path: str, pdf_bytes: bytes) -> str:
@@ -4799,7 +4775,9 @@ def _normaliser_reglements(rows) -> tuple[list, float]:
 
 # Lot 7d : facture sans date de chantier (ni « Fin travaux » ni « Travaux achevés le … »), « Réf. devis » dans le bloc
 # DOSSIER. Les factures émises avant n'ont pas cette marque : leur rectificative garde la mise en page d'origine.
-MISE_EN_PAGE_FACTURE = "lot7d"
+MISE_EN_PAGE_FACTURE = "lot8f"
+# Lot 8f : libellés de fiche produit plus jamais coupés. Mise en page antérieure (pour ses rectificatives) :
+MISE_EN_PAGE_LOT7D = "lot7d"
 
 
 def _render_facture_html(request: Request, numero: str, numero_facture: str, numero_devis_ref: str, date_fin_travaux: str, numero_dossier: str | None = None, acquittee: bool = False, reglements=None, surcharges: dict | None = None) -> str:
@@ -4991,7 +4969,8 @@ def _rendu_rectificative(request: Request, numero: str, rec: dict, numero_factur
     regl = [x for x in (rec.get("reglements") or []) if isinstance(x, dict)] if rec.get("acquittee") else []
     surcharges = {
         "facture_rectificative": {"numero": rec.get("numero_facture", ""), "date": rec.get("date_emission", "")},
-        "facture_mise_en_page_avant_lot7d": rec.get("mise_en_page") != MISE_EN_PAGE_FACTURE,
+        "facture_mise_en_page_avant_lot7d": rec.get("mise_en_page") not in (MISE_EN_PAGE_LOT7D, MISE_EN_PAGE_FACTURE),
+        "specs_libelles_tronques": rec.get("mise_en_page") != MISE_EN_PAGE_FACTURE,
         "mention_cee_titre": titre, "mention_cee_texte": texte, "mention_cee_sous_traitant": sous_traitant,
         "reglements": regl, "reglements_total": money(sum(_montant_depuis_texte(x.get("montant")) for x in regl)),
     }

@@ -186,6 +186,8 @@ def test_dossier_facture_rend_le_devis_archive(page):
 
 
 def test_clics_repetes_et_ouvertures_successives(page):
+    from services import pdf_chromium
+    pdf_chromium.vider_cache()        # Lot 8f : une vraie génération (pas le cache, qui répond en ~50 ms) pendant la rafale
     requetes = []
     page.on("request", lambda r: "/pdf" in r.url and requetes.append(r.url))
     _ouvrir_devis(page, "PR-90001")

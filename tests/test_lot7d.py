@@ -72,10 +72,10 @@ def test_rectificative_d_une_facture_d_avant_le_lot7d_garde_sa_mise_en_page():
 
 
 def test_marque_de_mise_en_page_et_rectificative():
-    assert main.MISE_EN_PAGE_FACTURE == "lot7d"
+    assert main.MISE_EN_PAGE_FACTURE == "lot8f" and main.MISE_EN_PAGE_LOT7D == "lot7d"     # lot 8f : nouvelle marque
     src = open(main.__file__, encoding="utf-8").read()
     assert '"mise_en_page": MISE_EN_PAGE_FACTURE' in src
-    assert '"facture_mise_en_page_avant_lot7d": rec.get("mise_en_page") != MISE_EN_PAGE_FACTURE' in src
+    assert '"facture_mise_en_page_avant_lot7d": rec.get("mise_en_page") not in (MISE_EN_PAGE_LOT7D, MISE_EN_PAGE_FACTURE)' in src
 
 
 # ── 1 bis. CRM : la date de fin de travaux reste saisie, enregistrée, affichée ──────────────────────────────────────
@@ -103,7 +103,7 @@ def test_crm_date_de_fin_de_travaux_exigee_et_enregistree(monkeypatch):
     r = client.post(f"/api/facture/{NUM}", json={"date_fin_travaux": "2026-09-12"})
     assert r.status_code == 200, r.text
     rec = main._read_factures_meta()[NUM][-1]
-    assert rec["date_fin_travaux"] == "2026-09-12" and rec["mise_en_page"] == "lot7d"
+    assert rec["date_fin_travaux"] == "2026-09-12" and rec["mise_en_page"] == "lot8f"
     assert "12/09/2026" not in docs._texte(vus["html"]) and "Fin travaux" not in vus["html"]
     liste = client.get(f"/api/factures/{NUM}/list")                 # Documents → Factures : « Fin travaux 12/09/2026 »
     assert liste.status_code == 200 and "12/09/2026" in liste.text
