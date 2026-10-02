@@ -5169,7 +5169,7 @@ def _lignes_pdf(source) -> list:
 AJOUTS_RECTIFICATIVE = ("Ancien système de chauffage déposé : chaudière — énergie :", "Application :",
                         "Installation et paramétrage du régulateur",
                         "Dépose et évacuation de l'ancienne chaudière", "Dépose et évacuation des équipements remplacés",
-                        "Volume CEE :", "Classe énergétique chauffage 35°C / 55°C",   # Lot 10
+                        "Volume CEE", "Classe énergétique chauffage 35°C / 55°C",   # Lot 10 / 10d
                         "Volume ballon ECS (L) / Profil soutirage", "Volume ballon ECS / Profil soutirage",   # Lot 10b
                         "Poids module ext. en fonction (kg)", "Poids module ext. / int. en fonction (kg)",
                         "Poids à vide unité extérieure", "Classe éner. chauffage",
