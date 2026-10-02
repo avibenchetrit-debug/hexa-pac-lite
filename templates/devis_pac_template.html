@@ -3569,6 +3569,7 @@
 <div class="recap-line total"><span class="label">Total TTC</span><span class="amount">{{ recap_total_ttc }}</span></div>
 <div class="recap-line aide"><span class="label">Estimation aide MaPrimeRénov' — Pompe à chaleur air-eau</span><span class="amount">- {{ montant_mpr }}</span></div>
 <div class="recap-line aide"><span class="label">Estimation aide Prime CEE</span><span class="amount">- {{ montant_cee }}</span></div>
+{% if volume_cee_kwhc %}<div class="recap-line recap-volume-cee" data-volume-cee="{{ volume_cee_kwhc }}" style="font-size:10px;color:var(--gris-mute);padding-top:0;"><span class="label">Volume CEE : {{ "{:,}".format(volume_cee_kwhc).replace(",", " ") }} kWh cumac ({{ volume_cee_type }})</span></div>{% endif %}
 <div style="font-size: 9.5px; color: var(--gris-mute); padding: 2px 0 4px; margin-top: 0; line-height: 1.4;">Le reste à payer correspond au total TTC diminué des estimations d'aides MaPrimeRénov' et Prime CEE.</div>
 <div class="recap-rac{% if facture_acquittee %} is-acquittee{% endif %}"><span class="recap-rac-label">Montant total à régler</span><span class="recap-rac-amount">{% if facture_acquittee %}0,00 €{% else %}{{ reste_a_charge }}{% endif %}</span></div>
 {% if mode != 'facture' %}
