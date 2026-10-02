@@ -6433,7 +6433,16 @@ def _facture_cee_formulaire(payload: dict) -> dict:
     f["option_express"] = str(f.get("option_express")).strip().lower() in ("1", "true", "oui", "on")
     dest = payload.get("destinataire") if isinstance(payload.get("destinataire"), dict) else {}
     f["destinataire"] = {k: str(dest.get(k) or "").strip() for k in facture_cee.CHAMPS_DESTINATAIRE}
-    return {k: (v.strip() if isinstance(v, str) else v) for k, v in f.items()}
+    f = {k: (v.strip() if isinstance(v, str) else v) for k, v in f.items()}
+    # Lot 11c : nombres saisis « 12,50 » / « 3 480 » enregistrés en nombres (le solde les reprend tels quels)
+    for k in ("quote_part", "echeance_jours", "volume_precaire_mwh", "volume_classique_mwh", "prix_precaire", "prix_classique",
+              "prime_operation", "commission_operation", "taux_tva"):
+        if f.get(k) not in (None, ""):
+            try:
+                f[k] = facture_cee._f(f[k])
+            except (TypeError, ValueError):
+                pass                                   # laissé tel quel : facture_cee.erreurs() le signale
+    return f
 
 
 def _facture_cee_html(f: dict, numero_facture: str) -> str:
@@ -6442,6 +6451,9 @@ def _facture_cee_html(f: dict, numero_facture: str) -> str:
 
 def _facture_cee_numero_suivant(counters: dict, annee: str) -> tuple:
     seq = max(int(counters.get(f"facture_cee_{annee}") or 0), int(facture_cee.DEJA_EMISES.get(annee) or 0)) + 1
+    pris = _numeros_fa_cee()                       # Lot 11c : numéros importés réservés, jamais réattribués
+    while f"{facture_cee.SERIE}-{annee}-{seq:04d}" in pris:
+        seq += 1
     return seq, f"{facture_cee.SERIE}-{annee}-{seq:04d}"
 
 
@@ -6452,6 +6464,7 @@ def _facture_cee_item(rec: dict) -> dict:
                                     "ref_operation", "date_facture", "echeance", "statut", "date_paiement", "net_a_payer",
                                     "created_at", "created_by")}
     item["available"] = bool(rec.get("file") and os.path.exists(rec["file"]))
+    item["importee"] = bool(rec.get("importee"))
     item["en_retard"] = (not payee) and bool(rec.get("echeance")) and aujourd_hui > str(rec.get("echeance"))
     return item
 
@@ -6460,7 +6473,15 @@ def _facture_cee_item(rec: dict) -> dict:
 async def facture_cee_preremplir(numero: str, request: Request) -> JSONResponse:
     _require_admin_session(request)
     counters = _read_json(COUNTERS_PATH, {})
-    return JSONResponse({"formulaire": _facture_cee_preremplissage(numero),
+    # Lot 11c : coordonnées et tarifs de chaque délégataire (import d'une facture : changer de délégataire re-remplit)
+    par_deleg = {}
+    for d in _read_delegataires():
+        cle = facture_cee.cle_delegataire(d.get("nom"))
+        fact = d.get("facturation") or facture_cee.facturation_par_defaut(cle)
+        par_deleg.setdefault(cle, {"destinataire": {k: fact.get(k, "") for k in facture_cee.CHAMPS_DESTINATAIRE},
+                                   "ref_contrat": fact.get("contrat") or "", "prix_precaire": float_value(d.get("mwh_precaire"), 0),
+                                   "prix_classique": float_value(d.get("mwh_classique"), 0)})
+    return JSONResponse({"formulaire": _facture_cee_preremplissage(numero), "delegataires": par_deleg,
                          "factures": [_facture_cee_item(r) for r in _factures_cee(numero)],
                          "prochain_numero": _facture_cee_numero_suivant(counters if isinstance(counters, dict) else {},
                                                                         datetime.now(PARIS_TZ).strftime("%Y"))[1]})
@@ -6537,6 +6558,83 @@ async def facture_cee_suivi(numero: str, request: Request) -> JSONResponse:
         rec["suivi_maj"] = _now_iso()
         _atomic_write_json(FACTURES_CEE_META_PATH, meta)
     return JSONResponse({"success": True, "facture": _facture_cee_item(rec)})
+
+
+# ---- Lot 11c : importer une facture délégataire DÉJÀ ÉMISE (hors CRM) ----
+# Le PDF est rangé tel quel (jamais régénéré) ; son numéro est réservé dans la série FA-CEE (doublon refusé) sans
+# toucher au compteur ; elle a le même suivi que les factures émises par le CRM et compte comme un acompte émis :
+# le solde du dossier reprend ses données (prix, contrat, volume, destinataire, références, part restante).
+_NUMERO_FA_CEE = re.compile(r"^FA-CEE-(\d{4})-(\d{4})$")
+
+
+def _numeros_fa_cee() -> set:
+    return {str(r.get("numero_facture") or "") for recs in _read_factures_cee_meta().values() if isinstance(recs, list)
+            for r in recs if isinstance(r, dict)}
+
+
+@app.post("/api/admin/facture-cee/{numero}/importer")
+async def facture_cee_importer(numero: str, request: Request, fichier: UploadFile = File(...),
+                               donnees: str = Form("{}")) -> JSONResponse:
+    user = _require_admin_session(request)
+    if not _find_lead(numero):
+        raise HTTPException(status_code=404, detail="Prospect introuvable")
+    pdf = await fichier.read()
+    if not pdf.startswith(b"%PDF"):
+        raise HTTPException(status_code=400, detail="Le fichier importé n'est pas un PDF")
+    try:
+        d = json.loads(donnees or "{}")
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Données illisibles")
+    d = d if isinstance(d, dict) else {}
+    numero_facture = str(d.get("numero_facture") or "").strip().upper()
+    if not _NUMERO_FA_CEE.match(numero_facture):
+        raise HTTPException(status_code=400, detail="Numéro de facture attendu au format FA-CEE-AAAA-NNNN")
+    f = _facture_cee_formulaire(d)
+    try:
+        pct = facture_cee._f(f.get("quote_part"))
+        prime_ht, commission_ht = round(facture_cee._f(d.get("prime_ht")), 2), round(facture_cee._f(d.get("commission_ht")), 2)
+        tva, ttc = round(facture_cee._f(d.get("tva")), 2), round(facture_cee._f(d.get("total_ttc")), 2)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="Un montant, un volume ou un pourcentage n'est pas un nombre.")
+    err = []
+    if f.get("type") not in facture_cee.TYPES:
+        err.append("Type de facture inconnu (acompte, solde ou totalité).")
+    if not 0 < pct <= 100:
+        err.append("La quote-part doit être comprise entre 0 et 100 %.")
+    if not re.match(r"^\d{4}-\d{2}-\d{2}$", str(f.get("date_facture") or "")):
+        err.append("Renseignez la date de la facture.")
+    if abs(prime_ht + commission_ht + tva - ttc) > 0.011:
+        err.append(f"Total TTC incohérent : prime + commission HT + TVA = {prime_ht + commission_ht + tva:.2f} € ≠ {ttc:.2f} €.")
+    statut = "payee" if d.get("statut") == "payee" else "envoyee"
+    date_paiement = str(d.get("date_paiement") or "").strip()[:10]
+    if statut == "payee" and not re.match(r"^\d{4}-\d{2}-\d{2}$", date_paiement):
+        err.append("Renseignez la date de paiement.")
+    if err:
+        raise HTTPException(status_code=400, detail=" ".join(err))
+    # montants de l'OPÉRATION (ce que le solde reprend) = montants de la facture ramenés à 100 %
+    f["prime_operation"] = round(prime_ht * 100 / pct, 2)
+    f["commission_operation"] = round(commission_ht * 100 / pct, 2)
+    f["taux_tva"] = round(tva * 100 / commission_ht, 2) if commission_ht else facture_cee.TAUX_TVA_COMMISSION
+    with _facture_lock:
+        if numero_facture in _numeros_fa_cee():
+            raise HTTPException(status_code=409, detail=f"Le numéro {numero_facture} existe déjà dans la série FA-CEE")
+        dest = f["destinataire"].get("nom_commercial") or f["destinataire"].get("raison_sociale") or ""
+        nom = re.sub(r"[^A-Za-z0-9_.-]+", "_", f"{numero_facture}_{dest}_{f.get('ref_operation') or numero}_importee").strip("_") + ".pdf"
+        path = _write_pdf(os.path.join(FACTURES_CEE_DIR, re.sub(r"[^A-Za-z0-9_-]", "_", numero), nom), pdf)    # tel quel
+        rec = {"numero_facture": numero_facture, "type": f.get("type"), "quote_part": pct,
+               "delegataire": facture_cee.cle_delegataire(f.get("delegataire")), "destinataire_nom": dest,
+               "ref_appel": f.get("ref_appel"), "ref_operation": f.get("ref_operation"), "date_facture": f.get("date_facture"),
+               "echeance": facture_cee.echeance(f.get("date_facture"), f.get("echeance_jours")),
+               "statut": statut, "date_paiement": date_paiement if statut == "payee" else "",
+               "net_a_payer": ttc, "montants": {"quote_part": pct, "prime_ht": prime_ht, "commission_ht": commission_ht,
+                                                "tva_commission": tva, "total_ht": round(prime_ht + commission_ht, 2),
+                                                "total_ttc": ttc, "net_a_payer": ttc},
+               "formulaire": f, "file": path, "sha256_pdf": hashlib.sha256(pdf).hexdigest(), "importee": True,
+               "created_at": _now_iso(), "created_by": (user or {}).get("username", ""), "verrouillee": True}
+        meta = _read_factures_cee_meta()
+        meta.setdefault(numero, []).append(rec)
+        _atomic_write_json(FACTURES_CEE_META_PATH, meta)            # le compteur FA-CEE n'est pas touché
+    return JSONResponse({"success": True, "numero_facture": numero_facture, "facture": _facture_cee_item(rec)})
 
 
 @app.get("/api/admin/facture-cee/{numero}/download")

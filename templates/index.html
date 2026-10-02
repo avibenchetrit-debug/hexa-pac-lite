@@ -10825,14 +10825,14 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     block.style.display = '';
     const factures = (data.factures || []).slice().reverse();
     if (factures.some(f => f.en_retard)) block.classList.remove('is-collapsed');
-    root.innerHTML = `<div class="docs-devis-actions"><button type="button" class="hexa-meta-card-action" data-fcee-ouvrir>🏦 Facturer le délégataire</button></div>`
+    root.innerHTML = `<div class="docs-devis-actions"><button type="button" class="hexa-meta-card-action" data-fcee-ouvrir>🏦 Facturer le délégataire</button><button type="button" class="hexa-meta-card-action" data-fcee-importer>📄 Importer une facture déjà émise</button></div>`
       + (factures.length ? factures.map(f => {
         const etat = f.statut === 'payee'
           ? `<span class="fcee-tag fcee-payee">Payée le ${escapeHtml(fceeDate(f.date_paiement))}</span>`
           : (f.en_retard ? `<span class="fcee-tag fcee-retard" data-fcee-retard>Impayée — échue le ${escapeHtml(fceeDate(f.echeance))}</span>`
                          : `<span class="fcee-tag fcee-envoyee">Envoyée</span>`);
         return `<div class="docs-devis-row${f.en_retard ? ' fcee-row-retard' : ''}" data-fcee-row="${escapeHtml(f.numero_facture)}">
-          <div><b>${escapeHtml(f.numero_facture)}</b> — ${escapeHtml(FCEE_TYPES[f.type] || '')} ${escapeHtml(String(f.quote_part).replace('.', ','))} % · ${escapeHtml(f.destinataire_nom || '')} ${etat}</div>
+          <div><b>${escapeHtml(f.numero_facture)}</b> — ${escapeHtml(FCEE_TYPES[f.type] || '')} ${escapeHtml(String(f.quote_part).replace('.', ','))} % · ${escapeHtml(f.destinataire_nom || '')} ${etat}${f.importee ? ' <span class="fcee-tag fcee-importee" data-fcee-importee>Importée</span>' : ''}</div>
           <div style="font-size:12px;color:#475569;margin-top:2px;">Date ${escapeHtml(fceeDate(f.date_facture))} · échéance ${escapeHtml(fceeDate(f.echeance))} · ${escapeHtml(fceeEuros(f.net_a_payer))} net à payer${f.ref_appel ? ` · appel ${escapeHtml(f.ref_appel)}` : ''}</div>
           <div class="docs-devis-actions fcee-suivi">
             ${f.available ? `<button type="button" class="hexa-meta-card-action" data-fcee-pdf="${escapeHtml(f.numero_facture)}">📥 Ouvrir</button>` : '<span class="pv-muted" style="font-size:12px;">PDF indisponible</span>'}
@@ -10843,6 +10843,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
         </div>`;
       }).join('') : '<div class="pv-muted" style="font-size:12px;margin-top:6px;">Aucune facture délégataire pour ce dossier.</div>');
     root.querySelector('[data-fcee-ouvrir]')?.addEventListener('click', () => ouvrirFactureDelegataire(data));
+    root.querySelector('[data-fcee-importer]')?.addEventListener('click', () => importerFactureDelegataire(data));
     root.querySelectorAll('[data-fcee-pdf]').forEach(b => b.addEventListener('click', () =>
       window.open(`/api/admin/facture-cee/${encodeURIComponent(currentProspect)}/download?numero_facture=${encodeURIComponent(b.dataset.fceePdf)}`, '_blank')));
     root.querySelectorAll('[data-fcee-row]').forEach(row => {
@@ -10858,6 +10859,101 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     });
   }
   window.refreshFacturesDelegataire = refreshFacturesDelegataire;
+
+  // Lot 11c : importer une facture délégataire DÉJÀ ÉMISE (hors CRM). Le PDF est rangé tel quel ; son numéro est réservé
+  // dans la série FA-CEE (doublon refusé) ; elle compte comme un acompte émis pour le solde du dossier.
+  function importerFactureDelegataire(data) {
+    document.getElementById('fcee-import-overlay')?.remove();
+    const f0 = data.formulaire || {}, parDeleg = data.delegataires || {};
+    const pct0 = Number(f0.quote_part) || 100;
+    const r2 = v => Math.round((v + Number.EPSILON) * 100) / 100;
+    const num = v => { const n = parseFloat(String(v ?? '').replace(/[\s\u00a0\u202f€]/g, '').replace(',', '.')); return isFinite(n) ? n : 0; };
+    const valo = num(f0.volume_precaire_mwh) * num(f0.prix_precaire) + num(f0.volume_classique_mwh) * num(f0.prix_classique);
+    const prime0 = r2(num(f0.prime_operation) * pct0 / 100), comm0 = r2((valo - num(f0.prime_operation)) * pct0 / 100), tva0 = r2(comm0 * 0.2);
+    const champ = (k, lab, val, attrs) => `<label class="fcee-champ"><span>${lab}</span><input data-k="${k}" value="${escapeHtml(val ?? '')}" ${attrs || 'type="text"'}></label>`;
+    const champD = (k, lab) => `<label class="fcee-champ"><span>${lab}</span><input data-dest="${k}" type="text" value="${escapeHtml((f0.destinataire || {})[k] || '')}"></label>`;
+    const nombre = 'type="text" inputmode="decimal"';
+    const wrap = document.createElement('div');
+    wrap.id = 'fcee-import-overlay';
+    wrap.className = 'devis-modal-overlay';
+    wrap.innerHTML = `
+      <div class="fcee-box" role="dialog" aria-modal="true" aria-labelledby="fcee-import-titre">
+        <h3 id="fcee-import-titre">Importer une facture délégataire déjà émise</h3>
+        <p class="fcee-note">Le PDF est enregistré tel quel (jamais régénéré). Son numéro est réservé dans la série FA-CEE sans décaler la numérotation ; la facture compte comme émise pour le solde du dossier. Pré-rempli d'après le dossier : recopiez les valeurs imprimées sur la facture.</p>
+        <label class="fcee-champ"><span>PDF de la facture</span><input type="file" accept="application/pdf" data-fcee-fichier></label>
+        <fieldset><legend>Facture</legend><div class="fcee-grille">
+          ${champ('numero_facture', 'N° de facture', '', 'type="text" placeholder="FA-CEE-2026-0001"')}
+          ${champ('date_facture', 'Date de facture', f0.date_facture, 'type="date"')}
+          <label class="fcee-champ"><span>Délégataire</span><select data-k="delegataire">${Object.keys(parDeleg).map(k => `<option value="${escapeHtml(k)}"${k === f0.delegataire ? ' selected' : ''}>${escapeHtml(k === 'PICOTY' ? 'PICOTY (ECAIR)' : k)}</option>`).join('')}</select></label>
+          <label class="fcee-champ"><span>Type</span><select data-k="type">${Object.entries(FCEE_TYPES).map(([k, v]) => `<option value="${k}"${f0.type === k ? ' selected' : ''}>${v}</option>`).join('')}</select></label>
+          ${champ('quote_part', 'Quote-part (%)', f0.quote_part, nombre)}
+          ${champ('ref_appel', 'Réf. appel à facturation', '')}
+          ${champ('ref_contrat', 'Réf. contrat', f0.ref_contrat)}
+          ${champ('ref_operation', 'Réf. opération', '')}
+          ${champ('beneficiaire', 'Bénéficiaire', f0.beneficiaire)}${champ('adresse_travaux', 'Adresse des travaux', f0.adresse_travaux)}
+        </div></fieldset>
+        <fieldset><legend>Destinataire</legend><div class="fcee-grille">
+          ${champD('raison_sociale', 'Raison sociale')}${champD('forme', 'Forme')}${champD('nom_commercial', 'Nom commercial')}
+          ${champD('adresse', 'Adresse')}${champD('immatriculation', 'SIREN / RCS')}${champD('tva', 'N° TVA intracom.')}${champD('mandataire', 'Mandataire')}
+        </div></fieldset>
+        <fieldset><legend>Volume et montants imprimés sur la facture</legend><div class="fcee-grille">
+          ${champ('volume_precaire_mwh', 'Volume précaire (MWh cumac)', f0.volume_precaire_mwh, nombre)}${champ('volume_classique_mwh', 'Volume classique (MWh cumac)', f0.volume_classique_mwh, nombre)}
+          ${champ('prix_precaire', 'Prix précaire (€/MWhc)', f0.prix_precaire, nombre)}${champ('prix_classique', 'Prix classique (€/MWhc)', f0.prix_classique, nombre)}
+          ${champ('prime_ht', 'Prime bénéficiaire (€)', prime0, nombre)}${champ('commission_ht', 'Commission HT (€)', comm0, nombre)}
+          ${champ('tva', 'TVA (€)', tva0, nombre)}${champ('total_ttc', 'Total TTC (€)', r2(prime0 + comm0 + tva0), nombre)}
+        </div></fieldset>
+        <fieldset><legend>Suivi</legend><div class="fcee-grille">
+          <label class="fcee-champ"><span>Statut</span><select data-k="statut"><option value="envoyee">Envoyée</option><option value="payee">Payée</option></select></label>
+          <label class="fcee-champ" data-fcee-paiement hidden><span>Date de paiement</span><input data-k="date_paiement" type="date"></label>
+        </div></fieldset>
+        <div class="fcee-res" data-fcee-res hidden></div>
+        <div class="rectif-apercu-actions">
+          <button type="button" class="adm-btn adm-btn-cancel" data-fcee-annuler>Annuler</button>
+          <button type="button" class="adm-btn adm-btn-primary" data-fcee-importer-ok>📄 Importer la facture</button>
+        </div>
+      </div>`;
+    document.body.appendChild(wrap);
+    const q = sel => wrap.querySelector(sel);
+    const val = k => q(`[data-k="${k}"]`);
+    let ttcSaisi = false;
+    val('total_ttc').addEventListener('input', () => { ttcSaisi = true; });
+    ['prime_ht', 'commission_ht', 'tva'].forEach(k => val(k).addEventListener('input', () => {
+      if (!ttcSaisi) val('total_ttc').value = String(r2(num(val('prime_ht').value) + num(val('commission_ht').value) + num(val('tva').value)));
+    }));
+    val('delegataire').addEventListener('change', () => {
+      const d = parDeleg[val('delegataire').value] || {};
+      wrap.querySelectorAll('[data-dest]').forEach(el => { el.value = (d.destinataire || {})[el.dataset.dest] || ''; });
+      val('ref_contrat').value = d.ref_contrat || ''; val('prix_precaire').value = d.prix_precaire ?? ''; val('prix_classique').value = d.prix_classique ?? '';
+    });
+    val('statut').addEventListener('change', () => {
+      q('[data-fcee-paiement]').hidden = val('statut').value !== 'payee';
+      if (val('statut').value === 'payee' && !val('date_paiement').value) val('date_paiement').value = new Date().toISOString().slice(0, 10);
+    });
+    const res = q('[data-fcee-res]');
+    const afficher = (html, ok) => { res.hidden = false; res.className = 'fcee-res ' + (ok ? 'ok' : 'ko'); res.innerHTML = html; };
+    q('[data-fcee-annuler]').addEventListener('click', () => wrap.remove());
+    q('[data-fcee-importer-ok]').addEventListener('click', async () => {
+      const fichier = q('[data-fcee-fichier]').files[0];
+      if (!fichier) { afficher('⚠ Choisissez le PDF de la facture.', false); return; }
+      const d = { destinataire: {} };
+      wrap.querySelectorAll('[data-k]').forEach(el => { d[el.dataset.k] = el.value; });
+      wrap.querySelectorAll('[data-dest]').forEach(el => { d.destinataire[el.dataset.dest] = el.value; });
+      const fd = new FormData();
+      fd.append('fichier', fichier);
+      fd.append('donnees', JSON.stringify(d));
+      const b = q('[data-fcee-importer-ok]');
+      b.disabled = true;
+      try {
+        const r = await fetch(`/api/admin/facture-cee/${encodeURIComponent(currentProspect)}/importer`, { method: 'POST', body: fd });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) { afficher('⚠ Rien n’a été importé : ' + escapeHtml(j.detail || ('erreur ' + r.status)), false); b.disabled = false; return; }
+        afficher(`✓ Facture <b data-fcee-importee-ok>${escapeHtml(j.numero_facture)}</b> importée. Elle est dans « Factures délégataire ».`, true);
+        b.hidden = true; q('[data-fcee-annuler]').textContent = 'Fermer';
+        wrap.querySelectorAll('input, select').forEach(el => { el.disabled = true; });
+        refreshFacturesDelegataire();
+      } catch (e) { afficher('⚠ Le serveur n’a pas répondu : vérifiez la liste avant de réessayer.', false); b.disabled = false; }
+    });
+  }
 
   function ouvrirFactureDelegataire(data) {
     document.getElementById('fcee-overlay')?.remove();
@@ -21525,6 +21621,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
   .fcee-envoyee { background: #E0F2FE; color: #075985; }
   .fcee-payee { background: #DCFCE7; color: #166534; }
   .fcee-retard { background: #FEE2E2; color: #B91C1C; }
+  .fcee-importee { background: #F1F5F9; color: #475569; }
   .docs-devis-row.fcee-row-retard { border-left: 3px solid #DC2626; padding-left: 8px; background: #FEF2F2; }
   .fcee-suivi { align-items: center; flex-wrap: wrap; }
   .fcee-suivi select, .fcee-suivi input[type=date] { font: inherit; font-size: 12px; height: 28px; }
