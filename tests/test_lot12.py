@@ -240,3 +240,29 @@ def test_regenerer_absent_sur_dossier_facture(page):
     page.click("#btn-voir-devis")
     page.wait_for_selector("#devis-preview-frame")
     assert page.query_selector("#devis-regen-btn") is None and page.is_visible("#devis-pdf-btn")
+
+
+# ---------------------------------------------------------------- 3 : case « Projet en un coup d'œil »
+COUP_D_OEIL = "VOTRE PROJET EN UN COUP D'ŒIL"
+
+
+def test_case_projet_en_un_coup_d_oeil_masque_le_bloc_partout(page):
+    ouvrir_etape6(page)
+    case = page.locator("#sim-afficher-apercu")
+    assert page.inner_text("label:has(#sim-afficher-apercu)").strip() == "Projet en un coup d'œil"
+    assert "Économies sur le devis" not in page.inner_text("#p-hotes")
+    assert case.is_checked()
+    page.click("label:has(#sim-afficher-apercu)")
+    assert not case.is_checked()
+    page.click("#btn-voir-devis")
+    page.wait_for_selector("#devis-preview-frame")
+    page.wait_for_timeout(1500)
+    assert COUP_D_OEIL not in apercu(page).upper()
+    assert COUP_D_OEIL not in texte_pdf(page).upper()
+    ouvrir_etape6(page)                                            # réglage enregistré pour ce prospect
+    assert etat_serveur(page).get("afficher_apercu") is False and not page.locator("#sim-afficher-apercu").is_checked()
+    page.click("label:has(#sim-afficher-apercu)")
+    page.click("#btn-voir-devis")
+    page.wait_for_selector("#devis-preview-frame")
+    page.wait_for_timeout(1500)
+    assert COUP_D_OEIL in apercu(page).upper()

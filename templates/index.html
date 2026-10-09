@@ -12820,7 +12820,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
           <button type="button" class="p6-btn p6-btn--prec" data-p6-go="5">← Besoin</button>
           <button type="button" class="p6-btn p6-btn--bleu" id="sim-arguments-btn" aria-expanded="${state.arguments_ouverts ? 'true' : 'false'}">Arguments</button>
           <span class="p6-cases">
-            <label class="l4s-case"><input type="checkbox" id="sim-afficher-apercu" ${state.afficher_apercu !== false ? 'checked' : ''}> Économies sur le devis</label>
+            <label class="l4s-case" title="Bloc « Votre projet en un coup d'œil » (rentabilité, économies, nouvelle facture) sur le pré-devis, le devis et le PDF"><input type="checkbox" id="sim-afficher-apercu" ${state.afficher_apercu !== false ? 'checked' : ''}> Projet en un coup d'œil</label>
             <label class="l4s-case"><input type="checkbox" id="sim-afficher-mention-mpr" ${state.afficher_mention_mpr !== false ? 'checked' : ''}> Mention MaPrimeRénov'</label>
           </span>
           ${document.body.dataset.vtValidee === '1' ? '<button type="button" id="btn-note-definitive" class="p6-btn p6-btn--vert">📐 Note de dim définitive</button>' : ''}
