@@ -3,6 +3,7 @@
 du clic ; bouton « Régénérer » ; case « Projet en un coup d'œil » ; bouton « Enregistrer » explicite.
 Vrai Chromium, fiche fabriquée PR-95001 (gaz, 4 pers., chauffage + eau chaude)."""
 import copy
+import io
 import json
 import re
 import socket
@@ -13,6 +14,7 @@ import pytest
 
 import main
 
+pypdf = pytest.importorskip("pypdf")
 sync_api = pytest.importorskip("playwright.sync_api")
 uvicorn = pytest.importorskip("uvicorn")
 
@@ -198,3 +200,43 @@ def test_changer_la_surface_recalcule_le_modele(page):
     page.wait_for_timeout(600)
     vu = ecran(page)
     assert vu["modele"] != NIMBUS_NOM and vu["prix"] != "17 321", vu
+
+
+# ---------------------------------------------------------------- 2 : « Régénérer »
+def texte_pdf(pg):
+    with pg.expect_download(timeout=90000) as dl:
+        pg.click("#devis-pdf-btn")
+    pdf = open(dl.value.path(), "rb").read()
+    return espaces(" ".join((p.extract_text() or "") for p in pypdf.PdfReader(io.BytesIO(pdf)).pages))
+
+
+def test_regenerer_reconstruit_depuis_l_ecran_et_le_pdf_suit(page):
+    ouvrir_etape6(page)
+    choisir_nimbus_et_prix(page, 17321)
+    vu = ecran(page)
+    page.click("#btn-voir-devis")
+    page.wait_for_selector("#devis-preview-frame")
+    page.wait_for_timeout(2500)
+    # état serveur devenu périmé (ex. autre onglet resté sur l'ancien modèle) : l'aperçu rechargé le montrerait
+    page.evaluate("""n => fetch('/api/simulateur/' + n + '/state', {method: 'POST', headers: {'Content-Type': 'application/json'},
+                         body: JSON.stringify({modele_pac_id: 'ATL-EXCELLIA-S-DUO-12', modele_pac_nom: 'ALFÉA EXCELLIA S DUO 12', prix_pac: 15490})})""", NUM)
+    avant = page.get_attribute("#devis-preview-frame", "src")
+    page.click("#devis-regen-btn")
+    page.wait_for_function("document.querySelector('#devis-regen-btn').textContent === 'Régénéré ✓'")
+    assert page.get_attribute("#devis-preview-frame", "src") != avant
+    assert page.is_hidden("#devis-pdf-erreur")
+    etat = etat_serveur(page)
+    assert etat.get("modele_pac_id") == NIMBUS and int(etat.get("prix_pac")) == 17321, etat
+    verifier_document(apercu(page), vu)
+    pdf = texte_pdf(page)
+    assert NIMBUS_NOM in pdf and "ALFÉA" not in pdf and "17 321" in pdf, pdf[:500]
+    assert vu["pendant_credit"].replace(" ", "") in pdf.replace(" ", "")        # mensualité du crédit comprise
+    assert vu["total20"].replace(" ", "") in pdf.replace(" ", "")               # bloc coup d'œil
+
+
+def test_regenerer_absent_sur_dossier_facture(page):
+    ouvrir_etape6(page)
+    page.evaluate("window.__hexaDossierFige = true")
+    page.click("#btn-voir-devis")
+    page.wait_for_selector("#devis-preview-frame")
+    assert page.query_selector("#devis-regen-btn") is None and page.is_visible("#devis-pdf-btn")

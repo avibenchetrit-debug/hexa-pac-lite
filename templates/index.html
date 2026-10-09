@@ -13830,6 +13830,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
           <div class="devis-modal-title">${vtOk ? 'Devis' : 'Pré-devis'} ${numero}</div>
           <button type="button" class="adm-btn adm-btn-ghost devis-tab${surNote ? '' : ' active'}" data-url="${devisUrl}" data-kind="devis">📄 ${vtOk ? 'Devis' : 'Pré-devis'}</button>
           ${vtOk ? `<button type="button" class="adm-btn adm-btn-ghost devis-tab${surNote ? ' active' : ''}" data-url="${notedimUrl}" data-kind="notedim">📐 Note de dim définitive</button>` : ''}
+          ${window.__hexaDossierFige ? '' : '<button type="button" class="adm-btn adm-btn-ghost" id="devis-regen-btn" title="Enregistre la fiche et le simulateur tels qu\'affichés, puis reconstruit le document">🔄 Régénérer</button>'}
           <button type="button" class="adm-btn adm-btn-primary" id="devis-pdf-btn">📥 Télécharger PDF</button>
           <button type="button" class="devis-send-btn" id="devis-send-btn">📧 Envoyer</button>
           <button type="button" class="devis-close-btn" id="devis-close-btn" aria-label="Fermer">×</button>
@@ -13868,6 +13869,34 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     const pdfErreur = wrap.querySelector('#devis-pdf-erreur');
     const cacherErreurPdf = () => { pdfErreur.hidden = true; };
     pdfErreur.querySelector('button').addEventListener('click', cacherErreurPdf);
+    // Lot 12 : « Régénérer » = même enregistrement que « Voir le devis » (fiche puis simulateur, tels qu'affichés),
+    // puis l'aperçu ouvert est reconstruit par le serveur. Le PDF est toujours calculé à la demande : il suit.
+    const regenBtn = wrap.querySelector('#devis-regen-btn');
+    regenBtn?.addEventListener('click', async ()=>{
+      if (regenBtn.getAttribute('aria-busy') === 'true') return;
+      const libelle = regenBtn.textContent;
+      cacherErreurPdf();
+      regenBtn.disabled = true;
+      regenBtn.setAttribute('aria-busy', 'true');
+      regenBtn.textContent = 'Régénération…';
+      let ok = false;
+      try {
+        const r = await enregistrerAvantDevis(null);
+        if (r !== true) throw new Error(r === 'fiche' ? "la fiche n'a pas pu être enregistrée (vérifiez ses champs)" : "le simulateur n'a pas pu être enregistré");
+        const actif = wrap.querySelector('.devis-tab.active');
+        actif.dataset.url = actif.dataset.url.replace(/([?&]t=)\d+/, '$1' + Date.now());
+        frameDevis.src = actif.dataset.url;
+        ok = true;
+      } catch (err) {
+        pdfErreur.querySelector('span').textContent = `Le document n'a pas pu être régénéré : ${err && err.message ? err.message : 'erreur inattendue'}. Réessayez.`;
+        pdfErreur.hidden = false;
+      } finally {
+        regenBtn.disabled = false;
+        regenBtn.removeAttribute('aria-busy');
+        regenBtn.textContent = ok ? 'Régénéré ✓' : libelle;
+        if (ok) setTimeout(() => { regenBtn.textContent = libelle; }, 2500);
+      }
+    });
     pdfBtn.addEventListener('click', async ()=>{
       if (pdfBtn.getAttribute('aria-busy') === 'true') return;             // un seul PDF à la fois
       const kind = currentKind;
