@@ -13994,6 +13994,10 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
       btn.disabled = true;
       btn.textContent = 'Envoi...';
       try{
+        // Lot 12 : la version envoyée (v1, v2…) est figée par le serveur depuis l'état enregistré -> l'état affiché
+        // (fiche puis proposition) est enregistré d'abord, comme « Régénérer » ; sinon rien ne part.
+        const enregistre = await enregistrerAvantDevis(null);
+        if (enregistre !== true) throw new Error(enregistre === 'fiche' ? "la fiche n'a pas pu être enregistrée : rien n'a été envoyé" : "la proposition n'a pas pu être enregistrée : rien n'a été envoyé");
         const auteur = (localStorage.getItem('hexa_user') || 'Anonyme');
         const r = await fetch(`/api/devis/${encodeURIComponent(numero)}/send`, {
           method:'POST',

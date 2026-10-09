@@ -7,8 +7,10 @@ import io
 import json
 import re
 import socket
+import sys
 import threading
 import time
+import types
 
 import pytest
 
@@ -46,11 +48,16 @@ def _catalogue_avec_nimbus():
 @pytest.fixture(autouse=True)
 def _donnees_restaurees():
     """Catalogue, fiches et paramètres partagés par la suite : remis en l'état après chaque test."""
-    chemins = (main.CATALOGUE_PATH, main.PARAMETRES_ADMIN_PATH, main.LEADS_PATH)
+    chemins = (main.CATALOGUE_PATH, main.PARAMETRES_ADMIN_PATH, main.LEADS_PATH, main.COUNTERS_PATH,
+               main.DEVIS_ENVOYES_PATH, main.DEVIS_META_PATH, main.ECHANGES_PATH)
     sauve = {c: open(c, "rb").read() for c in chemins if main.os.path.exists(c)}
+    absents = [c for c in chemins if not main.os.path.exists(c)]
     yield
     for c, octets in sauve.items():
         open(c, "wb").write(octets)
+    for c in absents:
+        if main.os.path.exists(c):
+            main.os.remove(c)
 
 
 def _semer():
@@ -320,3 +327,54 @@ def test_enregistrer_dit_quand_la_proposition_n_est_pas_enregistree(page):
     page.click("#btn-save")
     toast(page, "la proposition (étape 6) n'a pas pu l'être")
     assert page.inner_text("#btn-save").strip() == "Enregistrer" and page.is_enabled("#btn-save")
+
+
+
+# ---------------------------------------------------------------- 5 : « Envoyer » part avec l'état affiché
+@pytest.fixture
+def envoi_simule(monkeypatch):
+    """Envoi e-mail simulé (comme scripts/e2e_appel_local.py) : aucun service extérieur."""
+    envois = []
+    faux = types.ModuleType("resend")
+    faux.Emails = types.SimpleNamespace(send=lambda msg: envois.append(msg) or {"id": f"factice-{len(envois)}"})
+    monkeypatch.setitem(sys.modules, "resend", faux)
+    monkeypatch.setenv("RESEND_API_KEY", "cle-factice-locale")
+    return envois
+
+
+def test_envoyer_enregistre_l_ecran_avant_de_figer_la_version(page, envoi_simule):
+    ouvrir_etape6(page)
+    choisir_nimbus_et_prix(page, 17321)
+    page.click("#btn-voir-devis")
+    page.wait_for_selector("#devis-preview-frame")
+    page.wait_for_timeout(2500)
+    # état serveur devenu périmé pendant que la fenêtre est ouverte (ex. traitement en arrière-plan, autre onglet)
+    page.evaluate("""n => fetch('/api/simulateur/' + n + '/state', {method: 'POST', headers: {'Content-Type': 'application/json'},
+                         body: JSON.stringify({modele_pac_id: 'ATL-EXCELLIA-S-DUO-12', modele_pac_nom: 'ALFÉA EXCELLIA S DUO 12', prix_pac: 15490})})""", NUM)
+    page.click("#devis-send-btn")
+    messages = []
+    page.on("dialog", lambda d: (messages.append(d.message), d.accept()))
+    page.click("#btn-send-predevis")
+    page.wait_for_function("!document.getElementById('modal-envoi-mail')", timeout=120000)
+    assert messages == ["Pré-devis envoyé au client."], messages
+    assert len(envoi_simule) >= 1
+    fige = main._read_devis_meta()[NUM][-1]                       # la version figée (v1) envoyée au client
+    html_fige = espaces(open(fige["html_file"], encoding="utf-8").read())
+    assert NIMBUS_NOM in html_fige and "ALFÉA" not in html_fige and "17 321" in html_fige
+    assert etat_serveur(page).get("modele_pac_id") == NIMBUS
+
+
+def test_envoyer_n_envoie_rien_si_la_proposition_n_est_pas_enregistree(page, envoi_simule):
+    ouvrir_etape6(page)
+    page.click("#btn-voir-devis")
+    page.wait_for_selector("#devis-preview-frame")
+    page.wait_for_timeout(2000)
+    page.route("**/api/simulateur/*/state", lambda r: r.fulfill(status=500, body="{}") if r.request.method == "POST" else r.continue_())
+    page.click("#devis-send-btn")
+    messages = []
+    page.on("dialog", lambda d: (messages.append(d.message), d.accept()))
+    page.click("#btn-send-predevis")
+    page.wait_for_function("document.getElementById('btn-send-predevis').textContent.includes('Envoyer')")
+    page.wait_for_timeout(300)
+    assert messages and "rien n'a été envoyé" in messages[0], messages
+    assert envoi_simule == [] and not main._read_devis_meta().get(NUM)
