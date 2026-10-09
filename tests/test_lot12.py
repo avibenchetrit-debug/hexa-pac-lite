@@ -266,3 +266,57 @@ def test_case_projet_en_un_coup_d_oeil_masque_le_bloc_partout(page):
     page.wait_for_selector("#devis-preview-frame")
     page.wait_for_timeout(1500)
     assert COUP_D_OEIL in apercu(page).upper()
+
+
+# ---------------------------------------------------------------- 4 : « Enregistrer » dans le bandeau
+def toast(pg, texte):
+    pg.wait_for_function("t => Array.from(document.querySelectorAll('.pv-toast')).some(x => x.textContent.includes(t))", arg=texte)
+
+
+def test_enregistrer_visible_aux_6_etapes_et_navigation_intacte(page):
+    ouvrir_etape6(page)
+    page.evaluate("window.hexaParcoursEtape(1)")
+    page.wait_for_timeout(300)
+    for n in range(1, 7):
+        assert page.is_visible("#prospect-sticky-bar #btn-save"), n
+        assert page.inner_text("#btn-save").strip() == "Enregistrer"
+        assert page.query_selector("#p-carte .p-nav #btn-save") is None
+        assert page.evaluate("document.body.dataset.p6Etape") == str(n)
+        if n < 6:
+            page.click("#p-suiv")                                   # « Suivant » : sans rapport avec l'enregistrement
+            page.wait_for_timeout(250)
+    assert page.is_hidden("#form-actions-bar")
+
+
+def test_enregistrer_nimbus_et_prix_puis_recharger(page):
+    ouvrir_etape6(page)
+    choisir_nimbus_et_prix(page, 17321)
+    page.click("#btn-save")
+    toast(page, "Enregistré ✓ — fiche et proposition")
+    etat = etat_serveur(page)                                       # tout de suite, sans attendre l'envoi différé
+    assert etat.get("modele_pac_id") == NIMBUS and int(etat.get("prix_pac")) == 17321, etat
+    ouvrir_etape6(page)
+    vu = ecran(page)
+    assert vu["modele"] == NIMBUS_NOM and vu["prix"] == "17 321"
+
+
+def test_enregistrer_un_champ_de_la_fiche_puis_recharger(page):
+    ouvrir_etape6(page)
+    page.evaluate("window.hexaParcoursEtape(1)")
+    page.fill('[name="prenom"]', "Faustina")
+    assert page.eval_on_selector("#btn-save", "b => b.classList.contains('is-modifie')")      # pastille « non enregistré »
+    page.click("#btn-save")
+    toast(page, "Enregistré ✓")
+    assert not page.eval_on_selector("#btn-save", "b => b.classList.contains('is-modifie')")
+    ouvrir_etape6(page)
+    assert page.input_value('[name="prenom"]') == "Faustina"
+    assert main._find_lead(NUM)["prenom"] == "Faustina"
+
+
+def test_enregistrer_dit_quand_la_proposition_n_est_pas_enregistree(page):
+    ouvrir_etape6(page)
+    choisir_nimbus_et_prix(page, 17321)
+    page.route("**/api/simulateur/*/state", lambda r: r.fulfill(status=500, body="{}") if r.request.method == "POST" else r.continue_())
+    page.click("#btn-save")
+    toast(page, "la proposition (étape 6) n'a pas pu l'être")
+    assert page.inner_text("#btn-save").strip() == "Enregistrer" and page.is_enabled("#btn-save")

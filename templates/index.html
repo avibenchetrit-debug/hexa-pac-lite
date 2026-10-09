@@ -8915,6 +8915,9 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
   }
   async function onSaveClick(e) {
     const suiteDevis = window.__hexaApresFiche || null;   // Lot 6g : lu avant tout « await » (doublon -> « Continuer » -> devis)
+    // Lot 12 : vrai clic sur « Enregistrer » (hexaEnregistrerFiche, appelé par « Voir le devis » / « Régénérer »,
+    // passe un faux évènement : ceux-là enregistrent le simulateur eux-mêmes juste après)
+    const clicBouton = e instanceof Event;
     // Toujours re-cibler les noeuds actifs (PJAX / toggle édition)
     btnSave = document.getElementById('btn-save');
     form = document.getElementById('form-prospect');
@@ -9026,7 +9029,8 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
         }
         btnSave.dataset.ctaMode = savedNumero ? 'view' : 'create';
         setSaveCtaLabel(savedNumero ? 'MODIFIER' : 'ENREGISTRER');
-        saveToast('Prospect enregistré ✓', '#0D6B3B');
+        const simEnregistrable = clicBouton && typeof window.hexaSimEnregistrerMaintenant === 'function';
+        if (!simEnregistrable) saveToast('Prospect enregistré ✓', '#0D6B3B');
         // 1er enregistrement : les notes/échanges saisis en brouillon rejoignent le lead.
         // Aussi quand la création a fusionné dans un lead existant (created=false, sans
         // numéro de départ) : sinon ils resteraient sous la clé TMP et seraient purgés.
@@ -9035,6 +9039,16 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
         }
         if (typeof window.syncCurrentProspectToSimulatorState === 'function') {
           window.syncCurrentProspectToSimulatorState();
+        }
+        // Lot 12 : « Enregistrer » enregistre aussi le simulateur tout de suite (pas dans 1,5 s) et le confirme
+        if (simEnregistrable) {
+          btn.disabled = true;
+          btn.innerHTML = '⏳ Enregistrement…';
+          const simOk = await window.hexaSimEnregistrerMaintenant();
+          btn.disabled = false;
+          setSaveCtaLabel(savedNumero ? 'MODIFIER' : 'ENREGISTRER');
+          if (simOk) saveToast('Enregistré ✓ — fiche et proposition', '#0D6B3B');
+          else saveToast("Fiche enregistrée, mais la proposition (étape 6) n'a pas pu l'être. Réessayez.", '#B91C1C');
         }
         if (typeof window.hexaRefreshProspectsTable === 'function') {
           window.hexaRefreshProspectsTable();
@@ -9073,8 +9087,17 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     if (!btnSave || btnSave.tagName === 'A') return;
     const label = (text || '').trim();
     btnSave.dataset.label = label;
+    // Lot 12 : dans le bandeau du parcours, toujours « Enregistrer » ; une pastille signale des modifications non enregistrées
+    if (btnSave.closest('#prospect-sticky-bar')) {
+      const modifie = label === 'ENREGISTRER MODIF.';
+      btnSave.classList.toggle('is-modifie', modifie);
+      btnSave.title = modifie ? 'Modifications non enregistrées' : 'Enregistrer la fiche et la proposition';
+      btnSave.innerHTML = SAVE_ICON_SVG + 'Enregistrer';
+      return;
+    }
     btnSave.innerHTML = SAVE_ICON_SVG + label;
   }
+  window.hexaSaveCtaLabel = setSaveCtaLabel;
 
   function initSaveCtaState() {
     btnSave = document.getElementById('btn-save');
@@ -14035,6 +14058,13 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
   }
   window.syncSimulateurDepuisFiche = syncDepuisFiche;
   window.syncCurrentProspectToSimulatorState = syncCurrentProspectToSimulatorState;
+  // Lot 12 : bouton « Enregistrer » — l'état affiché part tout de suite (l'envoi différé de 1,5 s est annulé) ; true = enregistré
+  window.hexaSimEnregistrerMaintenant = function(){
+    if (window.__hexaEstimationExpress) return Promise.resolve(true);
+    if (!state.numero) state.numero = (document.body.dataset.prospectNumero || '').trim() || null;   // fiche qui vient d'être créée
+    clearTimeout(simSaveTimeout);
+    return saveSimulatorState();
+  };
 
   // input + change couvrent saisie clavier et sélection
   ['input','change'].forEach(evt=>{
@@ -18822,7 +18852,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     if(btnSave){
       btnSave.style.display='inline-flex';
       btnSave.dataset.ctaMode='view';
-      if(btnSave.tagName==='BUTTON') btnSave.textContent='MODIFIER';
+      if(btnSave.tagName==='BUTTON'){ if(typeof window.hexaSaveCtaLabel==='function') window.hexaSaveCtaLabel('MODIFIER'); else btnSave.textContent='MODIFIER'; }   // Lot 12 : « Enregistrer » dans le bandeau
     }
     const nomEl=form.querySelector('[name="nom"]'); if(nomEl) nomEl.value=window.formatNomDisplay(nomEl.value);
     const prenomEl=form.querySelector('[name="prenom"]'); if(prenomEl) prenomEl.value=window.formatPrenomDisplay(prenomEl.value);
@@ -21277,9 +21307,15 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     if (tete && leg) { tete.appendChild(leg); }
     const t6 = document.querySelector('.p6-tete6'), lh = document.querySelector('.p6-legende-hote');
     if (t6 && lh && lh.firstChild) t6.appendChild(lh.firstChild);
-    // Enregistrer : dans le pied de carte (la barre du bas disparaît : zéro défilement)
-    const save = document.getElementById('btn-save'), pied = document.querySelector('#p-carte .p-nav');
-    if (save && pied) { const suiv = document.getElementById('p-suiv'); pied.insertBefore(save, suiv); document.body.classList.add('p6-save-pied'); }
+    // Enregistrer : dans le bandeau du prospect, après « Fin d'appel », visible aux 6 étapes (Lot 12 ; avant : pied de
+    // carte, masqué à l'étape 6). Même bouton, mêmes écouteurs ; la barre du bas disparaît (zéro défilement).
+    const save = document.getElementById('btn-save'), bandeau = document.getElementById('prospect-sticky-bar');
+    if (save && bandeau) {
+      const actions = bandeau.querySelector('.psb-actions');
+      if (actions) bandeau.insertBefore(save, actions); else bandeau.appendChild(save);
+      document.body.classList.add('p6-save-bandeau');
+      if (typeof window.hexaSaveCtaLabel === 'function') window.hexaSaveCtaLabel(save.dataset.label || '');
+    }
     // notification de recherche DPE : à l'étape 2, sous le bandeau (plus répétée aux autres étapes)
     const notif = document.getElementById('dpe-lookup-bandeau'), bande = document.getElementById('p6-dpe-bande');
     if (notif && bande) bande.insertAdjacentElement('afterend', notif);
@@ -22087,13 +22123,17 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
 <style id="hexa-lot6b">
   /* ================= Lot 6b — zéro défilement à 1366×768 (zoom 0,9), panneaux latéraux, bandeau DPE compact ================= */
   /* habillage : bouton Enregistrer dans le pied de carte ; en-tête de carte sur une ligne avec la légende */
-  body.l6.p6-save-pied #form-actions-bar, body.l6.p6-save-pied .form-actions-anchor { display: none !important; }
+  body.l6.p6-save-bandeau #form-actions-bar, body.l6.p6-save-bandeau .form-actions-anchor { display: none !important; }
   body.l6 .p-nav { padding: 7px 18px; gap: 10px; }
   body.l6 .p-nav-btn { height: 40px; font-size: 15px; padding: 0 22px; }
   body.l6 .p-nav-btn--prec { font-size: 14px; padding: 0 16px; }
-  body.l6 .p-nav .btn-save { margin: 0 0 0 auto !important; height: 40px !important; min-height: 0 !important; line-height: 40px !important;
-    padding: 0 18px !important; font-size: 13.5px !important; border-radius: 8px !important; width: auto !important; box-shadow: none !important; }
-  body.l6 .p-nav .btn-save svg { width: 15px; height: 15px; }
+  body.l6 #prospect-sticky-bar .btn-save { flex: none; margin: 0 !important; height: 28px !important; min-height: 0 !important; line-height: 28px !important;
+    padding: 0 12px !important; font-size: 12px !important; letter-spacing: 0 !important; border-radius: 8px !important; width: auto !important;
+    gap: 6px; box-shadow: none !important; position: relative; }
+  body.l6 #prospect-sticky-bar .btn-save svg { width: 13px; height: 13px; }
+  /* Lot 12 : modifications de la fiche pas encore enregistrées */
+  body.l6 #prospect-sticky-bar .btn-save.is-modifie::after { content: ''; position: absolute; top: -4px; right: -4px; width: 10px; height: 10px;
+    border-radius: 50%; background: #F59E0B; border: 2px solid #fff; }
   body.l6 .p-carte-tete { display: flex; align-items: center; gap: 12px; padding: 7px 18px; flex-wrap: nowrap; }
   body.l6 .p-carte-tete .p-carte-ligne { flex: none; }
   body.l6 .p-carte-titre { font-size: 18px; white-space: nowrap; }
