@@ -11960,9 +11960,11 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     set('iso_menuiserie', state.iso_menuiserie || 'double');
     set('service', state.service || 'chauffage_ecs');
   }
+  // Lot 12 : appelée après chaque enregistrement de la fiche (dont celui de « Voir le devis ») : le modèle choisi est
+  // gardé (sinon retour au « Recommandé » juste avant l'envoi de l'état, et le devis partait avec l'autre modèle).
+  // Une donnée de la fiche qui change la puissance relance toujours le choix (syncDepuisFiche).
   function syncCurrentProspectToSimulatorState(){
     lireContexteFiche();
-    state.modele_force = false;
     syncSimStateToForm(true);
     scheduleSaveSimulatorState();
     if (estOuvert()) refresh();
