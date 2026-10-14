@@ -5,8 +5,10 @@ Données : « Valeur verte des logements : écarts de prix par étiquette DPE (6
 (data.gouv.fr / france-dpe.fr), dans data/valeur_verte/ : écart de prix au m² de chaque classe par rapport
 à la classe D (D = 0), par type de bien, en France et par département.
 
-Valeur verte = valeur du bien × (écart[classe après] − écart[classe avant]) ; écart du département s'il
-existe pour cette classe, sinon écart France. Fourchette ± 30 % (admin). Montants arrondis à la centaine.
+Valeur verte = valeur du bien × (écart[classe après] − écart[classe avant]), une seule source par calcul : le
+département s'il a un écart pour la classe avant ET pour la classe après, sinon la France pour les deux. Garde-fou :
+une classe qui s'améliore ne donne jamais une valeur négative (département -> France ; sinon pas de valeur verte).
+Fourchette ± 30 % (admin). Montants arrondis à la centaine.
 
 Version serveur de window.HexaValeurVerte (templates/index.html, bloc HEXA-VALEUR-VERTE) ; les deux sont
 tenues identiques par tests/test_lot13_valeur_verte.py."""
@@ -46,14 +48,18 @@ def departement(cp):
     return cp[:3] if cp.startswith("97") else cp[:2]
 
 
-def ecarts(tab, dep, tb):
-    """Écart (%) par classe : département si la classe y figure, sinon France ; D = 0."""
+def ecarts(tab, dep, tb, classe_avant, classe_apres):
+    """Écarts (%) par classe d'UNE seule source, et cette source ('departement' | 'france') : le département
+    s'il a un écart pour la classe avant ET la classe après (D = 0 partout), sinon la France pour les deux."""
     fr = (tab.get("france") or {}).get(tb) or {}
     dp = ((tab.get("departements") or {}).get(dep) or {}).get(tb) or {}
-    out = {}
-    for c in CLASSES:
-        out[c] = 0.0 if c == "D" else (dp[c] if c in dp else fr.get(c, 0.0))
-    return out
+    a = lambda src, c: c == "D" or c in src  # noqa: E731
+    src, nom = (dp, "departement") if dep and a(dp, classe_avant) and a(dp, classe_apres) else (fr, "france")
+    return {c: 0.0 if c == "D" else src.get(c, 0.0) for c in CLASSES}, nom
+
+
+def libelle_ecarts(source, dep):
+    return f"Source : département {dep}" if source == "departement" else "Source : France entière"
 
 
 def valeur_bien(valeur_bien_estimee, prix_m2_estime, surface):
@@ -72,6 +78,8 @@ def calculer(valeur, classe_avant, classe_apres, ec, fourchette_pct=30):
     if not ok or CLASSES.index(classe_apres) >= CLASSES.index(classe_avant):
         return {"ok": False, "raison": "classe"}
     ecart = ec[classe_apres] - ec[classe_avant]
+    if ecart <= 0:
+        return {"ok": False, "raison": "ecart"}
     vv = valeur * ecart / 100
     f = (_num(fourchette_pct, 30) or 0) / 100
     return {"ok": True, "valeur": _arrondi(vv / 100) * 100, "min": _arrondi(vv * (1 - f) / 100) * 100,
@@ -87,10 +95,15 @@ def projet(entree, res, params, tab=None):
     cls = dpe_estime.classes_projet(dpe_estime.classe_reelle(entree.get("classe_dpe_avant"), entree.get("dpe_connu")), est)
     if not cls.get("ok"):
         return {"ok": False, "raison": "economies"}
-    ec = ecarts(tab, departement(entree.get("cp")), type_bien(entree.get("type_logement")))
-    r = calculer(entree.get("valeur_bien"), cls["classe_avant"], cls["classe_apres"], ec,
-                 dpe_estime.params_dpe(params)["valeur_verte_fourchette_pct"])
+    dep, tb, av, ap = departement(entree.get("cp")), type_bien(entree.get("type_logement")), cls["classe_avant"], cls["classe_apres"]
+    fourchette = dpe_estime.params_dpe(params)["valeur_verte_fourchette_pct"]
+    ec, source = ecarts(tab, dep, tb, av, ap)
+    r = calculer(entree.get("valeur_bien"), av, ap, ec, fourchette)
+    if r.get("raison") == "ecart" and source == "departement":    # garde-fou : jamais négative -> France
+        ec, source = ecarts(tab, "", tb, av, ap)
+        r = calculer(entree.get("valeur_bien"), av, ap, ec, fourchette)
     r.update({"classe_avant": cls["classe_avant"], "classe_apres": cls["classe_apres"], "dpe_reel": cls["dpe_reel"],
               "libelle_classes": f"Classe {cls['classe_avant']} → {cls['classe_apres']}",
-              "libelle_source": "(DPE réel)" if cls["dpe_reel"] else "(classe estimée)"})
+              "libelle_source": "(DPE réel)" if cls["dpe_reel"] else "(classe estimée)",
+              "source_ecarts": source, "libelle_ecarts": libelle_ecarts(source, dep)})
     return r

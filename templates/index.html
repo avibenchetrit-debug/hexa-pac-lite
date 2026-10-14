@@ -13118,7 +13118,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
         <div class="p6-blk p-quand"><h4>② QUI PAIE, ET QUAND <span>· pour le client : − ce qu'il paie, + ce qu'il récupère</span></h4>${flux}</div>
         <div class="sim-roi p6-roi"><div class="p6-g ${vvOk ? 'p6-g3' : 'p6-g2'} p6-tuiles">
           <div class="p6-tuile${ecoMois < 0 ? ' p6-tuile--warn' : ''}"><span>Économies d'énergie</span><b id="p6-tuile-eco">${eco ? eur(ecoMois) + '/mois' : '—'}</b><i>${eco ? `${eur(state.facture_avant)} → ${eur(state.facture_apres)}/mois` : 'facture inconnue'}</i>${total20 !== null ? `<i><b class="sim-roi-big">${eur(total20)}</b> sur ${dureeTuile} ans</i>` : ''}${rentTxt ? `<i id="p6-tuile-rent">${rentTxt}</i>` : ''}</div>
-          ${vvOk ? `<div class="p6-tuile p6-tuile--vv" id="p6-tuile-vv"><span>Valeur verte</span><b>+ ${eur(vv.min)} à + ${eur(vv.max)}</b><i>${vv.libelle_classes}</i><i>${vv.libelle_source}</i></div>` : ''}
+          ${vvOk ? `<div class="p6-tuile p6-tuile--vv" id="p6-tuile-vv"><span>Valeur verte</span><b>+ ${eur(vv.min)} à + ${eur(vv.max)}</b><i>${vv.libelle_classes}</i><i>${vv.libelle_source}</i><i class="p6-vv-ecarts">${vv.libelle_ecarts}</i></div>` : ''}
           <div class="p6-tuile p6-tuile--nuit" id="p6-tuile-total"><span>Gain total sur ${dureeTuile} ans</span><b>${gainTotal !== null ? eur(gainTotal) : '—'}</b><i>${total20 !== null ? `${eur(total20)} d'économies${vvOk ? ` + ${eur(vv.valeur)} de valeur verte` : ' (valeur verte non estimée)'}` : (eco ? `au-delà de ${dureeTuile} ans` : 'facture inconnue')}</i></div>
         </div>
         ${!state.eco ? `<div class="p6-alerte" id="sim-eco-indisponible">Économies non calculées : renseignez la facture de l'énergie de la chaudière, ou la surface et l'énergie du logement pour l'estimer.</div>` : ''}
@@ -19445,13 +19445,16 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     if (d.length < 2) return '';
     return d.startsWith('97') ? d.slice(0, 3) : d.slice(0, 2);
   }
-  function ecarts(tab, dep, tb) {
+  function ecarts(tab, dep, tb, classeAvant, classeApres) {   // une seule source par calcul (miroir de ecarts())
     const fr = ((tab && tab.france) || {})[tb] || {};
     const dp = (((tab && tab.departements) || {})[dep] || {})[tb] || {};
-    const out = {};
-    for (const c of CLASSES) out[c] = c === 'D' ? 0 : (c in dp ? dp[c] : (c in fr ? fr[c] : 0));
-    return out;
+    const a = (src, c) => c === 'D' || c in src;
+    const dept = !!dep && a(dp, classeAvant) && a(dp, classeApres);
+    const src = dept ? dp : fr, out = {};
+    for (const c of CLASSES) out[c] = c === 'D' ? 0 : (c in src ? src[c] : 0);
+    return [out, dept ? 'departement' : 'france'];
   }
+  function libelleEcarts(source, dep) { return source === 'departement' ? `Source : département ${dep}` : 'Source : France entière'; }
   function valeurBien(valeurBienEstimee, prixM2Estime, surface) {
     const v = num(valeurBienEstimee, 0) || 0;
     if (v > 0) return v;
@@ -19463,6 +19466,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     if (!CLASSES.includes(classeAvant) || !CLASSES.includes(classeApres) || !classeAvant || !classeApres
         || CLASSES.indexOf(classeApres) >= CLASSES.indexOf(classeAvant)) return { ok: false, raison: 'classe' };
     const ecart = ec[classeApres] - ec[classeAvant];
+    if (ecart <= 0) return { ok: false, raison: 'ecart' };
     const vv = valeur * ecart / 100;
     const f = (num(fourchettePct, 30) || 0) / 100;
     return { ok: true, valeur: arrondi(vv / 100) * 100, min: arrondi(vv * (1 - f) / 100) * 100,
@@ -19475,14 +19479,21 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     const est = estimer(res, entree.surface, entree.personnes, entree.ecs_chaudiere, params);
     const cls = classesProjet(classeReelle(entree.classe_dpe_avant, entree.dpe_connu), est);
     if (!cls.ok) return { ok: false, raison: 'economies' };
-    const ec = ecarts(tab, departement(entree.cp), typeBien(entree.type_logement));
-    const r = calculer(entree.valeur_bien, cls.classe_avant, cls.classe_apres, ec, paramsDpe(params).valeur_verte_fourchette_pct);
+    const dep = departement(entree.cp), tb = typeBien(entree.type_logement), av = cls.classe_avant, ap = cls.classe_apres;
+    const fourchette = paramsDpe(params).valeur_verte_fourchette_pct;
+    let [ec, source] = ecarts(tab, dep, tb, av, ap);
+    let r = calculer(entree.valeur_bien, av, ap, ec, fourchette);
+    if (r.raison === 'ecart' && source === 'departement') {       // garde-fou : jamais négative -> France
+      [ec, source] = ecarts(tab, '', tb, av, ap);
+      r = calculer(entree.valeur_bien, av, ap, ec, fourchette);
+    }
     return Object.assign(r, { classe_avant: cls.classe_avant, classe_apres: cls.classe_apres, dpe_reel: cls.dpe_reel,
       libelle_classes: `Classe ${cls.classe_avant} → ${cls.classe_apres}`,
-      libelle_source: cls.dpe_reel ? '(DPE réel)' : '(classe estimée)' });
+      libelle_source: cls.dpe_reel ? '(DPE réel)' : '(classe estimée)',
+      source_ecarts: source, libelle_ecarts: libelleEcarts(source, dep) });
   }
 
-  window.HexaValeurVerte = { donnees: null, typeBien, departement, ecarts, valeurBien, calculer, projet };
+  window.HexaValeurVerte = { donnees: null, typeBien, departement, ecarts, libelleEcarts, valeurBien, calculer, projet };
 })();
 /* HEXA-VALEUR-VERTE:FIN */
 // Lot 13 : table des écarts de prix par classe DPE (data/valeur_verte) -> HexaValeurVerte.donnees
