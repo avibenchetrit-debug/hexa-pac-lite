@@ -96,6 +96,7 @@ const sandbox = {
     return new Promise((res) => sandbox.pending.push(() => res(`HTML#${seq}`)));
   },
   bind() {},
+  majMargeDossier() {},   // Lot 9 : appelé en fin de refresh() (marge admin), sans effet ici
   document: {
     getElementById: (id) => (id === 'sim-drawer-content' ? content : null),
     querySelector: () => null,

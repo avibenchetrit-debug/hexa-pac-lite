@@ -76,6 +76,8 @@ def page(serveur):
         ctx = b.new_context(viewport={"width": 1440, "height": 900})
         ctx.route("**/*", lambda r: r.continue_() if r.request.url.startswith(serveur) else r.abort())
         pg = ctx.new_page()
+        pg.erreurs_js = []
+        pg.on("pageerror", lambda e: pg.erreurs_js.append(str(e)))
         pg.goto(serveur + "/login")
         pg.fill("#username", "testeur")
         pg.fill("#password", "essai-local")
@@ -113,5 +115,8 @@ def test_tuiles_fiche_identiques_au_predevis(page):
     frame = page.frame_locator("#devis-preview-frame")
     frame.locator(".projet-apercu-tuiles").wait_for()
     doc = espaces(frame.locator(".projet-apercu").inner_text())
-    for t in (vv, total, rent, espaces(page.inner_text("#p6-tuile-eco")), "Valeur verte : estimation indicative"):
+    for t in (vv, total, rent, espaces(page.inner_text("#p6-tuile-eco")), "Valeur verte : estimation indicative",
+              tuile("#p6-tuile-vv .p6-vv-ecarts")):
         assert t in doc, (t, doc)
+    assert tuile("#p6-tuile-vv .p6-vv-ecarts") in ("Source : département 72", "Source : France entière")
+    assert page.erreurs_js == []          # aucune erreur JS (dont « majMargeDossier is not defined ») en admin à l'étape 6

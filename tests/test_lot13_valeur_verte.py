@@ -58,10 +58,44 @@ def test_table_des_ecarts_versionnee():
     assert "D" not in t["france"]["maison"]
 
 
-def test_ecart_departement_sinon_france_d_vaut_zero():
-    ec = vv.ecarts(vv.table(), "72", "maison")
-    assert ec["D"] == 0 and ec["F"] == -21.6                 # Sarthe
-    assert ec["B"] == vv.table()["france"]["maison"]["B"]    # absent en Sarthe -> France
+def test_une_seule_source_departement_si_les_deux_classes_y_sont():
+    fr = vv.table()["france"]["maison"]
+    ec, src = vv.ecarts(vv.table(), "72", "maison", "F", "C")         # Sarthe : F et C présents
+    assert src == "departement" and (ec["F"], ec["C"], ec["D"]) == (-21.6, 6.9, 0)
+    ec, src = vv.ecarts(vv.table(), "72", "maison", "F", "D")         # D = 0 partout : Sarthe
+    assert src == "departement" and ec["F"] == -21.6
+    ec, src = vv.ecarts(vv.table(), "72", "maison", "G", "F")         # G absent en Sarthe -> France pour les DEUX
+    assert src == "france" and (ec["G"], ec["F"]) == (fr["G"], fr["F"])
+
+
+def _projet_force(monkeypatch, avant, apres, cp, type_logement="maison", valeur=200000):
+    """Classes forcées (estimation remplacée) : seul le choix des écarts est testé."""
+    monkeypatch.setattr(dpe_estime, "estimer", lambda *a, **k: {"ok": True, "classe_avant": avant,
+                                                                 "classe_apres": apres, "gain": 1})
+    entree = dict(valeur_bien=valeur, classe_dpe_avant="aucun", cp=cp, type_logement=type_logement, surface=100)
+    return vv.projet(entree, {"ok": True}, {})
+
+
+def test_sarthe_g_vers_f_positif(monkeypatch):
+    r = _projet_force(monkeypatch, "G", "F", "72300")
+    assert r["ok"] and r["valeur"] > 0 and r["min"] > 0                 # France : −13,0 − (−16,4) = +3,4 %
+    assert r["valeur"] == 6800 and r["ecart_avant"] == -16.4 and r["ecart_apres"] == -13.0
+    assert r["source_ecarts"] == "france" and r["libelle_ecarts"] == "Source : France entière"
+
+
+def test_sarthe_f_vers_c_source_departement(monkeypatch):
+    r = _projet_force(monkeypatch, "F", "C", "72300")
+    assert r["source_ecarts"] == "departement" and r["libelle_ecarts"] == "Source : département 72"
+    assert r["valeur"] == 57000                                        # 200 000 × (6,9 + 21,6) %
+
+
+def test_garde_fou_jamais_negative_bascule_france(monkeypatch):
+    # Bouches-du-Rhône, appartement : F = +2,4 %, D = 0 -> −2,4 % ; France : F = −6,5 % -> +6,5 %
+    r = _projet_force(monkeypatch, "F", "D", "13001", "appartement")
+    assert r["ok"] and r["valeur"] == 13000 and r["source_ecarts"] == "france"
+    # France aussi négative (appartement G -> F : −6,5 − (−5,7)) : pas de valeur verte
+    r = _projet_force(monkeypatch, "G", "F", "97411", "appartement")   # pas de données : France
+    assert r["ok"] is False and r["raison"] == "ecart"
 
 
 def test_calcul_et_fourchette():
@@ -70,6 +104,7 @@ def test_calcul_et_fourchette():
                  "ecart_avant": -13.0, "ecart_apres": 0.0}
     assert vv.calculer(0, "F", "D", {}, 30)["ok"] is False
     assert vv.calculer(200000, "D", "D", {c: 0.0 for c in "ABCDEFG"}, 30)["raison"] == "classe"
+    assert vv.calculer(200000, "F", "E", {**{c: 0.0 for c in "ABCDEFG"}, "F": 2.0, "E": 1.0}, 30)["raison"] == "ecart"
 
 
 def test_valeur_du_bien_saisie_sinon_dvf():
@@ -109,8 +144,11 @@ const out = e.cas.map(([eco, entree, params]) => {
            mois: E.moisRentabilite(res.ok ? res : null, entree.debourse),
            texte: E.texteRentabilite(entree.comptant, E.moisRentabilite(res.ok ? res : null, entree.debourse), entree.delta, 3, 20) };
 });
-process.stdout.write(JSON.stringify(out));
+const ecarts = e.ecarts.map(([dep, tb, a, b]) => V.ecarts(e.table, dep, tb, a, b));
+process.stdout.write(JSON.stringify({ out, ecarts }));
 """
+ECARTS = [["72", "maison", "F", "C"], ["72", "maison", "G", "F"], ["72", "maison", "F", "D"], ["13", "appartement", "F", "D"],
+          ["", "maison", "E", "B"], ["974", "maison", "F", "C"], ["49", "appartement", "F", "C"]]
 ENTREE = dict(valeur_bien=180000, classe_dpe_avant="", dpe_connu="", surface=100, cp="72300", type_logement="maison",
               personnes=3, ecs_chaudiere=True, debourse=9857, comptant=True, delta=None)
 CAS = [
@@ -124,6 +162,11 @@ CAS = [
     (dict(GAZ, energie="bois", facture_annuelle=1500), dict(ENTREE, cp="97411", valeur_bien=0), {}),
     (GAZ, ENTREE, {"dpe_seuils_ep": {"C": 90}, "coef_ep": {"electricite": 2.3}, "valeur_verte_fourchette_pct": 20}),
     (dict(GAZ, facture_annuelle=0), ENTREE, {}),
+    (GAZ, dict(ENTREE, classe_dpe_avant="G"), {}),                                   # Sarthe : G absent -> France
+    (dict(GAZ, energie="fioul", facture_annuelle=3000), dict(ENTREE, classe_dpe_avant="F", cp="13001",
+                                                                type_logement="appartement", surface=70), {}),
+    (dict(GAZ, energie="fioul", facture_annuelle=3000), dict(ENTREE, classe_dpe_avant="G", cp="75011",
+                                                                type_logement="appartement", surface=70), {}),
     (GAZ, dict(ENTREE, surface=0), {}),
 ]
 
@@ -133,10 +176,12 @@ def test_parite_js_python(tmp_path):
     runner = tmp_path / "parite13.js"
     runner.write_text(NODE_RUNNER, encoding="utf-8")
     html = os.path.join(os.path.dirname(__file__), "..", "templates", "index.html")
-    entree = {"cas": [list(c) for c in CAS], "table": vv.table()}
+    entree = {"cas": [list(c) for c in CAS], "table": vv.table(), "ecarts": ECARTS}
     res = subprocess.run(["node", str(runner), html], input=json.dumps(entree), capture_output=True,
                          text=True, encoding="utf-8", check=True)
-    js = json.loads(res.stdout)
+    sortie = json.loads(res.stdout)
+    js = sortie["out"]
+    assert [tuple(x) for x in sortie["ecarts"]] == [tuple(vv.ecarts(vv.table(), *x)) for x in ECARTS]
     for (e, entree_cas, params), j in zip(CAS, js):
         r = eco.calculer_economies(e, params)
         assert j["estime"] == dpe_estime.estimer(r, entree_cas["surface"], entree_cas["personnes"],
@@ -146,6 +191,7 @@ def test_parite_js_python(tmp_path):
         assert j["mois"] == mois
         assert j["texte"] == eco.texte_rentabilite(entree_cas["comptant"], mois, entree_cas["delta"], 3, 20)
     assert any(j["projet"].get("ok") for j in js) and any(j["projet"].get("dpe_reel") for j in js)
+    assert {j["projet"].get("source_ecarts") for j in js} >= {"departement", "france"}
 
 
 # ---------------------------------------------------------------- pré-devis / devis : 3 tuiles + mention
