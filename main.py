@@ -4480,7 +4480,7 @@ def _valeur_verte_devis(prospect: dict, eco_res: dict, admin: dict, eco20: int) 
         "ecs_chaudiere": ecs_par_chaudiere(devis_value(prospect, "ecs", "gestion_ecs", default=""), energie),
     }, eco_res, params)
     ok = bool(vv.get("ok"))
-    gain = eco20 + (vv["valeur"] if ok else 0)
+    gain = eco20 + (vv["min"] if ok else 0)          # Lot 13d : document client = bas de la fourchette
     return {
         "valeur_verte": dict(vv, min_fmt=_eur_fmt(vv["min"]), max_fmt=_eur_fmt(vv["max"]),
                              valeur_fmt=_eur_fmt(vv["valeur"])) if ok else None,
