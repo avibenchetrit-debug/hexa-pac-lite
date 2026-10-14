@@ -320,7 +320,7 @@ def test_devis_calcule_toujours_cote_serveur(client):
     assert pa["phrase_aujourdhui"] == "Aujourd'hui : 400 €/mois de fioul, dont 359 € pour le chauffage"
     html = client.get("/api/devis/PR-00077/preview").text
     bloc = html.split('<div class="projet-apercu">')[1].split('<div class="anah-mention-block')[0]
-    assert "Vous gagnez" in bloc and "Rentabilisé en" in bloc      # on examine bien le bloc économies
+    assert "Économies d'énergie" in bloc and "Gain total sur" in bloc      # on examine bien le bloc économies (Lot 13 : 3 tuiles)
     assert "—" not in bloc
     assert "Aujourd'hui : 400 €/mois de fioul, dont 359 € pour le chauffage" in html.replace("&#39;", "'")
 
@@ -330,8 +330,9 @@ def test_devis_accord_an_ans(client):
     pa = main._build_devis_context(None, "PR-00077")["projet_apercu"]
     html = client.get("/api/devis/PR-00077/preview").text
     n = pa["annee_rentable"]
-    unite = "an" if n == 1 else "ans"
-    assert f">{n} {unite}</div>" in html
+    # Lot 13 : la tuile dit « rentabilisé … » ; la frise garde « Nᵉ année · remboursé » (1ʳᵉ, jamais 1ᵉ)
+    assert pa["rentabilite_texte"] in html
+    assert f"{n}{'ʳᵉ' if n == 1 else 'ᵉ'} année · remboursé" in html
     assert "1 ans" not in html and "1ᵉ année" not in html
 
 

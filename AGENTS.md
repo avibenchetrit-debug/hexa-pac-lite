@@ -135,6 +135,13 @@ derrière la connexion ; `/api/...` répond 401 même pour une route inexistante
   bouton vert « 📐 Note de dim définitive » (onglet de la fenêtre du devis). Noms des PDF : interne `NoteDim-DEFINITIVE_ND…`,
   `Pre-devis_PD…`, `Devis_DE…` ; côté client (liens e-mail) `Note-de-dimensionnement_ND…`, `Pre-devis_PD…`, `Devis_DE…`.
 - **Facture** : panneau Suivi → « 🧾 Générer la facture » (installation finie, pas de facture) ou « 🧾 Voir la facture ».
+- **Valeur verte (Lot 13)** : étape Logement, `valeur_bien_estimee` (€, = `prix_m2_estime × surface` tant que non saisie)
+  et `classe_dpe_avant` (A-G ou `aucun` = Pas de DPE ; jamais choisie → classe `dpe_connu`). Classe avant/après estimée par
+  `services/dpe_estime.py` (double critère EP / CO2, seuils et coefficients dans l'admin) ; valeur verte =
+  valeur × (écart[après] − écart[avant]) par `services/valeur_verte.py`, écarts `data/valeur_verte/*.csv` (département
+  sinon France, D = 0), fourchette ± 30 %. Miroirs JS (`HEXA-VALEUR-VERTE`, `HexaEconomies.moisRentabilite /
+  texteRentabilite`) tenus identiques par `tests/test_lot13_valeur_verte.py`. 3 tuiles identiques à l'étape 6 et sur le
+  pré-devis / devis (Économies d'énergie · Valeur verte · Gain total) ; le délai de rentabilité reste sur l'énergie seule.
 - Clés DocuSeal / Resend : seulement sur Railway. En local, l'envoi réel est impossible (le script de bout en bout le simule).
 
 ### Tests

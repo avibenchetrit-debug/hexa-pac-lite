@@ -32,11 +32,13 @@ from services.economies import (
     facture_electricite_totale,
     financement_net,
     mention_devis,
+    mois_rentabilite,
     phrase_aujourdhui,
     phrase_baisse,
     projeter,
     scop_modele,
     source_effective,
+    texte_rentabilite,
 )
 from starlette.background import BackgroundTask
 
@@ -75,7 +77,7 @@ from services.service_devis import (
     _format_date_fr,
 )
 from services.backup_github import start_backup_scheduler
-from services import dpe_audit, facture_cee, valeur_dvf
+from services import dpe_audit, dpe_estime, facture_cee, valeur_dvf, valeur_verte
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 TEMPLATES_DIR = os.path.join(BASE_DIR, "templates")
@@ -224,6 +226,8 @@ DEFAULT_PARAMS_ECO_ENERGIE = {
     "cop_ecs_cet": 2.8,
     "coef_periode": {"avant_1975": 1.3, "1975_2000": 1.0, "apres_2000": 0.7, "inconnue": 1.0},
     "usages_specifiques_kwh_an": 2500,
+    # Lot 13 : classe DPE estimée et valeur verte (services/dpe_estime.py, mêmes valeurs par défaut)
+    **{k: (dict(v) if isinstance(v, dict) else v) for k, v in dpe_estime.DEFAULTS.items()},
 }
 
 DEFAULT_PARAMS_FINANCEMENT = {
@@ -2333,6 +2337,12 @@ def _label_type_logement(val):
 def get_dpe_lookup(adresse: str = "", cp: str = "", lat: float | None = None, lon: float | None = None,
                    type_logement: str = "") -> JSONResponse:
     return JSONResponse(dpe_audit.rechercher(adresse, cp, lat, lon, type_logement))
+
+
+# Lot 13 : écarts de prix par classe DPE (data/valeur_verte), lus par le calcul de la valeur verte de la fiche.
+@app.get("/api/valeur-verte/ecarts")
+def get_valeur_verte_ecarts() -> JSONResponse:
+    return JSONResponse(valeur_verte.table())
 
 
 # Partie B : prix au m² DVF (même source et même méthode que le Master) pour prix_m2_estime / _min / _max.
@@ -4449,6 +4459,36 @@ def _economies_devis(prospect: dict, state: dict, modele_obj, admin: dict, zone_
     return res, source
 
 
+def _eur_fmt(n) -> str:
+    return f"{int(n):,}".replace(",", " ") + " €"
+
+
+def _valeur_verte_devis(prospect: dict, eco_res: dict, admin: dict, eco20: int) -> dict:
+    """Lot 13 : valeur verte (services/valeur_verte.py) et gain total sur la durée de vie, pour le
+    pré-devis et le devis. Mêmes entrées que la fiche (window.HexaValeurVerte.projet)."""
+    params = (admin or {}).get("params_eco_energie") or {}
+    energie = cle_energie(devis_value(prospect, "mode_chauffage", "chauffage_actuel", default=""))
+    surface = float_value(devis_value(prospect, "surface_logement_m2", "surface_habitable", default=""))
+    vv = valeur_verte.projet({
+        "valeur_bien": valeur_verte.valeur_bien(prospect.get("valeur_bien_estimee"), prospect.get("prix_m2_estime"), surface),
+        "classe_dpe_avant": prospect.get("classe_dpe_avant", ""),
+        "dpe_connu": devis_value(prospect, "dpe_connu", "classe_dpe", default=""),
+        "surface": surface,
+        "cp": devis_value(prospect, "code_postal_chantier", "cp_chantier", "cp", default=""),
+        "type_logement": prospect.get("type_logement", ""),
+        "personnes": devis_value(prospect, "nombre_personnes", default=""),
+        "ecs_chaudiere": ecs_par_chaudiere(devis_value(prospect, "ecs", "gestion_ecs", default=""), energie),
+    }, eco_res, params)
+    ok = bool(vv.get("ok"))
+    gain = eco20 + (vv["valeur"] if ok else 0)
+    return {
+        "valeur_verte": dict(vv, min_fmt=_eur_fmt(vv["min"]), max_fmt=_eur_fmt(vv["max"]),
+                             valeur_fmt=_eur_fmt(vv["valeur"])) if ok else None,
+        "gain_total": gain,
+        "gain_total_fmt": _eur_fmt(gain),
+    }
+
+
 def _build_devis_context(request: Request, numero: str, version: int | None = None, avec_sous_traitant: bool = True, numero_dossier: str | None = None) -> dict:
     prospect = _find_lead(numero)
     if not prospect:
@@ -4610,6 +4650,13 @@ def _build_devis_context(request: Request, numero: str, version: int | None = No
                 "phrase_baisse": _phrase_baisse,
                 "alerte_economies": bool(_eco_res.get("alerte")),
             }
+            # Lot 13 : tuiles Économies d'énergie / Valeur verte / Gain total, mêmes calculs que la fiche
+            _comptant = _mode == "comptant"
+            projet_apercu["eco_mois"] = _eco_apres
+            projet_apercu["rentabilite_texte"] = texte_rentabilite(
+                _comptant, mois_rentabilite(_eco_res, _reste_net) if _comptant else None, _eco_pendant,
+                _proj["annee_rentable"], _eco_res["duree_ans"])
+            projet_apercu.update(_valeur_verte_devis(prospect, _eco_res, admin, _eco20))
     # Interrupteur par lead : décocher masque le bloc éco/ROI (devis + pré-devis + e-mail).
     # Absent ou True → affiché (rétrocompat) ; seul False explicite masque.
     if state.get("afficher_apercu") is False:

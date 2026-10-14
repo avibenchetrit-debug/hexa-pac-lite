@@ -146,9 +146,9 @@ def test_un_document_confirme_remplit_la_fiche(page):
     page.wait_for_function("document.querySelector('[name=prix_m2_estime]').value === '10500'")
     assert (val(page, "prix_m2_min"), val(page, "prix_m2_max")) == ("9250", "11750")
     assert val(page, "valeur_bien_source") == DVF_OK["source"]
-    page.wait_for_function(r"document.querySelector('#p6-valeur-bien').textContent.replace(/\s/g, '') === '1239000€'")
+    page.wait_for_function("document.querySelector('#p6-valeur-bien').value === '1239000'")   # Lot 13 : valeur_bien_estimee
     blanc = lambda t: re.sub(r"\s", " ", t)                               # séparateurs de milliers : espaces fines
-    assert blanc(page.inner_text("#p6-valeur-bien")) == "1 239 000 €"
+    assert val(page, "valeur_bien_estimee") == "1239000"
     assert blanc(page.inner_text("#p6-valeur-bien-src")) == "Source DVF : " + DVF_OK["source"] + " (10 500 €/m²)"
     assert len(page.lookups) == 1                                         # une seule recherche (BAN + CP + parcelle)
 
@@ -312,4 +312,7 @@ def test_enregistrement_une_seule_cle_ajoutee(page):
     assert lead["dpe_numero"] == "A0001" and lead["dpe_source"] == "ademe_audit" and lead["annee_construction"] == "1965"
     assert lead["valeur_bien_source"] == DVF_OK["source"] and lead["prix_m2_estime"] == "10500"
     assert "valeur_bien_source" in avant                                   # le seul champ caché ajouté au formulaire
-    assert not [k for k in lead if re.search(r"candidat|dpe_audit|valeur_bien(?!_source)", k)]
+    # Lot 13 : valeur_bien_estimee (€) et classe_dpe_avant sont les deux seules autres clés ajoutées
+    assert lead["valeur_bien_estimee"] == str(round(10500 * float(lead["surface_logement_m2"])))
+    assert lead["classe_dpe_avant"] in "ABCDEFG" or lead["classe_dpe_avant"] == "aucun"
+    assert not [k for k in lead if re.search(r"candidat|dpe_audit|valeur_bien(?!_source|_estimee)", k)]

@@ -295,6 +295,40 @@ def projeter(res, credit_annuel=0.0, duree_credit_ans=0.0, debourse_initial=0.0)
     return {"annee_rentable": annee_rentable, "total": cumul - debourse_initial, "cumul": cumul}
 
 
+def mois_rentabilite(res, debourse):
+    """Mois nécessaires pour que les économies d'énergie remboursent un paiement comptant (hausse
+    appliquée par année, comme projeter()). None si pas remboursé sur la durée de vie.
+    Miroir de moisRentabilite() du simulateur (Lot 13 : même délai sur la fiche et le devis)."""
+    if not res:
+        return None
+    if not (debourse and debourse > 0):
+        return 0
+    cumul = 0.0
+    for m in range(1, int(res["duree_ans"]) * 12 + 1):
+        k = (m - 1) // 12
+        avant = (res["chauffage_avant"] * (1 + res["inflation_avant"]) ** k
+                 + res["ecs_actuelle"] * (1 + res["inflation_ecs_avant"]) ** k)
+        apres = res["apres_annuel"] * (1 + res["inflation_apres"]) ** k
+        cumul += (avant - apres) / 12
+        if cumul >= debourse:
+            return m
+    return None
+
+
+def texte_rentabilite(comptant, mois, delta, annee_rentable, duree_ans):
+    """Ligne « rentabilisé en N mois » de la tuile Économies d'énergie (fiche, pré-devis, devis).
+    Comptant : délai en mois ; crédit : dès le 1er mois si la mensualité est couverte, sinon l'année."""
+    if comptant:
+        if mois is None:
+            return f"rentabilité au-delà de {duree_ans} ans"
+        return "rentabilisé dès le 1er mois" if mois <= 1 else f"rentabilisé en {mois} mois"
+    if delta is not None and delta >= 0:
+        return "rentabilisé dès le 1er mois"
+    if annee_rentable:
+        return f"rentabilisé dès la {annee_rentable}{'ʳᵉ' if annee_rentable == 1 else 'ᵉ'} année"
+    return f"rentabilité au-delà de {duree_ans} ans"
+
+
 DE_ENERGIE = {"fioul": "de fioul", "gaz": "de gaz", "bois": "de bois", "electricite": "d'électricité",
               "pac": "d'électricité"}
 
