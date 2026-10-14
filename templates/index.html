@@ -19334,6 +19334,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
   'use strict';
   const E = window.HexaEconomies;
   const CLASSES = 'ABCDEFG';
+  const GAIN_MAX_ESTIME = 2;   // Lot 13c : sans DPE, gain plafonné à 2 classes
   const DEFAULTS = {
     dpe_seuils_ep: { A: 70, B: 110, C: 180, D: 250, E: 330, F: 420 },
     dpe_seuils_co2: { A: 6, B: 11, C: 30, D: 50, E: 70, F: 100 },
@@ -19433,7 +19434,9 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
       const i = CLASSES.indexOf(reelle);
       return { ok: true, classe_avant: reelle, classe_apres: CLASSES[Math.max(0, i - estimation.gain)], dpe_reel: true };
     }
-    return { ok: true, classe_avant: estimation.classe_avant, classe_apres: estimation.classe_apres, dpe_reel: false };
+    const i = CLASSES.indexOf(estimation.classe_avant);
+    const apres = CLASSES[Math.max(CLASSES.indexOf(estimation.classe_apres), i - GAIN_MAX_ESTIME)];
+    return { ok: true, classe_avant: estimation.classe_avant, classe_apres: apres, dpe_reel: false };
   }
 
   window.HexaDpeEstime = { DEFAULTS, CLASSES, paramsDpe, classe, consommations, estimer, classeReelle, classesProjet };

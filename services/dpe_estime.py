@@ -11,6 +11,8 @@ sont tenues identiques par tests/test_lot13_valeur_verte.py. Fonctions pures."""
 from services import economies as eco
 
 CLASSES = "ABCDEFG"
+# Lot 13c : sans DPE (classe avant estimée), le gain retenu est plafonné à 2 classes.
+GAIN_MAX_ESTIME = 2
 
 # Valeurs par défaut (Admin → Hypothèses économie d'énergie → « Classe DPE estimée »)
 DEFAULTS = {
@@ -115,10 +117,13 @@ def classe_reelle(classe_dpe_avant, dpe_connu=""):
 
 
 def classes_projet(reelle, estimation):
-    """Classe avant / après retenues. Vrai DPE : sa classe + le gain estimé (sans dépasser A)."""
+    """Classe avant / après retenues. Vrai DPE : sa classe + le gain estimé (sans dépasser A).
+    Sans DPE : classes estimées, gain plafonné à GAIN_MAX_ESTIME classes."""
     if not (estimation and estimation.get("ok")):
         return {"ok": False}
     if reelle:
         i = CLASSES.index(reelle)
         return {"ok": True, "classe_avant": reelle, "classe_apres": CLASSES[max(0, i - estimation["gain"])], "dpe_reel": True}
-    return {"ok": True, "classe_avant": estimation["classe_avant"], "classe_apres": estimation["classe_apres"], "dpe_reel": False}
+    i = CLASSES.index(estimation["classe_avant"])
+    apres = CLASSES[max(CLASSES.index(estimation["classe_apres"]), i - GAIN_MAX_ESTIME)]
+    return {"ok": True, "classe_avant": estimation["classe_avant"], "classe_apres": apres, "dpe_reel": False}
