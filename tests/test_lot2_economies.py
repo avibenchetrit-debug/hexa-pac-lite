@@ -319,7 +319,7 @@ def test_devis_calcule_toujours_cote_serveur(client):
     assert pa["mention_economies"].startswith("Estimation indicative calculée sur votre facture déclarée")
     assert pa["phrase_aujourdhui"] == "Aujourd'hui : 400 €/mois de fioul, dont 359 € pour le chauffage"
     html = client.get("/api/devis/PR-00077/preview").text
-    bloc = html.split('<div class="projet-apercu">')[1].split('<div class="anah-mention-block')[0]
+    bloc = html.split('<div class="projet-apercu">')[1].split('<div class="anah-mention-block')[0].replace("&#39;", "'")
     assert "Économies d'énergie" in bloc and "Gain total sur" in bloc      # on examine bien le bloc économies (Lot 13 : 3 tuiles)
     assert "—" not in bloc
     assert "Aujourd'hui : 400 €/mois de fioul, dont 359 € pour le chauffage" in html.replace("&#39;", "'")

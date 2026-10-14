@@ -103,29 +103,41 @@ def test_etape2_valeur_du_bien_et_classe_preremplies(page):
     assert page.input_value("[name=valeur_bien_estimee]") == "210000"
 
 
+LIRE_FICHE = """() => [...document.querySelectorAll('#p-hotes .p6-tuiles3 > .p6-tuile3')].map(t => ({
+  titre: t.querySelector('.t3-titre').textContent, pre: t.querySelector('.t3-pre').textContent.replace(/^\\u00a0$/, ''),
+  montant: t.querySelector('.t3-montant').textContent,
+  details: [...t.querySelectorAll('.t3-details > i')].map(i => i.textContent)}))"""
+LIRE_DOC = """() => { const c = (k) => [...document.querySelectorAll('.projet-apercu-tuiles td.pa-t3-' + k)];
+  return c('titre').map((td, i) => ({ titre: td.textContent.trim(), pre: c('pre')[i].textContent.trim().replace(/^\\u00a0$/, ''),
+    montant: c('montant')[i].textContent.trim(), details: [...c('details')[i].children].map(d => d.textContent) })); }"""
+
+
 def test_tuiles_fiche_identiques_au_predevis(page):
     page.evaluate("window.hexaParcoursEtape(6)")
     page.wait_for_selector("#p6-tuile-vv")
-    tuile = lambda sel: espaces(page.inner_text(sel))
-    vv, total, rent = tuile("#p6-tuile-vv b"), tuile("#p6-tuile-total b"), tuile("#p6-tuile-rent")
-    assert re.fullmatch(r"\+ [\d ]+ € à \+ [\d ]+ €", vv), vv              # fiche : fourchette complète
-    bas = re.match(r"\+ ([\d ]+ €)", vv).group(1)
-    assert "(classe estimée)" in tuile("#p6-tuile-vv") and rent.startswith("rentabilisé")
+    fiche = page.evaluate(LIRE_FICHE)
+    assert [t["titre"] for t in fiche] == ["Économies d'énergie", "Valeur verte", "Gain total sur 20 ans"]
+    vv_t, total_t = fiche[1], fiche[2]
+    assert vv_t["pre"] == "à partir de" and re.fullmatch(r"\d{1,3}(\u00a0\d{3})*\u00a0€", vv_t["montant"]), vv_t
+    assert total_t["pre"] == "à partir de" and total_t["details"][0].startswith("dont ")
+    assert " à " not in vv_t["montant"] and "(classe estimée)" in vv_t["details"]
     page.click("#btn-voir-devis")
     page.wait_for_selector("#devis-preview-frame")
-    frame = page.frame_locator("#devis-preview-frame")
-    frame.locator(".projet-apercu-tuiles").wait_for()
-    doc = espaces(frame.locator(".projet-apercu").inner_text())
-    assert "à partir de " + bas in doc and vv not in doc                     # document client : bas de la fourchette
-    # fiche inchangée : total au milieu ; document : économies + bas de la fourchette
-    nombre = lambda t: int(re.sub(r"\D", "", t))
-    eur = lambda n: f"{n:,}".replace(",", " ") + " €"
-    eco20, milieu = nombre(tuile("#p-hotes .sim-roi-big")), tuile("#p6-tuile-total i")
-    assert nombre(total) == eco20 + nombre(re.search(r"\+ ([\d ]+) € de valeur verte", milieu).group(1))
-    assert "à partir de " + eur(eco20 + nombre(bas)) in doc and total not in doc
-    assert f"dont {eur(eco20)} d'économies d'énergie + à partir de {bas} de valeur verte" in doc
-    for t in (rent, espaces(page.inner_text("#p6-tuile-eco")), "Valeur verte : estimation indicative",
-              tuile("#p6-tuile-vv .p6-vv-ecarts")):
-        assert t in doc, (t, doc)
-    assert tuile("#p6-tuile-vv .p6-vv-ecarts") in ("Source : département 72", "Source : France entière")
+    frame = page.frame("devis-preview-frame") or next(f for f in page.frames if f != page.main_frame)
+    frame.wait_for_selector(".projet-apercu-tuiles")
+    doc = frame.evaluate(LIRE_DOC)
+    assert doc == fiche                                                  # strictement identiques (titres, montants, détails)
+    texte_doc = frame.inner_text(".projet-apercu")
+    assert "Valeur verte : estimation indicative" in texte_doc
+    # mise en forme : montants sur une ligne, montants alignés, tuiles de même hauteur (fiche et document)
+    for cible in (page, frame):
+        mesures = cible.evaluate("""() => { const sel = document.querySelector('.p6-tuiles3')
+              ? ['#p-hotes .p6-tuile3', '#p-hotes .p6-tuile3 .t3-montant'] : ['.projet-apercu-tuiles td.pa-t3-montant', '.projet-apercu-tuiles td.pa-t3-montant > div'];
+          const b = (s) => [...document.querySelectorAll(s)].map(e => e.getBoundingClientRect());
+          const m = b(sel[1]);
+          return { tops: m.map(r => Math.round(r.top)), hauteurs: m.map(r => Math.round(r.height)),
+                   tuiles: document.querySelector('.p6-tuiles3') ? b(sel[0]).map(r => Math.round(r.height)) : [] }; }""")
+        assert len(set(mesures["tops"])) == 1, mesures                   # montants sur la même ligne horizontale
+        assert max(mesures["hauteurs"]) <= 30, mesures                   # une seule ligne
+        assert len(set(mesures["tuiles"])) <= 1, mesures                 # même hauteur (fiche)
     assert page.erreurs_js == []          # aucune erreur JS (dont « majMargeDossier is not defined ») en admin à l'étape 6

@@ -3635,40 +3635,20 @@
   <span style="display:table-cell;vertical-align:middle;font-size:10px;text-transform:uppercase;letter-spacing:0.22em;color:#E2214B;font-weight:700;">Votre projet en un coup d'œil</span>
 </div>
 
-{# Lot 13 : 3 tuiles, mêmes chiffres que l'étape 6 de la fiche #}
-<table class="projet-apercu-tuiles" style="width:100%;border-collapse:collapse;margin-bottom:8px;table-layout:fixed;">
+{# Lot 13e : tuiles construites par valeur_verte.tuiles (comme l'étape 6 de la fiche) ; une rangée par niveau
+   (titre · libellé · montant · détails) : même hauteur, montants alignés, montants jamais coupés #}
+<table class="projet-apercu-tuiles" style="width:calc(100% + 12px);border-collapse:separate;border-spacing:6px 0;margin:0 -6px 8px;table-layout:fixed;">
   <tr>
-    <td style="vertical-align:top;padding:0 4px;">
-      <table style="width:100%;border-collapse:collapse;background:#FFFFFF;border:1px solid #E1E5EB;border-top:3px solid #002E5A;">
-        <tr><td style="padding:8px 10px;">
-          <div style="font-size:9px;text-transform:uppercase;letter-spacing:0.1em;color:#8A92A0;margin-bottom:4px;">Économies d'énergie</div>
-          <div class="pa-tuile-eco" style="color:#002E5A;font-weight:800;font-size:20px;line-height:1;">{{ projet_apercu.eco_mois }} €/mois</div>
-          <div style="font-size:10px;color:#4A5567;margin-top:4px;line-height:1.3;">{{ projet_apercu.facture_avant }} € → {{ projet_apercu.facture_apres }} €/mois</div>
-          <div style="font-size:10px;color:#4A5567;margin-top:4px;line-height:1.3;"><b>{{ projet_apercu.eco_20_ans_fmt }} €</b> sur {{ projet_apercu.duree_vie_pac_ans }} ans</div>
-          <div class="pa-tuile-rent" style="font-size:10px;color:#4A5567;margin-top:4px;line-height:1.3;">{{ projet_apercu.rentabilite_texte }}</div>
-        </td></tr>
-      </table>
-    </td>
-    {% if projet_apercu.valeur_verte %}
-    <td style="vertical-align:top;padding:0 4px;">
-      <table style="width:100%;border-collapse:collapse;background:#FFFFFF;border:1px solid #E1E5EB;border-top:3px solid #15803D;">
-        <tr><td style="padding:8px 10px;">
-          <div style="font-size:9px;text-transform:uppercase;letter-spacing:0.1em;color:#8A92A0;margin-bottom:4px;">Valeur verte</div>
-          <div class="pa-tuile-vv" style="color:#002E5A;font-weight:800;font-size:20px;line-height:1;">à partir de {{ projet_apercu.valeur_verte.min_fmt }}</div>
-          <div style="font-size:10px;color:#4A5567;margin-top:4px;line-height:1.3;">{{ projet_apercu.valeur_verte.libelle_classes }}<br>{{ projet_apercu.valeur_verte.libelle_source }}<br><span class="pa-vv-ecarts">{{ projet_apercu.valeur_verte.libelle_ecarts }}</span></div>
-        </td></tr>
-      </table>
-    </td>
-    {% endif %}
-    <td style="vertical-align:top;padding:0 4px;">
-      <table style="width:100%;border-collapse:collapse;background:#FFFFFF;border:1px solid #E1E5EB;border-top:3px solid #E2214B;">
-        <tr><td style="padding:8px 10px;">
-          <div style="font-size:9px;text-transform:uppercase;letter-spacing:0.1em;color:#8A92A0;margin-bottom:4px;">Gain total sur {{ projet_apercu.duree_vie_pac_ans }} ans{% if projet_apercu.valeur_verte %} :{% endif %}</div>
-          <div class="pa-tuile-total" style="color:#002E5A;font-weight:800;font-size:20px;line-height:1;">{% if projet_apercu.valeur_verte %}à partir de {% endif %}{{ projet_apercu.gain_total_fmt }}</div>
-          <div style="font-size:10px;color:#4A5567;margin-top:4px;line-height:1.3;">dont {{ projet_apercu.eco_20_ans_fmt }} € d'économies d'énergie{% if projet_apercu.valeur_verte %} + à partir de {{ projet_apercu.valeur_verte.min_fmt }} de valeur verte{% else %} (valeur verte non estimée){% endif %}</div>
-        </td></tr>
-      </table>
-    </td>
+    {% for t in projet_apercu.tuiles %}<td class="pa-t3-titre pa-t3-{{ t.cle }}" style="vertical-align:bottom;background:#FFFFFF;border-left:1px solid #E1E5EB;border-right:1px solid #E1E5EB;border-top:3px solid {{ '#E2214B' if t.cle == 'total' else ('#15803D' if t.cle == 'vv' else '#002E5A') }};padding:8px 10px 0;"><div style="font-size:9px;text-transform:uppercase;letter-spacing:0.1em;color:#8A92A0;">{{ t.titre }}</div></td>{% endfor %}
+  </tr>
+  <tr>
+    {% for t in projet_apercu.tuiles %}<td class="pa-t3-pre pa-t3-{{ t.cle }}" style="vertical-align:bottom;background:#FFFFFF;border-left:1px solid #E1E5EB;border-right:1px solid #E1E5EB;padding:3px 10px 0;"><div style="font-size:9.5px;font-weight:600;color:{{ '#E2214B' if t.cle == 'total' else '#4A5567' }};">{% if t.pre %}{{ t.pre }}{% else %}&nbsp;{% endif %}</div></td>{% endfor %}
+  </tr>
+  <tr>
+    {% for t in projet_apercu.tuiles %}<td class="pa-t3-montant pa-t3-{{ t.cle }}" style="vertical-align:bottom;background:#FFFFFF;border-left:1px solid #E1E5EB;border-right:1px solid #E1E5EB;padding:1px 10px 0;"><div class="pa-tuile-{{ t.cle }}" style="white-space:nowrap;font-weight:800;font-size:19px;line-height:1.1;color:{{ '#8A4B00' if t.alerte else '#002E5A' }};">{{ t.montant }}</div></td>{% endfor %}
+  </tr>
+  <tr>
+    {% for t in projet_apercu.tuiles %}<td class="pa-t3-details pa-t3-{{ t.cle }}" style="vertical-align:top;background:#FFFFFF;border-left:1px solid #E1E5EB;border-right:1px solid #E1E5EB;border-bottom:1px solid #E1E5EB;padding:4px 10px 8px;">{% for d in t.details %}<div class="pa-d-{{ d.cle }}" style="font-size:9.5px;line-height:1.35;color:#4A5567;">{% if d.fort %}<b style="white-space:nowrap;">{{ d.fort }}</b>{% endif %}{{ d.texte }}</div>{% endfor %}</td>{% endfor %}
   </tr>
 </table>
 

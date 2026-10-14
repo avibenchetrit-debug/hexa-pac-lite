@@ -107,3 +107,50 @@ def projet(entree, res, params, tab=None):
               "libelle_source": "(DPE réel)" if cls["dpe_reel"] else "(classe estimée)",
               "source_ecarts": source, "libelle_ecarts": libelle_ecarts(source, dep)})
     return r
+
+
+# ---------------------------------------------------------------- Lot 13e : les 3 tuiles (fiche, pré-devis, devis)
+NBSP = " "
+
+
+def eur(n):
+    """« 32 900 € » : espaces insécables dans les milliers et avant « € » (jamais coupé)."""
+    n = _arrondi(n)
+    return ("-" if n < 0 else "") + f"{abs(n):,}".replace(",", NBSP) + NBSP + "€"
+
+
+def tuiles(eco, vv, duree):
+    """Contenu des tuiles Économies d'énergie / Valeur verte / Gain total, identique sur la fiche et les documents.
+    eco : None (facture inconnue) ou {avant_mensuel, apres_mensuel, total (cumul net sur la durée, None si non
+    rentable), rentabilite (texte)} ; vv : projet() ou None. La valeur verte est TOUJOURS le bas de la fourchette.
+    Chaque tuile : {cle, titre, pre, montant, details: [{cle, texte, fort?}]}."""
+    vv_ok = bool(vv and vv.get("ok"))
+    eco20 = _arrondi(eco["total"]) if eco and eco.get("total") is not None else None
+    if eco:
+        mois = _arrondi(eco["avant_mensuel"]) - _arrondi(eco["apres_mensuel"])
+        details = [{"cle": "facture", "texte": f"{eur(eco['avant_mensuel'])} → {eur(eco['apres_mensuel'])}/mois"}]
+        if eco20 is not None:
+            details.append({"cle": "total20", "fort": eur(eco20), "texte": f" sur {duree} ans"})
+        if eco.get("rentabilite"):
+            details.append({"cle": "rent", "texte": eco["rentabilite"]})
+        t_eco = {"cle": "eco", "titre": "Économies d'énergie", "pre": "", "montant": f"{eur(mois)}/mois",
+                 "details": details, "alerte": mois < 0}
+    else:
+        t_eco = {"cle": "eco", "titre": "Économies d'énergie", "pre": "", "montant": "—",
+                 "details": [{"cle": "facture", "texte": "facture inconnue"}], "alerte": False}
+    out = [t_eco]
+    if vv_ok:
+        out.append({"cle": "vv", "titre": "Valeur verte", "pre": "à partir de", "montant": eur(vv["min"]),
+                    "details": [{"cle": "classes", "texte": vv["libelle_classes"]},
+                                {"cle": "source", "texte": vv["libelle_source"]},
+                                {"cle": "ecarts", "texte": vv["libelle_ecarts"]}], "alerte": False})
+    if eco20 is None:
+        total = {"pre": "", "montant": "—",
+                 "details": [{"cle": "dont", "texte": f"au-delà de {duree} ans" if eco else "facture inconnue"}]}
+    else:
+        dont = f"dont {eur(eco20)} d'économies d'énergie" + (
+            f" + à partir de {eur(vv['min'])} de valeur verte" if vv_ok else " (valeur verte non estimée)")
+        total = {"pre": "à partir de" if vv_ok else "", "montant": eur(eco20 + (vv["min"] if vv_ok else 0)),
+                 "details": [{"cle": "dont", "texte": dont}]}
+    out.append(dict(total, cle="total", titre=f"Gain total sur {duree} ans", alerte=False))
+    return out
