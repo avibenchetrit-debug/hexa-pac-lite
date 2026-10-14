@@ -108,14 +108,16 @@ def test_tuiles_fiche_identiques_au_predevis(page):
     page.wait_for_selector("#p6-tuile-vv")
     tuile = lambda sel: espaces(page.inner_text(sel))
     vv, total, rent = tuile("#p6-tuile-vv b"), tuile("#p6-tuile-total b"), tuile("#p6-tuile-rent")
-    assert re.fullmatch(r"\+ [\d ]+ € à \+ [\d ]+ €", vv), vv
+    assert re.fullmatch(r"\+ [\d ]+ € à \+ [\d ]+ €", vv), vv              # fiche : fourchette complète
+    bas = re.match(r"\+ ([\d ]+ €)", vv).group(1)
     assert "(classe estimée)" in tuile("#p6-tuile-vv") and rent.startswith("rentabilisé")
     page.click("#btn-voir-devis")
     page.wait_for_selector("#devis-preview-frame")
     frame = page.frame_locator("#devis-preview-frame")
     frame.locator(".projet-apercu-tuiles").wait_for()
     doc = espaces(frame.locator(".projet-apercu").inner_text())
-    for t in (vv, total, rent, espaces(page.inner_text("#p6-tuile-eco")), "Valeur verte : estimation indicative",
+    assert "à partir de " + bas in doc and vv not in doc                     # document client : bas de la fourchette
+    for t in (total, rent, espaces(page.inner_text("#p6-tuile-eco")), "Valeur verte : estimation indicative",
               tuile("#p6-tuile-vv .p6-vv-ecarts")):
         assert t in doc, (t, doc)
     assert tuile("#p6-tuile-vv .p6-vv-ecarts") in ("Source : département 72", "Source : France entière")

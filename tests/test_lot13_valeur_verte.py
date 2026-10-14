@@ -42,7 +42,10 @@ def test_vrai_dpe_classe_plus_gain_sans_depasser_a():
     est = {"ok": True, "classe_avant": "E", "classe_apres": "B", "gain": 3}
     assert dpe_estime.classes_projet("F", est) == {"ok": True, "classe_avant": "F", "classe_apres": "C", "dpe_reel": True}
     assert dpe_estime.classes_projet("B", est)["classe_apres"] == "A"
-    assert dpe_estime.classes_projet("", est) == {"ok": True, "classe_avant": "E", "classe_apres": "B", "dpe_reel": False}
+    # sans DPE : gain plafonné à 2 classes (E -> B estimé devient E -> C) ; vrai DPE : pas de plafond (F -> C)
+    assert dpe_estime.classes_projet("", est) == {"ok": True, "classe_avant": "E", "classe_apres": "C", "dpe_reel": False}
+    est2 = {"ok": True, "classe_avant": "G", "classe_apres": "F", "gain": 1}
+    assert dpe_estime.classes_projet("", est2)["classe_apres"] == "F"                 # sous le plafond : inchangé
 
 
 @pytest.mark.parametrize("choix, dpe_connu, attendu", [("F", "", "F"), ("aucun", "F", ""), ("", "e", "E"),
@@ -84,9 +87,20 @@ def test_sarthe_g_vers_f_positif(monkeypatch):
 
 
 def test_sarthe_f_vers_c_source_departement(monkeypatch):
-    r = _projet_force(monkeypatch, "F", "C", "72300")
+    # vrai DPE F + gain estimé de 3 classes : pas de plafond -> F -> C
+    monkeypatch.setattr(dpe_estime, "estimer", lambda *a, **k: {"ok": True, "classe_avant": "E",
+                                                                 "classe_apres": "B", "gain": 3})
+    r = vv.projet(dict(valeur_bien=200000, classe_dpe_avant="F", cp="72300", type_logement="maison", surface=100),
+                  {"ok": True}, {})
+    assert (r["classe_avant"], r["classe_apres"], r["dpe_reel"]) == ("F", "C", True)
     assert r["source_ecarts"] == "departement" and r["libelle_ecarts"] == "Source : département 72"
     assert r["valeur"] == 57000                                        # 200 000 × (6,9 + 21,6) %
+
+
+def test_sans_dpe_gain_plafonne_a_deux_classes(monkeypatch):
+    r = _projet_force(monkeypatch, "F", "C", "72300")                  # estimé F -> C : plafonné à F -> D
+    assert (r["classe_avant"], r["classe_apres"], r["dpe_reel"]) == ("F", "D", False)
+    assert r["libelle_classes"] == "Classe F → D" and r["valeur"] == 43200   # 200 000 × 21,6 % (Sarthe)
 
 
 def test_garde_fou_jamais_negative_bascule_france(monkeypatch):
@@ -220,6 +234,7 @@ def test_devis_trois_tuiles_et_mention():
     assert pa["rentabilite_texte"].startswith("rentabilisé")
     html = TestClient(main.app).get(f"/api/devis/{LEAD['numero']}/preview").text.replace("&#39;", "'")
     bloc = html.split('<div class="projet-apercu">')[1].split('<div class="anah-mention-block')[0]
+    assert "à partir de " + v["min_fmt"] in bloc and v["max_fmt"] not in bloc
     for t in ("Économies d'énergie", "Valeur verte", "Gain total sur", v["libelle_classes"], "(classe estimée)",
               pa["rentabilite_texte"], MENTION):
         assert t in bloc, t
