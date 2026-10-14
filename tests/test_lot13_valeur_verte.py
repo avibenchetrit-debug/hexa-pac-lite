@@ -230,11 +230,14 @@ def test_devis_trois_tuiles_et_mention():
     assert pa is not None
     v = pa["valeur_verte"]
     assert v and v["ok"] and v["libelle_source"] == "(classe estimée)" and v["min"] < v["valeur"] < v["max"]
-    assert pa["gain_total"] == pa["eco_20_ans"] + v["valeur"]
+    assert pa["gain_total"] == pa["eco_20_ans"] + v["min"]                 # bas de la fourchette
+    assert pa["gain_total_fmt"] == main._eur_fmt(pa["eco_20_ans"] + v["min"])
     assert pa["rentabilite_texte"].startswith("rentabilisé")
     html = TestClient(main.app).get(f"/api/devis/{LEAD['numero']}/preview").text.replace("&#39;", "'")
     bloc = html.split('<div class="projet-apercu">')[1].split('<div class="anah-mention-block')[0]
-    assert "à partir de " + v["min_fmt"] in bloc and v["max_fmt"] not in bloc
+    assert "à partir de " + v["min_fmt"] in bloc and v["max_fmt"] not in bloc and v["valeur_fmt"] not in bloc
+    assert "à partir de " + pa["gain_total_fmt"] in bloc
+    assert (f"dont {pa['eco_20_ans_fmt']} € d'économies d'énergie + à partir de {v['min_fmt']} de valeur verte") in bloc
     for t in ("Économies d'énergie", "Valeur verte", "Gain total sur", v["libelle_classes"], "(classe estimée)",
               pa["rentabilite_texte"], MENTION):
         assert t in bloc, t

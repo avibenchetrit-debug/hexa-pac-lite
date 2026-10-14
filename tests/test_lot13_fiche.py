@@ -117,7 +117,14 @@ def test_tuiles_fiche_identiques_au_predevis(page):
     frame.locator(".projet-apercu-tuiles").wait_for()
     doc = espaces(frame.locator(".projet-apercu").inner_text())
     assert "à partir de " + bas in doc and vv not in doc                     # document client : bas de la fourchette
-    for t in (total, rent, espaces(page.inner_text("#p6-tuile-eco")), "Valeur verte : estimation indicative",
+    # fiche inchangée : total au milieu ; document : économies + bas de la fourchette
+    nombre = lambda t: int(re.sub(r"\D", "", t))
+    eur = lambda n: f"{n:,}".replace(",", " ") + " €"
+    eco20, milieu = nombre(tuile("#p-hotes .sim-roi-big")), tuile("#p6-tuile-total i")
+    assert nombre(total) == eco20 + nombre(re.search(r"\+ ([\d ]+) € de valeur verte", milieu).group(1))
+    assert "à partir de " + eur(eco20 + nombre(bas)) in doc and total not in doc
+    assert f"dont {eur(eco20)} d'économies d'énergie + à partir de {bas} de valeur verte" in doc
+    for t in (rent, espaces(page.inner_text("#p6-tuile-eco")), "Valeur verte : estimation indicative",
               tuile("#p6-tuile-vv .p6-vv-ecarts")):
         assert t in doc, (t, doc)
     assert tuile("#p6-tuile-vv .p6-vv-ecarts") in ("Source : département 72", "Source : France entière")
