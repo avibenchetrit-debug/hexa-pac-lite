@@ -142,6 +142,9 @@ derrière la connexion ; `/api/...` répond 401 même pour une route inexistante
   sinon France, D = 0), fourchette ± 30 %. Miroirs JS (`HEXA-VALEUR-VERTE`, `HexaEconomies.moisRentabilite /
   texteRentabilite`) tenus identiques par `tests/test_lot13_valeur_verte.py`. 3 tuiles identiques à l'étape 6 et sur le
   pré-devis / devis (Économies d'énergie · Valeur verte · Gain total) ; le délai de rentabilité reste sur l'énergie seule.
+  Tuiles construites par une seule fonction, `valeur_verte.tuiles()` (JS `HexaValeurVerte.tuiles`, parité testée) : valeur
+  verte = bas de la fourchette partout (« à partir de »), jamais le milieu ni le haut ; montants `valeur_verte.eur()`
+  (espaces insécables). Écarts : département seulement s'il a les deux classes, sinon France ; sans DPE, gain ≤ 2 classes.
 - Clés DocuSeal / Resend : seulement sur Railway. En local, l'envoi réel est impossible (le script de bout en bout le simule).
 
 ### Tests

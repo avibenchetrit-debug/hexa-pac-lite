@@ -159,7 +159,9 @@ const out = e.cas.map(([eco, entree, params]) => {
            texte: E.texteRentabilite(entree.comptant, E.moisRentabilite(res.ok ? res : null, entree.debourse), entree.delta, 3, 20) };
 });
 const ecarts = e.ecarts.map(([dep, tb, a, b]) => V.ecarts(e.table, dep, tb, a, b));
-process.stdout.write(JSON.stringify({ out, ecarts }));
+const tuiles = e.tuiles.map(([eco, vvr, d]) => V.tuiles(eco, vvr, d));
+const eurs = e.eurs.map((n) => V.eur(n));
+process.stdout.write(JSON.stringify({ out, ecarts, tuiles, eurs }));
 """
 ECARTS = [["72", "maison", "F", "C"], ["72", "maison", "G", "F"], ["72", "maison", "F", "D"], ["13", "appartement", "F", "D"],
           ["", "maison", "E", "B"], ["974", "maison", "F", "C"], ["49", "appartement", "F", "C"]]
@@ -190,11 +192,19 @@ def test_parite_js_python(tmp_path):
     runner = tmp_path / "parite13.js"
     runner.write_text(NODE_RUNNER, encoding="utf-8")
     html = os.path.join(os.path.dirname(__file__), "..", "templates", "index.html")
-    entree = {"cas": [list(c) for c in CAS], "table": vv.table(), "ecarts": ECARTS}
+    vv_ok = {"ok": True, "min": 18200, "valeur": 26000, "max": 33800, "libelle_classes": "Classe F → D",
+             "libelle_source": "(classe estimée)", "libelle_ecarts": "Source : France entière"}
+    eco_ok = {"avant_mensuel": 299, "apres_mensuel": 120, "total": 54296.5, "rentabilite": "rentabilisé en 52 mois"}
+    tuiles = [[eco_ok, vv_ok, 20], [eco_ok, None, 20], [eco_ok, {"ok": False}, 15], [dict(eco_ok, total=None), vv_ok, 20],
+              [dict(eco_ok, apres_mensuel=330, rentabilite=""), vv_ok, 20], [None, None, 20]]
+    eurs = [0, 7, 999, 1000, 32900, 1234567, -1500, 54296.5]
+    entree = {"cas": [list(c) for c in CAS], "table": vv.table(), "ecarts": ECARTS, "tuiles": tuiles, "eurs": eurs}
     res = subprocess.run(["node", str(runner), html], input=json.dumps(entree), capture_output=True,
                          text=True, encoding="utf-8", check=True)
     sortie = json.loads(res.stdout)
     js = sortie["out"]
+    assert sortie["tuiles"] == [vv.tuiles(*x) for x in tuiles]
+    assert sortie["eurs"] == [vv.eur(n) for n in eurs] and vv.eur(32900) == "32\u00a0900\u00a0€"
     assert [tuple(x) for x in sortie["ecarts"]] == [tuple(vv.ecarts(vv.table(), *x)) for x in ECARTS]
     for (e, entree_cas, params), j in zip(CAS, js):
         r = eco.calculer_economies(e, params)
@@ -231,16 +241,22 @@ def test_devis_trois_tuiles_et_mention():
     v = pa["valeur_verte"]
     assert v and v["ok"] and v["libelle_source"] == "(classe estimée)" and v["min"] < v["valeur"] < v["max"]
     assert pa["gain_total"] == pa["eco_20_ans"] + v["min"]                 # bas de la fourchette
-    assert pa["gain_total_fmt"] == main._eur_fmt(pa["eco_20_ans"] + v["min"])
+    assert pa["gain_total_fmt"] == vv.eur(pa["eco_20_ans"] + v["min"])
     assert pa["rentabilite_texte"].startswith("rentabilisé")
+    eco_t, vv_t, total_t = pa["tuiles"]
+    assert (vv_t["pre"], vv_t["montant"]) == ("à partir de", v["min_fmt"])
+    assert (total_t["pre"], total_t["montant"]) == ("à partir de", pa["gain_total_fmt"])
+    assert total_t["details"][0]["texte"] == (f"dont {vv.eur(pa['eco_20_ans'])} d'économies d'énergie"
+                                              f" + à partir de {v['min_fmt']} de valeur verte")
     html = TestClient(main.app).get(f"/api/devis/{LEAD['numero']}/preview").text.replace("&#39;", "'")
     bloc = html.split('<div class="projet-apercu">')[1].split('<div class="anah-mention-block')[0]
-    assert "à partir de " + v["min_fmt"] in bloc and v["max_fmt"] not in bloc and v["valeur_fmt"] not in bloc
-    assert "à partir de " + pa["gain_total_fmt"] in bloc
-    assert (f"dont {pa['eco_20_ans_fmt']} € d'économies d'énergie + à partir de {v['min_fmt']} de valeur verte") in bloc
-    for t in ("Économies d'énergie", "Valeur verte", "Gain total sur", v["libelle_classes"], "(classe estimée)",
-              pa["rentabilite_texte"], MENTION):
+    for t in ("Économies d'énergie", "Valeur verte", "Gain total sur", "à partir de", v["min_fmt"], pa["gain_total_fmt"],
+              total_t["details"][0]["texte"], v["libelle_classes"], "(classe estimée)", pa["rentabilite_texte"], MENTION):
         assert t in bloc, t
+    # ni le milieu ni le haut de la fourchette, ni un montant coupable (espace normale dans un montant)
+    assert vv.eur(v["valeur"]) not in bloc and vv.eur(v["max"]) not in bloc
+    import re
+    assert not re.search(r"\d \d{3}\b|\d €", bloc.split("projet-apercu-tuiles")[1].split("</table>")[0])
 
 
 def test_devis_dpe_reel_et_tuile_masquee_sans_valeur():
@@ -250,6 +266,8 @@ def test_devis_dpe_reel_et_tuile_masquee_sans_valeur():
     _preparer(dict(LEAD, valeur_bien_estimee="", prix_m2_estime=""))
     pa = main._build_devis_context(None, LEAD["numero"])["projet_apercu"]
     assert pa["valeur_verte"] is None and pa["gain_total"] == pa["eco_20_ans"]
+    assert [t["cle"] for t in pa["tuiles"]] == ["eco", "total"]
+    assert pa["tuiles"][1]["pre"] == "" and pa["tuiles"][1]["details"][0]["texte"].endswith("(valeur verte non estimée)")
     html = TestClient(main.app).get(f"/api/devis/{LEAD['numero']}/preview").text
     assert MENTION not in html and "Gain total sur" in html
 

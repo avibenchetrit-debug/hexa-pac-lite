@@ -4460,7 +4460,7 @@ def _economies_devis(prospect: dict, state: dict, modele_obj, admin: dict, zone_
 
 
 def _eur_fmt(n) -> str:
-    return f"{int(n):,}".replace(",", " ") + " €"
+    return valeur_verte.eur(n)          # Lot 13e : « 32 900 € », espaces insécables (comme les tuiles)
 
 
 def _valeur_verte_devis(prospect: dict, eco_res: dict, admin: dict, eco20: int) -> dict:
@@ -4482,8 +4482,7 @@ def _valeur_verte_devis(prospect: dict, eco_res: dict, admin: dict, eco20: int) 
     ok = bool(vv.get("ok"))
     gain = eco20 + (vv["min"] if ok else 0)          # Lot 13d : document client = bas de la fourchette
     return {
-        "valeur_verte": dict(vv, min_fmt=_eur_fmt(vv["min"]), max_fmt=_eur_fmt(vv["max"]),
-                             valeur_fmt=_eur_fmt(vv["valeur"])) if ok else None,
+        "valeur_verte": dict(vv, min_fmt=_eur_fmt(vv["min"])) if ok else None,      # Lot 13e : jamais le milieu / le haut
         "gain_total": gain,
         "gain_total_fmt": _eur_fmt(gain),
     }
@@ -4657,6 +4656,11 @@ def _build_devis_context(request: Request, numero: str, version: int | None = No
                 _comptant, mois_rentabilite(_eco_res, _reste_net) if _comptant else None, _eco_pendant,
                 _proj["annee_rentable"], _eco_res["duree_ans"])
             projet_apercu.update(_valeur_verte_devis(prospect, _eco_res, admin, _eco20))
+            # Lot 13e : tuiles construites par la même fonction que la fiche (valeur_verte.tuiles)
+            projet_apercu["tuiles"] = valeur_verte.tuiles(
+                {"avant_mensuel": _fav, "apres_mensuel": _fap, "total": _proj["total"],
+                 "rentabilite": projet_apercu["rentabilite_texte"]},
+                projet_apercu["valeur_verte"], projet_apercu["duree_vie_pac_ans"])
     # Interrupteur par lead : décocher masque le bloc éco/ROI (devis + pré-devis + e-mail).
     # Absent ou True → affiché (rétrocompat) ; seul False explicite masque.
     if state.get("afficher_apercu") is False:

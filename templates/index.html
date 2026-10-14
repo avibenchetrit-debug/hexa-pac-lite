@@ -13104,11 +13104,22 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     const ecoMois = eco ? state.facture_avant - state.facture_apres : 0;
     const rentTxt = eco && !r.indisponible && HE
       ? HE.texteRentabilite(comptant, comptant ? moisRentabilite(eco, c.resteAttente) : null, delta, r.anneeRentable, r.dureeVie) : '';
-    const total20 = eco && !r.indisponible && r.anneeRentable ? Math.round(r.total20) : null;
+    // Lot 13e : tuiles construites par HexaValeurVerte.tuiles (= valeur_verte.tuiles du pré-devis / devis)
     const vv = valeurVerteSim();
-    const vvOk = !!(vv && vv.ok);
-    const gainTotal = total20 !== null ? total20 + (vvOk ? vv.valeur : 0) : null;
     const dureeTuile = r.dureeVie || DUREE_VIE_PAC;
+    const V = window.HexaValeurVerte;
+    const listeTuiles = V ? V.tuiles(eco ? { avant_mensuel: state.facture_avant, apres_mensuel: state.facture_apres,
+      total: !r.indisponible && r.anneeRentable ? r.total20 : null, rentabilite: rentTxt } : null, vv, dureeTuile) : [];
+    const escT = (t) => String(t ?? '').replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
+    const ID_TUILE = { eco: 'p6-tuile-economies', vv: 'p6-tuile-vv', total: 'p6-tuile-total' };
+    const CLS_TUILE = { eco: '', vv: ' p6-tuile--vv', total: ' p6-tuile--nuit' };
+    const detailT = (d) => d.fort
+      ? `<i class="t3-d-${d.cle}"><b class="sim-roi-big">${escT(d.fort)}</b>${escT(d.texte)}</i>`
+      : `<i class="t3-d-${d.cle}"${d.cle === 'rent' ? ' id="p6-tuile-rent"' : ''}>${escT(d.texte)}</i>`;
+    const htmlTuiles = listeTuiles.map((t) => `<div class="p6-tuile p6-tuile3${CLS_TUILE[t.cle]}${t.alerte ? ' p6-tuile--warn' : ''}" id="${ID_TUILE[t.cle]}">`
+      + `<span class="t3-titre">${escT(t.titre)}</span><small class="t3-pre">${t.pre ? escT(t.pre) : '&nbsp;'}</small>`
+      + `<b class="t3-montant"${t.cle === 'eco' ? ' id="p6-tuile-eco"' : ''}>${escT(t.montant)}</b>`
+      + `<div class="t3-details">${t.details.map(detailT).join('')}</div></div>`).join('');
     const mois = comptant ? moisRentabilite(state.eco, c.resteAttente) : null;
     const declare = state.eco && !state.eco.ecs_traitee && state.facture_avant < Math.round(state.eco.facture_annuelle / 12)
       ? ` <i>(${eur(Math.round(state.eco.facture_annuelle / 12))} déclarés, dont chauffage)</i>` : '';
@@ -13116,10 +13127,8 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
         <div class="p6-blk"><h4>① CE QUE ÇA COÛTE <span>· le calcul du reste à charge</span></h4>${compte}</div>
 
         <div class="p6-blk p-quand"><h4>② QUI PAIE, ET QUAND <span>· pour le client : − ce qu'il paie, + ce qu'il récupère</span></h4>${flux}</div>
-        <div class="sim-roi p6-roi"><div class="p6-g ${vvOk ? 'p6-g3' : 'p6-g2'} p6-tuiles">
-          <div class="p6-tuile${ecoMois < 0 ? ' p6-tuile--warn' : ''}"><span>Économies d'énergie</span><b id="p6-tuile-eco">${eco ? eur(ecoMois) + '/mois' : '—'}</b><i>${eco ? `${eur(state.facture_avant)} → ${eur(state.facture_apres)}/mois` : 'facture inconnue'}</i>${total20 !== null ? `<i><b class="sim-roi-big">${eur(total20)}</b> sur ${dureeTuile} ans</i>` : ''}${rentTxt ? `<i id="p6-tuile-rent">${rentTxt}</i>` : ''}</div>
-          ${vvOk ? `<div class="p6-tuile p6-tuile--vv" id="p6-tuile-vv"><span>Valeur verte</span><b>+ ${eur(vv.min)} à + ${eur(vv.max)}</b><i>${vv.libelle_classes}</i><i>${vv.libelle_source}</i><i class="p6-vv-ecarts">${vv.libelle_ecarts}</i></div>` : ''}
-          <div class="p6-tuile p6-tuile--nuit" id="p6-tuile-total"><span>Gain total sur ${dureeTuile} ans</span><b>${gainTotal !== null ? eur(gainTotal) : '—'}</b><i>${total20 !== null ? `${eur(total20)} d'économies${vvOk ? ` + ${eur(vv.valeur)} de valeur verte` : ' (valeur verte non estimée)'}` : (eco ? `au-delà de ${dureeTuile} ans` : 'facture inconnue')}</i></div>
+        <div class="sim-roi p6-roi"><div class="p6-tuiles3" style="--n:${listeTuiles.length}">
+          ${htmlTuiles}
         </div>
         ${!state.eco ? `<div class="p6-alerte" id="sim-eco-indisponible">Économies non calculées : renseignez la facture de l'énergie de la chaudière, ou la surface et l'énergie du logement pour l'estimer.</div>` : ''}
         ${state.eco && state.eco.alerte ? `<div class="p6-alerte" id="sim-eco-alerte">Résultat inhabituel : vérifiez la facture et l'énergie saisies.</div>` : ''}
@@ -19496,7 +19505,41 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
       source_ecarts: source, libelle_ecarts: libelleEcarts(source, dep) });
   }
 
-  window.HexaValeurVerte = { donnees: null, typeBien, departement, ecarts, libelleEcarts, valeurBien, calculer, projet };
+  // Lot 13e : les 3 tuiles (miroir exact de valeur_verte.tuiles ; valeur verte = bas de la fourchette)
+  const NBSP = '\u00a0';
+  function eurT(n) {
+    n = arrondi(Number(n) || 0);
+    return (n < 0 ? '-' : '') + String(Math.abs(n)).replace(/\B(?=(\d{3})+(?!\d))/g, NBSP) + NBSP + '€';
+  }
+  function tuiles(eco, vv, duree) {
+    const vvOk = !!(vv && vv.ok);
+    const eco20 = eco && eco.total !== null && eco.total !== undefined ? arrondi(eco.total) : null;
+    let tEco;
+    if (eco) {
+      const mois = arrondi(eco.avant_mensuel) - arrondi(eco.apres_mensuel);
+      const details = [{ cle: 'facture', texte: `${eurT(eco.avant_mensuel)} → ${eurT(eco.apres_mensuel)}/mois` }];
+      if (eco20 !== null) details.push({ cle: 'total20', fort: eurT(eco20), texte: ` sur ${duree} ans` });
+      if (eco.rentabilite) details.push({ cle: 'rent', texte: eco.rentabilite });
+      tEco = { cle: 'eco', titre: 'Économies d\'énergie', pre: '', montant: `${eurT(mois)}/mois`, details, alerte: mois < 0 };
+    } else {
+      tEco = { cle: 'eco', titre: 'Économies d\'énergie', pre: '', montant: '—', details: [{ cle: 'facture', texte: 'facture inconnue' }], alerte: false };
+    }
+    const out = [tEco];
+    if (vvOk) out.push({ cle: 'vv', titre: 'Valeur verte', pre: 'à partir de', montant: eurT(vv.min),
+      details: [{ cle: 'classes', texte: vv.libelle_classes }, { cle: 'source', texte: vv.libelle_source },
+                { cle: 'ecarts', texte: vv.libelle_ecarts }], alerte: false });
+    let total;
+    if (eco20 === null) {
+      total = { pre: '', montant: '—', details: [{ cle: 'dont', texte: eco ? `au-delà de ${duree} ans` : 'facture inconnue' }] };
+    } else {
+      const dont = `dont ${eurT(eco20)} d'économies d'énergie` + (vvOk ? ` + à partir de ${eurT(vv.min)} de valeur verte` : ' (valeur verte non estimée)');
+      total = { pre: vvOk ? 'à partir de' : '', montant: eurT(eco20 + (vvOk ? vv.min : 0)), details: [{ cle: 'dont', texte: dont }] };
+    }
+    out.push(Object.assign(total, { cle: 'total', titre: `Gain total sur ${duree} ans`, alerte: false }));
+    return out;
+  }
+
+  window.HexaValeurVerte = { donnees: null, eur: eurT, tuiles, typeBien, departement, ecarts, libelleEcarts, valeurBien, calculer, projet };
 })();
 /* HEXA-VALEUR-VERTE:FIN */
 // Lot 13 : table des écarts de prix par classe DPE (data/valeur_verte) -> HexaValeurVerte.donnees
@@ -20778,6 +20821,27 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
   #p-sim-6r.p6-dense3 #sim-dynamic .p6-calc--tot .p6-calc-v, #p-sim-6r.p6-dense3 #sim-dynamic .p6-calc--fin .p6-calc-v { font-size: 18px; line-height: 21px; }
   #p-sim-6r.p6-dense3 #sim-dynamic .p6-tuile { padding: 2px 8px; }
   #p-sim-6r.p6-dense3 #sim-dynamic .p6-base { margin-top: 1px; }
+  /* Lot 13e : 3 tuiles (titre · petit libellé · montant · détails), mêmes lignes d'une tuile à l'autre (subgrid) :
+     même hauteur, montants alignés ; montant sur une ligne, réduit avec la largeur plutôt que coupé */
+  body.l6 #p-hotes .p6-tuiles3, .p6-tuiles3 { display: grid; grid-template-columns: repeat(var(--n, 3), minmax(0, 1fr));
+    grid-template-rows: auto auto auto 1fr; column-gap: 6px; row-gap: 0; container-type: inline-size; }
+  body.l6 #p-hotes .p6-tuiles3 > .p6-tuile3, .p6-tuiles3 > .p6-tuile3 { display: grid; grid-row: span 4;
+    grid-template-rows: subgrid; row-gap: 0; align-content: start; padding: 6px 10px; flex-direction: initial; }
+  .p6-tuile3 > .t3-titre { font-size: 11px; font-weight: 700; color: var(--p6-green); line-height: 1.25; }
+  .p6-tuile3 > .t3-pre { display: block; font-size: 10px; line-height: 1.2; color: var(--p6-green); font-weight: 600; margin-top: 2px; }
+  body.l6 #p-hotes .p6-tuile3 > .t3-montant, .p6-tuile3 > .t3-montant { display: block; white-space: nowrap !important; overflow-wrap: normal !important;
+    font-size: clamp(12px, 5.6cqi, 17px); line-height: 1.15; font-weight: 800; color: var(--p6-green); }
+  .p6-tuile3 > .t3-details { display: flex; flex-direction: column; gap: 1px; margin-top: 3px; }
+  .p6-tuile3 > .t3-details > i { display: block; margin: 0; font-style: normal; font-size: 10px; line-height: 1.3; color: #3A4656; }
+  body.l6 #p-hotes .p6-tuile3 .sim-roi-big { display: inline !important; font-size: inherit !important; font-weight: 700; color: inherit; white-space: nowrap !important; }
+  .p6-tuile3.p6-tuile--warn > .t3-titre, .p6-tuile3.p6-tuile--warn > .t3-pre, .p6-tuile3.p6-tuile--warn > .t3-montant { color: #8A4B00; }
+  .p6-tuile3.p6-tuile--nuit > .t3-titre, .p6-tuile3.p6-tuile--nuit > .t3-pre, .p6-tuile3.p6-tuile--nuit > .t3-details > i { color: #9FB4CE; }
+  body.l6 #p-hotes .p6-tuile3.p6-tuile--nuit > .t3-montant, .p6-tuile3.p6-tuile--nuit > .t3-montant { color: #fff; }
+  @media (max-width: 640px) {
+    body.l6 #p-hotes .p6-tuiles3, .p6-tuiles3 { grid-template-columns: 1fr; grid-template-rows: none; row-gap: 6px; }
+    body.l6 #p-hotes .p6-tuiles3 > .p6-tuile3, .p6-tuiles3 > .p6-tuile3 { grid-row: auto; grid-template-rows: none; }
+    body.l6 #p-hotes .p6-tuile3 > .t3-montant, .p6-tuile3 > .t3-montant { font-size: 20px; }
+  }
 </style>
 <script id="hexa-lot6d-js">
 /* Lot 6d : resserre la colonne de droite de l'étape 6 seulement si elle déborde (mesure après chaque rendu). */
@@ -21245,7 +21309,8 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     const surf = nombre(val('surface_logement_m2')), annee = (String(val('annee_construction')).match(/^\d{4}$/) || [])[0];
     const txt = (s) => { const e = document.querySelector(s); return e ? e.textContent.replace(/[  ]/g, ' ').replace(/\s+/g, ' ').trim() : ''; };
     const reste = /\d/.test(txt('#sim-reste')) ? txt('#sim-reste') : '';
-    const tuile = document.getElementById('p6-tuile-eco'), ecoLib = tuile && tuile.previousElementSibling ? tuile.previousElementSibling.textContent : '';
+    const tuile = document.getElementById('p6-tuile-eco');                                   // Lot 13e : titre de la tuile
+    const ecoLib = tuile ? (tuile.closest('.p6-tuile')?.querySelector('.t3-titre')?.textContent || '') : '';
     const eco = /^Économie/.test(ecoLib) ? (txt('#p6-tuile-eco').match(/^([\d ]+)/) || [])[1] : '';
     // Lot 6i : coût théorique du document (DPE / audit), catégorie, aides du dernier calcul, années de l'avis d'impôt
     const mil = (n) => Math.round(n).toLocaleString('fr-FR').replace(/[  ]/g, ' ');
