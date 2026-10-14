@@ -1,0 +1,13 @@
+type_bien,classe_dpe,nb_ventes,ecart_prix_m2_pct_vs_d
+appartement,A,292,37.7
+appartement,B,4796,20.7
+appartement,C,59981,12.5
+appartement,E,38243,-4.1
+appartement,F,11462,-6.5
+appartement,G,5513,-5.7
+maison,A,2846,22.2
+maison,B,3299,17.6
+maison,C,34052,7.9
+maison,E,26483,-6.4
+maison,F,8884,-13.0
+maison,G,4434,-16.4

@@ -1,0 +1,195 @@
+# -*- coding: utf-8 -*-
+"""Lot 13 : classe DPE estimée (services/dpe_estime.py), valeur verte (services/valeur_verte.py),
+parité avec les blocs JS de la fiche et 3 tuiles du pré-devis / devis."""
+import json
+import os
+import shutil
+import subprocess
+
+import pytest
+from fastapi.testclient import TestClient
+
+import main
+from services import dpe_estime, economies as eco, valeur_verte as vv
+
+GAZ = dict(facture_annuelle=1800, energie="gaz", ecs_chaudiere=True, personnes=3, service="chauffage_seul",
+           ballon=False, scop=3.8)
+
+
+# ---------------------------------------------------------------- seuils DPE, double critère
+@pytest.mark.parametrize("ep, co2, attendu", [(70, 6, "A"), (71, 6, "B"), (110, 30, "C"), (250, 5, "D"),
+                                             (100, 60, "E"), (421, 1, "G"), (60, 101, "G"), (180, 50, "D")])
+def test_classe_retient_la_pire_des_deux(ep, co2, attendu):
+    assert dpe_estime.classe(ep, co2, {}) == attendu
+
+
+def test_seuils_de_l_admin():
+    p = {"dpe_seuils_ep": {"A": 100}}
+    assert dpe_estime.classe(90, 1, p) == "A" and dpe_estime.classe(90, 1, {}) == "B"
+
+
+def test_estimation_gaz_avant_apres():
+    r = eco.calculer_economies(GAZ, {})
+    e = dpe_estime.estimer(r, 100, 3, True, {})
+    # avant : 1800 € / 0,12 €/kWh = 15 000 kWh de gaz -> 150 kWh/m² et 34 kg CO2/m² -> classe D
+    assert e["ep_avant"] == pytest.approx(150, abs=0.1) and e["co2_avant"] == pytest.approx(34.1, abs=0.1)
+    assert e["classe_avant"] == "D"
+    # après : électricité PAC (besoin / SCOP) + ECS restée au gaz
+    assert e["classe_apres"] in "ABC" and e["gain"] >= 1
+
+
+def test_vrai_dpe_classe_plus_gain_sans_depasser_a():
+    est = {"ok": True, "classe_avant": "E", "classe_apres": "B", "gain": 3}
+    assert dpe_estime.classes_projet("F", est) == {"ok": True, "classe_avant": "F", "classe_apres": "C", "dpe_reel": True}
+    assert dpe_estime.classes_projet("B", est)["classe_apres"] == "A"
+    assert dpe_estime.classes_projet("", est) == {"ok": True, "classe_avant": "E", "classe_apres": "B", "dpe_reel": False}
+
+
+@pytest.mark.parametrize("choix, dpe_connu, attendu", [("F", "", "F"), ("aucun", "F", ""), ("", "e", "E"),
+                                                       ("", "", ""), ("", "AB", "")])
+def test_classe_reelle(choix, dpe_connu, attendu):
+    assert dpe_estime.classe_reelle(choix, dpe_connu) == attendu
+
+
+# ---------------------------------------------------------------- valeur verte
+def test_table_des_ecarts_versionnee():
+    t = vv.table()
+    assert t["france"]["maison"]["F"] == -13.0 and t["departements"]["72"]["maison"]["F"] == -21.6
+    assert "D" not in t["france"]["maison"]
+
+
+def test_ecart_departement_sinon_france_d_vaut_zero():
+    ec = vv.ecarts(vv.table(), "72", "maison")
+    assert ec["D"] == 0 and ec["F"] == -21.6                 # Sarthe
+    assert ec["B"] == vv.table()["france"]["maison"]["B"]    # absent en Sarthe -> France
+
+
+def test_calcul_et_fourchette():
+    r = vv.calculer(200000, "F", "D", {**{c: 0.0 for c in "ABCDEFG"}, "F": -13.0}, 30)
+    assert r == {"ok": True, "valeur": 26000, "min": 18200, "max": 33800, "ecart_pct": 13.0,
+                 "ecart_avant": -13.0, "ecart_apres": 0.0}
+    assert vv.calculer(0, "F", "D", {}, 30)["ok"] is False
+    assert vv.calculer(200000, "D", "D", {c: 0.0 for c in "ABCDEFG"}, 30)["raison"] == "classe"
+
+
+def test_valeur_du_bien_saisie_sinon_dvf():
+    assert vv.valeur_bien("250000", "2000", "100") == 250000
+    assert vv.valeur_bien("", "2000", "100") == 200000
+
+
+def test_departement_et_type():
+    assert vv.departement("72300") == "72" and vv.departement("97411") == "974" and vv.departement("") == ""
+    assert vv.type_bien("appartement") == "appartement" and vv.type_bien("maison") == "maison"
+
+
+# ---------------------------------------------------------------- délai de rentabilité (énergie seule)
+def test_mois_rentabilite_52_mois():
+    res = {"chauffage_avant": 299 * 12, "ecs_actuelle": 0, "apres_annuel": 120 * 12, "inflation_avant": 0.04,
+           "inflation_ecs_avant": 0.04, "inflation_apres": 0.03, "duree_ans": 20}
+    assert eco.mois_rentabilite(res, 9857) == 52
+    assert eco.texte_rentabilite(True, 52, None, 5, 20) == "rentabilisé en 52 mois"
+    assert eco.texte_rentabilite(False, None, 12, 1, 20) == "rentabilisé dès le 1er mois"
+    assert eco.texte_rentabilite(False, None, -20, 3, 20) == "rentabilisé dès la 3ᵉ année"
+
+
+# ---------------------------------------------------------------- parité JS / Python
+NODE_RUNNER = r"""
+const fs = require('fs'), vm = require('vm');
+const html = fs.readFileSync(process.argv[2], 'utf8');
+const bloc = (d, f) => { const a = html.indexOf(d), b = html.indexOf(f); if (a < 0 || b < 0) throw new Error(d); return html.slice(a, b); };
+const ctx = { window: {} }; vm.createContext(ctx);
+vm.runInContext(bloc('/* HEXA-ECONOMIES:DEBUT', '/* HEXA-ECONOMIES:FIN */'), ctx);
+vm.runInContext(bloc('/* HEXA-VALEUR-VERTE:DEBUT', '/* HEXA-VALEUR-VERTE:FIN */'), ctx);
+const { HexaEconomies: E, HexaDpeEstime: D, HexaValeurVerte: V } = ctx.window;
+const e = JSON.parse(fs.readFileSync(0, 'utf8'));
+const out = e.cas.map(([eco, entree, params]) => {
+  const res = E.calculerEconomies(eco, params);
+  return { estime: D.estimer(res, entree.surface, entree.personnes, entree.ecs_chaudiere, params),
+           projet: V.projet(entree, res, params, e.table),
+           mois: E.moisRentabilite(res.ok ? res : null, entree.debourse),
+           texte: E.texteRentabilite(entree.comptant, E.moisRentabilite(res.ok ? res : null, entree.debourse), entree.delta, 3, 20) };
+});
+process.stdout.write(JSON.stringify(out));
+"""
+ENTREE = dict(valeur_bien=180000, classe_dpe_avant="", dpe_connu="", surface=100, cp="72300", type_logement="maison",
+              personnes=3, ecs_chaudiere=True, debourse=9857, comptant=True, delta=None)
+CAS = [
+    (GAZ, ENTREE, {}),
+    (dict(GAZ, energie="fioul", facture_annuelle=3000), dict(ENTREE, classe_dpe_avant="F", cp="49460"), {}),
+    (dict(GAZ, energie="fioul", facture_annuelle=3000), dict(ENTREE, dpe_connu="E", cp="49460"), {}),
+    (dict(GAZ, service="chauffage_ecs"), dict(ENTREE, type_logement="appartement", cp="75011", surface=60), {}),
+    (dict(GAZ, ecs_chaudiere=False, ballon=True), dict(ENTREE, ecs_chaudiere=False, comptant=False, delta=-5), {}),
+    (dict(GAZ, energie="electricite", facture_annuelle=2400, facture_electricite_totale=True),
+     dict(ENTREE, classe_dpe_avant="aucun", dpe_connu="G"), {}),
+    (dict(GAZ, energie="bois", facture_annuelle=1500), dict(ENTREE, cp="97411", valeur_bien=0), {}),
+    (GAZ, ENTREE, {"dpe_seuils_ep": {"C": 90}, "coef_ep": {"electricite": 2.3}, "valeur_verte_fourchette_pct": 20}),
+    (dict(GAZ, facture_annuelle=0), ENTREE, {}),
+    (GAZ, dict(ENTREE, surface=0), {}),
+]
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node absent")
+def test_parite_js_python(tmp_path):
+    runner = tmp_path / "parite13.js"
+    runner.write_text(NODE_RUNNER, encoding="utf-8")
+    html = os.path.join(os.path.dirname(__file__), "..", "templates", "index.html")
+    entree = {"cas": [list(c) for c in CAS], "table": vv.table()}
+    res = subprocess.run(["node", str(runner), html], input=json.dumps(entree), capture_output=True,
+                         text=True, encoding="utf-8", check=True)
+    js = json.loads(res.stdout)
+    for (e, entree_cas, params), j in zip(CAS, js):
+        r = eco.calculer_economies(e, params)
+        assert j["estime"] == dpe_estime.estimer(r, entree_cas["surface"], entree_cas["personnes"],
+                                                 entree_cas["ecs_chaudiere"], params), (e, entree_cas)
+        assert j["projet"] == vv.projet(entree_cas, r, params, vv.table()), (e, entree_cas)
+        mois = eco.mois_rentabilite(r if r["ok"] else None, entree_cas["debourse"])
+        assert j["mois"] == mois
+        assert j["texte"] == eco.texte_rentabilite(entree_cas["comptant"], mois, entree_cas["delta"], 3, 20)
+    assert any(j["projet"].get("ok") for j in js) and any(j["projet"].get("dpe_reel") for j in js)
+
+
+# ---------------------------------------------------------------- pré-devis / devis : 3 tuiles + mention
+LEAD = {"numero": "PR-01313", "civilite": "M.", "nom": "Test", "prenom": "Vv", "telephone": "0611121314",
+        "email": "v@x.fr", "adresse_chantier": "1 rue A", "cp_chantier": "72300", "code_postal_chantier": "72300",
+        "ville_chantier": "Solesmes", "type_logement": "maison", "surface_logement_m2": "100", "hsp": "2,5",
+        "mode_chauffage": "gaz", "ecs": "chaudiere", "type_emetteurs": "radiateurs_classiques",
+        "alimentation_electrique": "monophase", "categorie": "tres_modeste", "nombre_personnes": "3",
+        "cout_energetique_mensuel_eur": "150", "cout_energie_source": "reel", "valeur_bien_estimee": "180000"}
+MENTION = "Valeur verte : estimation indicative et non contractuelle"
+
+
+def _preparer(lead, state=None):
+    main._atomic_write_json(main.LEADS_PATH, [lead])
+    main._atomic_write_json(main._state_simulateur_path(lead["numero"]), {})
+    main.save_state_simulateur_atomic(lead["numero"], state or {"service": "chauffage_seul", "option": "opt3"})
+
+
+def test_devis_trois_tuiles_et_mention():
+    _preparer(LEAD)
+    pa = main._build_devis_context(None, LEAD["numero"])["projet_apercu"]
+    assert pa is not None
+    v = pa["valeur_verte"]
+    assert v and v["ok"] and v["libelle_source"] == "(classe estimée)" and v["min"] < v["valeur"] < v["max"]
+    assert pa["gain_total"] == pa["eco_20_ans"] + v["valeur"]
+    assert pa["rentabilite_texte"].startswith("rentabilisé")
+    html = TestClient(main.app).get(f"/api/devis/{LEAD['numero']}/preview").text.replace("&#39;", "'")
+    bloc = html.split('<div class="projet-apercu">')[1].split('<div class="anah-mention-block')[0]
+    for t in ("Économies d'énergie", "Valeur verte", "Gain total sur", v["libelle_classes"], "(classe estimée)",
+              pa["rentabilite_texte"], MENTION):
+        assert t in bloc, t
+
+
+def test_devis_dpe_reel_et_tuile_masquee_sans_valeur():
+    _preparer(dict(LEAD, classe_dpe_avant="F"))
+    v = main._build_devis_context(None, LEAD["numero"])["projet_apercu"]["valeur_verte"]
+    assert v["classe_avant"] == "F" and v["libelle_source"] == "(DPE réel)"
+    _preparer(dict(LEAD, valeur_bien_estimee="", prix_m2_estime=""))
+    pa = main._build_devis_context(None, LEAD["numero"])["projet_apercu"]
+    assert pa["valeur_verte"] is None and pa["gain_total"] == pa["eco_20_ans"]
+    html = TestClient(main.app).get(f"/api/devis/{LEAD['numero']}/preview").text
+    assert MENTION not in html and "Gain total sur" in html
+
+
+def test_api_ecarts():
+    r = TestClient(main.app).get("/api/valeur-verte/ecarts")
+    assert r.status_code == 200 and r.json()["departements"]["49"]["maison"]["F"] == -13.4
