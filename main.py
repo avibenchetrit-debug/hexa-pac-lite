@@ -43,6 +43,7 @@ from services.economies import (
 from starlette.background import BackgroundTask
 
 from services.service_devis import (
+    MODE_MPR_DEFAUT,
     calculer_cee_bar_th_171,
     DEPT_ZONE,
     lignes_solution_chauffage,
@@ -1370,6 +1371,13 @@ def save_state_simulateur_atomic(numero: str, payload: dict) -> dict:
     return state
 
 
+def _init_choix_demarrage(numero: str) -> None:
+    """Lot 13f : un lead neuf porte dès sa création le choix de démarrage par défaut (« attend l'accord
+    MaPrimeRénov' » = PICOTY), lu par l'étape Foyer, l'étape Proposition, le pré-devis et le devis."""
+    if not load_state_simulateur(numero).get("mode_mpr"):
+        save_state_simulateur_atomic(numero, {"mode_mpr": MODE_MPR_DEFAUT})
+
+
 async def _read_request_payload(request: Request) -> dict:
     """Read JSON or form payload and return a flat dict."""
     ctype = request.headers.get("content-type", "")
@@ -1472,6 +1480,8 @@ def _upsert_lead(payload: dict, forced_numero: str | None = None) -> tuple[dict,
         created = False
 
     _atomic_write_json(LEADS_PATH, leads)
+    if created:
+        _init_choix_demarrage(numero)
     return merged, created
 
 
@@ -3386,6 +3396,7 @@ async def import_leads(file: UploadFile = File(...)) -> JSONResponse:
     leads = _read_leads()
     notes = _read_notes()
     imported = 0
+    importes = []
 
     for idx, row in df.iterrows():
         raw = {field: str(row[col]).strip() for col, field in col_map.items()}
@@ -3413,6 +3424,7 @@ async def import_leads(file: UploadFile = File(...)) -> JSONResponse:
         prospect = {"numero": numero, "date": file_date or _now_iso()}
         prospect.update({field: record.get(field, "") for field in IMPORT_PROSPECT_FIELDS})
         leads.append(prospect)
+        importes.append(numero)
         imported += 1
 
         if note_text:
@@ -3422,6 +3434,8 @@ async def import_leads(file: UploadFile = File(...)) -> JSONResponse:
 
     _atomic_write_json(LEADS_PATH, leads)
     _atomic_write_json(NOTES_PATH, notes)
+    for numero in importes:
+        _init_choix_demarrage(numero)
 
     return JSONResponse({"ok": True, "imported": imported, "errors": errors})
 
