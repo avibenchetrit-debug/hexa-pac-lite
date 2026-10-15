@@ -6042,8 +6042,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
         </div>
         <div class="suivi-dernier" id="suivi-dernier-repondu" style="display:none"></div>
 
-        <!-- Programmer un rappel -->
-        <div class="card-subtitle">Programmer un rappel</div>
+        <!-- Programmer un rappel (titre ajouté dans le panneau « Fin d'appel », Lot 13g) -->
         <div class="row-rappel-compact">
           <div class="field"><label>Date</label><input type="date" id="suivi-rap-date"></div>
           <div class="field"><label>Heure</label><input type="time" id="suivi-rap-heure"></div>
@@ -20215,11 +20214,18 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
       // Lot 5 : « Fin d'appel » toujours visible ; ouvre les contrôles existants (mêmes id, même logique)
       const fa = document.createElement('div');
       fa.className = 'p-fin-appel';
-      fa.innerHTML = '<button type="button" class="p-fin-appel-btn" id="p-fin-appel-btn" aria-expanded="false">Fin d\'appel</button><div class="p-fin-appel-pop" id="p-fin-appel-pop" hidden></div>';
+      fa.innerHTML = '<button type="button" class="p-fin-appel-btn" id="p-fin-appel-btn" aria-expanded="false">Fin d\'appel</button>'
+        + '<button type="button" class="p-rappel-btn" id="p-rappel-btn">📅 Rappel</button><div class="p-fin-appel-pop" id="p-fin-appel-pop" hidden></div>';
       q('#p-fin-appel-btn', fa).addEventListener('click', (e) => {
         e.stopPropagation();
         const pop = q('#p-fin-appel-pop'); pop.hidden = !pop.hidden;
         e.currentTarget.setAttribute('aria-expanded', pop.hidden ? 'false' : 'true');
+      });
+      // Lot 13g : « 📅 Rappel » ouvre le panneau « Fin d'appel » directement sur la date du rappel
+      q('#p-rappel-btn', fa).addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (typeof window.hexaL6OuvrirRappel === 'function') window.hexaL6OuvrirRappel();
+        else if (q('#p-fin-appel-pop').hidden) q('#p-fin-appel-btn').click();
       });
       document.addEventListener('click', (e) => {
         const pop = q('#p-fin-appel-pop');
@@ -20345,6 +20351,8 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
         const el = q(s, suivi);
         if (el) fin.appendChild(el);
       });
+      const rap = q('.row-rappel-compact', fin);       // Lot 13g : titre visible au-dessus de Date · Heure · Motif · Assigné
+      if (rap) rap.insertAdjacentHTML('beforebegin', '<div class="p6-vt-titre" id="suivi-rap-titre">Programmer un rappel</div>');
       const nrp = q('#suivi-nrp', fin);
       if (nrp) { const d = document.createElement('div'); d.className = 'l4-aide'; d.textContent = AIDE_NRP; nrp.closest('.suivi-actions').insertAdjacentElement('afterend', d); }
       suivi.classList.add('l4-ancienne-carte');
@@ -21968,6 +21976,9 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
   .p-fin-appel-btn { border: 1px solid #E2214B; background: #fff; color: #E2214B; border-radius: 8px; padding: 4px 10px; font: inherit;
     font-size: 12px; font-weight: 700; cursor: pointer; }
   .p-fin-appel-btn[aria-expanded="true"] { background: #FFF1F3; }
+  .p-rappel-btn { margin-left: 6px; border: 1px solid #002E5A; background: #fff; color: #002E5A; border-radius: 8px; padding: 4px 10px; font: inherit;
+    font-size: 12px; font-weight: 700; cursor: pointer; }
+  .p-rappel-btn:hover { background: #F4F8FC; }
   .p-fin-appel-pop { position: absolute; right: 0; top: calc(100% + 8px); z-index: 70; width: 340px; background: #fff; border: 1px solid #E2E8F0;
     border-radius: 10px; box-shadow: 0 12px 30px rgba(0, 0, 0, .15); padding: 10px 12px; }
   .p-fin-appel-pop[hidden] { display: none; }
