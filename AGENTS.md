@@ -151,6 +151,9 @@ derrière la connexion ; `/api/...` répond 401 même pour une route inexistante
   et `prime_cee()` (`services/service_devis.py`, utilisée par `calculer_devis`), parité `tests/test_lot13f_prime_cee.py`.
   Plus de « Jusqu'à » / maximum au Foyer ; note « Prime CEE calculée pour un démarrage après accord MaPrimeRénov' … » ou
   « … pour des travaux tout de suite … ». L'accompagnateur (`[CEE]`, `[aides]`) lit ce même dernier calcul.
+- **Lot 13g (rappel)** : bouton « 📅 Rappel » (`#p-rappel-btn`) dans le bandeau, à côté de « Fin d'appel » : ouvre ce
+  panneau sur la date (`hexaL6OuvrirRappel`). Titre « Programmer un rappel » (`#suivi-rap-titre`) ajouté dans le panneau ;
+  la carte `#card-suivi` (masquée) reste : source des contrôles déplacés et garde de `bindSuiviCard()`.
 - Clés DocuSeal / Resend : seulement sur Railway. En local, l'envoi réel est impossible (le script de bout en bout le simule).
 
 ### Tests
