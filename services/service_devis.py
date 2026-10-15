@@ -377,6 +377,7 @@ def calculer_mpr_ballon(prospect, admin_params):
 # celui de l'attente, avec une alerte. Réglage absent (ancien fichier) : PICOTY = attente, ACE = tout de suite.
 # Précaire = Très modestes, classique pour tous les autres (inchangé). Même règle dans la page (choisirDelegataire).
 USAGES_DELEGATAIRE = ("attente", "tout_de_suite")
+MODE_MPR_DEFAUT = "attente"        # Lot 13f : choix de démarrage d'un lead neuf = attend l'accord MaPrimeRénov' (PICOTY)
 _USAGE_PAR_NOM = {"PICOTY": "attente", "ACE": "tout_de_suite"}
 
 
@@ -400,7 +401,7 @@ def mode_cee(prospect, state_simulateur, admin_params):
     """« attente » si le client attend l'accord MaPrimeRénov' et a droit à une prime ; sinon « tout_de_suite »."""
     categorie = value(prospect, "categorie_revenu", "categorie", default="modeste")
     mpr = 0 if categorie == "superieur" else calculer_mpr(prospect, state_simulateur, admin_params)
-    mode_mpr = str(value(state_simulateur, "mode_mpr", default="attente") or "attente")
+    mode_mpr = str(value(state_simulateur, "mode_mpr", default=MODE_MPR_DEFAUT) or MODE_MPR_DEFAUT)
     return "tout_de_suite" if (mode_mpr == "sans_attente" or mpr <= 0) else "attente"
 
 
@@ -601,6 +602,18 @@ def appliquer_plafonds_reglementaires(prix_pac_ttc, montant_mpr_brut, montant_ce
     }
 
 
+def prime_cee(prospect, state_simulateur, admin_params, prix_pac_ttc):
+    """Lot 13f — LA prime CEE du pré-devis / devis, même calcul que primeCee() de la page (étapes Foyer et
+    Proposition, parité : tests/test_lot13f_prime_cee.py) : délégataire du choix de démarrage en cours (mode_mpr,
+    défaut « attente » = PICOTY), puis plafond réglementaire. Renvoie le résultat des plafonds (+ mode, délégataire)."""
+    mpr_brut = calculer_mpr(prospect, state_simulateur, admin_params)
+    cee_brut = calculer_cee(prospect, state_simulateur, admin_params, with_bonification=True)
+    res = appliquer_plafonds_reglementaires(prix_pac_ttc=prix_pac_ttc, montant_mpr_brut=mpr_brut,
+                                            montant_cee_brut=cee_brut, prospect=prospect, admin_params=admin_params)
+    res["mode"] = mode_cee(prospect, state_simulateur, admin_params)
+    return res
+
+
 def calculer_devis(prospect, state_simulateur, admin_params, catalogue_pac):
     prix_pac_ttc = get_prix_pac_for_devis(prospect, state_simulateur, catalogue_pac)
     tva_rate = float_value(((admin_params or {}).get("params") or {}).get("tva"), 0.055)
@@ -620,15 +633,7 @@ def calculer_devis(prospect, state_simulateur, admin_params, catalogue_pac):
     prix_fourniture_ttc = round(prix_fourniture_ht * (1 + tva_rate), 2)
     total_tva = round(total_ttc - total_ht, 2)
 
-    montant_mpr_brut = calculer_mpr(prospect, state_simulateur, admin_params)
-    montant_cee_brut = calculer_cee(prospect, state_simulateur, admin_params, with_bonification=True)
-    result_plafonds = appliquer_plafonds_reglementaires(
-        prix_pac_ttc=total_ttc,
-        montant_mpr_brut=montant_mpr_brut,
-        montant_cee_brut=montant_cee_brut,
-        prospect=prospect,
-        admin_params=admin_params,
-    )
+    result_plafonds = prime_cee(prospect, state_simulateur, admin_params, total_ttc)
     montant_mpr = result_plafonds["mpr_final"]
     montant_cee = result_plafonds["cee_final"]
     reste_a_charge = result_plafonds["reste_a_charge"]

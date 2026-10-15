@@ -145,6 +145,12 @@ derrière la connexion ; `/api/...` répond 401 même pour une route inexistante
   Tuiles construites par une seule fonction, `valeur_verte.tuiles()` (JS `HexaValeurVerte.tuiles`, parité testée) : valeur
   verte = bas de la fourchette partout (« à partir de »), jamais le milieu ni le haut ; montants `valeur_verte.eur()`
   (espaces insécables). Écarts : département seulement s'il a les deux classes, sinon France ; sans DPE, gain ≤ 2 classes.
+- **Lot 13f (prime CEE unique)** : étape Foyer, étape Proposition, pré-devis et devis affichent la MÊME prime CEE, celle du
+  choix de démarrage en cours (`mode_mpr` de l'état du simulateur ; défaut `MODE_MPR_DEFAUT` = « attente » = PICOTY, écrit
+  à la création du lead par `_init_choix_demarrage`). Une seule fonction : `primeCee()` (bloc `HEXA-PRIME-CEE` de la page)
+  et `prime_cee()` (`services/service_devis.py`, utilisée par `calculer_devis`), parité `tests/test_lot13f_prime_cee.py`.
+  Plus de « Jusqu'à » / maximum au Foyer ; note « Prime CEE calculée pour un démarrage après accord MaPrimeRénov' … » ou
+  « … pour des travaux tout de suite … ». L'accompagnateur (`[CEE]`, `[aides]`) lit ce même dernier calcul.
 - Clés DocuSeal / Resend : seulement sur Railway. En local, l'envoi réel est impossible (le script de bout en bout le simule).
 
 ### Tests

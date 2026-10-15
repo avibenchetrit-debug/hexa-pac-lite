@@ -11686,6 +11686,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     nombre_personnes: null,
     eco: null,                     // dernier résultat de calculerEconomies
     option: 'opt1',                // opt1 | opt2 | opt3 (financement propre)
+    mode_mpr: 'attente',           // Lot 13f : choix de démarrage, défaut « attend l'accord MaPrimeRénov' » (PICOTY)
     iso_toit: 'isole',
     iso_mur: 'isole',
     iso_menuiserie: 'double',
@@ -12248,6 +12249,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     return capital*i/(1-Math.pow(1+i,-nMois));
   }
 
+  /* HEXA-PRIME-CEE:DEBUT — Lot 13f : copie de services/service_devis.py (prime_cee), parité : tests/test_lot13f_prime_cee.py */
   // Lot 6b : délégataire CEE selon le choix de démarrage (même règle que le serveur, choisir_delegataire) :
   // attente de l'accord MaPrimeRénov' -> délégataire « attente » (PICOTY) ; tout de suite ou foyer sans
   // MaPrimeRénov' -> délégataire « tout de suite » (ACE) ; tarif vide -> repli sur « attente » + alerte.
@@ -12317,6 +12319,32 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     return { montant, erreur: null, delegataire: delegataire.nom || '', alerte: choix.alerte,
              details: { typeLogement, etas, surface, zone, categorie, kwhc, mwhc, prixUnitaire, mult } };
   }
+  // Plafond réglementaire des aides (MaPrimeRénov' gardée, CEE réduite au plafond) = appliquer_plafonds_reglementaires
+  function ecreterAides(categorie, prixPac, mprBase, cee, cfg){
+    if (categorie === 'superieur') return { mpr: 0, cee, conserve: 0 };
+    const plafonds = (cfg && cfg.plafonds_reglementaires) || {};
+    const baseEligible = Math.min(Number(prixPac) || 0, Number(plafonds.plafond_eligible_ttc) || 12000);
+    const plafondPct = Number((plafonds.plafonds_aides_pct || {})[categorie] ?? 0) / 100;
+    const plafondAides = baseEligible * plafondPct;
+    if (plafondPct > 0 && mprBase + cee > plafondAides) {
+      const c2 = Math.round(Math.max(plafondAides - mprBase, 0) * 100) / 100;
+      return { mpr: mprBase, cee: c2, conserve: Math.round((cee - c2) * 100) / 100 };
+    }
+    return { mpr: mprBase, cee, conserve: 0 };
+  }
+  // Lot 13f : LA prime CEE, une seule fonction pour l'étape Foyer, l'étape Proposition (et prime_cee() côté serveur
+  // pour le pré-devis / devis) : délégataire du choix de démarrage EN COURS (mode_mpr, défaut « attente » = PICOTY),
+  // puis plafond réglementaire. Jamais de maximum ni de minimum : un seul montant.
+  function primeCee(st, formule, cfg, mprBrut){
+    const categorie = st.categorie || 'modeste';
+    const mode = modeCee(st, categorie === 'superieur' ? 0 : mprBrut);
+    const r = calculerCeeBarTh171(st, formule, cfg || {}, mode);
+    const ec = ecreterAides(categorie, st.prix_pac, mprBrut, r.montant || 0, cfg);
+    return { mode, delegataire: r.delegataire || '', alerte: r.alerte || null, brut: r.montant || 0,
+             mpr: ec.mpr, cee: ec.cee, conserve: ec.conserve };
+  }
+  if (typeof window !== 'undefined') window.HexaPrimeCee = { primeCee, ecreterAides, calculerCeeBarTh171, modeCee };
+  /* HEXA-PRIME-CEE:FIN */
 
   // OBSOLÈTE — remplacé par calculerEconomies / services/economies.py (Lot 2).
   // Conservée pour mémoire : norme théorique (surface × conso zone / SCOP) sans lien avec la maison.
@@ -12439,38 +12467,16 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     const contextePret = !!state.categorie && !!state.zone && Number.isFinite(dim.surface_chauffee) && dim.surface_chauffee > 0;
     const sKey = trancheSurface(state.surface_chauffee);
     const node = GRILLE['etas_140_plus']?.[sKey]; // ETAS supprime (valeur figee, ecrasee ensuite par forfaits_mpr)
-    let ceeBrut = 0;
     let mprDevis    = contextePret ? (node?.mpr_devis?.[state.zone]?.[state.categorie] ?? 0) : 0;
     if (M3_CONFIG?.forfaits_mpr && state.categorie in M3_CONFIG.forfaits_mpr) {
       mprDevis = Number(M3_CONFIG.forfaits_mpr[state.categorie]) || 0;
     }
-    const modeCeeCourant = modeCee(state, (state.categorie === 'superieur') ? 0 : mprDevis);
-    const formuleCee = M3_CONFIG?.formule_bar_th_171 || defaultFormuleBarTh171();
-    const resultCee = calculerCeeBarTh171(state, formuleCee, M3_CONFIG || {}, modeCeeCourant);
-    ceeBrut = resultCee.montant || 0;
-    const plafonds = M3_CONFIG?.plafonds_reglementaires || {};
-    const plafondEligible = Number(plafonds.plafond_eligible_ttc) || 12000;
-    const plafondsPct = plafonds.plafonds_aides_pct || {};
-    const baseEligible = Math.min(state.prix_pac || 0, plafondEligible);
-    const categoriePlafond = state.categorie || 'modeste';
-    // écrêtement réglementaire (inchangé) : MPR gardée, CEE réduite au plafond
-    const ecreter = (mprBase, cee) => {
-      if (categoriePlafond === 'superieur') return { mpr: 0, cee, conserve: 0 };
-      const plafondPct = Number(plafondsPct[categoriePlafond] ?? 0) / 100;
-      const plafondAides = baseEligible * plafondPct;
-      if (plafondPct > 0 && mprBase + cee > plafondAides) {
-        const c2 = Math.max(plafondAides - mprBase, 0);
-        return { mpr: mprBase, cee: c2, conserve: Math.round((cee - c2) * 100) / 100 };
-      }
-      return { mpr: mprBase, cee, conserve: 0 };
-    };
-    const ec = ecreter(mprDevis, ceeBrut);
+    // Lot 13f : prime CEE du choix de démarrage en cours, la même pour l'étape Foyer et l'étape Proposition
+    const ec = primeCee(state, M3_CONFIG?.formule_bar_th_171 || defaultFormuleBarTh171(), M3_CONFIG || {}, mprDevis);
+    const modeCeeCourant = ec.mode;
     let mprFinal = ec.mpr;
     let ceeDevis = ec.cee;
     let ceeConserveCalcule = ec.conserve;
-    // étape 4 : scénario « tout de suite » (délégataire ACE), le maximum
-    const resultCeeMax = calculerCeeBarTh171(state, formuleCee, M3_CONFIG || {}, 'tout_de_suite');
-    const ecMax = ecreter(mprDevis, resultCeeMax.montant || 0);
     mprDevis = mprFinal;
     const ceeConserve = ceeConserveCalcule;
     const aidesDevis  = ceeDevis + mprDevis;
@@ -12531,8 +12537,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
              mensOptNet, nMoisNet, modeMpr, finMpr, sansAttente,
              contextePret,
              // Lot 6b : délégataire CEE de ce calcul et scénario « tout de suite » (étape 4)
-             delegataireCee: resultCee.delegataire || '', alerteDelegataire: resultCee.alerte || null, modeCee: modeCeeCourant,
-             ceeMax: ecMax.cee, aidesMax: ecMax.cee + ecMax.mpr,
+             delegataireCee: ec.delegataire, alerteDelegataire: ec.alerte, modeCee: modeCeeCourant,
              // Categorie AYANT SERVI a ces montants : le bandeau l'affiche telle quelle, sinon un
              // state modifie pendant l'await afficherait SUP au-dessus de chiffres calcules en TMO.
              categorie: state.categorie,
@@ -12991,7 +12996,12 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
           <div class="p6-aides p6-aides--vide" id="p6-aides"><span class="p6-sec p6-sec--vert">2 · LES AIDES AUXQUELLES LE CLIENT A DROIT</span>
             <div class="p6-aide">Renseignez le nombre de personnes et le revenu fiscal (et la surface à l'étape Logement) : les aides se calculent toutes seules.</div></div>`;
     }
-    const mpr = c.mprDevis, cee = c.ceeMax, tot = c.aidesMax;      // Lot 6b : scénario « tout de suite » (maximum)
+    // Lot 13f : exactement les montants de l'étape Proposition et du devis (choix de démarrage en cours)
+    const mpr = c.mprDevis, cee = c.ceeDevis, tot = c.aidesDevis;
+    const note = c.modeCee === 'attente'
+      ? 'Prime CEE calculée pour un démarrage après accord MaPrimeRénov\' (modifiable à l\'étape Proposition).'
+      : (mpr > 0 ? 'Prime CEE calculée pour des travaux tout de suite (modifiable à l\'étape Proposition).'
+                 : 'Prime CEE calculée pour des travaux tout de suite.');
     const dire = mpr > 0
       ? `« Compte tenu de votre situation, vous avez droit à ${eur(tot)} d'aides : ${eur(mpr)} de MaPrimeRénov' et ${eur(cee)} de prime CEE. »`
       : `« Compte tenu de votre situation, vous avez droit à ${eur(cee)} de prime CEE. »`;
@@ -12999,13 +13009,13 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
           <div class="p6-aides" id="p6-aides">
             <div class="p6-aides-tete"><span class="p6-sec p6-sec--vert">2 · LES AIDES AUXQUELLES LE CLIENT A DROIT</span>
               <span class="p6-pill" style="background:${k.bg};color:${k.fg}">Revenus ${k.lib.toLowerCase()} · CEE ${LABELS_CEE[c.categorie] || ''}</span></div>
-            <div class="p6-aides-total"><span>Jusqu'à</span><strong id="p6-aides-total">${eur(tot)}</strong><span>d'aides pour une PAC air-eau</span></div>
+            <div class="p6-aides-total"><strong id="p6-aides-total">${eur(tot)}</strong><span>d'aides pour une PAC air-eau</span></div>
             <div class="p6-g p6-g2 p6-aides-lignes">
               <div class="p6-aides-l"><b>MaPrimeRénov'</b><span id="p6-aides-mpr">${eur(mpr)}</span></div>
               <div class="p6-aides-l"><b>Prime CEE</b><span id="p6-aides-cee">${eur(cee)}</span></div>
             </div>
             <div class="p6-adire">À dire : ${dire}</div>
-            <div class="p6-aide">Prime CEE selon le choix de démarrage (attente de l'accord MaPrimeRénov' ou travaux tout de suite) : montant maximum affiché, confirmé à l'étape Proposition.</div>
+            <div class="p6-aide" id="p6-aides-note">${note}</div>
           </div>
           ${c.categorie === 'superieur' ? `<div class="p6-alerte" id="p6-alerte-sup"><b>POINT D'ATTENTION :</b> revenus supérieurs : pas de MaPrimeRénov' pour une PAC air-eau, seule la prime CEE s'applique. Le projet reste possible.</div>` : ''}`;
   }
