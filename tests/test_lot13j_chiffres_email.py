@@ -133,8 +133,8 @@ def test_phrase_moins_cher_jamais_en_comptant_ni_sans_chiffre(apercu):
 
 # ---------- 3. économie nulle ou négative pendant le crédit ----------
 
-@pytest.mark.parametrize("mens", [119.0, 124.0, 300.0])
-def test_economie_nulle_ou_negative_seulement_l_economie_apres(mens):
+@pytest.mark.parametrize("mens", [109.6, 112.0, 117.0, 119.0, 124.0, 300.0])
+def test_economie_sous_10_euros_nulle_ou_negative_seulement_l_economie_apres(mens):
     corps = main._email_devis_html("Michel", _apercu("credit", mens=mens), "https://x.invalid/d")
     t = _texte(corps)
     _jamais_negatif(corps)
@@ -239,7 +239,8 @@ def test_envoi_plus_de_24h_apres_sans_confirmation(monkeypatch, client):
 def test_renvoi_recent_compte_aussi(monkeypatch, client):
     il_y_a_30h = (datetime.now(main.PARIS_TZ) - timedelta(hours=30)).isoformat(timespec="seconds")
     il_y_a_1h = (datetime.now(main.PARIS_TZ) - timedelta(hours=1)).isoformat(timespec="seconds")
-    _semer_envoi(timedelta(hours=30), sent_at=il_y_a_30h, renvois=[{"sent_at": il_y_a_1h, "email": LEAD["email"]}])
+    _semer_envoi(timedelta(hours=30), sent_at=il_y_a_30h, renvois=[{"sent_at": il_y_a_1h, "email": LEAD["email"]}],
+                 chiffres_email=main.CHIFFRES_EMAIL)
     envois = _faux_resend(monkeypatch)
     r = client.post(f"/api/devis/{NUM}/renvoyer", json={"version": 1})
     assert r.status_code == 409 and r.json()["detail"]["code"] == "envoi_recent" and envois == []
@@ -274,3 +275,52 @@ def test_relance_valeurs_relevees_a_l_envoi_prioritaires(monkeypatch):
     main._send_relance(NUM, 1, main._SchedulerRequest("https://exemple.invalid"))
     t = _texte(envois[0]["html"])
     assert "ALFÉA EXCELLIA S DUO 12" in t and "11 902,00 €" in t and "NIMBUS" not in t
+
+
+def test_economie_pendant_a_10_euros_affichee():
+    t = _texte(main._email_devis_html("Michel", _apercu("credit", mens=109.0), "https://x.invalid/d"))
+    assert "Vous économisez dès maintenant 10 € /mois" in t and "moins cher qu'aujourd'hui" in t
+
+
+def test_cas_laisne_2_euros_seulement_l_economie_apres():
+    t = _texte(main._email_devis_html("Line", _apercu("credit", fav=148, fap=67, mens=79.4), "https://x.invalid/d"))
+    assert "dès maintenant" not in t and "2 €" not in t and "Une fois l'installation remboursée 81 € /mois" in t
+    assert "-55%" in t and "moins cher" not in t
+
+
+# ---------- 13j-bis : « Renvoyer » bloqué pour un e-mail aux anciens chiffres ----------
+
+@pytest.mark.parametrize("champs, bloque", [
+    ({"sent_at": "2026-10-20T11:11:33+02:00"}, True),                       # LE BRAS v1 : avant c0f20cb
+    ({"sent_at": "2026-10-15T17:44:00+02:00"}, True),
+    ({"sent_at": "2026-10-20T12:18:28+02:00"}, True),
+    ({"sent_at": "2026-10-20T12:18:30+02:00"}, False),                      # après la mise en ligne
+    ({"sent_at": "2026-10-20T11:00:00+02:00", "chiffres_email": "lot13j"}, False),
+    ({"sent_at": ""}, True),
+])
+def test_anciens_chiffres_selon_la_date_ou_la_marque(champs, bloque):
+    assert main._anciens_chiffres(champs) is bloque
+
+
+def test_renvoi_d_un_envoi_aux_anciens_chiffres_bloque(monkeypatch, client):
+    _semer_envoi(timedelta(days=3))                                      # aucune marque, avant la correction
+    envois = _faux_resend(monkeypatch)
+    assert client.get(f"/api/devis/{NUM}/list").json()[0]["anciens_chiffres"] is True
+    for confirme in (False, True):
+        r = client.post(f"/api/devis/{NUM}/renvoyer", json={"version": 1, "confirmer_envoi_recent": confirme})
+        assert r.status_code == 409 and r.json()["detail"] == (
+            "Cet envoi contient d'anciens chiffres. Faites un nouvel envoi depuis la fiche pour envoyer la version corrigée.")
+    assert envois == [] and "renvois" not in main._read_devis_meta()[NUM][0]
+
+
+def test_nouvel_envoi_marque_et_renvoyable(monkeypatch, client):
+    _semer_envoi(timedelta(days=3))
+    _envoi_sans_pdf(monkeypatch)
+    _faux_resend(monkeypatch)
+    assert client.post(f"/api/devis/{NUM}/send", json={"variante": "pre_devis"}).status_code == 200
+    v2 = main._read_devis_meta()[NUM][-1]
+    assert v2["chiffres_email"] == main.CHIFFRES_EMAIL and not main._anciens_chiffres(v2)
+    liste = client.get(f"/api/devis/{NUM}/list").json()
+    assert [x["anciens_chiffres"] for x in liste] == [False, True]          # v2 corrigée, v1 ancienne
+    r = client.post(f"/api/devis/{NUM}/renvoyer", json={"version": 2, "confirmer_envoi_recent": True})
+    assert r.status_code == 200 and r.json()["ok"]
