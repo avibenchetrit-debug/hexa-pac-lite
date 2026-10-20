@@ -4665,8 +4665,13 @@ def _build_devis_context(request: Request, numero: str, version: int | None = No
     context["mode_mpr"] = "sans_attente" if _sans_attente else "attente"
     context["montant_mpr_affiche"] = f"{round(_mpr_total):,}".replace(",", " ")
     context["afficher_mention_mpr"] = state.get("afficher_mention_mpr") is not False
-    # financement choisi dans le simulateur (opt1 Crédit Travaux par défaut, comme le simulateur)
-    context["financement_devis"] = calculer_financement_devis(_base_credit, admin, str(state.get("option") or "opt1").strip())
+    # financement choisi dans le simulateur (opt1 Crédit Travaux par défaut, comme le simulateur ; opt3 comptant : aucune
+    # mensualité). Mode inconnu : aucun financement inventé -> le bloc économies (document + e-mail) est masqué.
+    try:
+        context["financement_devis"] = calculer_financement_devis(_base_credit, admin, str(state.get("option") or "opt1").strip())
+    except ValueError as exc:
+        print(f"[devis] {numero} : {exc} — bloc économies masqué")
+        context["financement_devis"] = None
     # Lot 6b : la mention RAI nomme le délégataire qui valorise la prime (attente MPR : PICOTY ; tout de suite : ACE)
     _deleg = choisir_delegataire(admin.get("delegataires") or [], mode_cee(prospect, state, admin),
                                  devis_value(prospect, "categorie_revenu", "categorie", default="modeste"))[0] or {}
@@ -4693,7 +4698,7 @@ def _build_devis_context(request: Request, numero: str, version: int | None = No
     _eco = context.get("economie_devis") or {}
     _fin = context.get("financement_devis") or {}
     projet_apercu = None
-    if _eco.get("facture_apres_mois") and _eco.get("facture_avant_mois"):
+    if _fin and _eco.get("facture_apres_mois") and _eco.get("facture_avant_mois"):
         _fav = float_value(_eco.get("facture_avant_mois"))
         _fap = max(0.0, float_value(_eco.get("facture_apres_mois")))
         _mens = float_value(_fin.get("mensualite"))
@@ -4706,8 +4711,8 @@ def _build_devis_context(request: Request, numero: str, version: int | None = No
         # projection que le simulateur : financement net de l'option choisie, hausse par
         # composante), à partir du lead et du dernier état simulateur sauvegardé. Plus jamais de
         # « — » : si le calcul est impossible ou non rentable sur la durée de vie, le bloc est masqué.
-        _opt = str(state.get("option") or "").strip()
-        _mens_net, _duree_net = financement_net(_reste_net, _opt or "opt1",
+        _opt = _fin["option"]
+        _mens_net, _duree_net = financement_net(_reste_net, _opt,
                                                 admin.get("params_financement") or DEFAULT_PARAMS_FINANCEMENT)
         _credit_annuel, _duree_credit_ans = _mens_net * 12, _duree_net / 12
         _est_credit = _credit_annuel > 0 and _duree_credit_ans > 0
@@ -4717,13 +4722,15 @@ def _build_devis_context(request: Request, numero: str, version: int | None = No
             _eco20_fmt = f"{_eco20:,}".replace(",", " ")
             _phrase_auj = phrase_aujourdhui(_eco_res, _fav)
             _phrase_baisse = phrase_baisse(_fav, _fap)
-            _mode = {"opt1": "credit", "opt2": "ecoptz", "opt3": "comptant"}.get(_opt) or ("comptant" if round(_mens) <= 0 else "credit")
+            _mode = {"opt1": "credit", "opt2": "ecoptz", "opt3": "comptant"}[_opt]
             _duree_vie = int(float_value((admin.get("params_eco_energie") or {}).get("duree_vie_pac_ans", 20)) or 20)
             projet_apercu = {
                 "facture_avant": round(_fav),
                 "facture_apres": round(_fap),
                 "total_credit": _total_credit,
                 "mensualite_credit": _arrondi(_mens),
+                # « Montant total à régler » du document (comptant : ce que le client paie avant d'économiser)
+                "reste_a_payer": round(_reste_affiche, 2),
                 "eco_pendant": _eco_pendant,
                 "eco_apres": _eco_apres,
                 # « 4,9 », « 0 » (comme le simulateur), jamais « 0.0 »
@@ -5709,23 +5716,73 @@ def _email_footer_html():
 </td></tr>"""
 
 
-def _email_devis_html(prenom, apercu, pct_eco, lien_devis, pre_devis=False):
+# Phrase « moins cher dès le premier mois » : seulement si l'économie pendant le financement atteint ce seuil (€/mois)
+SEUIL_PHRASE_MOINS_CHER = 10
+
+
+def _montant_email(x) -> str:
+    """« 11 902 € », « 10 837,80 € » : les centimes seulement s'il y en a (espaces insécables)."""
+    x = round(float(x or 0), 2)
+    txt = f"{x:,.0f}" if x == int(x) else f"{x:,.2f}"
+    return txt.replace(",", " ").replace(".", ",") + " €"
+
+
+def _bandeau_email_devis(apercu) -> dict | None:
+    """Ce que l'e-mail du devis affiche, d'après l'aperçu du document (mêmes chiffres). None : pas de bandeau.
+    - comptant : reste à payer, puis l'économie dès l'installation (aucune mensualité) ;
+    - crédit / Éco-PTZ avec une économie pendant le financement : l'économie « dès maintenant », puis après ;
+    - économie nulle ou négative pendant le financement : seulement l'économie après remboursement (comme le document).
+    Le badge = économie affichée en gros ÷ facture actuelle ; jamais de chiffre négatif."""
+    if not apercu or not apercu.get("facture_avant") or (apercu.get("eco_apres") or 0) <= 0:
+        return None
+    fav, apres, pendant = apercu["facture_avant"], apercu["eco_apres"], apercu.get("eco_pendant") or 0
+    if apercu.get("mode") == "comptant":
+        cas, eco_badge = "comptant", apres
+    elif pendant > 0:
+        cas, eco_badge = "pendant", pendant
+    else:
+        cas, eco_badge = "apres", apres
+    pct = round(eco_badge / fav * 100)
+    return {"cas": cas, "pct": pct if pct >= 1 else None, "eco_pendant": pendant, "eco_apres": apres,
+            "reste_a_payer": apercu.get("reste_a_payer"),
+            "moins_cher": cas == "pendant" and pendant >= SEUIL_PHRASE_MOINS_CHER}
+
+
+def _email_devis_html(prenom, apercu, lien_devis, pre_devis=False):
+    b = _bandeau_email_devis(apercu)
     bandeau = ""
-    if apercu:
+    if b:
+        if b["cas"] == "comptant":
+            titre, gros, suite = ("Reste à payer", _montant_email(b["reste_a_payer"]),
+                                  f"puis vous économisez <strong style=\"color:#fff;\">{b['eco_apres']} €/mois</strong> dès l'installation")
+            unite = ""
+        elif b["cas"] == "pendant":
+            titre, gros, suite = ("Vous économisez dès maintenant", f"{b['eco_pendant']} €",
+                                  f"puis <strong style=\"color:#fff;\">{b['eco_apres']} €/mois</strong> une fois l'installation remboursée")
+            unite = " /mois"
+        else:
+            titre, gros, suite = ("Une fois l'installation remboursée", f"{b['eco_apres']} €",
+                                  "d'économie sur votre facture")
+            unite = " /mois"
+        badge = (f'<span style="display:inline-block;background:#E2214B;color:#fff;font-size:15px;font-weight:bold;'
+                 f'padding:6px 12px;border-radius:6px;">-{b["pct"]}%</span>') if b["pct"] else ""
         bandeau = f"""<tr><td style="padding:20px 32px 8px 32px;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#002E5A;border-radius:8px;"><tr><td style="padding:22px 24px;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
 <td style="vertical-align:top;">
-<div style="color:#9fb8d4;font-size:12px;text-transform:uppercase;letter-spacing:0.06em;">Vous économisez dès maintenant</div>
-<div style="margin-top:6px;"><span style="color:#ffffff;font-size:38px;font-weight:bold;">{apercu['eco_pendant']} €</span><span style="color:#9fb8d4;font-size:16px;"> /mois</span></div>
-<div style="border-top:1px solid #1a4775;margin-top:12px;padding-top:12px;color:#c5d2e0;font-size:14px;">puis <strong style="color:#fff;">{apercu['eco_apres']} €/mois</strong> une fois l'installation remboursée</div>
+<div style="color:#9fb8d4;font-size:12px;text-transform:uppercase;letter-spacing:0.06em;">{titre}</div>
+<div style="margin-top:6px;"><span style="color:#ffffff;font-size:38px;font-weight:bold;">{gros}</span><span style="color:#9fb8d4;font-size:16px;">{unite}</span></div>
+<div style="border-top:1px solid #1a4775;margin-top:12px;padding-top:12px;color:#c5d2e0;font-size:14px;">{suite}</div>
 </td>
 <td style="width:70px;vertical-align:top;text-align:right;">
-<span style="display:inline-block;background:#E2214B;color:#fff;font-size:15px;font-weight:bold;padding:6px 12px;border-radius:6px;">-{pct_eco}%</span>
+{badge}
 </td>
 </tr></table>
 </td></tr></table>
 </td></tr>"""
+    # « moins cher dès le premier mois » : seulement si c'est vrai et chiffré (crédit / Éco-PTZ, au moins 10 €/mois)
+    bonne_nouvelle = (" Bonne nouvelle : dès le premier mois, vous payez <strong style=\"color:#002E5A\">moins cher "
+                      "qu'aujourd'hui</strong> — tout en remboursant votre installation.") if b and b["moins_cher"] else ""
     return f"""<!DOCTYPE html><html><head><meta charset="utf-8"></head>
 <body style="margin:0;padding:0;background:#eef1f5;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#eef1f5;padding:24px 0;"><tr><td align="center">
@@ -5734,7 +5791,7 @@ def _email_devis_html(prenom, apercu, pct_eco, lien_devis, pre_devis=False):
 <tr><td style="padding:32px 32px 0 32px;">
 <div style="color:#E2214B;font-size:13px;font-weight:bold;text-transform:uppercase;letter-spacing:0.04em;">Votre {'pré-devis' if pre_devis else 'devis'} personnalisé est prêt</div>
 <div style="color:#0a2540;font-size:23px;font-weight:bold;margin-top:10px;line-height:1.3;">Bonjour {prenom},<br>votre projet de pompe à chaleur prend forme.</div>
-<div style="color:#4A5567;font-size:15px;line-height:1.6;margin-top:16px;">Nous avons préparé votre {'pré-devis' if pre_devis else 'devis'} sur mesure. Bonne nouvelle : dès le premier mois, vous payez <strong style="color:#002E5A">moins cher qu'aujourd'hui</strong> — tout en remboursant votre installation.</div>
+<div style="color:#4A5567;font-size:15px;line-height:1.6;margin-top:16px;">Nous avons préparé votre {'pré-devis' if pre_devis else 'devis'} sur mesure.{bonne_nouvelle}</div>
 </td></tr>
 {bandeau}
 <tr><td style="padding:24px 32px 8px 32px;text-align:center;">
@@ -5953,11 +6010,8 @@ def _email_devis_corps(request: Request, numero: str, prospect: dict, variante, 
     """Corps HTML (sans pixel) de l'e-mail du devis / pré-devis."""
     ctx = _build_devis_context(request, numero)
     apercu = ctx.get("projet_apercu")                 # aperçu éco (bandeau) — peut être None
-    pct_eco = None
-    if apercu and apercu.get("facture_avant") and apercu.get("eco_pendant"):
-        pct_eco = round(apercu["eco_pendant"] / apercu["facture_avant"] * 100)
     prenom = html.escape(str(prospect.get("prenom") or ""))
-    return _email_devis_html(prenom, apercu, pct_eco, _public_devis_url_v(request, numero, version),
+    return _email_devis_html(prenom, apercu, _public_devis_url_v(request, numero, version),
                              pre_devis=(variante == "pre_devis"))
 
 
@@ -6049,6 +6103,66 @@ def _entrees_envoi(item: dict) -> list:
     return [item] + [r for r in renvois if isinstance(r, dict)]
 
 
+_RE_DOC_MODELE = re.compile(r'<div class="pac-desc-title">(.*?)</div>', re.S)
+_RE_DOC_RESTE = re.compile(r'<span class="recap-rac-amount">(.*?)</span>', re.S)
+
+
+def _infos_document_html(html_file) -> dict:
+    """Lot 13j — modèle et « Montant total à régler » lus dans le document archivé (HTML figé à l'envoi). {} si illisible."""
+    if not html_file or not os.path.exists(html_file):
+        return {}
+    try:
+        texte = _read_text(html_file)
+    except OSError:
+        return {}
+    # espaces insécables du document conservées (« 9 762,00 € » ne se coupe pas)
+    propre = lambda m: re.sub(r"[ \t\r\n]+", " ", html.unescape(re.sub(r"<[^>]+>", "", m.group(1)))).strip(" ") if m else ""
+    infos = {"modele_pac": propre(_RE_DOC_MODELE.search(texte)), "reste_a_charge": propre(_RE_DOC_RESTE.search(texte))}
+    return infos if any(infos.values()) else {}
+
+
+def _infos_document_envoye(item: dict) -> dict:
+    """Lot 13j — modèle et montant du document RÉELLEMENT envoyé (jamais la fiche du jour) : relevés à l'envoi ; pour les
+    envois plus anciens, relus dans le HTML archivé. {} si introuvables."""
+    if not isinstance(item, dict):
+        return {}
+    if item.get("modele_pac") or item.get("reste_a_charge"):
+        return {"modele_pac": item.get("modele_pac") or "", "reste_a_charge": item.get("reste_a_charge") or ""}
+    return _infos_document_html(item.get("html_file"))
+
+
+def _envoi_recent(numero: str, maintenant: datetime | None = None) -> str:
+    """Lot 13j — message de confirmation si un document (envoi ou renvoi) est parti chez ce client il y a moins de 24 h ;
+    "" sinon."""
+    maintenant = maintenant or datetime.now(PARIS_TZ)
+    dernier = None
+    for it in _sent_devis_items(numero):
+        if not isinstance(it, dict):
+            continue
+        for entree in _entrees_envoi(it):
+            dt = _parse_paris_dt(entree.get("sent_at"))
+            if dt and timedelta(0) <= maintenant - dt < timedelta(hours=24) and (dernier is None or dt > dernier[0]):
+                dernier = (dt, it)
+    if dernier is None:
+        return ""
+    dt, it = dernier
+    infos = _infos_document_envoye(it)
+    details = ", ".join(x for x in ((f"modèle {infos['modele_pac']}" if infos.get("modele_pac") else ""),
+                                    infos.get("reste_a_charge") or "") if x)
+    return (f"{'Un pré-devis' if it.get('variante') == 'pre_devis' else 'Un devis'} a déjà été envoyé à ce client "
+            f"{'' if dt.date() == maintenant.date() else 'hier '}à {dt:%H}h{dt:%M}"
+            f"{f' ({details})' if details else ''}. Envoyer quand même ?")
+
+
+def _refuser_si_envoi_recent(numero: str, confirme) -> None:
+    """Lot 13j — tout nouvel envoi moins de 24 h après le précédent exige une confirmation explicite (409 sinon)."""
+    if confirme:
+        return
+    message = _envoi_recent(numero)
+    if message:
+        raise HTTPException(status_code=409, detail={"code": "envoi_recent", "message": message})
+
+
 def _envoi_en_echec(item: dict) -> dict | None:
     """Statut affiché (code « echec ») si la livraison la plus RÉCENTE connue du document (envoi initial ou renvoi) est
     en échec ; None sinon. Un renvoi livré ensuite (adresse corrigée) lève la suspension des relances."""
@@ -6137,6 +6251,7 @@ async def _send_devis(numero: str, payload: dict, request: Request) -> dict:
     if variante == "devis" and not vt_validee:
         raise HTTPException(status_code=400, detail="VT non validée : seul le pré-devis est possible")
     avec_sous_traitant = (variante == "devis")
+    _refuser_si_envoi_recent(numero, payload.get("confirmer_envoi_recent"))   # Lot 13j : envoyé il y a moins de 24 h
 
     version = _next_sent_version(numero)
     numero_dossier = _lead_numero_dossier(numero) or _commit_numero_dossier()
@@ -6200,6 +6315,7 @@ async def _send_devis(numero: str, payload: dict, request: Request) -> dict:
         "email_file": email_file,
         "statut": "envoye",
         "variante": variante,
+        **_infos_document_html(devis_html),           # Lot 13j : modèle et montant du document envoyé (relances)
     }
     if variante == "devis":
         item["notedim_resend_id"] = notedim_id
@@ -6214,7 +6330,7 @@ async def _send_devis(numero: str, payload: dict, request: Request) -> dict:
             "notedim_erreur": notedim_erreur}
 
 
-def _renvoyer_devis(numero: str, version: int, auteur: str, request: Request) -> dict:
+def _renvoyer_devis(numero: str, version: int, auteur: str, request: Request, confirmer_envoi_recent: bool = False) -> dict:
     """Lot 13h — renvoie le document DÉJÀ envoyé (même version archivée, même lien, même pixel) à l'adresse ACTUELLE de
     la fiche (celle de l'envoi initial a pu être corrigée).
     Ne touche ni à la date d'envoi, ni au compteur ou au calendrier des relances, ni au statut du lead."""
@@ -6231,6 +6347,7 @@ def _renvoyer_devis(numero: str, version: int, auteur: str, request: Request) ->
         raise HTTPException(status_code=400, detail="Aucun email enregistré sur la fiche")
     if not os.environ.get("RESEND_API_KEY", ""):
         raise HTTPException(status_code=400, detail="RESEND_API_KEY non configurée")
+    _refuser_si_envoi_recent(numero, confirmer_envoi_recent)   # Lot 13j : envoyé il y a moins de 24 h -> confirmation
     variante = item.get("variante") or "devis"
     ref = _numero_imprime(item.get("numero_devis") or "", variante == "pre_devis") or f"v{version}"
     contexte = f"renvoi {_type_document(variante)} {ref} ({numero} v{version})"
@@ -6291,7 +6408,8 @@ async def renvoyer_devis(numero: str, request: Request) -> JSONResponse:
     if version < 1:
         raise HTTPException(status_code=400, detail="Version requise")
     auteur = str(payload.get("auteur") or "Anonyme")
-    return JSONResponse(await run_in_threadpool(_renvoyer_devis, numero, version, auteur, request))
+    return JSONResponse(await run_in_threadpool(_renvoyer_devis, numero, version, auteur, request,
+                                                bool(payload.get("confirmer_envoi_recent"))))
 
 
 @app.get("/api/devis/{numero}/envois-echoues")
@@ -6493,19 +6611,23 @@ def _send_relance(numero: str, version: int, request: Request) -> dict:
         variante = target.get("variante", "devis")
         ouvert = bool(target.get("first_opened_at"))
         numero_devis = target.get("numero_devis") or numero
+        infos_doc = _infos_document_envoye(target)     # Lot 13j : le document envoyé, pas la fiche du jour
         meta[numero] = items
         _atomic_write_json(DEVIS_META_PATH, meta)
 
     # --- ENVOI hors lock (niveau deja claime) ---
-    ctx = _build_devis_context(request, numero)
+    if not infos_doc:                                 # document archivé illisible : seul repli, signalé au journal
+        print(f"[relance] {numero} v{version} : document envoyé illisible, modèle et montant repris de la fiche")
+        ctx = _build_devis_context(request, numero)
+        infos_doc = {"modele_pac": str(ctx.get("modele_pac", "")), "reste_a_charge": str(ctx.get("reste_a_charge", ""))}
     prenom = html.escape(str(prospect.get("prenom") or ""))
     tpl = _relance_config()["messages"]["ouvert" if ouvert else "non_ouvert"]
     # Lot 13h : texte brut (l'objet est du texte, le corps est échappé plus bas) ; référence telle qu'imprimée (PD… / DE…)
     subst = {
         "prenom": str(prospect.get("prenom") or ""),
         "numero": _numero_imprime(numero_devis, variante == "pre_devis"),
-        "modele_pac": str(ctx.get("modele_pac", "")),
-        "reste_a_charge": str(ctx.get("reste_a_charge", "")),
+        "modele_pac": infos_doc.get("modele_pac") or "",
+        "reste_a_charge": infos_doc.get("reste_a_charge") or "",
         "type_document": "pré-devis" if variante == "pre_devis" else "devis",
     }
 

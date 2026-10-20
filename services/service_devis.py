@@ -724,19 +724,34 @@ def _pmt(taux_annuel, n_mois, capital):
     return capital * i / (1 - (1 + i) ** (-n_mois))
 
 
+MODES_FINANCEMENT = ("opt1", "opt2", "opt3")
+
+
 def calculer_financement_devis(reste_a_charge, admin_params, option="opt1"):
     """Financement choisi dans le simulateur — réplique JS (mensO1 / mensO2) :
-    opt1 Crédit Travaux (taux/durée selon le seuil), opt2 Éco-PTZ (barème eco_ptz)."""
+    opt1 Crédit Travaux (taux/durée selon le seuil), opt2 Éco-PTZ (barème eco_ptz), opt3 comptant (aucune
+    mensualité). Un mode inconnu lève ValueError : il n'est JAMAIS transformé en crédit."""
+    if option not in MODES_FINANCEMENT:
+        raise ValueError(f"mode de financement inconnu : {option!r}")
     fin = (admin_params or {}).get("params_financement") or {}
     libelles = fin.get("libelles") or {}
     rac = float_value(reste_a_charge)
+    if option == "opt3":
+        return {
+            "option": option,
+            "libelle": libelles.get("option3") or "Fonds propres",
+            "mensualite": 0.0,
+            "taux_pct": 0.0,
+            "duree_mois": 0,
+            "reste_a_charge": round(rac, 2),
+            "premiere_echeance_jours": None,
+        }
     if option == "opt2":
         bareme = fin.get("eco_ptz") or {}
         taux_pct = float_value(bareme.get("taux_pct"), 0)
         duree_mois = int(float_value(bareme.get("duree_mois"), 180))
         libelle = libelles.get("option2") or "Éco-PTZ"
-    else:
-        option = "opt1"
+    else:                                             # opt1 (seul cas restant, vérifié plus haut)
         seuil = float_value(fin.get("seuil_rac_eur"), 6000)
         credit = fin.get("credit_travaux") or {}
         sous = rac < seuil

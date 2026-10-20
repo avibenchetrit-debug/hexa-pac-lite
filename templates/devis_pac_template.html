@@ -3662,7 +3662,7 @@
   <tr>
     <td style="text-align:left;vertical-align:top;width:30%;">
       <div style="font-size:10px;font-weight:700;color:#E2214B;">Aujourd'hui</div>
-      <div style="font-size:9px;color:#8A92A0;">vous démarrez sans avance</div>
+      <div style="font-size:9px;color:#8A92A0;">{% if projet_apercu.mode == 'comptant' %}vous réglez votre installation{% else %}vous démarrez sans avance{% endif %}</div>
     </td>
     <td style="text-align:center;vertical-align:top;width:40%;">
       <div style="font-size:10px;font-weight:700;color:#002E5A;">{{ projet_apercu.annee_rentable }}{{ 'ʳᵉ' if projet_apercu.annee_rentable == 1 else 'ᵉ' }} année · remboursé</div>

@@ -10695,11 +10695,19 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     btn.disabled = true;
     btn.textContent = 'Envoi…';
     try {
-      const r = await fetch(`/api/devis/${encodeURIComponent(currentProspect)}/renvoyer`, {
+      const renvoyer = (confirmer) => fetch(`/api/devis/${encodeURIComponent(currentProspect)}/renvoyer`, {
         method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ version: Number(btn.dataset.devisResend), auteur: (localStorage.getItem('hexa_user') || 'Anonyme') })
+        body: JSON.stringify({ version: Number(btn.dataset.devisResend), auteur: (localStorage.getItem('hexa_user') || 'Anonyme'),
+                               confirmer_envoi_recent: confirmer })
       });
-      const data = await r.json().catch(() => ({}));
+      let r = await renvoyer(false);
+      let data = await r.json().catch(() => ({}));
+      // Lot 13j : déjà envoyé à ce client il y a moins de 24 h -> confirmation obligatoire
+      if (r.status === 409 && data.detail && data.detail.code === 'envoi_recent') {
+        if (!confirm(data.detail.message)) { btn.disabled = false; btn.textContent = libelle; return; }
+        r = await renvoyer(true);
+        data = await r.json().catch(() => ({}));
+      }
       if (!r.ok || !data.ok) throw new Error(data.detail || `erreur du serveur (${r.status})`);
       window.showToast('✅ ' + data.message, 'success', 5000);
       await refreshDevisList();
@@ -14087,16 +14095,24 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
         const enregistre = await enregistrerAvantDevis(null);
         if (enregistre !== true) throw new Error(enregistre === 'fiche' ? "la fiche n'a pas pu être enregistrée : rien n'a été envoyé" : "la proposition n'a pas pu être enregistrée : rien n'a été envoyé");
         const auteur = (localStorage.getItem('hexa_user') || 'Anonyme');
-        const r = await fetch(`/api/devis/${encodeURIComponent(numero)}/send`, {
+        const envoyer = (confirmer) => fetch(`/api/devis/${encodeURIComponent(numero)}/send`, {
           method:'POST',
           headers:{'Content-Type':'application/json'},
           body: JSON.stringify({
             auteur,
             variante,
-            destinataire: document.getElementById('mail-destinataire')?.value || ''
+            destinataire: document.getElementById('mail-destinataire')?.value || '',
+            confirmer_envoi_recent: confirmer
           })
         });
-        const data = await r.json().catch(()=>({}));
+        let r = await envoyer(false);
+        let data = await r.json().catch(()=>({}));
+        // Lot 13j : déjà envoyé à ce client il y a moins de 24 h -> confirmation obligatoire
+        if (r.status === 409 && data.detail && data.detail.code === 'envoi_recent') {
+          if (!confirm(data.detail.message)) return;
+          r = await envoyer(true);
+          data = await r.json().catch(()=>({}));
+        }
         if(!r.ok || !(data.ok || data.success)) throw new Error(data.detail || data.msg || 'Envoi impossible');
         alert(variante === 'devis' ? 'Devis complet envoyé au client.' : 'Pré-devis envoyé au client.');
         if(typeof window.hexaActualiserStatutFiche === 'function') window.hexaActualiserStatutFiche(numero);   // Lot 13i
