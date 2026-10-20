@@ -13957,6 +13957,11 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
       wrap.querySelector('#devis-alerte-regulateur').hidden = !manque;
     });
     document.body.appendChild(wrap);
+    // Lot 13i : « Voir le devis » (pas l'onglet de la note de dim) : 1re ouverture d'une fiche « Nouveau » -> « Pré-devis »
+    if (!surNote) fetch(`/api/leads/${encodeURIComponent(numero)}/premier-apercu-devis`, { method:'POST' })
+      .then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)))
+      .then(d => { if (d.statut_change && typeof window.hexaActualiserStatutFiche === 'function') window.hexaActualiserStatutFiche(numero); })
+      .catch(err => console.error('[statut pré-devis]', err));
     const close = () => wrap.remove();
     document.getElementById('devis-close-btn')?.addEventListener('click', close);
     document.getElementById('devis-close-bottom')?.addEventListener('click', close);

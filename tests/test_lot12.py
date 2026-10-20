@@ -378,3 +378,26 @@ def test_envoyer_n_envoie_rien_si_la_proposition_n_est_pas_enregistree(page, env
     page.wait_for_timeout(300)
     assert messages and "rien n'a été envoyé" in messages[0], messages
     assert envoi_simule == [] and not main._read_devis_meta().get(NUM)
+
+
+def test_lot13i_voir_le_devis_passe_en_pre_devis_le_pdf_ne_change_rien(page):
+    """Lot 13i : 1re ouverture de « Voir le devis » sur une fiche « Nouveau » -> « Pré-devis » (pilule à jour sans
+    recharger, historique) ; le bouton PDF et une nouvelle ouverture ne changent rien."""
+    leads = main._read_leads()
+    leads[0]["statut"] = ""
+    main._atomic_write_json(main.LEADS_PATH, leads)
+    ouvrir_etape6(page)
+    page.click("#btn-voir-devis")
+    page.wait_for_selector("#devis-preview-frame")
+    page.wait_for_function("document.getElementById('p-suivi-statut').textContent.includes('Pré-devis')", timeout=30000)
+    assert main._find_lead(NUM)["statut"] == "pre_devis"
+    notes = [n["texte"] for n in main._read_notes().get(NUM, []) if n["texte"].startswith("Statut → ")]
+    assert len(notes) == 1 and notes[0].startswith("Statut → Pré-devis, automatique, le ")
+    page.request.post(f"{page.base}/api/leads/{NUM}/status", data={"statut": "nouveau"})
+    with page.expect_download(timeout=120000):
+        page.click("#devis-pdf-btn")                                             # PDF : rien
+    page.click("#devis-close-btn")
+    page.click("#btn-voir-devis")                                                # 2e ouverture : rien
+    page.wait_for_selector("#devis-preview-frame")
+    page.wait_for_timeout(1500)
+    assert main._find_lead(NUM)["statut"] == "nouveau"
