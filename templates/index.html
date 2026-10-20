@@ -10681,6 +10681,11 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
   }
 
   async function renvoyerDevis(btn){
+    // Lot 13j-bis : e-mail archivé avant la correction des chiffres -> jamais renvoyé, nouvel envoi depuis la fiche
+    if (btn.dataset.anciensChiffres === '1') {
+      window.showToast("❌ Cet envoi contient d'anciens chiffres. Faites un nouvel envoi depuis la fiche pour envoyer la version corrigée.", 'error', 12000);
+      return;
+    }
     // Lot 13h : envoi vers l'adresse ENREGISTRÉE sur la fiche (data-email-fiche), pas celle du premier envoi
     const initiale = btn.dataset.email || '', actuelle = btn.dataset.emailFiche || '';
     const saisie = (document.querySelector('[name="email"]')?.value || '').trim();
@@ -10758,7 +10763,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
           <div class="docs-devis-actions">
             <button type="button" class="hexa-meta-card-action" data-devis-preview="${item.version}">👁 Aperçu</button>
             <button type="button" class="hexa-meta-card-action" data-devis-download="${item.version}">📥 Télécharger</button>
-            <button type="button" class="hexa-meta-card-action" data-devis-resend="${item.version}" data-email="${escapeHtml(item.email || '')}" data-email-fiche="${escapeHtml(item.email_fiche || '')}">📧 Renvoyer</button>
+            <button type="button" class="hexa-meta-card-action" data-devis-resend="${item.version}" data-anciens-chiffres="${item.anciens_chiffres ? '1' : ''}" data-email="${escapeHtml(item.email || '')}" data-email-fiche="${escapeHtml(item.email_fiche || '')}">📧 Renvoyer</button>
           </div>
           ${item.has_notedim ? `<div class="docs-notedim-row"><span class="docs-notedim-label">Note de dim définitive (envoyée avec le devis ${escapeHtml(item.numero_devis || '')})</span><button type="button" class="hexa-meta-card-action" data-notedim-preview="${item.version}" data-numero-devis="${escapeHtml(item.numero_devis || '')}">👁 Aperçu</button><button type="button" class="hexa-meta-card-action" data-notedim-download="${item.version}">📥 Télécharger</button></div>` : ''}
         </div>`).join('');

@@ -5730,22 +5730,24 @@ def _montant_email(x) -> str:
 def _bandeau_email_devis(apercu) -> dict | None:
     """Ce que l'e-mail du devis affiche, d'après l'aperçu du document (mêmes chiffres). None : pas de bandeau.
     - comptant : reste à payer, puis l'économie dès l'installation (aucune mensualité) ;
-    - crédit / Éco-PTZ avec une économie pendant le financement : l'économie « dès maintenant », puis après ;
-    - économie nulle ou négative pendant le financement : seulement l'économie après remboursement (comme le document).
+    - crédit / Éco-PTZ avec au moins 10 €/mois d'économie pendant le financement : l'économie « dès maintenant », puis
+      après ;
+    - économie pendant le financement sous 10 €/mois (nulle ou négative comprise) : seulement l'économie après
+      remboursement.
     Le badge = économie affichée en gros ÷ facture actuelle ; jamais de chiffre négatif."""
     if not apercu or not apercu.get("facture_avant") or (apercu.get("eco_apres") or 0) <= 0:
         return None
     fav, apres, pendant = apercu["facture_avant"], apercu["eco_apres"], apercu.get("eco_pendant") or 0
     if apercu.get("mode") == "comptant":
         cas, eco_badge = "comptant", apres
-    elif pendant > 0:
+    elif pendant >= SEUIL_PHRASE_MOINS_CHER:          # Lot 13j-bis : même seuil que la phrase « moins cher »
         cas, eco_badge = "pendant", pendant
     else:
         cas, eco_badge = "apres", apres
     pct = round(eco_badge / fav * 100)
     return {"cas": cas, "pct": pct if pct >= 1 else None, "eco_pendant": pendant, "eco_apres": apres,
             "reste_a_payer": apercu.get("reste_a_payer"),
-            "moins_cher": cas == "pendant" and pendant >= SEUIL_PHRASE_MOINS_CHER}
+            "moins_cher": cas == "pendant"}
 
 
 def _email_devis_html(prenom, apercu, lien_devis, pre_devis=False):
@@ -6103,6 +6105,22 @@ def _entrees_envoi(item: dict) -> list:
     return [item] + [r for r in renvois if isinstance(r, dict)]
 
 
+# Lot 13j-bis : e-mails archivés avant la correction des chiffres (lot 13j, c0f20cb en ligne le 20/10/2026 à 12h18:29) —
+# leur « Renvoyer » renverrait les anciens chiffres. Les envois faits depuis portent la marque CHIFFRES_EMAIL.
+CHIFFRES_EMAIL = "lot13j"
+CHIFFRES_EMAIL_EN_LIGNE = "2026-10-20T12:18:29+02:00"
+MESSAGE_ANCIENS_CHIFFRES = ("Cet envoi contient d'anciens chiffres. Faites un nouvel envoi depuis la fiche pour envoyer "
+                            "la version corrigée.")
+
+
+def _anciens_chiffres(item: dict) -> bool:
+    """Lot 13j-bis — True si l'e-mail archivé de cet envoi date d'avant la correction des chiffres (lot 13j)."""
+    if not isinstance(item, dict) or item.get("chiffres_email") == CHIFFRES_EMAIL:
+        return False
+    dt, en_ligne = _parse_paris_dt(item.get("sent_at")), _parse_paris_dt(CHIFFRES_EMAIL_EN_LIGNE)
+    return dt is None or dt < en_ligne
+
+
 _RE_DOC_MODELE = re.compile(r'<div class="pac-desc-title">(.*?)</div>', re.S)
 _RE_DOC_RESTE = re.compile(r'<span class="recap-rac-amount">(.*?)</span>', re.S)
 
@@ -6316,6 +6334,7 @@ async def _send_devis(numero: str, payload: dict, request: Request) -> dict:
         "statut": "envoye",
         "variante": variante,
         **_infos_document_html(devis_html),           # Lot 13j : modèle et montant du document envoyé (relances)
+        "chiffres_email": CHIFFRES_EMAIL,             # Lot 13j-bis : e-mail aux chiffres corrigés (« Renvoyer » permis)
     }
     if variante == "devis":
         item["notedim_resend_id"] = notedim_id
@@ -6341,6 +6360,8 @@ def _renvoyer_devis(numero: str, version: int, auteur: str, request: Request, co
                  if isinstance(it, dict) and int(it.get("version") or 0) == int(version)), None)
     if item is None:
         raise HTTPException(status_code=404, detail="Ce document envoyé est introuvable")
+    if _anciens_chiffres(item):                       # Lot 13j-bis : jamais renvoyer un e-mail aux anciens chiffres
+        raise HTTPException(status_code=409, detail=MESSAGE_ANCIENS_CHIFFRES)
     # adresse ENREGISTRÉE sur la fiche aujourd'hui (corrigée depuis l'envoi initial, s'il le faut)
     email_to = str(prospect.get("email") or "").strip()
     if not email_to:
@@ -6966,6 +6987,7 @@ async def list_devis(numero: str) -> JSONResponse:
                 "sent_at": item.get("sent_at", ""),
                 "email": item.get("email", ""),
                 "email_fiche": email_fiche,                # Lot 13h : « Renvoyer » part vers cette adresse
+                "anciens_chiffres": _anciens_chiffres(item),  # Lot 13j-bis : « Renvoyer » bloqué
                 "file": path,
                 "has_notedim": bool(item.get("notedim_file") and os.path.exists(item.get("notedim_file"))),
                 "first_opened_at": item.get("first_opened_at") or "",

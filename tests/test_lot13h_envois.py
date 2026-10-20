@@ -46,18 +46,20 @@ def _fichier(nom, contenu):
 
 
 def _semer(relance_count=2):
-    """v1 pré-devis (envoyé il y a 10 jours, 2 relances) et v2 devis, documents archivés présents."""
+    """v1 pré-devis (envoyé il y a 10 jours, 2 relances) et v2 devis, documents archivés présents (e-mails aux chiffres
+    corrigés du lot 13j : « Renvoyer » permis)."""
     main._atomic_write_json(main.LEADS_PATH, [dict(LEAD)])
     il_y_a_10j = (datetime.now(main.PARIS_TZ) - timedelta(days=10)).isoformat(timespec="seconds")
     il_y_a_2j = (datetime.now(main.PARIS_TZ) - timedelta(days=2)).isoformat(timespec="seconds")
     v1 = {"version": 1, "numero_devis": "DE2026-3535-1EM", "variante": "pre_devis", "sent_at": il_y_a_10j,
           "email": LEAD["email"], "file": _fichier(f"{NUM}_v1.pdf", "%PDF-1.4"), "resend_id": "id-initial-1",
-          "statut": "envoye", "relance_count": relance_count, "last_relance_at": il_y_a_2j,
+          "statut": "envoye", "chiffres_email": main.CHIFFRES_EMAIL, "relance_count": relance_count,
+          "last_relance_at": il_y_a_2j,
           "relances": [{"niveau": n + 1, "sent_at": il_y_a_2j} for n in range(relance_count)],
           "email_file": _fichier(f"{NUM}_v1_email.html", "<html><body><p>Corps archivé v1</p></body></html>")}
     v2 = {"version": 2, "numero_devis": "DE2026-3535-2EM", "variante": "devis", "sent_at": il_y_a_2j,
           "email": LEAD["email"], "file": _fichier(f"{NUM}_v2.pdf", "%PDF-1.4"), "resend_id": "id-initial-2",
-          "statut": "envoye", "notedim_file": None,
+          "statut": "envoye", "chiffres_email": main.CHIFFRES_EMAIL, "notedim_file": None,
           "email_file": _fichier(f"{NUM}_v2_email.html", "<html><body><p>Corps archivé v2</p></body></html>")}
     main._atomic_write_json(main.DEVIS_META_PATH, {NUM: [v1, v2]})
     main._atomic_write_json(main.NOTES_PATH, {})
