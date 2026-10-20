@@ -19967,7 +19967,9 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     const ecs = valeurChamp('select[name="ecs"]') || valeurChamp('select[name="gestion_ecs"]');
     const annuel = E.estimerFactureAnnuelle(surface ? surface * 0.9 : 0, zone, valeurChamp('[name="annee_construction"]'),
       mode, E.ecsParChaudiere(ecs, energie), valeurChamp('[name="nombre_personnes"]'), params);
-    if (annuel && annuel > 0) window.setCoutEnergieAuto(annuel / 12, 'estime');
+    if (!(annuel && annuel > 0)) return;
+    if (cur === 'estime' && Math.round(annuel / 12) === Math.round(nombre(el.value))) return;   // inchangée : rien n'est réécrit
+    window.setCoutEnergieAuto(annuel / 12, 'estime');
   }
   function planifierEstimation() {
     clearTimeout(minuterie);
@@ -19994,7 +19996,9 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     if (!s && nombre(el.value)) ecrireSource('a_confirmer');
     else ecrireSource(s);
     syncAffichage();
-    if (!nombre(el.value)) planifierEstimation();
+    // Lot 13l : une facture ESTIMÉE est recalculée à l'ouverture (hypothèses de l'Admin du jour). Facture réelle, saisie
+    // à la main, à confirmer, DPE ou audit : jamais touchée (lancerEstimation ne réécrit que '' ou 'estime').
+    if (!nombre(el.value) || s === 'estime') planifierEstimation();
   };
 
   // ---- construction de l'interface autour du champ ----
