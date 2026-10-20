@@ -154,9 +154,9 @@ def estimer_facture_annuelle(surface_chauffee, zone, annee, energie, ecs_chaudie
     coef = _num(p["coef_periode"].get(periode_construction(annee)), 1.0) or 1.0
     rend = (_num(p["rendement_pct"].get(energie), 100) or 100) / 100
     prix = _prix(p, energie)
-    besoin = surface * conso * coef
-    facture = besoin / rend * prix
-    if ecs_chaudiere:
+    # consommation « type DPE » (kWh achetés, pertes de la chaudière incluses) : jamais divisée par le rendement
+    facture = surface * conso * coef * prix
+    if ecs_chaudiere:                                 # ECS : un besoin (kWh utiles) -> divisé par le rendement
         n = _num(personnes) or PERSONNES_DEFAUT
         facture += n * _num(p["ecs_kwh_par_personne"], 800) / rend * prix
     return round(facture, 2)

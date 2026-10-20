@@ -97,11 +97,15 @@ def test_periode_construction(annee, cle):
 
 
 def test_estimation_sans_facture():
-    # 108 m² chauffés (120 m² habitables), H1, 1968 : 108 × 150 × 1,3 / 0,85 × 0,13 + 4 × 800 / 0,85 × 0,13
-    attendu = 108 * 150 * 1.3 / 0.85 * 0.13 + 4 * 800 / 0.85 * 0.13
+    # 108 m² chauffés (120 m² habitables), H1, 1968 : 108 × 150 × 1,3 × 0,13 + 4 × 800 / 0,85 × 0,13
+    # Lot 13k : consommation « type DPE » (pertes de la chaudière incluses) jamais divisée par le rendement ; l'ECS
+    # (un besoin) l'est toujours.
+    attendu = 108 * 150 * 1.3 * 0.13 + 4 * 800 / 0.85 * 0.13
     assert eco.estimer_facture_annuelle(108, "H1", "1968", "fioul", True, 4, {}) == pytest.approx(attendu, abs=0.01)
     sans_ecs = eco.estimer_facture_annuelle(108, "H1", "1968", "fioul", False, 4, {})
-    assert sans_ecs == pytest.approx(108 * 150 * 1.3 / 0.85 * 0.13, abs=0.01)
+    assert sans_ecs == pytest.approx(108 * 150 * 1.3 * 0.13, abs=0.01)
+    # le rendement de la chaudière ne change plus la consommation estimée (déjà incluse), seulement la part ECS
+    assert eco.estimer_facture_annuelle(108, "H1", "1968", "fioul", False, 4, {"rendement_pct": {"fioul": 60}}) == sans_ecs
 
 
 def test_hypotheses_admin_prises_en_compte():

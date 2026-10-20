@@ -3853,10 +3853,32 @@ async def get_params_eco_energie():
     return params.get("params_eco_energie", DEFAULT_PARAMS_ECO_ENERGIE)
 
 
+# Lot 13k : plage réaliste du prix du kWh (€ TTC) ; hors plage = erreur d'unité probable (litre, m³, tonne, centimes)
+PLAGES_PRIX_KWH = {"electricite": ("Électricité", 0.10, 0.40), "gaz": ("Gaz", 0.03, 0.30),
+                   "fioul": ("Fioul", 0.03, 0.30), "bois": ("Bois", 0.03, 0.30)}
+
+
+def _erreurs_prix_kwh(prix_kwh) -> list:
+    prix_kwh = prix_kwh if isinstance(prix_kwh, dict) else {}
+    erreurs = []
+    for cle, (nom, mini, maxi) in PLAGES_PRIX_KWH.items():
+        v = prix_kwh.get(cle)
+        x = float_value(v, None) if v not in (None, "") else None
+        if x is None or not (mini <= x <= maxi):
+            saisi = "vide" if x is None else f"{x:g}".replace(".", ",")
+            erreurs.append(f"{nom} : {saisi} €/kWh — attendu entre {mini:g} et {maxi:g} €/kWh".replace(".", ","))
+    return erreurs
+
+
 @app.post("/api/admin/params-eco-energie")
 async def save_params_eco_energie(request: Request):
     _require_admin(request)
     payload = await _read_request_payload(request)
+    erreurs = _erreurs_prix_kwh((payload or {}).get("prix_kwh"))
+    if erreurs:
+        raise HTTPException(status_code=400, detail=(
+            "Prix du kWh hors plage, rien n'est enregistré. " + " ; ".join(erreurs)
+            + ". Saisissez le prix par kWh (pas au litre, au m³ ni à la tonne)."))
     params = load_parametres_admin()
     params["params_eco_energie"] = payload
     save_parametres_admin_atomic(params)
