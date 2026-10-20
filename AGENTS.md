@@ -180,6 +180,15 @@ derrière la connexion ; `/api/...` répond 401 même pour une route inexistante
   refermé, il revient dans `#fiche-statut-slot` (la clôture « Perdu » l'y cherche). Bandeau de la fiche : commandes
   regroupées dans `.psb-commandes` (insertions via `actions.parentNode`), une rangée tant qu'elles tiennent (identité base
   390 px), sinon 2e ligne ; email (et ville) raccourcis par le CSS « … », adresse complète au survol.
+- **Lot 13i (statut automatique)** : `_avancer_statut(numero, cible)` (rang `RANG_STATUT_AUTO`, vers l'avant seulement ;
+  `STATUTS_MANUELS_PROTEGES` Signé / Perdu / À rappeler jamais écrasés, sauf Signé -> Installation finie ; note « Statut →
+  … , automatique, le JJ/MM à HHhMM », auteur « Automatique »). Appelé par : envoi initial accepté par Resend
+  (pré-devis / devis envoyé), date de VT saisie ou modifiée à l'enregistrement (Envoyé en VT), « Valider la VT » (VT
+  validé), facture générée (Installation finie). Renvoi, relances, envoi refusé : jamais. Enregistrer une fiche
+  EXISTANTE n'écrit plus son statut (`_upsert_lead` retire `statut`) : le champ caché portait celui lu à l'ouverture et
+  remettait en arrière un statut avancé entre-temps (bug depuis le 03/07, 4b97de1 ; LEVESQUE 19/10). Statut manuel :
+  pilule -> `POST /api/leads/{n}/status`. Pilule rafraîchie après envoi / enregistrement (`hexaActualiserStatutFiche`).
+  `LIBELLES_STATUT` = STATUTS de la page (parité testée).
 - Clés DocuSeal / Resend : seulement sur Railway. En local, l'envoi réel est impossible (le script de bout en bout le simule).
 
 ### Tests
