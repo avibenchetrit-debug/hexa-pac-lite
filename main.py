@@ -142,13 +142,16 @@ DEFAULT_MODELES_EMAIL = [
     },
 ]
 
+# Lot 13h : même objet que l'envoi initial (« Votre pré-devis Hexa Rénov' — Prénom »), suivi de la référence imprimée
+# sur le document ({numero} = PD… pour un pré-devis, DE… pour un devis). Ancien défaut remplacé par _migrate_lot13h.
+SUJET_RELANCE_AVANT_LOT13H = "Votre {type_document} Hexa Rénov' — {numero}"
 DEFAULT_RELANCE_MESSAGES = {
     "non_ouvert": {
-        "sujet": "Votre {type_document} Hexa Rénov' — {numero}",
+        "sujet": "Votre {type_document} Hexa Rénov' — {prenom} ({numero})",
         "contenu": "Bonjour {prenom},\n\nVotre {type_document} {numero} se sentirait presque seul... l'auriez-vous manqué ?\n\nNous l'avons préparé pour votre projet {modele_pac} (reste à charge estimé {reste_a_charge}), et il n'attend plus que vous. Une question, un doute, une envie d'en parler ? Nous sommes là.\n\nÀ très vite,\nL'équipe Hexa-Rénov'",
     },
     "ouvert": {
-        "sujet": "Votre {type_document} Hexa Rénov' — {numero}",
+        "sujet": "Votre {type_document} Hexa Rénov' — {prenom} ({numero})",
         "contenu": "Bonjour {prenom},\n\nVous avez ouvert votre {type_document} {numero} — c'est déjà un bon début ! 😊\n\nAlors, qu'en avez-vous pensé ? S'il reste une question, un doute ou un détail à ajuster, nous sommes là pour en parler. Votre future pompe à chaleur, elle, n'attend qu'un feu vert.\n\nÀ très vite,\nL'équipe Hexa-Rénov'",
     },
 }
@@ -1095,6 +1098,24 @@ def _migrate_lot11b() -> bool:
     return change
 
 
+def _migrate_lot13h() -> bool:
+    """Lot 13h, au démarrage : objet des relances devis / pré-devis encore à l'ancien défaut (« … — {numero} », sans le
+    prénom de l'envoi initial) -> nouveau défaut. Un objet personnalisé dans l'admin n'est jamais touché."""
+    brut = _read_json(PARAMETRES_ADMIN_PATH, {})
+    msgs = ((brut.get("relances") or {}).get("messages") if isinstance(brut, dict) else None)
+    if not isinstance(msgs, dict):
+        return False
+    change = False
+    for k, m in msgs.items():
+        if isinstance(m, dict) and m.get("sujet") == SUJET_RELANCE_AVANT_LOT13H and k in DEFAULT_RELANCE_MESSAGES:
+            m["sujet"] = DEFAULT_RELANCE_MESSAGES[k]["sujet"]
+            change = True
+    if change:
+        _atomic_write_json(PARAMETRES_ADMIN_PATH, brut)
+        print("[relances] lot 13h : objet des relances -> « … — {prenom} ({numero}) »")
+    return change
+
+
 def _migrate_lot10c() -> list:
     """Lot 10c, au démarrage, idempotent : groupes extérieurs des Ariston DUO (poids, dimensions) corrigés d'après la doc
     Ariston « Doc Pro Nimbus Plus Net R32 » (services/import_catalogue_pac.CORRECTIONS_ARISTON_DUO). Rend les réf. corrigées."""
@@ -1993,6 +2014,13 @@ def _run_relances_once():
         print("[relances] week-end -> skip")
         return
     today = now.date()
+    # Lot 13h : une adresse en échec ne doit plus être relancée -> statut relu chez Resend, juste avant, pour chaque
+    # document à relancer aujourd'hui, quel que soit son âge (_relances_a_faire l'écarte ensuite)
+    for numero in sorted({it["numero"] for it in _relances_a_faire(today)}):
+        try:
+            _actualiser_livraisons(numero, jours=3650, forcer=True)
+        except Exception as exc:  # noqa: BLE001 — la relance part quand même, avec le statut déjà connu
+            print(f"[relances] statut de livraison {numero} non actualisé : {type(exc).__name__}: {exc}")
     req = _SchedulerRequest(_PUBLIC_BASE_URL)
     n_dev = 0
     n_nrp = 0
@@ -2050,6 +2078,7 @@ async def startup_event():
     _migrate_lot10()
     _migrate_lot10c()
     _migrate_lot11b()
+    _migrate_lot13h()
     _admin_password()
     start_backup_scheduler(DATA_DIR)
     start_relances_scheduler()
@@ -5815,6 +5844,236 @@ def _email_notedim_html(prenom, specs, lien_notedim):
 </body></html>"""
 
 
+# ---- Lot 13h : envois Resend contrôlés (refus visible, statut de livraison, renvoi, copie interne) ----
+EXPEDITEUR_DEVIS = "Hexa Rénov' <a.parisot@hexa-renov.fr>"
+# Copie de chaque envoi / renvoi de devis et pré-devis, pour en garder la trace dans Gmail. E-mail SÉPARÉ et sans pixel :
+# en copie cachée du même message, l'ouverture de la copie compterait comme une ouverture par le client.
+COPIE_INTERNE_DEVIS = os.environ.get("DEVIS_COPIE_INTERNE", "info@hexa-renov.fr").strip()
+DEVIS_ECHECS_PATH = os.path.join(DEVIS_DIR, "envois_echoues.json")
+
+# Dernier événement Resend -> (code, libellé, raison). « Accepté par Resend » ne veut pas dire « reçu par le client ».
+_LIVRAISON = {
+    "delivered": ("livre", "Livré", ""),
+    "opened": ("livre", "Livré", ""),
+    "clicked": ("livre", "Livré", ""),
+    "queued": ("en_cours", "Envoi en cours", ""),
+    "scheduled": ("en_cours", "Envoi en cours", ""),
+    "sent": ("en_cours", "Envoi en cours", ""),
+    "delivery_delayed": ("differe", "Différé", "la messagerie du client retarde la réception, Resend réessaie"),
+    "bounced": ("echec", "Échec d'envoi",
+                "adresse refusée par la messagerie du client (adresse inexistante, mal écrite ou boîte fermée)"),
+    "complained": ("echec", "Classé indésirable", "le client a signalé l'e-mail comme indésirable"),
+    "suppressed": ("echec", "Échec d'envoi", "adresse bloquée par Resend après un refus précédent"),
+    "failed": ("echec", "Échec d'envoi", "Resend n'a pas pu envoyer l'e-mail"),
+    "canceled": ("echec", "Échec d'envoi", "envoi annulé"),
+}
+_LIVRAISON_DEFINITIVE = {"delivered", "opened", "clicked", "bounced", "complained", "suppressed", "failed", "canceled"}
+_LIVRAISON_RECONTROLE_S = 600
+
+
+class EnvoiRefuse(Exception):
+    """Resend a refusé l'e-mail ou n'a pas confirmé l'avoir accepté (message = raison lisible)."""
+
+
+def _type_document(variante) -> str:
+    return "Pré-devis" if variante == "pre_devis" else "Devis"
+
+
+def _resend_envoyer(message: dict, contexte: str) -> str:
+    """Envoie par Resend et renvoie l'identifiant attribué. Refus ou absence d'identifiant : journal + EnvoiRefuse."""
+    import resend
+
+    resend.api_key = os.environ.get("RESEND_API_KEY", "")
+    dest = ", ".join(message.get("to") or [])
+    try:
+        result = resend.Emails.send(message)
+    except Exception as exc:  # noqa: BLE001 — erreur Resend ou réseau = envoi refusé, jamais avalé
+        raison = str(getattr(exc, "message", "") or exc or type(exc).__name__)[:300]
+        print(f"[envoi] ECHEC {contexte} -> {dest} : {type(exc).__name__}: {raison}")
+        raise EnvoiRefuse(raison) from exc
+    resend_id = result.get("id") if isinstance(result, dict) else getattr(result, "id", "")
+    if not resend_id:
+        print(f"[envoi] ECHEC {contexte} -> {dest} : Resend n'a renvoyé aucun identifiant ({result!r})")
+        raise EnvoiRefuse("le service d'envoi n'a pas confirmé l'acceptation de l'e-mail")
+    print(f"[envoi] OK {contexte} -> {dest} (resend_id {resend_id})")
+    return str(resend_id)
+
+
+def _sujet_devis(prospect: dict, variante) -> str:
+    return f"Votre {'pré-devis' if variante == 'pre_devis' else 'devis'} Hexa Rénov' — {str(prospect.get('prenom') or '')}"
+
+
+def _email_devis_corps(request: Request, numero: str, prospect: dict, variante, version) -> str:
+    """Corps HTML (sans pixel) de l'e-mail du devis / pré-devis."""
+    ctx = _build_devis_context(request, numero)
+    apercu = ctx.get("projet_apercu")                 # aperçu éco (bandeau) — peut être None
+    pct_eco = None
+    if apercu and apercu.get("facture_avant") and apercu.get("eco_pendant"):
+        pct_eco = round(apercu["eco_pendant"] / apercu["facture_avant"] * 100)
+    prenom = html.escape(str(prospect.get("prenom") or ""))
+    return _email_devis_html(prenom, apercu, pct_eco, _public_devis_url_v(request, numero, version),
+                             pre_devis=(variante == "pre_devis"))
+
+
+def _envoyer_notedim(request: Request, numero: str, prospect: dict, email_to: str, contexte: str):
+    """(resend_id, erreur) : la note de dim part après le devis ; son échec est signalé sans annuler le devis."""
+    catalogue = _read_catalogue_pac()
+    state = _load_state_simulateur(numero, prospect, catalogue)
+    modele_ref = state.get("modele_pac_id") or state.get("modele_pac")
+    modele_obj = find_modele(catalogue, modele_ref) or select_default_modele(prospect, catalogue)
+    specs = {                                         # None -> « — » dans le modèle d'e-mail
+        "modele": (modele_obj.get("nom") or modele_obj.get("ref")) if modele_obj else None,
+        "etas35": devis_value(modele_obj or {}, "etas35", default=None),
+        "etas55": devis_value(modele_obj or {}, "etas55", default=None),
+        "surface": round(_float_value(devis_value(state, "surface_chauffee", default="") or devis_value(prospect, "surface_habitable", "surface_logement_m2", default=""), 0)) or None,
+    }
+    prenom = html.escape(str(prospect.get("prenom") or ""))
+    try:
+        return _resend_envoyer({
+            "from": EXPEDITEUR_DEVIS,
+            "to": [email_to],
+            "subject": "Votre note de dimensionnement Hexa Rénov'",
+            "html": _email_notedim_html(prenom, specs, _public_notedim_url(request, numero)),
+        }, f"{contexte} note de dim"), ""
+    except EnvoiRefuse as exc:
+        return "", str(exc)
+
+
+def _envoyer_copie_interne(sujet: str, corps: str, email_to: str, contexte: str) -> None:
+    if not COPIE_INTERNE_DEVIS:
+        return
+    try:
+        _resend_envoyer({
+            "from": EXPEDITEUR_DEVIS,
+            "to": [COPIE_INTERNE_DEVIS],
+            "subject": f"[Copie] {sujet} — envoyé à {email_to}",
+            "html": corps,
+        }, f"{contexte} copie interne")
+    except EnvoiRefuse:
+        pass                                          # déjà journalisé ; l'e-mail du client, lui, est parti
+
+
+def _noter_echec_envoi(numero: str, variante, email_to: str, raison: str, auteur: str) -> None:
+    now = _now_iso()
+    with _devis_open_lock:
+        echecs = _read_json(DEVIS_ECHECS_PATH, {})
+        if not isinstance(echecs, dict):
+            echecs = {}
+        echecs.setdefault(numero, []).append(
+            {"date": now, "variante": variante, "email": email_to, "raison": raison, "auteur": auteur})
+        _atomic_write_json(DEVIS_ECHECS_PATH, echecs)
+    notes = _read_notes()
+    notes.setdefault(numero, []).append({
+        "texte": f"Échec d'envoi du {_type_document(variante).lower()} le {_date_heure_fr(now)} à {email_to} : {raison}",
+        "date": _now_paris_iso(), "auteur": auteur})
+    _atomic_write_json(NOTES_PATH, notes)
+
+
+def _livraison_affichee(entree: dict) -> dict:
+    """Statut de livraison d'un envoi ou d'un renvoi, tel qu'affiché dans Documents."""
+    if not entree.get("resend_id"):
+        return {"code": "inconnu", "libelle": "Livraison inconnue", "raison": "envoi sans identifiant Resend", "evenement": ""}
+    liv = entree.get("livraison") if isinstance(entree.get("livraison"), dict) else {}
+    ev = str(liv.get("evenement") or "")
+    if not ev:
+        return {"code": "non_verifie", "libelle": "Accepté par Resend, livraison non vérifiée", "raison": "", "evenement": ""}
+    code, libelle, raison = _LIVRAISON.get(ev, ("en_cours", f"Statut Resend : {ev}", ""))
+    return {"code": code, "libelle": libelle, "raison": raison, "evenement": ev, "verifie_at": liv.get("verifie_at") or ""}
+
+
+def _resend_dernier_evenement(resend_id: str) -> str:
+    """Dernier événement Resend de l'e-mail (« delivered », « bounced »…) ; "" si la lecture échoue (journalisé)."""
+    cle = os.environ.get("RESEND_API_KEY", "")
+    if not cle or not resend_id:
+        return ""
+    req = urllib.request.Request(f"https://api.resend.com/emails/{urllib.parse.quote(str(resend_id))}",
+                                 headers={"Authorization": f"Bearer {cle}", "User-Agent": "hexa-pac-lite"})
+    try:
+        with urllib.request.urlopen(req, timeout=5) as r:
+            data = json.loads(r.read().decode("utf-8"))
+    except Exception as exc:  # noqa: BLE001 — statut illisible : on réessaiera, l'affichage reste « en cours »
+        print(f"[envoi] statut Resend {resend_id} illisible : {type(exc).__name__}: {exc}")
+        return ""
+    return str((data or {}).get("last_event") or "").strip().lower()
+
+
+def _entrees_envoi(item: dict) -> list:
+    """L'envoi initial puis chacun de ses renvois (chacun a son identifiant Resend et son statut)."""
+    renvois = item.get("renvois") if isinstance(item.get("renvois"), list) else []
+    return [item] + [r for r in renvois if isinstance(r, dict)]
+
+
+def _envoi_en_echec(item: dict) -> dict | None:
+    """Statut affiché (code « echec ») si la livraison la plus RÉCENTE connue du document (envoi initial ou renvoi) est
+    en échec ; None sinon. Un renvoi livré ensuite (adresse corrigée) lève la suspension des relances."""
+    for entree in reversed(_entrees_envoi(item if isinstance(item, dict) else {})):
+        liv = entree.get("livraison") if isinstance(entree.get("livraison"), dict) else {}
+        if liv.get("evenement") in _LIVRAISON_DEFINITIVE:
+            aff = _livraison_affichee(entree)
+            return dict(aff, email=entree.get("email") or "") if aff["code"] == "echec" else None
+    return None
+
+
+def _actualiser_livraisons(numero: str | None = None, jours: int = 30, forcer: bool = False) -> int:
+    """Relit chez Resend le statut des envois et renvois des `jours` derniers jours dont la livraison n'est pas encore
+    définitive ; au plus une lecture toutes les 10 min par e-mail, sauf `forcer`. Renvoie le nombre de lectures."""
+    if not os.environ.get("RESEND_API_KEY"):
+        return 0
+    maintenant = datetime.now(PARIS_TZ)
+    a_lire = []
+    for num, items in _read_devis_meta().items():
+        if (numero and num != numero) or not isinstance(items, list):
+            continue
+        for it in items:
+            dt = _parse_paris_dt(it.get("sent_at")) if isinstance(it, dict) else None
+            if dt is None or (maintenant - dt).days > jours:
+                continue
+            for entree in _entrees_envoi(it):
+                liv = entree.get("livraison") if isinstance(entree.get("livraison"), dict) else {}
+                if not entree.get("resend_id") or liv.get("evenement") in _LIVRAISON_DEFINITIVE:
+                    continue
+                vu = _parse_paris_dt(liv.get("verifie_at"))
+                if not forcer and vu and (maintenant - vu).total_seconds() < _LIVRAISON_RECONTROLE_S:
+                    continue
+                a_lire.append(str(entree["resend_id"]))
+    lus = {}
+    for i, rid in enumerate(a_lire):
+        if i:
+            time.sleep(0.6)                           # Resend : 2 requêtes par seconde au plus
+        ev = _resend_dernier_evenement(rid)
+        if ev:
+            lus[rid] = ev
+    if not lus:
+        return len(a_lire)
+    echecs = []
+    with _devis_open_lock:
+        meta = _read_devis_meta()
+        for num, items in meta.items():
+            for it in (items if isinstance(items, list) else []):
+                for entree in _entrees_envoi(it):
+                    ev = lus.get(str(entree.get("resend_id") or ""))
+                    if not ev:
+                        continue
+                    avant = (entree.get("livraison") or {}).get("evenement") if isinstance(entree.get("livraison"), dict) else ""
+                    entree["livraison"] = {"evenement": ev, "verifie_at": _now_iso()}
+                    if ev != avant and _LIVRAISON.get(ev, ("",))[0] == "echec":
+                        echecs.append((num, it, entree, ev))
+        _atomic_write_json(DEVIS_META_PATH, meta)
+    if echecs:
+        notes = _read_notes()
+        for num, it, entree, ev in echecs:
+            variante = it.get("variante", "devis")
+            ref = _numero_imprime(it.get("numero_devis") or "", variante == "pre_devis")
+            raison = _LIVRAISON[ev][2]
+            print(f"[envoi] LIVRAISON EN ECHEC {num} {ref} -> {entree.get('email')} : {ev} ({raison})")
+            notes.setdefault(num, []).append({
+                "texte": f"{_type_document(variante)} {ref} non reçu par {entree.get('email')} "
+                         f"(envoi du {_date_heure_fr(entree.get('sent_at'))}) : {raison}",
+                "date": _now_paris_iso(), "auteur": "Resend"})
+        _atomic_write_json(NOTES_PATH, notes)
+    return len(a_lire)
+
+
 async def _send_devis(numero: str, payload: dict, request: Request) -> dict:
     prospect = _find_lead(numero)
     if not prospect:
@@ -5838,49 +6097,30 @@ async def _send_devis(numero: str, payload: dict, request: Request) -> dict:
     devis_path, devis_html, version = _ensure_devis_pdf(numero, request, version, avec_sous_traitant, numero_dossier)
     notedim_path = _ensure_notedim_pdf(numero, request, version) if variante == "devis" else None
 
-    # Aperçu éco (bandeau email devis) — peut être None
-    ctx = _build_devis_context(request, numero)
-    apercu = ctx.get("projet_apercu")
-    pct_eco = None
-    if apercu and apercu.get("facture_avant") and apercu.get("eco_pendant"):
-        pct_eco = round(apercu["eco_pendant"] / apercu["facture_avant"] * 100)
+    auteur = str(payload.get("auteur") or "Anonyme")
+    sujet = _sujet_devis(prospect, variante)
+    corps = _email_devis_corps(request, numero, prospect, variante, version)
+    contexte = f"{_type_document(variante)} {numero} v{version}"
 
-    # Specs techniques note de dim (None -> "—" géré dans le template email)
-    catalogue = _read_catalogue_pac()
-    state = _load_state_simulateur(numero, prospect, catalogue)
-    modele_ref = state.get("modele_pac_id") or state.get("modele_pac")
-    modele_obj = find_modele(catalogue, modele_ref) or select_default_modele(prospect, catalogue)
-    specs = {
-        "modele": (modele_obj.get("nom") or modele_obj.get("ref")) if modele_obj else None,
-        "etas35": devis_value(modele_obj or {}, "etas35", default=None),
-        "etas55": devis_value(modele_obj or {}, "etas55", default=None),
-        "surface": round(_float_value(devis_value(state, "surface_chauffee", default="") or devis_value(prospect, "surface_habitable", "surface_logement_m2", default=""), 0)) or None,
-    }
-
-    prenom = html.escape(str(prospect.get("prenom") or ""))
-    lien_devis = _public_devis_url_v(request, numero, version)
-    lien_notedim = _public_notedim_url(request, numero)
-
-    import resend
-
-    resend.api_key = api_key
-    result = resend.Emails.send(
-        {
-            "from": "Hexa Rénov' <a.parisot@hexa-renov.fr>",
+    # Lot 13h : « Envoyé » seulement si Resend a accepté l'e-mail ; sinon rien n'est marqué envoyé et l'échec est visible.
+    try:
+        resend_id = _resend_envoyer({
+            "from": EXPEDITEUR_DEVIS,
             "to": [email_to],
-            "subject": f"Votre {'pré-devis' if variante == 'pre_devis' else 'devis'} Hexa Rénov' — {prenom}",
-            "html": _inject_pixel(_email_devis_html(prenom, apercu, pct_eco, lien_devis, pre_devis=(variante == "pre_devis")), _pixel_devis_url(request, numero, version)),
-        }
-    )
-    if variante == "devis":
-        resend.Emails.send(
-            {
-                "from": "Hexa Rénov' <a.parisot@hexa-renov.fr>",
-                "to": [email_to],
-                "subject": "Votre note de dimensionnement Hexa Rénov'",
-                "html": _email_notedim_html(prenom, specs, lien_notedim),
-            }
-        )
+            "subject": sujet,
+            "html": _inject_pixel(corps, _pixel_devis_url(request, numero, version)),
+        }, contexte)
+    except EnvoiRefuse as exc:
+        _noter_echec_envoi(numero, variante, email_to, str(exc), auteur)
+        raise HTTPException(status_code=502, detail=f"Échec d'envoi à {email_to} : {exc}. Rien n'a été marqué « Envoyé ».") from exc
+    notedim_id, notedim_erreur = _envoyer_notedim(request, numero, prospect, email_to, contexte) if variante == "devis" else ("", "")
+    _envoyer_copie_interne(sujet, corps, email_to, contexte)
+    email_file = os.path.join(DEVIS_DIR, f"{numero}_v{version}_email.html")
+    try:
+        _write_text(email_file, corps)                # le renvoi reprend exactement ce corps
+    except OSError as exc:
+        print(f"[envoi] corps de l'e-mail {numero} v{version} non archivé : {exc}")
+        email_file = ""
 
     now = _now_iso()
     leads = _read_leads()
@@ -5890,11 +6130,13 @@ async def _send_devis(numero: str, payload: dict, request: Request) -> dict:
         leads[idx]["date_envoi_devis"] = now
         _atomic_write_json(LEADS_PATH, leads)
 
-    auteur = str(payload.get("auteur") or "Anonyme")
     notes = _read_notes()
     notes.setdefault(numero, []).append(
         {"texte": f"{'Pré-devis' if variante == 'pre_devis' else 'Devis'} v{version} envoyé le {_date_heure_fr(now)} à {email_to} par {auteur}", "date": _now_paris_iso(), "auteur": auteur}
     )
+    if notedim_erreur:
+        notes[numero].append({"texte": f"Note de dimensionnement non envoyée à {email_to} : {notedim_erreur}",
+                              "date": _now_paris_iso(), "auteur": auteur})
     _atomic_write_json(NOTES_PATH, notes)
 
     meta = _read_devis_meta()
@@ -5907,16 +6149,160 @@ async def _send_devis(numero: str, payload: dict, request: Request) -> dict:
         "file": devis_path,
         "html_file": devis_html,
         "notedim_file": notedim_path,
-        "resend_id": result.get("id") if isinstance(result, dict) else "",
+        "resend_id": resend_id,
+        "livraison": {"evenement": "sent"},
+        "email_file": email_file,
         "statut": "envoye",
         "variante": variante,
     }
+    if variante == "devis":
+        item["notedim_resend_id"] = notedim_id
+        if notedim_erreur:
+            item["notedim_erreur"] = notedim_erreur
     meta.setdefault(numero, []).append(item)
     _atomic_write_json(DEVIS_META_PATH, meta)
     sent = _read_devis_envoyes()
     sent.append({"numero_prospect": numero, **item})
     _atomic_write_json(DEVIS_ENVOYES_PATH, sent)
-    return {"success": True, "ok": True, "version": version, "resend_id": item["resend_id"]}
+    return {"success": True, "ok": True, "version": version, "resend_id": item["resend_id"],
+            "notedim_erreur": notedim_erreur}
+
+
+def _renvoyer_devis(numero: str, version: int, auteur: str, request: Request) -> dict:
+    """Lot 13h — renvoie le document DÉJÀ envoyé (même version archivée, même lien, même pixel, même destinataire).
+    Ne touche ni à la date d'envoi, ni au compteur ou au calendrier des relances, ni au statut du lead."""
+    prospect = _find_lead(numero)
+    if not prospect:
+        raise HTTPException(status_code=404, detail="Prospect introuvable")
+    item = next((it for it in _sent_devis_items(numero)
+                 if isinstance(it, dict) and int(it.get("version") or 0) == int(version)), None)
+    if item is None:
+        raise HTTPException(status_code=404, detail="Ce document envoyé est introuvable")
+    email_to = str(item.get("email") or "").strip()
+    if not email_to:
+        raise HTTPException(status_code=400, detail="Adresse de l'envoi initial introuvable")
+    if not os.environ.get("RESEND_API_KEY", ""):
+        raise HTTPException(status_code=400, detail="RESEND_API_KEY non configurée")
+    variante = item.get("variante") or "devis"
+    ref = _numero_imprime(item.get("numero_devis") or "", variante == "pre_devis") or f"v{version}"
+    contexte = f"renvoi {_type_document(variante)} {ref} ({numero} v{version})"
+    sujet = _sujet_devis(prospect, variante)
+    archive = item.get("email_file")
+    if archive and os.path.exists(archive):
+        corps = _read_text(archive)
+    else:                                             # envoi d'avant le lot 13h : corps reconstruit, même lien
+        corps = _email_devis_corps(request, numero, prospect, variante, version)
+    try:
+        resend_id = _resend_envoyer({
+            "from": EXPEDITEUR_DEVIS,
+            "to": [email_to],
+            "subject": sujet,
+            "html": _inject_pixel(corps, _pixel_devis_url(request, numero, version)),
+        }, contexte)
+    except EnvoiRefuse as exc:
+        raise HTTPException(status_code=502, detail=f"Le renvoi à {email_to} a échoué : {exc}") from exc
+    notedim_erreur = _envoyer_notedim(request, numero, prospect, email_to, contexte)[1] if variante == "devis" else ""
+    _envoyer_copie_interne(sujet, corps, email_to, contexte)
+
+    now = _now_iso()
+    renvoi = {"sent_at": now, "email": email_to, "resend_id": resend_id, "auteur": auteur, "livraison": {"evenement": "sent"}}
+    if notedim_erreur:
+        renvoi["notedim_erreur"] = notedim_erreur
+    with _devis_open_lock:
+        meta = _read_devis_meta()
+        cible = next((it for it in (meta.get(numero) or [])
+                      if isinstance(it, dict) and int(it.get("version") or 0) == int(version)), None)
+        if cible is not None:
+            renvois = cible.get("renvois") if isinstance(cible.get("renvois"), list) else []
+            renvois.append(renvoi)
+            cible["renvois"] = renvois
+            _atomic_write_json(DEVIS_META_PATH, meta)
+    notes = _read_notes()
+    notes.setdefault(numero, []).append({
+        "texte": f"{_type_document(variante)} {ref} renvoyé le {_date_heure_fr(now)} à {email_to} par {auteur}",
+        "date": _now_paris_iso(), "auteur": auteur})
+    if notedim_erreur:
+        notes[numero].append({"texte": f"Note de dimensionnement non renvoyée à {email_to} : {notedim_erreur}",
+                              "date": _now_paris_iso(), "auteur": auteur})
+    _atomic_write_json(NOTES_PATH, notes)
+    message = f"{_type_document(variante)} {ref} renvoyé à {email_to}"
+    if notedim_erreur:
+        message += f" — note de dimensionnement NON envoyée : {notedim_erreur}"
+    return {"ok": True, "message": message, "renvoi": renvoi}
+
+
+@app.post("/api/devis/{numero}/renvoyer")
+async def renvoyer_devis(numero: str, request: Request) -> JSONResponse:
+    payload = await _read_request_payload(request)
+    try:
+        version = int(payload.get("version") or 0)
+    except (TypeError, ValueError):
+        version = 0
+    if version < 1:
+        raise HTTPException(status_code=400, detail="Version requise")
+    auteur = str(payload.get("auteur") or "Anonyme")
+    return JSONResponse(await run_in_threadpool(_renvoyer_devis, numero, version, auteur, request))
+
+
+@app.get("/api/devis/{numero}/envois-echoues")
+async def devis_envois_echoues(numero: str) -> JSONResponse:
+    """Envois refusés par Resend (rien n'a été marqué « Envoyé ») — ceux d'après le dernier envoi réussi."""
+    echecs = _read_json(DEVIS_ECHECS_PATH, {})
+    items = echecs.get(numero) if isinstance(echecs, dict) else None
+    if not isinstance(items, list):
+        return JSONResponse([])
+    reussis = [d for d in (_parse_paris_dt(it.get("sent_at")) for it in _sent_devis_items(numero) if isinstance(it, dict)) if d]
+    dernier = max(reussis) if reussis else None
+    out = [{"date": e.get("date", ""), "variante": e.get("variante", "devis"), "email": e.get("email", ""),
+            "raison": e.get("raison", "")}
+           for e in items if isinstance(e, dict)
+           and (dernier is None or (_parse_paris_dt(e.get("date")) or dernier) > dernier)]
+    return JSONResponse(out)
+
+
+@app.get("/api/admin/controle-envois", response_class=HTMLResponse)
+async def controle_envois(jours: int = 30) -> HTMLResponse:
+    """Lot 13h — rattrapage : devis et pré-devis envoyés depuis `jours` jours, statut Resend relu à l'instant."""
+    jours = max(1, min(int(jours or 30), 365))
+    await run_in_threadpool(_actualiser_livraisons, None, jours, True)
+    leads = {str(l.get("numero") or ""): l for l in _read_leads() if isinstance(l, dict)}
+    maintenant = datetime.now(PARIS_TZ)
+    lignes = []
+    for num, items in _read_devis_meta().items():
+        for it in (items if isinstance(items, list) else []):
+            dt = _parse_paris_dt(it.get("sent_at")) if isinstance(it, dict) else None
+            if dt is None or (maintenant - dt).days > jours:
+                continue
+            lead = leads.get(num, {})
+            variante = it.get("variante", "devis")
+            ref = _numero_imprime(it.get("numero_devis") or "", variante == "pre_devis")
+            for n, entree in enumerate(_entrees_envoi(it)):
+                liv = _livraison_affichee(entree)
+                lignes.append((_parse_paris_dt(entree.get("sent_at")) or dt, num, lead, ref, n, entree, liv,
+                               bool(it.get("first_opened_at"))))
+    lignes.sort(key=lambda x: x[0], reverse=True)
+    couleurs = {"livre": "#15803D", "echec": "#B91C1C", "differe": "#B45309"}
+    tr = []
+    for quand, num, lead, ref, n, entree, liv, ouvert in lignes:
+        e = html.escape
+        tr.append(
+            f"<tr style=\"{'background:#FEF2F2' if liv['code'] != 'livre' else ''}\">"
+            f"<td>{e(_date_heure_fr(entree.get('sent_at')))}</td><td>{e(num)}</td>"
+            f"<td>{e(str(lead.get('nom') or ''))} {e(str(lead.get('prenom') or ''))}</td>"
+            f"<td>{e(str(entree.get('email') or ''))}</td><td>{e(ref)}{' (renvoi)' if n else ''}</td>"
+            f"<td style=\"color:{couleurs.get(liv['code'], '#475569')};font-weight:700\">{e(liv['libelle'])}</td>"
+            f"<td>{e(liv['raison'])}</td><td>{'oui' if ouvert else 'non'}</td></tr>")
+    a_revoir = sum(1 for x in lignes if x[6]["code"] != "livre")
+    page = (
+        "<!doctype html><html lang=\"fr\"><head><meta charset=\"utf-8\"><title>Contrôle des envois</title>"
+        "<style>body{font-family:Arial,sans-serif;margin:24px;color:#0F172A}table{border-collapse:collapse;font-size:14px}"
+        "td,th{border:1px solid #CBD5E1;padding:6px 10px;text-align:left}th{background:#002E5A;color:#fff}</style></head><body>"
+        f"<h1>Devis et pré-devis envoyés depuis {jours} jours</h1>"
+        f"<p>{len(lignes)} envoi(s) ; <b>{a_revoir} à revoir</b> (lignes rosées : pas confirmé « Livré » par Resend). "
+        "Statuts relus chez Resend à l'instant. « Ouvert » = le client a affiché l'e-mail (pixel).</p>"
+        "<table><tr><th>Envoyé le</th><th>Fiche</th><th>Client</th><th>E-mail</th><th>Document</th>"
+        "<th>Statut Resend</th><th>Raison</th><th>Ouvert</th></tr>" + "".join(tr) + "</table></body></html>")
+    return HTMLResponse(page)
 
 
 @app.post("/api/devis/{numero}/send")
@@ -5972,6 +6358,8 @@ def _relances_a_faire(today):
         rc = int(it.get("relance_count") or 0)
         if rc >= maxr or rc >= len(niveaux):
             continue
+        if _envoi_en_echec(it):                       # Lot 13h : adresse en échec -> relances suspendues
+            continue
         dt = _parse_paris_dt(it.get("sent_at"))
         if dt is None:
             continue
@@ -6019,6 +6407,8 @@ def _send_relance(numero: str, version: int, request: Request) -> dict:
         target = next((it for it in items if int(it.get("version") or 0) == int(version)), None)
         if target is None:
             return {"ok": False, "skip": "version introuvable"}
+        if _envoi_en_echec(target):
+            return {"ok": False, "skip": "relances suspendues : adresse en échec"}
         rc = int(target.get("relance_count") or 0)
         if rc >= maxr:
             return {"ok": False, "skip": "max atteint"}
@@ -6040,9 +6430,10 @@ def _send_relance(numero: str, version: int, request: Request) -> dict:
     ctx = _build_devis_context(request, numero)
     prenom = html.escape(str(prospect.get("prenom") or ""))
     tpl = _relance_config()["messages"]["ouvert" if ouvert else "non_ouvert"]
+    # Lot 13h : texte brut (l'objet est du texte, le corps est échappé plus bas) ; référence telle qu'imprimée (PD… / DE…)
     subst = {
-        "prenom": prenom,
-        "numero": numero_devis,
+        "prenom": str(prospect.get("prenom") or ""),
+        "numero": _numero_imprime(numero_devis, variante == "pre_devis"),
         "modele_pac": str(ctx.get("modele_pac", "")),
         "reste_a_charge": str(ctx.get("reste_a_charge", "")),
         "type_document": "pré-devis" if variante == "pre_devis" else "devis",
@@ -6260,6 +6651,7 @@ def _sequences_relances(lead) -> list:
             int(it.get("relance_count") or 0),
             cfg["max"], cfg["niveaux_jours"],
             _parse_paris_dt(it.get("sent_at")),
+            "relances suspendues : adresse en échec" if _envoi_en_echec(it) else "",
         ))
 
     base_nrp = _parse_paris_dt((lead or {}).get("nrp_updated_at"))
@@ -6289,8 +6681,15 @@ def get_lead_relances(numero: str) -> JSONResponse:
     lead = _find_lead(numero)
     if not lead:
         raise HTTPException(status_code=404, detail="Prospect introuvable")
+    try:                                              # Lot 13h : statut de livraison à jour (10 min au plus)
+        _actualiser_livraisons(numero)
+    except Exception as exc:  # noqa: BLE001 — l'état s'affiche quand même, avec le dernier statut connu
+        print(f"[envoi] statuts de livraison {numero} non actualisés : {type(exc).__name__}: {exc}")
+    items = _read_devis_meta().get(numero)
+    echec = _envoi_en_echec(items[-1]) if isinstance(items, list) and items else None
     statut = _normalize_statut(lead.get("statut", ""))
     return JSONResponse({
+        "adresse_en_echec": {"email": echec["email"], "libelle": echec["libelle"], "raison": echec["raison"]} if echec else None,
         "numero": numero,
         "actives": _relances_actives_lead(lead),
         "global_actif": _relances_actives_global(),
@@ -6339,6 +6738,10 @@ async def post_relance_send(numero: str, request: Request) -> JSONResponse:
 
 @app.get("/api/devis/{numero}/list")
 async def list_devis(numero: str) -> JSONResponse:
+    try:                                              # Lot 13h : statut de livraison relu chez Resend (10 min au plus)
+        await run_in_threadpool(_actualiser_livraisons, numero)
+    except Exception as exc:  # noqa: BLE001 — la liste s'affiche quand même, avec le dernier statut connu
+        print(f"[envoi] statuts de livraison {numero} non actualisés : {type(exc).__name__}: {exc}")
     meta = _read_devis_meta().get(numero, [])
     items = []
     for item in meta:
@@ -6357,6 +6760,13 @@ async def list_devis(numero: str) -> JSONResponse:
                 "open_count": int(item.get("open_count") or 0),
                 "relance_count": int(item.get("relance_count") or 0),
                 "relances": item.get("relances") if isinstance(item.get("relances"), list) else [],
+                "livraison": _livraison_affichee(item),
+                "relances_suspendues": bool(_envoi_en_echec(item)),
+                "notedim_erreur": item.get("notedim_erreur") or "",
+                "renvois": [{"libelle": f"Renvoyé le {_date_heure_fr(r.get('sent_at'))} à {r.get('email', '')}",
+                             "sent_at": r.get("sent_at", ""), "email": r.get("email", ""),
+                             "livraison": _livraison_affichee(r), "notedim_erreur": r.get("notedim_erreur") or ""}
+                            for r in _entrees_envoi(item)[1:]],
             })
     items.sort(key=lambda x: x.get("version", 0), reverse=True)
     return JSONResponse(items)

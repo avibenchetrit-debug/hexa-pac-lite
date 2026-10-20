@@ -151,6 +151,9 @@
   --z-modal: 1500;
   --z-toast: 1600;
   --z-tooltip: 1700;
+  /* menu déroulant ouvert (statut, compte) : au-dessus des panneaux, du bloc VT (1700) et des vues plein écran
+     (liste des prospects : 2000), sous les fenêtres modales (3000 et plus) */
+  --z-popover: 2600;
 }
 
 
@@ -5649,7 +5652,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
 .pv-bulk-delete:hover{ background:#c01b3f; }
 .hexa-user-menu{ position:relative; }
 .hexa-user-btn{ border:1px solid #E2E8F0; background:#fff; color:#002E5A; border-radius:9px; padding:9px 12px; font-size:13px; font-weight:700; cursor:pointer; font-family:inherit; }
-.hexa-user-dropdown{ position:absolute; right:0; top:calc(100% + 6px); display:none; min-width:190px; background:#fff; border:1px solid #E2E8F0; border-radius:10px; box-shadow:0 12px 32px rgba(16,32,64,.18); padding:6px; z-index:2600; }
+.hexa-user-dropdown{ position:absolute; right:0; top:calc(100% + 6px); display:none; min-width:190px; background:#fff; border:1px solid #E2E8F0; border-radius:10px; box-shadow:0 12px 32px rgba(16,32,64,.18); padding:6px; z-index:var(--z-popover); }
 .hexa-user-dropdown.open{ display:block; }
 .hexa-user-dropdown button{ width:100%; border:none; background:transparent; color:#002E5A; text-align:left; padding:9px 10px; border-radius:8px; cursor:pointer; font-family:inherit; font-size:13px; }
 .hexa-user-dropdown button:hover{ background:#F4F8FC; }
@@ -5736,7 +5739,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
 .pv-statut:hover{ transform:translateY(-1px); }
 .pv-statut-label{ pointer-events:none; }
 .pv-statut-caret{ pointer-events:none; font-size:9px; opacity:.75; }
-.pv-statut-menu{ position:fixed; z-index:2500; display:none; flex-direction:column; gap:3px; padding:6px;
+.pv-statut-menu{ position:fixed; z-index:var(--z-popover); display:none; flex-direction:column; gap:3px; padding:6px;
   background:#fff; border:1px solid #E2E8F0; border-radius:12px; box-shadow:0 12px 32px rgba(16,32,64,.18); }
 .pv-statut-menu.open{ display:flex; }
 .pv-statut-opt{ display:flex; align-items:center; gap:8px; border:none; background:none; cursor:pointer; font-family:inherit;
@@ -5981,6 +5984,9 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
       <span id="psb-badge-categorie" class="psb-badge" style="display:none"></span>
       <span id="psb-badge-dpe" class="psb-badge" style="display:none"></span>
     </div>
+    <!-- Lot 13h : commandes du bandeau (jauge, aide, Suivi, Fin d'appel, Rappel, Enregistrer, N/E/D/S) regroupées :
+         quand la place manque, elles passent ensemble sur une 2e ligne, sous l'identité -->
+    <div class="psb-commandes">
     <div class="prospect-sticky-actions psb-actions">
       <button type="button" class="header-icon-btn psb-cta-btn btn-notes fiche-action-btn" data-cta="N" title="Notes internes"
         onclick="(window.ouvrirNotesInternes||window.ouvrirCommentaires)(document.body.dataset.prospectNumero||document.body.dataset.draftKey)">
@@ -6000,6 +6006,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
         onclick="window.ouvrirSimulationsDrawer(document.body.dataset.prospectNumero)">
         <span class="header-letter">S</span>
       </button>
+    </div>
     </div>
   </div>
 </div>
@@ -10663,24 +10670,70 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
   }
   window.toggleFacturesEnvoyees = toggleFacturesEnvoyees;
 
+  // Lot 13h : statut Resend (reçu ou non par la messagerie du client) à côté de « Ouvert / Pas encore ouvert »,
+  // pour ne plus confondre « pas ouvert » et « pas reçu ».
+  function livraisonHtml(liv){
+    if (!liv || !liv.code) return '';
+    const styles = { livre:['📬','#15803D'], differe:['⚠️','#B45309'], echec:['❌','#B91C1C'] };
+    const [ico, col] = styles[liv.code] || ['📤','#64748B'];
+    return `<span class="docs-livraison" data-livraison="${escapeHtml(liv.code)}" style="color:${col}">${ico} ${escapeHtml(liv.libelle || '')}${liv.raison ? ' — ' + escapeHtml(liv.raison) : ''}</span>`;
+  }
+
+  async function renvoyerDevis(btn){
+    const email = btn.dataset.email || '';
+    if (!confirm(`Renvoyer à ${email} ?`)) return;
+    const libelle = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Envoi…';
+    try {
+      const r = await fetch(`/api/devis/${encodeURIComponent(currentProspect)}/renvoyer`, {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ version: Number(btn.dataset.devisResend), auteur: (localStorage.getItem('hexa_user') || 'Anonyme') })
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok || !data.ok) throw new Error(data.detail || `erreur du serveur (${r.status})`);
+      window.showToast('✅ ' + data.message, 'success', 5000);
+      await refreshDevisList();
+    } catch (err) {
+      console.error('[renvoi devis]', err);
+      window.showToast('❌ Renvoi impossible : ' + (err instanceof TypeError ? 'connexion au serveur impossible' : err.message), 'error', 10000);
+      btn.disabled = false;
+      btn.textContent = libelle;
+    }
+  }
+
   async function refreshDevisList() {
     const root = document.getElementById('docs-devis-list');
     if (!root || !currentProspect) return;
     try {
-      const r = await fetch(`/api/devis/${encodeURIComponent(currentProspect)}/list`, { cache:'no-store' });
-      const items = r.ok ? await r.json() : [];
+      const [r, echecs] = await Promise.all([
+        fetch(`/api/devis/${encodeURIComponent(currentProspect)}/list`, { cache:'no-store' }),
+        fetch(`/api/devis/${encodeURIComponent(currentProspect)}/envois-echoues`, { cache:'no-store' })
+          .then(x => x.ok ? x.json() : []).catch(err => { console.error('[envois échoués]', err); return []; })
+      ]);
+      if (!r.ok) throw new Error(`liste des devis : erreur ${r.status}`);
+      const items = await r.json();
+      // Envois refusés par Resend : rien n'a été marqué « Envoyé », l'échec reste visible en rouge.
+      const echecsHtml = (Array.isArray(echecs) ? echecs : []).map(e => `
+        <div class="docs-devis-row docs-envoi-echoue" style="border-left:3px solid #B91C1C;padding-left:8px;">
+          <div style="color:#B91C1C;font-weight:700;">❌ Échec d'envoi — ${e.variante === 'pre_devis' ? 'Pré-devis' : 'Devis'} le ${formatParis(e.date)} à ${escapeHtml(e.email || '')}</div>
+          <div style="font-size:12px;color:#B91C1C;">${escapeHtml(e.raison || '')} — rien n'a été marqué « Envoyé ».</div>
+        </div>`).join('');
       if (!items.length) {
         const title = document.getElementById('docs-devis-title');
         if (title) title.textContent = '📋 Devis envoyés (0)';
-        root.innerHTML = '<div class="pv-muted">Aucun devis envoyé pour ce prospect</div>';
+        root.innerHTML = echecsHtml + '<div class="pv-muted">Aucun devis envoyé pour ce prospect</div>';
         return;
       }
       const title = document.getElementById('docs-devis-title');
       if (title) title.textContent = `📋 Devis envoyés (${items.length})`;
-      root.innerHTML = items.map(item => `
+      root.innerHTML = echecsHtml + items.map(item => `
         <div class="docs-devis-row">
           <div><b>${escapeHtml((item.variante === 'pre_devis' && (item.numero_devis || '').startsWith('DE')) ? ('PD' + item.numero_devis.slice(2)) : (item.numero_devis || ('v' + item.version)))}</b> — Envoyé le ${formatParis(item.sent_at)} à ${escapeHtml(item.email || '')}</div>
-          <div style="font-size:12px;font-weight:600;margin-top:2px;${item.first_opened_at ? 'color:#15803D' : 'color:#94A3B8'}">${item.first_opened_at ? `✅ Ouvert le ${formatParis(item.first_opened_at)}${(item.open_count||0) > 1 ? ` · ${item.open_count} ouvertures` : ''}` : '⏳ Pas encore ouvert'}</div>
+          <div style="font-size:12px;font-weight:600;margin-top:2px;"><span style="${item.first_opened_at ? 'color:#15803D' : 'color:#94A3B8'}">${item.first_opened_at ? `✅ Ouvert le ${formatParis(item.first_opened_at)}${(item.open_count||0) > 1 ? ` · ${item.open_count} ouvertures` : ''}` : '⏳ Pas encore ouvert'}</span> · ${livraisonHtml(item.livraison)}</div>
+          ${item.relances_suspendues ? `<div class="docs-relances-suspendues" style="font-size:12px;font-weight:700;color:#B91C1C;margin-top:2px;">⛔ Relances suspendues : adresse en échec</div>` : ''}
+          ${item.notedim_erreur ? `<div style="font-size:12px;color:#B91C1C;margin-top:2px;">❌ Note de dimensionnement non envoyée : ${escapeHtml(item.notedim_erreur)}</div>` : ''}
+          ${(Array.isArray(item.renvois) && item.renvois.length) ? `<ul class="docs-renvois" style="margin:4px 0 0;padding-left:18px;font-size:12px;">${item.renvois.map(rv => `<li>📧 ${escapeHtml(rv.libelle)} · ${livraisonHtml(rv.livraison)}${rv.notedim_erreur ? ` · <span style="color:#B91C1C">note de dim non envoyée : ${escapeHtml(rv.notedim_erreur)}</span>` : ''}</li>`).join('')}</ul>` : ''}
           ${(Array.isArray(item.relances) && item.relances.length) ? `<details class="docs-relances">
             <summary>${item.variante === 'pre_devis' ? 'Pré-devis' : 'Devis'} : ${item.relances.length} relance${item.relances.length > 1 ? 's' : ''}</summary>
             <ul class="docs-relances-list">${item.relances.map(r => `<li>Relance ${escapeHtml(r.niveau)} — ${formatParis(r.sent_at)}</li>`).join('')}</ul>
@@ -10688,7 +10741,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
           <div class="docs-devis-actions">
             <button type="button" class="hexa-meta-card-action" data-devis-preview="${item.version}">👁 Aperçu</button>
             <button type="button" class="hexa-meta-card-action" data-devis-download="${item.version}">📥 Télécharger</button>
-            <button type="button" class="hexa-meta-card-action" data-devis-resend="${item.version}">📧 Renvoyer</button>
+            <button type="button" class="hexa-meta-card-action" data-devis-resend="${item.version}" data-email="${escapeHtml(item.email || '')}">📧 Renvoyer</button>
           </div>
           ${item.has_notedim ? `<div class="docs-notedim-row"><span class="docs-notedim-label">Note de dim définitive (envoyée avec le devis ${escapeHtml(item.numero_devis || '')})</span><button type="button" class="hexa-meta-card-action" data-notedim-preview="${item.version}" data-numero-devis="${escapeHtml(item.numero_devis || '')}">👁 Aperçu</button><button type="button" class="hexa-meta-card-action" data-notedim-download="${item.version}">📥 Télécharger</button></div>` : ''}
         </div>`).join('');
@@ -10762,7 +10815,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
         btn.addEventListener('click', () => window.open(`/api/devis/${encodeURIComponent(currentProspect)}/download?version=${encodeURIComponent(btn.dataset.devisDownload)}`, '_blank'));
       });
       root.querySelectorAll('[data-devis-resend]').forEach(btn => {
-        btn.addEventListener('click', () => window.ouvrirSimulationsDrawer?.(currentProspect));
+        btn.addEventListener('click', () => renvoyerDevis(btn));
       });
       root.querySelectorAll('[data-notedim-preview]').forEach(btn => {
         btn.addEventListener('click', () => openNotedimPdfViewer(btn.dataset.notedimPreview, btn.dataset.numeroDevis));
@@ -10770,8 +10823,9 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
       root.querySelectorAll('[data-notedim-download]').forEach(btn => {
         btn.addEventListener('click', () => window.open(`/api/notedim/${encodeURIComponent(currentProspect)}/download?version=${encodeURIComponent(btn.dataset.notedimDownload)}`, '_blank'));
       });
-    } catch (_) {
-      root.innerHTML = '<div class="pv-muted">Aucun devis envoyé pour ce prospect</div>';
+    } catch (err) {
+      console.error('[devis envoyés]', err);
+      root.innerHTML = '<div class="pv-muted" style="color:#B91C1C">Liste des devis envoyés indisponible : ' + escapeHtml(err && err.message ? err.message : 'erreur inattendue') + '. Rouvrez le panneau dans un instant.</div>';
     }
   }
 
@@ -18067,14 +18121,36 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
   }
 
   // --- Menu statut : positionnement fixed (ne déborde pas) ---
+  // Lot 13h : ouvert dans le panneau « Suivi du dossier », le menu restait prisonnier du contexte d'empilement du
+  // bandeau (z 1600), SOUS le bloc « Date de visite technique » posé par-dessus le panneau (z 1700). Pendant
+  // l'ouverture SEULEMENT il est donc rattaché à <body> (ses écouteurs le suivent), au niveau --z-popover de la carte z-index.
+  // Pas assez de place en bas : il s'ouvre vers le haut ; place insuffisante des deux côtés : il défile.
   function positionMenu(btn, menu){
-    const r=btn.getBoundingClientRect(), z=window.hexaZoom();   // r : coordonnées écran
+    if(menu.parentElement!==document.body){
+      const maison=menu.parentElement;
+      document.body.appendChild(menu);
+      // refermé (par n'importe quel chemin) : il revient à sa place, où d'autres le cherchent (clôture « Perdu » de
+      // l'accompagnateur) ; sa place a disparu (nouveau rendu) : il est supprimé
+      if(!menu._hexaRetour){
+        menu._hexaRetour=new MutationObserver(()=>{
+          if(menu.classList.contains('open') || menu.parentElement!==document.body) return;
+          if(document.contains(maison)) maison.appendChild(menu); else { menu._hexaRetour.disconnect(); menu.remove(); }
+        });
+        menu._hexaRetour.observe(menu, { attributes:true, attributeFilter:['class'] });
+      }
+    }
+    const r=btn.getBoundingClientRect(), z=window.hexaZoom(), marge=8;   // r : coordonnées écran
+    menu.style.maxHeight=''; menu.style.overflowY='';
     menu.style.left=(r.left/z)+'px';
-    menu.style.top=((r.bottom+4)/z)+'px';
     menu.style.minWidth=(r.width/z)+'px';
-    // si déborde en bas, on remonte
-    const mh=menu.offsetHeight*z;
-    if(r.bottom+4+mh > window.innerHeight){ menu.style.top=((r.top-mh-4)/z)+'px'; }
+    const mh=menu.offsetHeight*z, mw=menu.offsetWidth*z;
+    const bas=window.innerHeight-r.bottom-4-marge, haut=r.top-4-marge;
+    const versLeHaut=mh>bas && haut>bas;
+    const place=versLeHaut ? haut : bas;
+    if(mh>place){ menu.style.maxHeight=(place/z)+'px'; menu.style.overflowY='auto'; }
+    menu.style.top=(versLeHaut ? (r.top-4-Math.min(mh,place)) : (r.bottom+4))/z+'px';
+    menu.dataset.sens=versLeHaut ? 'haut' : 'bas';
+    if(r.left+mw > window.innerWidth-marge) menu.style.left=(Math.max(marge, window.innerWidth-marge-mw)/z)+'px';
   }
   document.addEventListener('click', ()=>{ document.querySelectorAll('.pv-statut-menu.open').forEach(m=>m.classList.remove('open')); });
 
@@ -18550,10 +18626,8 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     const nomBanner = nom ? nom.toUpperCase() : '';
     nomEl.textContent = (prenomBanner || nomBanner) ? ((prenomBanner || '—') + ' ' + (nomBanner || '—')) : '—';
     telEl.textContent = tel || '—';
-    // identité jamais tronquée ; seul l'email au-delà de 34 caractères, adresse complète au survol
-    const EMAIL_MAX = 34;
-    const emailCourt = email.length > EMAIL_MAX ? email.slice(0, EMAIL_MAX - 1) + '…' : email;
-    if (emailEl.textContent !== (emailCourt || '—')) emailEl.textContent = emailCourt || '—';
+    // identité jamais tronquée ; seul l'email l'est, par le CSS (« … » selon la place, Lot 13h), adresse complète au survol
+    if (emailEl.textContent !== (email || '—')) emailEl.textContent = email || '—';
     emailEl.title = email;
     const lieuEl = document.getElementById('psb-lieu');
     if (lieuEl) {
@@ -18561,6 +18635,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
       const ville = (villeSel?.value || '').trim();
       const lieu = [cp, ville].filter(Boolean).join(' ');
       if (lieuEl.textContent !== lieu) lieuEl.textContent = lieu;
+      lieuEl.title = lieu;                                   // raccourci « … » si la place manque (Lot 13h)
       lieuEl.hidden = !lieu;
     }
 
@@ -18770,6 +18845,10 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
       html += '<span class="fiche-rel-off">⏹ Aucune relance — statut « ' + escapeHtml(d.statut) + ' »</span>';
     } else if(!d.global_actif){
       html += '<span class="fiche-rel-off">⏸ Relances coupées globalement (Admin)</span>';
+    } else if(d.adresse_en_echec){                     // Lot 13h : le dernier envoi n'a pas été reçu
+      html += '<span class="fiche-rel-echec" style="color:#B91C1C;font-weight:700">⛔ Relances suspendues : adresse en échec</span>'
+            + ' <span class="fiche-rel-muted" style="color:#B91C1C">' + escapeHtml(d.adresse_en_echec.email)
+            + (d.adresse_en_echec.raison ? ' — ' + escapeHtml(d.adresse_en_echec.raison) : '') + '</span>';
     } else {
       html += '<span class="fiche-rel-on">▶ Relances actives</span>'
             + ' <button type="button" class="fiche-rel-btn" data-rel="off">⏸ Arrêter pour ce prospect</button>';
@@ -20255,7 +20334,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
         }
       });
       document.addEventListener('keydown', (e) => { if (e.key === 'Escape') fermerPanneaux(); });
-      if (actions) { barreProspect.insertBefore(j, actions); barreProspect.insertBefore(a, actions); barreProspect.insertBefore(sv, actions); barreProspect.insertBefore(fa, actions); }
+      if (actions) { [j, a, sv, fa].forEach(x => actions.parentNode.insertBefore(x, actions)); }   // dans .psb-commandes (Lot 13h)
       else { barreProspect.appendChild(j); barreProspect.appendChild(a); barreProspect.appendChild(sv); barreProspect.appendChild(fa); }
       const statvt = q('.fiche-statvt-top');
       if (statvt) q('#p-suivi-pop', sv).appendChild(statvt);
@@ -21665,7 +21744,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     const save = document.getElementById('btn-save'), bandeau = document.getElementById('prospect-sticky-bar');
     if (save && bandeau) {
       const actions = bandeau.querySelector('.psb-actions');
-      if (actions) bandeau.insertBefore(save, actions); else bandeau.appendChild(save);
+      if (actions) actions.parentNode.insertBefore(save, actions); else bandeau.appendChild(save);
       document.body.classList.add('p6-save-bandeau');
       if (typeof window.hexaSaveCtaLabel === 'function') window.hexaSaveCtaLabel(save.dataset.label || '');
     }
@@ -22093,6 +22172,25 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
   body.l5 .prospect-sticky-bar .psb-lieu { white-space: nowrap; overflow: visible; font-size: 12px; line-height: 18px; }
   body.l5 .prospect-sticky-bar .psb-lieu { font-weight: 600; color: #334155; }
   body.l5 .prospect-sticky-bar .psb-lieu[hidden] { display: none; }
+  /* Lot 13h : le bandeau reste dans son cadre à toute largeur (avant : une seule ligne qui refusait de rétrécir,
+     N / E / D / S puis Enregistrer et Rappel poussés hors du cadre et de l'écran). Ligne 1 : identité ; quand la
+     place manque, les commandes (.psb-commandes) passent ENSEMBLE en ligne 2, à droite, et se replient encore s'il
+     le faut. L'email est le seul texte raccourci (« … », adresse complète au survol), sur une seule ligne. */
+  body.l5 .prospect-shell-sticky { min-width: 0; max-width: 100%; }
+  body.l5 .prospect-sticky-bar { flex-wrap: wrap; row-gap: 6px; min-width: 0; max-width: 100%; box-sizing: border-box; }
+  /* base 390 px (et non la largeur de l'identité sur une ligne) : tant que identité + commandes tiennent côte à côte,
+     le bandeau garde sa hauteur d'une rangée (zéro défilement des étapes) */
+  body.l5 .prospect-sticky-bar .psb-identite { flex: 1 1 390px; min-width: 0; max-width: 100%; }
+  body.l5 .prospect-sticky-bar .psb-contact { display: flex; flex: 0 1 auto; min-width: 0; max-width: 100%; }
+  body.l5 .prospect-sticky-bar .psb-contact .psb-item { flex: none; }        /* téléphone et icônes : jamais comprimés */
+  body.l5 .prospect-sticky-bar .psb-contact .psb-item:has(.prospect-sticky-email) { flex: 0 1 auto; min-width: 0; }
+  body.l5 .prospect-sticky-bar .psb-contact .psb-copy { flex: none; }
+  body.l5 .prospect-sticky-bar .psb-contact .prospect-sticky-email { display: block; min-width: 3em; max-width: 34ch;
+    overflow: hidden; text-overflow: ellipsis; }
+  body.l5 .prospect-sticky-bar .psb-commandes { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end;
+    gap: 6px; margin-left: auto; min-width: 0; max-width: 100%; }
+  body.l5 .prospect-sticky-bar .psb-contact .psb-lieu { min-width: 6em; overflow: hidden; text-overflow: ellipsis; }
+  body.l5 .prospect-sticky-bar .psb-commandes .l4-jauge { margin-left: 0; }
   .prospect-sticky-bar .copy-icon.psb-copy { position: static; transform: none; padding: 0 3px; font-size: 10px; line-height: 16px; border-radius: 4px; }
   .prospect-sticky-bar .copy-icon.psb-copy:active { transform: scale(0.95); }
   /* jauge : pastille compacte, verte si tout est complet, orange sinon ; « Manque : … » dans son panneau */
