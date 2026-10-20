@@ -14723,7 +14723,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
           <div class="adm-section">Hypothèses économie d'énergie</div>
           <p class="adm-hint">Hypothèses utilisées par le calcul des économies du simulateur et du devis / pré-devis : besoin de chaleur déduit de la facture du client, facture après PAC, estimation quand aucune facture n'est connue, projection sur la durée de vie.</p>
         </div>
-        <div class="adm-subsection"><h3>Consommation par zone climatique (kWh/m²/an)</h3>
+        <div class="adm-subsection"><h3>Consommation estimée (type DPE) (kWh/m²/an)</h3>
           <label class="adm-field">Zone H1 <div class="adm-input-with-unit"><input type="number" id="adm-eco-conso-h1" value="${adminEscape(conso.h1 ?? 150)}" step="1" min="0"><span class="adm-unit">kWh/m²/an</span></div></label>
           <label class="adm-field">Zone H2 <div class="adm-input-with-unit"><input type="number" id="adm-eco-conso-h2" value="${adminEscape(conso.h2 ?? 130)}" step="1" min="0"><span class="adm-unit">kWh/m²/an</span></div></label>
           <label class="adm-field">Zone H3 <div class="adm-input-with-unit"><input type="number" id="adm-eco-conso-h3" value="${adminEscape(conso.h3 ?? 110)}" step="1" min="0"><span class="adm-unit">kWh/m²/an</span></div></label>
@@ -14732,10 +14732,10 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
           <label class="adm-field">SCOP <div class="adm-input-with-unit"><input type="number" id="adm-eco-scop" value="${adminEscape(eco.scop_defaut ?? 3.5)}" step="0.1" min="0"></div></label>
         </div>
         <div class="adm-subsection"><h3>Prix du kWh (€)</h3>
-          <label class="adm-field">Électricité <div class="adm-input-with-unit"><input type="number" id="adm-eco-prix-elec" value="${adminEscape(prix.electricite ?? 0.21)}" step="0.01" min="0"><span class="adm-unit">€</span></div></label>
-          <label class="adm-field">Gaz <div class="adm-input-with-unit"><input type="number" id="adm-eco-prix-gaz" value="${adminEscape(prix.gaz ?? 0.12)}" step="0.01" min="0"><span class="adm-unit">€</span></div></label>
-          <label class="adm-field">Fioul <div class="adm-input-with-unit"><input type="number" id="adm-eco-prix-fioul" value="${adminEscape(prix.fioul ?? 0.13)}" step="0.01" min="0"><span class="adm-unit">€</span></div></label>
-          <label class="adm-field">Bois <div class="adm-input-with-unit"><input type="number" id="adm-eco-prix-bois" value="${adminEscape(prix.bois ?? 0.07)}" step="0.01" min="0"><span class="adm-unit">€</span></div></label>
+          <label class="adm-field">Électricité <div class="adm-input-with-unit"><input type="number" id="adm-eco-prix-elec" value="${adminEscape(prix.electricite ?? 0.21)}" step="0.001" min="0.10" max="0.40"><span class="adm-unit">€/kWh</span></div></label>
+          <label class="adm-field">Gaz <div class="adm-input-with-unit"><input type="number" id="adm-eco-prix-gaz" value="${adminEscape(prix.gaz ?? 0.12)}" step="0.001" min="0.03" max="0.30"><span class="adm-unit">€/kWh</span></div></label>
+          <label class="adm-field">Fioul <div class="adm-input-with-unit"><input type="number" id="adm-eco-prix-fioul" value="${adminEscape(prix.fioul ?? 0.13)}" step="0.001" min="0.03" max="0.30"><span class="adm-unit">€/kWh</span></div></label>
+          <label class="adm-field">Bois <div class="adm-input-with-unit"><input type="number" id="adm-eco-prix-bois" value="${adminEscape(prix.bois ?? 0.07)}" step="0.001" min="0.03" max="0.30"><span class="adm-unit">€/kWh</span></div></label>
         </div>
         <div class="adm-subsection"><h3>Inflation annuelle (%)</h3>
           <label class="adm-field">Électricité <div class="adm-input-with-unit"><input type="number" id="adm-eco-infl-elec" value="${adminEscape(infl.electricite ?? 3)}" step="0.1" min="0"><span class="adm-unit">%</span></div></label>
@@ -16878,6 +16878,15 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     bindMarquesSection();
     document.getElementById('btn-save-params-eco-energie')?.addEventListener('click', async ()=>{
       const n = id => Number(String(document.getElementById(id)?.value ?? '').replace(',','.')) || 0;
+      // Lot 13k : prix du kWh dans une plage réaliste, sinon rien n'est enregistré (même contrôle côté serveur)
+      const horsPlage = [['adm-eco-prix-elec', 'Électricité', 0.10, 0.40], ['adm-eco-prix-gaz', 'Gaz', 0.03, 0.30],
+                         ['adm-eco-prix-fioul', 'Fioul', 0.03, 0.30], ['adm-eco-prix-bois', 'Bois', 0.03, 0.30]]
+        .filter(([id, , mini, maxi]) => !(n(id) >= mini && n(id) <= maxi))
+        .map(([id, nom, mini, maxi]) => `${nom} : ${String(document.getElementById(id)?.value ?? '') || 'vide'} €/kWh — attendu entre ${String(mini).replace('.', ',')} et ${String(maxi).replace('.', ',')} €/kWh`);
+      if (horsPlage.length) {
+        adminToast("❌ Prix du kWh hors plage, rien n'est enregistré. " + horsPlage.join(' ; ') + '. Saisissez le prix par kWh (pas au litre, au m³ ni à la tonne).', '#B91C1C');
+        return;
+      }
       const payload = {
         conso_zone_kwh_m2_an:{ h1:n('adm-eco-conso-h1'), h2:n('adm-eco-conso-h2'), h3:n('adm-eco-conso-h3') },
         scop_defaut:n('adm-eco-scop'),
@@ -16903,7 +16912,10 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
         if (typeof window.hexaEstimationCoutRecharger === 'function') window.hexaEstimationCoutRecharger();
         adminToast('✓ Paramètres économiques sauvegardés', '#0D6B3B');
       }
-      else adminToast("❌ Erreur lors de l'enregistrement", '#B91C1C');
+      else {
+        const err = await r.json().catch(() => ({}));
+        adminToast('❌ ' + (typeof err.detail === 'string' ? err.detail : "Erreur lors de l'enregistrement"), '#B91C1C');
+      }
     });
     document.getElementById('btn-save-params-financement')?.addEventListener('click', async ()=>{
       const n = id => Number(String(document.getElementById(id)?.value ?? '').replace(',','.')) || 0;
@@ -19381,8 +19393,9 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     const coef = num(p.coef_periode[periodeConstruction(annee)], 1.0) || 1.0;
     const rend = (num(p.rendement_pct[energie], 100) || 100) / 100;
     const px = prix(p, energie);
-    let facture = surface * conso * coef / rend * px;
-    if (ecsChaudiere) {
+    // consommation « type DPE » (kWh achetés, pertes de la chaudière incluses) : jamais divisée par le rendement
+    let facture = surface * conso * coef * px;
+    if (ecsChaudiere) {                                  // ECS : un besoin (kWh utiles) -> divisé par le rendement
       const n = num(personnes, null) || PERSONNES_DEFAUT;
       facture += n * num(p.ecs_kwh_par_personne, 800) / rend * px;
     }
