@@ -145,6 +145,34 @@ def test_installation_finie_remplace_signe(client, monkeypatch):
     assert _statut() == "installation_finie"
 
 
+def test_voir_le_devis_premiere_ouverture_d_une_fiche_nouveau_pre_devis(client):
+    _semer("")
+    r = client.post(f"/api/leads/{NUM}/premier-apercu-devis").json()
+    assert r == {"ok": True, "premiere": True, "statut_change": True}
+    assert _statut() == "pre_devis" and NOTE.match(_notes_statut()[0]).group(1) == "Pré-devis"
+
+
+def test_voir_le_devis_ouvertures_suivantes_ne_changent_rien(client):
+    _semer("")
+    client.post(f"/api/leads/{NUM}/premier-apercu-devis")
+    client.post(f"/api/leads/{NUM}/status", json={"statut": "nouveau"})      # remis à la main
+    assert client.post(f"/api/leads/{NUM}/premier-apercu-devis").json()["statut_change"] is False
+    assert _statut() == "nouveau" and len(_notes_statut()) == 1
+
+
+@pytest.mark.parametrize("statut", ["contacte", "rappeler", "pre_devis_envoye", "signe", "perdu"])
+def test_voir_le_devis_seulement_si_nouveau(client, statut):
+    _semer(statut)
+    assert client.post(f"/api/leads/{NUM}/premier-apercu-devis").json()["statut_change"] is False
+    assert _statut() == statut and _notes_statut() == []
+
+
+def test_a_determiner_hors_schema(client):
+    _semer("pre_devis_envoye")
+    client.post(f"/api/leads/{NUM}", data={"date_visite_technique": "À déterminer", "date_visite_technique_date": ""})
+    assert _statut() == "pre_devis_envoye"
+
+
 # ---------- règles ----------
 
 @pytest.mark.parametrize("protege", ["signe", "perdu", "rappeler"])

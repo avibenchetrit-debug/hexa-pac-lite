@@ -183,7 +183,9 @@ derrière la connexion ; `/api/...` répond 401 même pour une route inexistante
 - **Lot 13i (statut automatique)** : `_avancer_statut(numero, cible)` (rang `RANG_STATUT_AUTO`, vers l'avant seulement ;
   `STATUTS_MANUELS_PROTEGES` Signé / Perdu / À rappeler jamais écrasés, sauf Signé -> Installation finie ; note « Statut →
   … , automatique, le JJ/MM à HHhMM », auteur « Automatique »). Appelé par : envoi initial accepté par Resend
-  (pré-devis / devis envoyé), date de VT saisie ou modifiée à l'enregistrement (Envoyé en VT), « Valider la VT » (VT
+  (pré-devis / devis envoyé), 1re ouverture de « Voir le devis » d'une fiche en « Nouveau » (Pré-devis ;
+  `POST /api/leads/{n}/premier-apercu-devis`, marque `premier_apercu_devis_at` ; le PDF ne change rien), date de VT
+  saisie ou modifiée à l'enregistrement (Envoyé en VT ; « À déterminer » hors schéma), « Valider la VT » (VT
   validé), facture générée (Installation finie). Renvoi, relances, envoi refusé : jamais. Enregistrer une fiche
   EXISTANTE n'écrit plus son statut (`_upsert_lead` retire `statut`) : le champ caché portait celui lu à l'ouverture et
   remettait en arrière un statut avancé entre-temps (bug depuis le 03/07, 4b97de1 ; LEVESQUE 19/10). Statut manuel :

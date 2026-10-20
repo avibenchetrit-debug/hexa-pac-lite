@@ -6788,6 +6788,24 @@ async def set_lead_relances(numero: str, request: Request) -> JSONResponse:
                          "sequences": _sequences_relances(leads[index])})
 
 
+@app.post("/api/leads/{numero}/premier-apercu-devis")
+def premier_apercu_devis(numero: str) -> JSONResponse:
+    """Lot 13i — « Voir le devis » : à la PREMIÈRE ouverture seulement (marque `premier_apercu_devis_at`), une fiche en
+    « Nouveau » passe en « Pré-devis ». Le bouton PDF et les ouvertures suivantes ne changent rien."""
+    with _statut_auto_lock:
+        leads = _read_leads()
+        idx = _find_lead_index(leads, numero)
+        if idx is None:
+            raise HTTPException(status_code=404, detail="Prospect introuvable")
+        if leads[idx].get("premier_apercu_devis_at"):
+            return JSONResponse({"ok": True, "premiere": False, "statut_change": False})
+        leads[idx]["premier_apercu_devis_at"] = _now_paris_iso()
+        en_nouveau = _normalize_statut(leads[idx].get("statut", "")) in ("", "nouveau")
+        _atomic_write_json(LEADS_PATH, leads)
+    change = en_nouveau and _avancer_statut(numero, "pre_devis")
+    return JSONResponse({"ok": True, "premiere": True, "statut_change": change})
+
+
 @app.get("/api/relances/a-faire")
 def get_relances_a_faire() -> JSONResponse:
     today = datetime.now(PARIS_TZ).date()
