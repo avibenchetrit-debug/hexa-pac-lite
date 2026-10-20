@@ -1486,6 +1486,10 @@ def _upsert_lead(payload: dict, forced_numero: str | None = None) -> tuple[dict,
         existing = {"numero": numero, "date": now}
     elif index is not None:
         _refuser_si_fige(numero, existing)            # Lot 6c : fiche en lecture seule
+        # Lot 13i : une fiche EXISTANTE n'écrit jamais son statut en s'enregistrant. Le formulaire porte celui lu à
+        # l'ouverture : enregistrer après un envoi (statut avancé par le serveur entre-temps) le remettait en arrière.
+        # Le statut change par la pilule (POST /api/leads/{n}/status) ou automatiquement (_avancer_statut).
+        payload = {k: v for k, v in payload.items() if k != "statut"}
 
     merged = dict(existing)
     merged.update(payload)
@@ -1503,6 +1507,11 @@ def _upsert_lead(payload: dict, forced_numero: str | None = None) -> tuple[dict,
     _atomic_write_json(LEADS_PATH, leads)
     if created:
         _init_choix_demarrage(numero)
+    # Lot 13i : date de visite technique saisie (nouvelle ou modifiée) -> « Envoyé en VT »
+    date_vt = str(merged.get("date_visite_technique_date") or "").strip()
+    if date_vt and date_vt != str(existing.get("date_visite_technique_date") or "").strip():
+        if _avancer_statut(numero, "vt_envoye"):
+            merged = _find_lead(numero) or merged
     return merged, created
 
 
@@ -1718,6 +1727,49 @@ DETECT_JAMAIS_CONTACTE_MAX_J = 30
 # aucune détection. "injoignable" n'en fait PAS partie : c'est précisément
 # l'état que la séquence de relance NRP cherche à débloquer.
 STATUTS_TERMINAUX = {"signe", "perdu", "vt_refuse", "installation_finie"}
+
+# Lot 13i — statut qui avance tout seul avec les actions de la fiche (envoi accepté par Resend, VT, facture).
+# Rang dans le parcours : un changement automatique ne va que vers un rang plus élevé. Absent = 0 (nouveau, contacté…).
+RANG_STATUT_AUTO = {"pre_devis": 1, "pre_devis_envoye": 2, "vt_envoye": 3, "vt_valide": 4, "vt_refuse": 4, "devis": 4,
+                    "devis_envoye": 5, "installation_finie": 6}
+# Posés à la main, jamais écrasés par une action automatique (sauf « Installation finie » qui remplace « Signé »)
+STATUTS_MANUELS_PROTEGES = {"signe", "perdu", "rappeler"}
+# Libellés de la pilule de statut (STATUTS de templates/index.html, parité testée)
+LIBELLES_STATUT = {"nouveau": "Nouveau", "rappeler": "À rappeler", "pre_devis": "Pré-devis",
+                   "pre_devis_envoye": "Pré-devis envoyé", "vt_envoye": "Envoyé en VT", "vt_valide": "VT validé",
+                   "vt_refuse": "VT refusé", "devis": "Devis", "devis_envoye": "Devis envoyé", "signe": "Signé",
+                   "installation_finie": "Installation finie", "perdu": "Perdu"}
+_statut_auto_lock = threading.Lock()
+
+
+def _statut_peut_avancer(actuel, cible: str) -> bool:
+    actuel = _normalize_statut(actuel)
+    if actuel in STATUTS_MANUELS_PROTEGES:
+        return actuel == "signe" and cible == "installation_finie"
+    return RANG_STATUT_AUTO.get(cible, 0) > RANG_STATUT_AUTO.get(actuel, 0)
+
+
+def _avancer_statut(numero: str, cible: str) -> bool:
+    """Fait avancer le statut de la fiche vers `cible` si les règles le permettent (vers l'avant seulement ; Signé,
+    Perdu, À rappeler intouchables) et l'inscrit dans l'historique. Renvoie True si le statut a changé."""
+    now = _now_paris_iso()
+    with _statut_auto_lock:
+        leads = _read_leads()
+        idx = _find_lead_index(leads, numero)
+        if idx is None or not _statut_peut_avancer(leads[idx].get("statut", ""), cible):
+            return False
+        avant = _normalize_statut(leads[idx].get("statut", "")) or "nouveau"
+        leads[idx]["statut"] = cible
+        leads[idx]["statut_updated_at"] = now
+        leads[idx]["updated_at"] = _now_iso()
+        _atomic_write_json(LEADS_PATH, leads)
+    jour = datetime.fromisoformat(now).strftime("%d/%m à %Hh%M")
+    notes = _read_notes()
+    notes.setdefault(numero, []).append({"texte": f"Statut → {LIBELLES_STATUT.get(cible, cible)}, automatique, le {jour}",
+                                         "date": now, "auteur": "Automatique"})
+    _atomic_write_json(NOTES_PATH, notes)
+    print(f"[statut] {numero} : {avant} -> {cible} (automatique)")
+    return True
 
 
 def _statut_terminal(lead) -> bool:
@@ -2734,7 +2786,7 @@ async def update_lead_vt(numero: str, request: Request) -> JSONResponse:
     """Visite technique : valide / refuse / annule la marque VT.
 
     La marque (vt_validee + vt_date) est INDEPENDANTE du statut commercial (Option 2) :
-    - valider : vt_validee=True + vt_date + statut='vt_valide'
+    - valider : vt_validee=True + vt_date + statut « VT validé » s'il peut avancer (Lot 13i : _avancer_statut)
     - refuser : statut='vt_refuse' (ne pose PAS la marque)
     - annuler : vt_validee=False + vt_date='' (ne touche PAS au statut)
     Le statut posé reste modifiable manuellement ensuite via la pilule.
@@ -2746,11 +2798,9 @@ async def update_lead_vt(numero: str, request: Request) -> JSONResponse:
     if index is None:
         raise HTTPException(status_code=404, detail="Prospect non trouvé")
     now_paris = _now_paris_iso()
-    if action == "valider":
+    if action == "valider":                          # statut : _avancer_statut plus bas (Lot 13i)
         leads[index]["vt_validee"] = True
         leads[index]["vt_date"] = now_paris
-        leads[index]["statut"] = "vt_valide"
-        leads[index]["statut_updated_at"] = now_paris
     elif action == "refuser":
         leads[index]["statut"] = "vt_refuse"
         leads[index]["statut_updated_at"] = now_paris
@@ -2761,6 +2811,8 @@ async def update_lead_vt(numero: str, request: Request) -> JSONResponse:
         raise HTTPException(status_code=400, detail="Action VT invalide")
     leads[index]["updated_at"] = _now_iso()
     _atomic_write_json(LEADS_PATH, leads)
+    if action == "valider" and _avancer_statut(numero, "vt_valide"):
+        leads[index] = _find_lead(numero) or leads[index]
     return JSONResponse({
         "success": True,
         "vt_validee": bool(leads[index].get("vt_validee", False)),
@@ -5246,13 +5298,7 @@ async def emettre_facture(numero: str, request: Request) -> JSONResponse:
         }
         meta.setdefault(numero, []).append(record)
         _atomic_write_json(FACTURES_META_PATH, meta)
-    leads = _read_leads()
-    idx = _find_lead_index(leads, numero)
-    if idx is not None:
-        leads[idx]["statut"] = "installation_finie"
-        leads[idx]["statut_updated_at"] = _now_paris_iso()
-        leads[idx]["updated_at"] = _now_iso()
-        _atomic_write_json(LEADS_PATH, leads)
+    _avancer_statut(numero, "installation_finie")     # Lot 13i : remplace aussi « Signé »
     return JSONResponse({"success": True, "numero_facture": numero_facture})
 
 
@@ -6126,9 +6172,9 @@ async def _send_devis(numero: str, payload: dict, request: Request) -> dict:
     leads = _read_leads()
     idx = _find_lead_index(leads, numero)
     if idx is not None:
-        leads[idx]["statut"] = "devis_envoye" if variante == "devis" else "pre_devis_envoye"
         leads[idx]["date_envoi_devis"] = now
         _atomic_write_json(LEADS_PATH, leads)
+    _avancer_statut(numero, "devis_envoye" if variante == "devis" else "pre_devis_envoye")   # Lot 13i
 
     notes = _read_notes()
     notes.setdefault(numero, []).append(
