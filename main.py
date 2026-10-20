@@ -620,7 +620,7 @@ def _sans_couts_modele(m):
 def _auth_is_html_page(method: str, path: str) -> bool:
     if method not in ("GET", "HEAD"):
         return False
-    if path in ("/", "/nouveau"):
+    if path in ("/", "/nouveau", "/api/admin/controle-envois"):
         return True
     if path.startswith("/prospect/"):
         rest = path[len("/prospect/"):]
@@ -6169,7 +6169,8 @@ async def _send_devis(numero: str, payload: dict, request: Request) -> dict:
 
 
 def _renvoyer_devis(numero: str, version: int, auteur: str, request: Request) -> dict:
-    """Lot 13h — renvoie le document DÉJÀ envoyé (même version archivée, même lien, même pixel, même destinataire).
+    """Lot 13h — renvoie le document DÉJÀ envoyé (même version archivée, même lien, même pixel) à l'adresse ACTUELLE de
+    la fiche (celle de l'envoi initial a pu être corrigée).
     Ne touche ni à la date d'envoi, ni au compteur ou au calendrier des relances, ni au statut du lead."""
     prospect = _find_lead(numero)
     if not prospect:
@@ -6178,9 +6179,10 @@ def _renvoyer_devis(numero: str, version: int, auteur: str, request: Request) ->
                  if isinstance(it, dict) and int(it.get("version") or 0) == int(version)), None)
     if item is None:
         raise HTTPException(status_code=404, detail="Ce document envoyé est introuvable")
-    email_to = str(item.get("email") or "").strip()
+    # adresse ENREGISTRÉE sur la fiche aujourd'hui (corrigée depuis l'envoi initial, s'il le faut)
+    email_to = str(prospect.get("email") or "").strip()
     if not email_to:
-        raise HTTPException(status_code=400, detail="Adresse de l'envoi initial introuvable")
+        raise HTTPException(status_code=400, detail="Aucun email enregistré sur la fiche")
     if not os.environ.get("RESEND_API_KEY", ""):
         raise HTTPException(status_code=400, detail="RESEND_API_KEY non configurée")
     variante = item.get("variante") or "devis"
@@ -6226,6 +6228,8 @@ def _renvoyer_devis(numero: str, version: int, auteur: str, request: Request) ->
                               "date": _now_paris_iso(), "auteur": auteur})
     _atomic_write_json(NOTES_PATH, notes)
     message = f"{_type_document(variante)} {ref} renvoyé à {email_to}"
+    if email_to.lower() != str(item.get("email") or "").strip().lower():
+        message += f" (nouvelle adresse ; premier envoi à {item.get('email')})"
     if notedim_erreur:
         message += f" — note de dimensionnement NON envoyée : {notedim_erreur}"
     return {"ok": True, "message": message, "renvoi": renvoi}
@@ -6260,11 +6264,9 @@ async def devis_envois_echoues(numero: str) -> JSONResponse:
     return JSONResponse(out)
 
 
-@app.get("/api/admin/controle-envois", response_class=HTMLResponse)
-async def controle_envois(jours: int = 30) -> HTMLResponse:
-    """Lot 13h — rattrapage : devis et pré-devis envoyés depuis `jours` jours, statut Resend relu à l'instant."""
-    jours = max(1, min(int(jours or 30), 365))
-    await run_in_threadpool(_actualiser_livraisons, None, jours, True)
+def _controle_envois_lignes(jours: int) -> list:
+    """Lot 13h — devis et pré-devis (envois et renvois) des `jours` derniers jours, du plus récent au plus ancien,
+    avec leur statut Resend (à relire juste avant par _actualiser_livraisons)."""
     leads = {str(l.get("numero") or ""): l for l in _read_leads() if isinstance(l, dict)}
     maintenant = datetime.now(PARIS_TZ)
     lignes = []
@@ -6281,18 +6283,40 @@ async def controle_envois(jours: int = 30) -> HTMLResponse:
                 lignes.append((_parse_paris_dt(entree.get("sent_at")) or dt, num, lead, ref, n, entree, liv,
                                bool(it.get("first_opened_at"))))
     lignes.sort(key=lambda x: x[0], reverse=True)
+    return [{"envoye_le": _date_heure_fr(entree.get("sent_at")), "sent_at": entree.get("sent_at") or "", "numero": num,
+             "client": f"{lead.get('nom') or ''} {lead.get('prenom') or ''}".strip(), "email": entree.get("email") or "",
+             "document": ref, "renvoi": bool(n), "livraison": liv, "ouvert": ouvert,
+             "relances_suspendues": bool(n == 0 and liv["code"] == "echec")}
+            for quand, num, lead, ref, n, entree, liv, ouvert in lignes]
+
+
+@app.get("/api/admin/controle-envois/donnees")
+async def controle_envois_donnees(jours: int = 30) -> JSONResponse:
+    """Lot 13h — Admin → « Contrôle des envois » (même session que le CRM) : statuts relus chez Resend à l'instant."""
+    jours = max(1, min(int(jours or 30), 365))
+    await run_in_threadpool(_actualiser_livraisons, None, jours, True)
+    lignes = _controle_envois_lignes(jours)
+    return JSONResponse({"jours": jours, "lignes": lignes,
+                         "a_revoir": sum(1 for x in lignes if x["livraison"]["code"] != "livre")})
+
+
+@app.get("/api/admin/controle-envois", response_class=HTMLResponse)
+async def controle_envois(jours: int = 30) -> HTMLResponse:
+    """Même contrôle en page HTML autonome (lien direct ; sans session : redirection vers /login)."""
+    jours = max(1, min(int(jours or 30), 365))
+    await run_in_threadpool(_actualiser_livraisons, None, jours, True)
+    lignes = _controle_envois_lignes(jours)
     couleurs = {"livre": "#15803D", "echec": "#B91C1C", "differe": "#B45309"}
     tr = []
-    for quand, num, lead, ref, n, entree, liv, ouvert in lignes:
-        e = html.escape
+    for x in lignes:
+        e, liv = html.escape, x["livraison"]
         tr.append(
             f"<tr style=\"{'background:#FEF2F2' if liv['code'] != 'livre' else ''}\">"
-            f"<td>{e(_date_heure_fr(entree.get('sent_at')))}</td><td>{e(num)}</td>"
-            f"<td>{e(str(lead.get('nom') or ''))} {e(str(lead.get('prenom') or ''))}</td>"
-            f"<td>{e(str(entree.get('email') or ''))}</td><td>{e(ref)}{' (renvoi)' if n else ''}</td>"
+            f"<td>{e(x['envoye_le'])}</td><td>{e(x['numero'])}</td><td>{e(x['client'])}</td>"
+            f"<td>{e(x['email'])}</td><td>{e(x['document'])}{' (renvoi)' if x['renvoi'] else ''}</td>"
             f"<td style=\"color:{couleurs.get(liv['code'], '#475569')};font-weight:700\">{e(liv['libelle'])}</td>"
-            f"<td>{e(liv['raison'])}</td><td>{'oui' if ouvert else 'non'}</td></tr>")
-    a_revoir = sum(1 for x in lignes if x[6]["code"] != "livre")
+            f"<td>{e(liv['raison'])}</td><td>{'oui' if x['ouvert'] else 'non'}</td></tr>")
+    a_revoir = sum(1 for x in lignes if x["livraison"]["code"] != "livre")
     page = (
         "<!doctype html><html lang=\"fr\"><head><meta charset=\"utf-8\"><title>Contrôle des envois</title>"
         "<style>body{font-family:Arial,sans-serif;margin:24px;color:#0F172A}table{border-collapse:collapse;font-size:14px}"
@@ -6743,6 +6767,7 @@ async def list_devis(numero: str) -> JSONResponse:
     except Exception as exc:  # noqa: BLE001 — la liste s'affiche quand même, avec le dernier statut connu
         print(f"[envoi] statuts de livraison {numero} non actualisés : {type(exc).__name__}: {exc}")
     meta = _read_devis_meta().get(numero, [])
+    email_fiche = str((_find_lead(numero) or {}).get("email") or "").strip()
     items = []
     for item in meta:
         version = int(item.get("version") or 0)
@@ -6754,6 +6779,7 @@ async def list_devis(numero: str) -> JSONResponse:
                 "variante": item.get("variante", "devis"),
                 "sent_at": item.get("sent_at", ""),
                 "email": item.get("email", ""),
+                "email_fiche": email_fiche,                # Lot 13h : « Renvoyer » part vers cette adresse
                 "file": path,
                 "has_notedim": bool(item.get("notedim_file") and os.path.exists(item.get("notedim_file"))),
                 "first_opened_at": item.get("first_opened_at") or "",

@@ -160,12 +160,14 @@ derrière la connexion ; `/api/...` répond 401 même pour une route inexistante
   (`GET api.resend.com/emails/{id}` -> `last_event`, `_actualiser_livraisons`, à l'ouverture de Documents, 10 min mini par
   e-mail, jusqu'à un état définitif ; 30 derniers jours) et affiché à côté de « Ouvert / Pas encore ouvert » (Livré / Envoi en
   cours / Différé / Échec + raison) ; un échec constaté est noté dans l'historique. « 📧 Renvoyer » (avant : ouvrait le
-  simulateur, rien ne partait) = `POST /api/devis/{n}/renvoyer` : même version archivée, même lien, même pixel, même adresse
-  que l'envoi initial (corps archivé `…_vN_email.html`, reconstruit pour les envois d'avant), note de dim pour un devis ;
+  simulateur, rien ne partait) = `POST /api/devis/{n}/renvoyer` : même version archivée, même lien, même pixel, vers l'adresse
+  ENREGISTRÉE sur la fiche (confirmation « L'adresse a changé depuis le premier envoi (ancienne → nouvelle) » ; email
+  modifié mais non enregistré : refus, « Enregistrez d'abord la fiche ») (corps archivé `…_vN_email.html`, reconstruit pour les envois d'avant), note de dim pour un devis ;
   ajouté dans `renvois` de l'envoi (date d'envoi, `relance_count`, `relances`, statut du lead : inchangés -> relances
   auto intactes), ligne « Renvoyé le JJ/MM/AAAA à HHhMM à x ». Copie de chaque envoi / renvoi à `DEVIS_COPIE_INTERNE`
   (info@hexa-renov.fr) : e-mail SÉPARÉ et SANS pixel (en BCC, l'ouverture de la copie compterait comme celle du client).
-  Rattrapage : `GET /api/admin/controle-envois?jours=30` (admin, page HTML, statuts relus à l'instant). Adresse en
+  Rattrapage : Admin → onglet « Contrôle des envois » (`GET /api/admin/controle-envois/donnees`, même session que le
+  CRM) ; page autonome `GET /api/admin/controle-envois` (sans session : redirection /login). Adresse en
   échec (bounce, refus, plainte, suppression : livraison la plus RÉCENTE connue du document, `_envoi_en_echec`) ->
   relances auto du document suspendues (`_relances_a_faire`, `_send_relance` sans consommer le niveau), « ⛔ Relances
   suspendues : adresse en échec » sur la fiche et dans Documents ; un renvoi livré ensuite les relance. Avant chaque
