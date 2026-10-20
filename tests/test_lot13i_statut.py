@@ -91,8 +91,9 @@ def resend_simule(monkeypatch):
     return etat
 
 
-def _envoyer(client, variante="pre_devis"):
-    return client.post(f"/api/devis/{NUM}/send", json={"variante": variante, "auteur": "Avi"})
+def _envoyer(client, variante="pre_devis", confirmer=False):
+    return client.post(f"/api/devis/{NUM}/send", json={"variante": variante, "auteur": "Avi",
+                                                        "confirmer_envoi_recent": confirmer})
 
 
 # ---------- une transition par test ----------
@@ -203,7 +204,8 @@ def test_renvoi_et_relance_ne_changent_pas_le_statut(client, resend_simule, monk
     _semer("")
     assert _envoyer(client).status_code == 200
     client.post(f"/api/leads/{NUM}/status", json={"statut": "nouveau"})      # remis à la main
-    assert client.post(f"/api/devis/{NUM}/renvoyer", json={"version": 1}).status_code == 200
+    # Lot 13j : renvoi moins de 24 h après l'envoi -> confirmé
+    assert client.post(f"/api/devis/{NUM}/renvoyer", json={"version": 1, "confirmer_envoi_recent": True}).status_code == 200
     monkeypatch.setattr(main, "_build_devis_context", lambda request, numero: {})
     assert main._send_relance(NUM, 1, main._SchedulerRequest("https://exemple.invalid"))["ok"] is True
     assert _statut() == "nouveau" and len(_notes_statut()) == 1
@@ -236,7 +238,7 @@ def test_garde_le_code_d_envoi_fait_toujours_avancer_le_statut(client, resend_si
     _semer("", vt_validee=True)
     for variante, attendu, libelle in (("pre_devis", "pre_devis_envoye", "Pré-devis envoyé"),
                                        ("devis", "devis_envoye", "Devis envoyé")):
-        r = _envoyer(client, variante)
+        r = _envoyer(client, variante, confirmer=True)          # Lot 13j : 2ᵉ envoi du jour -> confirmé
         assert r.status_code == 200 and r.json()["ok"], r.text
         assert _statut() == attendu, (variante, _statut())
         assert NOTE.match(_notes_statut()[-1]).group(1) == libelle
