@@ -431,3 +431,85 @@ def test_ecran_relances_suspendues_sur_la_fiche(ecran):
     texte = page.inner_text("#fiche-relances-slot") if page.is_visible("#fiche-relances-slot") else \
         page.evaluate("document.getElementById('fiche-relances-slot').textContent")
     assert "Relances suspendues : adresse en échec" in texte and LEAD["email"] in texte
+
+
+# ---------- Renvoyer : adresse ACTUELLE de la fiche ; Admin → Contrôle des envois ----------
+
+def test_renvoi_vers_l_adresse_actuelle_de_la_fiche(monkeypatch, client):
+    _semer()
+    main._atomic_write_json(main.LEADS_PATH, [dict(LEAD, email="nouvelle@example.invalid")])
+    envois = _faux_resend(monkeypatch)
+    assert client.get(f"/api/devis/{NUM}/list").json()[1]["email_fiche"] == "nouvelle@example.invalid"
+    r = client.post(f"/api/devis/{NUM}/renvoyer", json={"version": 1})
+    assert r.status_code == 200, r.text
+    assert envois[0]["to"] == ["nouvelle@example.invalid"]
+    assert r.json()["message"] == (f"Pré-devis PD2026-3535-1EM renvoyé à nouvelle@example.invalid "
+                                   f"(nouvelle adresse ; premier envoi à {LEAD['email']})")
+    assert _item(1)["email"] == LEAD["email"] and _item(1)["renvois"][0]["email"] == "nouvelle@example.invalid"
+    main._atomic_write_json(main.LEADS_PATH, [dict(LEAD, email="")])
+    assert client.post(f"/api/devis/{NUM}/renvoyer", json={"version": 1}).status_code == 400
+
+
+def test_controle_envois_donnees_pour_l_admin(monkeypatch, client):
+    _semer()
+    _faux_resend(monkeypatch)
+    monkeypatch.setattr(main, "_resend_dernier_evenement", lambda rid: {"id-initial-1": "bounced"}.get(rid, "delivered"))
+    monkeypatch.setattr(main.time, "sleep", lambda s: None)
+    d = client.get("/api/admin/controle-envois/donnees").json()
+    assert d["jours"] == 30 and d["a_revoir"] == 1
+    assert [(x["document"], x["livraison"]["code"], x["client"]) for x in d["lignes"]] == \
+        [("DE2026-3535-2EM", "livre", "Essai Marcel"), ("PD2026-3535-1EM", "echec", "Essai Marcel")]
+
+
+def test_lien_direct_sans_session_renvoie_a_la_connexion(monkeypatch, client):
+    monkeypatch.setenv("AUTH_ENFORCE", "1")
+    r = client.get("/api/admin/controle-envois", follow_redirects=False)
+    assert r.status_code == 302 and r.headers["location"] == "/login"
+    assert client.get("/api/admin/controle-envois/donnees").status_code == 401
+
+
+def test_ecran_renvoi_annonce_le_changement_d_adresse(ecran):
+    page, envois = ecran
+    main._atomic_write_json(main.LEADS_PATH, [dict(LEAD, email="nouvelle@example.invalid")])
+    page.reload()
+    page.wait_for_function("document.body.dataset.prospectNumero === %r" % NUM)
+    page.wait_for_function("(document.querySelector('[name=email]') || {}).value === 'nouvelle@example.invalid'")
+    page.evaluate("n => window.ouvrirDocuments(n)", NUM)
+    page.wait_for_selector("#docs-devis-list [data-devis-resend]", state="attached")
+    if page.is_hidden("#docs-devis-list [data-devis-resend]"):
+        page.click("#docs-devis-title")
+    dialogues = []
+    page.once("dialog", lambda d: (dialogues.append(d.message), d.accept()))
+    page.locator("#docs-devis-list [data-devis-resend]").nth(1).click()
+    page.wait_for_selector(".hexa-toast-success")
+    assert dialogues == [f"L'adresse a changé depuis le premier envoi ({LEAD['email']} → nouvelle@example.invalid).\n"
+                         "Renvoyer à nouvelle@example.invalid ?"]
+    assert envois[0]["to"] == ["nouvelle@example.invalid"]
+
+
+def test_ecran_email_modifie_non_enregistre_rien_ne_part(ecran):
+    page, envois = ecran
+    page.evaluate("() => { const e = document.querySelector('[name=email]'); e.value = 'pas.enregistree@example.invalid'; }")
+    dialogues = []
+    page.on("dialog", lambda d: (dialogues.append(d.message), d.dismiss()))
+    page.locator("#docs-devis-list [data-devis-resend]").first.click()
+    page.wait_for_selector(".hexa-toast-error")
+    assert "Enregistrez d'abord la fiche" in page.inner_text(".hexa-toast-error")
+    assert dialogues == [] and envois == []
+
+
+def test_ecran_admin_onglet_controle_des_envois(ecran, monkeypatch):
+    page, _ = ecran
+    monkeypatch.setattr(main, "_resend_dernier_evenement", lambda rid: {"id-initial-1": "bounced"}.get(rid, "delivered"))
+    monkeypatch.setattr(main.time, "sleep", lambda s: None)
+    p = f"admin:{int(time.time())}"
+    jeton = f"{p}.{main._sign_admin_token(p)}"
+    page.goto(page.url.split("/prospect/")[0] + "/")                     # Admin ouvert depuis l'accueil
+    page.wait_for_function("window.HexaAdmin && typeof window.HexaAdmin.open === 'function'")
+    page.evaluate("t => localStorage.setItem('hexa_admin_unlocked', JSON.stringify({ token: t, unlocked_at: Date.now() }))", jeton)
+    page.evaluate("window.HexaAdmin.open()")
+    page.click(".adm-roottab[data-roottab=envois]")
+    page.wait_for_selector(".adm-envois-table tbody tr")
+    texte = page.inner_text("#adm-envois-res")
+    assert "2 envoi(s)" in texte and "1 à revoir" in texte and "Échec d'envoi" in texte and "PD2026-3535-1EM" in texte
+    assert page.get_attribute(".adm-envois-table a", "href") == f"/prospect/{NUM}"

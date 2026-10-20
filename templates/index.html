@@ -10680,8 +10680,16 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
   }
 
   async function renvoyerDevis(btn){
-    const email = btn.dataset.email || '';
-    if (!confirm(`Renvoyer à ${email} ?`)) return;
+    // Lot 13h : envoi vers l'adresse ENREGISTRÉE sur la fiche (data-email-fiche), pas celle du premier envoi
+    const initiale = btn.dataset.email || '', actuelle = btn.dataset.emailFiche || '';
+    const saisie = (document.querySelector('[name="email"]')?.value || '').trim();
+    if (!actuelle) { window.showToast('❌ Aucun email enregistré sur la fiche : renseignez-le et enregistrez la fiche.', 'error', 8000); return; }
+    if (saisie && saisie.toLowerCase() !== actuelle.toLowerCase()) {
+      window.showToast(`❌ Enregistrez d'abord la fiche : l'email affiché (${saisie}) n'est pas encore enregistré.`, 'error', 10000);
+      return;
+    }
+    const change = initiale && initiale.toLowerCase() !== actuelle.toLowerCase();
+    if (!confirm((change ? `L'adresse a changé depuis le premier envoi (${initiale} → ${actuelle}).\n` : '') + `Renvoyer à ${actuelle} ?`)) return;
     const libelle = btn.textContent;
     btn.disabled = true;
     btn.textContent = 'Envoi…';
@@ -10741,7 +10749,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
           <div class="docs-devis-actions">
             <button type="button" class="hexa-meta-card-action" data-devis-preview="${item.version}">👁 Aperçu</button>
             <button type="button" class="hexa-meta-card-action" data-devis-download="${item.version}">📥 Télécharger</button>
-            <button type="button" class="hexa-meta-card-action" data-devis-resend="${item.version}" data-email="${escapeHtml(item.email || '')}">📧 Renvoyer</button>
+            <button type="button" class="hexa-meta-card-action" data-devis-resend="${item.version}" data-email="${escapeHtml(item.email || '')}" data-email-fiche="${escapeHtml(item.email_fiche || '')}">📧 Renvoyer</button>
           </div>
           ${item.has_notedim ? `<div class="docs-notedim-row"><span class="docs-notedim-label">Note de dim définitive (envoyée avec le devis ${escapeHtml(item.numero_devis || '')})</span><button type="button" class="hexa-meta-card-action" data-notedim-preview="${item.version}" data-numero-devis="${escapeHtml(item.numero_devis || '')}">👁 Aperçu</button><button type="button" class="hexa-meta-card-action" data-notedim-download="${item.version}">📥 Télécharger</button></div>` : ''}
         </div>`).join('');
@@ -15877,6 +15885,12 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
         <div class="adm-actions" style="justify-content:flex-start;gap:8px"><button type="button" class="adm-btn" data-reprise-annee="0">Voir la liste (sans rien modifier)</button>
         <button type="button" class="adm-btn adm-btn-danger" data-reprise-annee="1">Appliquer la reprise</button></div>
         <div id="adm-reprise-annee-res" class="adm-section-help"></div></div>`);
+    // Lot 13h : rattrapage des envois (statut Resend relu à l'ouverture de l'onglet), même session que le CRM
+    const admB14 = admBloc('14','14. Contrôle des envois (devis et pré-devis)', `<div class="adm-card" id="adm-envois">
+        <p class="adm-section-help">Envois et renvois des 30 derniers jours, statut de livraison relu chez Resend à l'ouverture.
+        « Ouvert » = le client a affiché l'e-mail. Les lignes rosées ne sont pas confirmées « Livré » : à revoir.</p>
+        <div class="adm-actions" style="justify-content:flex-start;gap:8px"><button type="button" class="adm-btn" id="adm-envois-actualiser">↻ Actualiser</button></div>
+        <div id="adm-envois-res" class="adm-section-help"></div></div>`);
     return `
       <div class="adm-overlay" id="adm-overlay">
         <div class="adm-modal">
@@ -15899,6 +15913,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
             <button class="adm-roottab" data-roottab="eco">Économie & Financement</button>
             <button class="adm-roottab" data-roottab="emails">Emails & Relances</button>
             <button class="adm-roottab" data-roottab="script">Script d'appel</button>
+            <button class="adm-roottab" data-roottab="envois">Contrôle des envois</button>
             <button class="adm-roottab" data-roottab="systeme">Système</button>
           </div>
           <div class="adm-body">
@@ -15911,6 +15926,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
             <div class="adm-rootpanel" data-rootpanel="eco" hidden>${admB8}</div>
             <div class="adm-rootpanel" data-rootpanel="emails" hidden>${admB6}${admB11}</div>
             <div class="adm-rootpanel" data-rootpanel="script" hidden>${admB12}</div>
+            <div class="adm-rootpanel" data-rootpanel="envois" hidden>${admB14}</div>
             <div class="adm-rootpanel" data-rootpanel="systeme" hidden>${admB10}${admB7}${admB13}</div>
           </div>
         </div>
@@ -16585,9 +16601,43 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
         this.classList.add('active');
         const panel = document.querySelector(`.adm-rootpanel[data-rootpanel="${target}"]`);
         if (panel) panel.hidden = false;
+        if (target === 'envois') {                     // bloc unique de l'onglet : déplié d'office
+          const bloc = document.querySelector('.adm-bloc[data-bloc-id="14"]');
+          if (bloc && bloc.dataset.open !== 'true') bloc.querySelector('[data-toggle-bloc]')?.click();
+          chargerControleEnvois();
+        }
       });
     });
+    document.getElementById('adm-envois-actualiser')?.addEventListener('click', chargerControleEnvois);
     bindAdminM3();
+  }
+
+  // Lot 13h : Admin → Contrôle des envois
+  async function chargerControleEnvois(){
+    const res = document.getElementById('adm-envois-res');
+    if (!res) return;
+    const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+    res.innerHTML = 'Lecture des statuts chez Resend…';
+    try {
+      const r = await fetch('/api/admin/controle-envois/donnees?jours=30', { cache:'no-store' });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.detail || ('erreur ' + r.status));
+      const couleurs = { livre:'#15803D', echec:'#B91C1C', differe:'#B45309' };
+      const lignes = Array.isArray(d.lignes) ? d.lignes : [];
+      res.innerHTML = `<p><b>${lignes.length} envoi(s)</b> depuis ${d.jours} jours ; <b style="color:${d.a_revoir ? '#B91C1C' : '#15803D'}">${d.a_revoir} à revoir</b>.</p>`
+        + (lignes.length ? `<div style="overflow-x:auto"><table class="adm-envois-table" style="border-collapse:collapse;font-size:12.5px;width:100%">
+          <thead><tr>${['Envoyé le','Fiche','Client','E-mail','Document','Statut Resend','Raison','Ouvert'].map(t => `<th style="text-align:left;padding:6px 8px;background:#002E5A;color:#fff;white-space:nowrap">${t}</th>`).join('')}</tr></thead>
+          <tbody>${lignes.map(x => `<tr style="${x.livraison.code !== 'livre' ? 'background:#FEF2F2' : ''};border-bottom:1px solid #E2E8F0">
+            <td style="padding:6px 8px;white-space:nowrap">${esc(x.envoye_le)}</td>
+            <td style="padding:6px 8px"><a href="/prospect/${encodeURIComponent(x.numero)}" target="_blank" rel="noopener">${esc(x.numero)}</a></td>
+            <td style="padding:6px 8px">${esc(x.client)}</td><td style="padding:6px 8px">${esc(x.email)}</td>
+            <td style="padding:6px 8px;white-space:nowrap">${esc(x.document)}${x.renvoi ? ' (renvoi)' : ''}</td>
+            <td style="padding:6px 8px;font-weight:700;color:${couleurs[x.livraison.code] || '#475569'}">${esc(x.livraison.libelle)}</td>
+            <td style="padding:6px 8px">${esc(x.livraison.raison)}</td><td style="padding:6px 8px">${x.ouvert ? 'oui' : 'non'}</td></tr>`).join('')}</tbody></table></div>` : '');
+    } catch (err) {
+      console.error('[contrôle des envois]', err);
+      res.innerHTML = `<span style="color:#B91C1C">Contrôle indisponible : ${esc(err instanceof TypeError ? 'connexion au serveur impossible' : err.message)}</span>`;
+    }
   }
 
   async function refreshGammesState(){
