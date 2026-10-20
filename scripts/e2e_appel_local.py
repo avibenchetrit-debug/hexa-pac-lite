@@ -26,6 +26,7 @@ resend.Emails = types.SimpleNamespace(send=lambda msg: ENVOIS.append(msg) or {"i
 sys.modules["resend"] = resend
 
 import main  # noqa: E402
+main._resend_dernier_evenement = lambda resend_id: ""   # Lot 13h : statut de livraison jamais lu chez Resend
 import uvicorn  # noqa: E402
 from playwright.sync_api import sync_playwright  # noqa: E402
 from services import dpe_audit, valeur_dvf  # noqa: E402
@@ -284,15 +285,17 @@ with sync_playwright() as p:
         pg.wait_for_function("!document.getElementById('modal-envoi-mail')", timeout=120000)
         items = pg.request.get(f"{BASE}/api/devis/{etat['n']}/list").json()
         assert items and items[0]["variante"] == "devis" and items[0]["has_notedim"], items
-        assert len(ENVOIS) == 2, len(ENVOIS)
+        # Lot 13h : devis + note de dim au client, puis copie SANS pixel à info@ (e-mail séparé)
+        assert [m["to"] for m in ENVOIS] == [["fabrique@example.invalid"]] * 2 + [["info@hexa-renov.fr"]], ENVOIS
+        assert "/o.gif" in ENVOIS[0]["html"] and "/o.gif" not in ENVOIS[2]["html"]
         pg.click("#devis-close-btn") if pg.query_selector("#devis-close-btn") else None
-        return f"devis {items[0]['numero_devis']} + note archivés ; 2 e-mails SIMULÉS (aucun envoi réel)"
+        return f"devis {items[0]['numero_devis']} + note archivés ; 2 e-mails + copie interne SIMULÉS (aucun envoi réel)"
     etape("11. Envoi (simulé)", s11)
 
     def s12():
         pg.click("#p-suivi-btn") if pg.is_hidden("#p-suivi-pop") else None
         pg.click("#fiche-statut-slot .pv-statut-btn, #fiche-statut-slot button") if pg.query_selector("#fiche-statut-slot button") else None
-        pg.click("#fiche-statut-slot .pv-statut-opt[data-k=installation_finie]")
+        pg.click(".pv-statut-menu.open .pv-statut-opt[data-k=installation_finie]")   # menu ouvert : rattaché à <body> (Lot 13h)
         pg.wait_for_function(f"fetch('/api/leads/{etat['n']}').then(r => r.json()).then(l => l.statut === 'installation_finie')", timeout=15000)
         return "statut « Installation finie »"
     etape("12. Installation finie", s12)

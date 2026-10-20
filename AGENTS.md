@@ -154,6 +154,30 @@ derrière la connexion ; `/api/...` répond 401 même pour une route inexistante
 - **Lot 13g (rappel)** : bouton « 📅 Rappel » (`#p-rappel-btn`) dans le bandeau, à côté de « Fin d'appel » : ouvre ce
   panneau sur la date (`hexaL6OuvrirRappel`). Titre « Programmer un rappel » (`#suivi-rap-titre`) ajouté dans le panneau ;
   la carte `#card-suivi` (masquée) reste : source des contrôles déplacés et garde de `bindSuiviCard()`.
+- **Lot 13h (envois contrôlés)** : devis / pré-devis envoyés par `_resend_envoyer` : refus de Resend ou absence d'identifiant
+  -> `EnvoiRefuse`, journal `[envoi] ECHEC …`, RIEN n'est marqué « Envoyé » (`devis/envois_echoues.json`, ligne rouge dans
+  Documents, `GET /api/devis/{n}/envois-echoues`). « Accepté par Resend » ≠ « reçu » : statut de livraison relu chez Resend
+  (`GET api.resend.com/emails/{id}` -> `last_event`, `_actualiser_livraisons`, à l'ouverture de Documents, 10 min mini par
+  e-mail, jusqu'à un état définitif ; 30 derniers jours) et affiché à côté de « Ouvert / Pas encore ouvert » (Livré / Envoi en
+  cours / Différé / Échec + raison) ; un échec constaté est noté dans l'historique. « 📧 Renvoyer » (avant : ouvrait le
+  simulateur, rien ne partait) = `POST /api/devis/{n}/renvoyer` : même version archivée, même lien, même pixel, même adresse
+  que l'envoi initial (corps archivé `…_vN_email.html`, reconstruit pour les envois d'avant), note de dim pour un devis ;
+  ajouté dans `renvois` de l'envoi (date d'envoi, `relance_count`, `relances`, statut du lead : inchangés -> relances
+  auto intactes), ligne « Renvoyé le JJ/MM/AAAA à HHhMM à x ». Copie de chaque envoi / renvoi à `DEVIS_COPIE_INTERNE`
+  (info@hexa-renov.fr) : e-mail SÉPARÉ et SANS pixel (en BCC, l'ouverture de la copie compterait comme celle du client).
+  Rattrapage : `GET /api/admin/controle-envois?jours=30` (admin, page HTML, statuts relus à l'instant). Adresse en
+  échec (bounce, refus, plainte, suppression : livraison la plus RÉCENTE connue du document, `_envoi_en_echec`) ->
+  relances auto du document suspendues (`_relances_a_faire`, `_send_relance` sans consommer le niveau), « ⛔ Relances
+  suspendues : adresse en échec » sur la fiche et dans Documents ; un renvoi livré ensuite les relance. Avant chaque
+  passage, le statut des documents à relancer est relu chez Resend, quel que soit leur âge. Relances : objet
+  « Votre {type_document} Hexa Rénov' — {prenom} ({numero}) », `{numero}` = référence IMPRIMÉE (PD… pour un pré-devis,
+  `_numero_imprime`), prénom brut (plus de double échappement) ; ancien objet par défaut remplacé par `_migrate_lot13h`.
+  Affichage : le menu Statut (`positionMenu`) est rattaché à `<body>` PENDANT l'ouverture seulement (il passait sous le
+  bloc « Date de visite technique », `#l4-bloc-5` z 1700, prisonnier du bandeau z 1600), niveau `--z-popover` (2600 : au-
+  dessus des vues 2000, sous les modales ≥ 3000), vers le haut si la place manque, défilant si elle manque des deux côtés ;
+  refermé, il revient dans `#fiche-statut-slot` (la clôture « Perdu » l'y cherche). Bandeau de la fiche : commandes
+  regroupées dans `.psb-commandes` (insertions via `actions.parentNode`), une rangée tant qu'elles tiennent (identité base
+  390 px), sinon 2e ligne ; email (et ville) raccourcis par le CSS « … », adresse complète au survol.
 - Clés DocuSeal / Resend : seulement sur Railway. En local, l'envoi réel est impossible (le script de bout en bout le simule).
 
 ### Tests
