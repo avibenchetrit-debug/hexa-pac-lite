@@ -1116,6 +1116,22 @@ def _migrate_lot13h() -> bool:
     return change
 
 
+def _migrate_sources_compleo() -> int:
+    """Au démarrage, idempotent : provenance « Compleo » (et toute variante de casse, d'accent ou d'espaces) -> « Compléo »,
+    l'orthographe du menu de la fiche. Corbeille comprise. Renvoie le nombre de fiches corrigées."""
+    leads = _read_leads()
+    n = 0
+    for lead in leads:
+        valeur = lead.get("source")
+        if isinstance(valeur, str) and valeur != "Compléo" and _norm(valeur) == "compleo":
+            lead["source"] = "Compléo"
+            n += 1
+    if n:
+        _atomic_write_json(LEADS_PATH, leads)
+        print(f"[sources] {n} fiche(s) « Compleo » -> « Compléo »")
+    return n
+
+
 def _migrate_lot10c() -> list:
     """Lot 10c, au démarrage, idempotent : groupes extérieurs des Ariston DUO (poids, dimensions) corrigés d'après la doc
     Ariston « Doc Pro Nimbus Plus Net R32 » (services/import_catalogue_pac.CORRECTIONS_ARISTON_DUO). Rend les réf. corrigées."""
@@ -2131,6 +2147,7 @@ async def startup_event():
     _migrate_lot10c()
     _migrate_lot11b()
     _migrate_lot13h()
+    _migrate_sources_compleo()
     _admin_password()
     start_backup_scheduler(DATA_DIR)
     start_relances_scheduler()
