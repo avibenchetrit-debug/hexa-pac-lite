@@ -4934,6 +4934,11 @@ input:focus{ outline:none; border-color: var(--c-navy,#002E5A); box-shadow:0 0 0
 .rel-switch-box.is-off .rel-switch-texte b{ color:#7F1D1D; }
 .rel-switch-texte span{ font-size:11.5px; color:#4B5563; }
 .rel-switch:focus-within .rel-switch-track{ outline:2px solid #002E5A; outline-offset:2px; }
+/* Relances par source (Admin) : une case par source, décochée = aucune relance de cette famille */
+.rel-sources-bloc{ margin:10px 0; }
+.rel-sources{ display:flex; flex-wrap:wrap; gap:6px 16px; margin-top:6px; }
+.rel-source{ display:inline-flex; align-items:center; gap:6px; font-size:13px; color:#1F2937; cursor:pointer; }
+.rel-source span{ color:#94A3B8; font-size:12px; }
 /* Bloc relances de la fiche prospect */
 .fiche-rel-row{ display:flex; align-items:flex-start; gap:10px; margin:2px 0 12px; flex-wrap:wrap; }
 .fiche-rel-seqs{ display:flex; flex-direction:column; gap:3px; }
@@ -14629,11 +14634,13 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
       <div style="margin:10px 0"><b style="font-size:13px">Message — devis NON ouvert</b><input type="text" id="rel-dev-no-sujet" placeholder="Sujet" style="width:100%;margin:4px 0;box-sizing:border-box"><textarea id="rel-dev-no-contenu" rows="6" style="width:100%;box-sizing:border-box"></textarea></div>
       <div style="margin:10px 0"><b style="font-size:13px">Message — devis OUVERT</b><input type="text" id="rel-dev-ou-sujet" placeholder="Sujet" style="width:100%;margin:4px 0;box-sizing:border-box"><textarea id="rel-dev-ou-contenu" rows="6" style="width:100%;box-sizing:border-box"></textarea></div>
       <div style="font-size:11px;color:#64748B;background:#F8FAFC;border-radius:6px;padding:6px 10px">Placeholders : <code>{prenom}</code> <code>{numero}</code> <code>{modele_pac}</code> <code>{reste_a_charge}</code> <code>{type_document}</code></div>
+      <div class="rel-sources-bloc"><b style="font-size:13px">Sources relancées</b> <span class="adm-hint-inline">— source décochée : aucune relance devis / pré-devis pour ses prospects, ni automatique ni manuelle</span><div class="rel-sources" id="rel-dev-sources"><span class="adm-hint-inline">Chargement…</span></div></div>
       <h4 style="margin:18px 0 6px;color:#002E5A;font-size:14px">Relances NRP (prospect pas joignable)</h4>
       <div class="adm-field adm-field-row"><span class="adm-lab">Nombre max de relances <span class="adm-hint-inline">0 = aucune relance NRP</span></span><input type="number" id="rel-nrp-max" min="0" max="12" style="width:70px"></div>
       <div class="adm-field adm-field-row"><span class="adm-lab">Délais (jours depuis le dernier appel)</span><input type="text" id="rel-nrp-niveaux" placeholder="1,3,7" style="width:240px"></div>
       <div style="margin:10px 0"><b style="font-size:13px">Message NRP</b><input type="text" id="rel-nrp-sujet" placeholder="Sujet" style="width:100%;margin:4px 0;box-sizing:border-box"><textarea id="rel-nrp-contenu" rows="6" style="width:100%;box-sizing:border-box"></textarea></div>
       <div style="font-size:11px;color:#64748B;background:#F8FAFC;border-radius:6px;padding:6px 10px">Placeholders : <code>{prenom}</code></div>
+      <div class="rel-sources-bloc"><b style="font-size:13px">Sources relancées</b> <span class="adm-hint-inline">— source décochée : aucune relance NRP pour ses prospects, ni automatique ni manuelle</span><div class="rel-sources" id="rel-nrp-sources"><span class="adm-hint-inline">Chargement…</span></div></div>
       <div class="adm-actions"><button type="button" class="adm-btn-save" id="rel-save">Enregistrer les relances</button></div>`;
   }
   async function loadRelancesSection(){
@@ -14657,9 +14664,26 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
       set('rel-nrp-niveaux', (nrp.niveaux_jours||[]).join(','));
       const nm = nrp.message||{};
       set('rel-nrp-sujet', nm.sujet); set('rel-nrp-contenu', nm.contenu);
+      remplirSourcesRelances('rel-dev-sources', dev.sources, dev.sources_desactivees);
+      remplirSourcesRelances('rel-nrp-sources', dev.sources, nrp.sources_desactivees);
       const cb = g('rel-actif');
       if(cb && !cb.dataset.bound){ cb.dataset.bound='1'; cb.addEventListener('change', majSwitchRelances); }
     } catch(_){}
+  }
+  /** Une case par source, cochée sauf si décochée en base. Une source décochée qui n'a plus de prospect reste affichée. */
+  function remplirSourcesRelances(id, sources, desactivees){
+    const box = document.getElementById(id);
+    if(!box || !Array.isArray(sources)) return;
+    const off = new Set(Array.isArray(desactivees) ? desactivees : []);
+    const liste = sources.slice();
+    off.forEach(cle => { if(!liste.some(s => s.cle === cle)) liste.splice(liste.length - 1, 0, { cle, libelle: cle, prospects: 0 }); });
+    box.innerHTML = liste.map(s => `<label class="rel-source"><input type="checkbox" data-cle="${adminEscape(s.cle)}"${off.has(s.cle) ? '' : ' checked'}> ${adminEscape(s.libelle)} <span>(${adminEscape(s.prospects)})</span></label>`).join('');
+  }
+  /** Clés des sources décochées ; null si la liste n'a pas pu être chargée (le réglage en base reste alors intact). */
+  function sourcesDecochees(id){
+    const cases = document.querySelectorAll('#' + id + ' input[data-cle]');
+    if(!cases.length) return null;
+    return Array.from(cases).filter(c => !c.checked).map(c => c.dataset.cle);
   }
   /** parseInt qui accepte 0 : parseInt(x)||N renvoyait N quand l'utilisateur saisissait 0. */
   function entierOuDefaut(valeur, defaut){
@@ -14699,6 +14723,9 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
         niveaux_jours: parseNiv(g('rel-nrp-niveaux').value),
         message: { sujet: g('rel-nrp-sujet').value, contenu: g('rel-nrp-contenu').value },
       };
+      const devOff = sourcesDecochees('rel-dev-sources'), nrpOff = sourcesDecochees('rel-nrp-sources');
+      if(devOff) devPayload.sources_desactivees = devOff;
+      if(nrpOff) nrpPayload.sources_desactivees = nrpOff;
       const r1 = await fetch('/api/admin/relances', { method:'POST', headers: window.adminHeaders(), body: JSON.stringify(devPayload) });
       const r2 = await fetch('/api/admin/relances-nrp', { method:'POST', headers: window.adminHeaders(), body: JSON.stringify(nrpPayload) });
       if(!r1.ok || !r2.ok) throw new Error('Échec sauvegarde');

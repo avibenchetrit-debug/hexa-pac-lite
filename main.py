@@ -15,6 +15,7 @@ import time
 import urllib.parse
 import urllib.request
 import unicodedata
+from collections import Counter
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
@@ -1116,6 +1117,22 @@ def _migrate_lot13h() -> bool:
     return change
 
 
+def _migrate_sources_compleo() -> int:
+    """Au démarrage, idempotent : provenance « Compleo » (et toute variante de casse, d'accent ou d'espaces) -> « Compléo »,
+    l'orthographe du menu de la fiche. Corbeille comprise. Renvoie le nombre de fiches corrigées."""
+    leads = _read_leads()
+    n = 0
+    for lead in leads:
+        valeur = lead.get("source")
+        if isinstance(valeur, str) and valeur != "Compléo" and _norm(valeur) == "compleo":
+            lead["source"] = "Compléo"
+            n += 1
+    if n:
+        _atomic_write_json(LEADS_PATH, leads)
+        print(f"[sources] {n} fiche(s) « Compleo » -> « Compléo »")
+    return n
+
+
 def _migrate_lot10c() -> list:
     """Lot 10c, au démarrage, idempotent : groupes extérieurs des Ariston DUO (poids, dimensions) corrigés d'après la doc
     Ariston « Doc Pro Nimbus Plus Net R32 » (services/import_catalogue_pac.CORRECTIONS_ARISTON_DUO). Rend les réf. corrigées."""
@@ -1794,6 +1811,44 @@ def _relances_possibles(lead) -> bool:
             and not _statut_terminal(lead))
 
 
+# Relances par source (Admin → Relances) : on enregistre les sources DÉCOCHÉES, par famille ("relances" = devis /
+# pré-devis, "relances_nrp"), sous leur forme normalisée -> une source nouvelle est relancée d'office.
+CLE_SANS_SOURCE = "__sans_source__"
+MOTIF_SOURCE_DESACTIVEE = "relances désactivées pour cette source"
+
+
+def _cle_source(valeur) -> str:
+    return _norm(valeur or "") or CLE_SANS_SOURCE
+
+
+def _nettoyer_sources_desactivees(valeurs) -> list:
+    out = []
+    for v in valeurs if isinstance(valeurs, list) else []:
+        cle = CLE_SANS_SOURCE if v == CLE_SANS_SOURCE else _norm(v or "")
+        if cle and cle not in out:
+            out.append(cle)
+    return out
+
+
+def _source_relancee(lead, famille: str) -> bool:
+    """False si la source du lead est décochée pour cette famille de relances. Absent = tout coché."""
+    cfg = load_parametres_admin().get(famille)
+    desactivees = _nettoyer_sources_desactivees((cfg or {}).get("sources_desactivees"))
+    return _cle_source((lead or {}).get("source")) not in desactivees
+
+
+def _sources_connues() -> list:
+    """Sources proposées dans l'Admin : celles des fiches (hors corbeille) + le menu de la fiche + « sans source »."""
+    leads = [l for l in _read_leads() if not _is_deleted(l)]
+    orthographes = _orthographes_sources(leads)
+    comptes = Counter(_cle_source(l.get("source")) for l in leads)
+    cles = list(dict.fromkeys([_norm(v) for v in SOURCES_PROVENANCE] + sorted(c for c in comptes if c != CLE_SANS_SOURCE)))
+    out = [{"cle": c, "libelle": orthographes.get(c, c), "prospects": comptes.get(c, 0)} for c in cles]
+    out.sort(key=lambda x: (-x["prospects"], _norm(x["libelle"])))
+    out.append({"cle": CLE_SANS_SOURCE, "libelle": "Leads sans source", "prospects": comptes.get(CLE_SANS_SOURCE, 0)})
+    return out
+
+
 def _normalize_assigne(value):
     """Normalise une identité déclarative en minuscule. Tolérant : ne rejette
     jamais une valeur inconnue (cf. CONCEPTION_RAPPELS.md decision 7)."""
@@ -1911,6 +1966,23 @@ IMPORT_PROSPECT_FIELDS = [
     "nom", "prenom", "telephone", "email", "cp",
     "ville", "statut", "categorie", "source", "projet_initial",
 ]
+
+# Choix du menu « Provenance » de la fiche (templates/index.html, parité testée) : orthographe de référence
+SOURCES_PROVENANCE = ["Direct", "Call", "Régie commerciale", "Régie", "Compléo", "Meta", "Bouche à oreille",
+                      "Site web", "Salon", "Autre"]
+
+
+def _orthographes_sources(leads) -> dict:
+    """{forme normalisée (sans casse, accents ni espaces en trop) : orthographe existante}. Le menu de la fiche
+    l'emporte ; sinon l'orthographe la plus fréquente parmi les fiches (corbeille comprise)."""
+    comptes = {}
+    for lead in leads:
+        valeur = str((lead or {}).get("source") or "").strip()
+        if valeur:
+            comptes.setdefault(_norm(valeur), Counter())[valeur] += 1
+    out = {cle: c.most_common(1)[0][0] for cle, c in comptes.items()}
+    out.update({_norm(v): v for v in SOURCES_PROVENANCE})
+    return out
 
 
 def _normalize_statut(value: str) -> str:
@@ -2131,6 +2203,7 @@ async def startup_event():
     _migrate_lot10c()
     _migrate_lot11b()
     _migrate_lot13h()
+    _migrate_sources_compleo()
     _admin_password()
     start_backup_scheduler(DATA_DIR)
     start_relances_scheduler()
@@ -3478,6 +3551,7 @@ async def import_leads(file: UploadFile = File(...)) -> JSONResponse:
     notes = _read_notes()
     imported = 0
     importes = []
+    orthographes = _orthographes_sources(leads)
 
     for idx, row in df.iterrows():
         raw = {field: str(row[col]).strip() for col, field in col_map.items()}
@@ -3492,6 +3566,8 @@ async def import_leads(file: UploadFile = File(...)) -> JSONResponse:
             record["statut"] = _normalize_statut(record.get("statut"))
         if "categorie" in record:
             record["categorie"] = _normalize_categorie(record.get("categorie"))
+        if record.get("source"):                      # source déjà connue -> son orthographe, jamais une variante
+            record["source"] = orthographes.setdefault(_norm(record["source"]), record["source"])
         note_text = ""
         for col, field in col_map.items():
             if field == "notes":
@@ -4026,7 +4102,7 @@ async def save_script_appel(request: Request):
 
 @app.get("/api/admin/relances")
 async def get_relances_config():
-    return _relance_config()
+    return {**_relance_config(), "sources": _sources_connues()}
 
 
 @app.post("/api/admin/relances")
@@ -4043,6 +4119,8 @@ async def save_relances_config(request: Request):
         cfg["hour"] = int(float_value(payload.get("hour"), cfg.get("hour", 10)))
     if isinstance(payload.get("niveaux_jours"), list):
         cfg["niveaux_jours"] = [int(float_value(x, 0)) for x in payload["niveaux_jours"] if str(x).strip()]
+    if isinstance(payload.get("sources_desactivees"), list):
+        cfg["sources_desactivees"] = _nettoyer_sources_desactivees(payload["sources_desactivees"])
     if isinstance(payload.get("messages"), dict):
         msgs = dict(cfg.get("messages") or {})
         for k in ("non_ouvert", "ouvert"):
@@ -4070,6 +4148,8 @@ async def save_relances_nrp_config(request: Request):
         cfg["max"] = int(float_value(payload.get("max"), cfg.get("max", 3)))
     if isinstance(payload.get("niveaux_jours"), list):
         cfg["niveaux_jours"] = [int(float_value(x, 0)) for x in payload["niveaux_jours"] if str(x).strip()]
+    if isinstance(payload.get("sources_desactivees"), list):
+        cfg["sources_desactivees"] = _nettoyer_sources_desactivees(payload["sources_desactivees"])
     if isinstance(payload.get("message"), dict):
         cfg["message"] = {"sujet": str(payload["message"].get("sujet", "")), "contenu": str(payload["message"].get("contenu", ""))}
     params["relances_nrp"] = cfg
@@ -6565,7 +6645,8 @@ def _relance_config():
         }
     hour = int(float_value(cfg.get("hour"), int(os.environ.get("RELANCES_HOUR_PARIS", "10") or "10")))
     return {"max": maxr, "niveaux_jours": [int(float_value(x, 0)) for x in niveaux],
-            "messages": messages, "hour": hour, "actif": cfg.get("actif") is not False}
+            "messages": messages, "hour": hour, "actif": cfg.get("actif") is not False,
+            "sources_desactivees": _nettoyer_sources_desactivees(cfg.get("sources_desactivees"))}
 
 
 def _relances_a_faire(today):
@@ -6580,7 +6661,7 @@ def _relances_a_faire(today):
         numero = str(lead.get("numero") or "").strip()
         if not numero:
             continue
-        if not _relances_possibles(lead):
+        if not _relances_possibles(lead) or not _source_relancee(lead, "relances"):
             continue
         items = meta.get(numero)
         if not isinstance(items, list) or not items:
@@ -6620,6 +6701,8 @@ def _send_relance(numero: str, version: int, request: Request) -> dict:
         return {"ok": False, "skip": f"lead {_normalize_statut(prospect.get('statut', ''))}"}
     if not _relances_actives_lead(prospect):
         return {"ok": False, "skip": "relances arrêtées sur ce lead"}
+    if not _source_relancee(prospect, "relances"):
+        return {"ok": False, "skip": MOTIF_SOURCE_DESACTIVEE}
     email_to = str(prospect.get("email") or "").strip()
     if not email_to:
         raise HTTPException(status_code=400, detail="Email prospect manquant")
@@ -6723,7 +6806,8 @@ def _relance_nrp_config():
         "sujet": str(m.get("sujet") or DEFAULT_RELANCE_NRP["sujet"]),
         "contenu": str(m.get("contenu") or DEFAULT_RELANCE_NRP["contenu"]),
     }
-    return {"max": maxr, "niveaux_jours": [int(float_value(x, 0)) for x in niveaux], "message": message}
+    return {"max": maxr, "niveaux_jours": [int(float_value(x, 0)) for x in niveaux], "message": message,
+            "sources_desactivees": _nettoyer_sources_desactivees(cfg.get("sources_desactivees"))}
 
 
 def _relances_nrp_a_faire(today):
@@ -6739,7 +6823,7 @@ def _relances_nrp_a_faire(today):
         if not numero:
             continue
         statut = _normalize_statut(lead.get("statut", ""))
-        if not _relances_possibles(lead):
+        if not _relances_possibles(lead) or not _source_relancee(lead, "relances_nrp"):
             continue
         nrp_count = int(lead.get("nrp_count") or 0)
         if nrp_count < 1 and statut not in ("rappeler", "injoignable"):
@@ -6798,6 +6882,8 @@ def _send_nrp_relance(numero: str, request: Request) -> dict:
             return {"ok": False, "skip": f"lead {_normalize_statut(lead.get('statut', ''))}"}
         if not _relances_actives_lead(lead):
             return {"ok": False, "skip": "relances arrêtées sur ce lead"}
+        if not _source_relancee(lead, "relances_nrp"):
+            return {"ok": False, "skip": MOTIF_SOURCE_DESACTIVEE}
         rc = int(lead.get("nrp_relance_count") or 0)
         if rc >= maxr:
             return {"ok": False, "skip": "max atteint"}
@@ -6886,7 +6972,8 @@ def _sequences_relances(lead) -> list:
             int(it.get("relance_count") or 0),
             cfg["max"], cfg["niveaux_jours"],
             _parse_paris_dt(it.get("sent_at")),
-            "relances suspendues : adresse en échec" if _envoi_en_echec(it) else "",
+            "relances suspendues : adresse en échec" if _envoi_en_echec(it)
+            else ("" if _source_relancee(lead, "relances") else MOTIF_SOURCE_DESACTIVEE),
         ))
 
     base_nrp = _parse_paris_dt((lead or {}).get("nrp_updated_at"))
@@ -6901,6 +6988,8 @@ def _sequences_relances(lead) -> list:
             rep_dt = _parse_paris_dt(rep) if rep else None
             if rep_dt is not None and rep_dt > base_nrp:
                 motif = "le prospect a répondu depuis"
+            elif not _source_relancee(lead, "relances_nrp"):
+                motif = MOTIF_SOURCE_DESACTIVEE
         cfg_nrp = _relance_nrp_config()
         out.append(_bloc(
             "nrp", "Relance NRP", f"{int((lead or {}).get('nrp_count') or 0)} appel(s) sans réponse",
