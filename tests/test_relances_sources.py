@@ -260,3 +260,42 @@ def test_admin_liste_des_sources_et_enregistrement(client):
     _decocher(client, "devis", [])                                    # tout recocher
     assert client.get("/api/admin/relances").json()["sources_desactivees"] == []
     assert client.post("/api/admin/relances", json={"sources_desactivees": []}).status_code == 401
+
+
+# ---------- écran Admin (vrai Chromium) ----------
+
+sync_api = pytest.importorskip("playwright.sync_api")
+import test_lot9 as l9  # noqa: E402
+from test_lot9 import navigateur  # noqa: E402,F401
+from test_fix_pdf import serveur  # noqa: E402,F401
+
+
+def _cases(pg, id_):
+    return pg.evaluate("id => [...document.querySelectorAll('#' + id + ' .rel-source')].map(l => "
+                       "[l.textContent.trim(), l.querySelector('input').checked])", id_)
+
+
+def test_ecran_admin_cases_par_source_enregistrees(navigateur):
+    main._atomic_write_json(main.LEADS_PATH, [
+        _lead("PR-1", source="Data Eva"), _lead("PR-2", source="Data Eva"), _lead("PR-3", source="Compléo"),
+        _lead("PR-4", source="")])
+    main._atomic_write_json(main.PARAMETRES_ADMIN_PATH, {"relances_nrp": {"sources_desactivees": ["data"]}})
+    pg = navigateur("admin")
+    l9._admin(pg, "emails")
+    pg.click('[data-toggle-bloc="11"]')
+    pg.wait_for_selector("#rel-dev-sources .rel-source", state="visible", timeout=10000)
+    dev = _cases(pg, "rel-dev-sources")
+    assert dev[:2] == [["Data Eva (2)", True], ["Compléo (1)", True]] and dev[-1] == ["Leads sans source (1)", True]
+    assert all(coche for _, coche in dev)                               # par défaut : tout coché
+    nrp = dict(_cases(pg, "rel-nrp-sources"))
+    assert nrp["data (0)"] is False and nrp["Data Eva (2)"] is True     # décochée sans prospect : toujours affichée
+    pg.locator("#rel-dev-sources .rel-source", has_text="Data Eva").locator("input").uncheck()
+    pg.locator("#rel-nrp-sources .rel-source", has_text="Leads sans source").locator("input").uncheck()
+    with pg.expect_response(lambda r: r.url.endswith("/api/admin/relances-nrp") and r.request.method == "POST"):
+        pg.click("#rel-save")
+    pg.wait_for_selector("text=Relances enregistrées ✓", timeout=10000)   # confirmation à l'écran
+    params = main.load_parametres_admin()
+    assert params["relances"]["sources_desactivees"] == ["data eva"]
+    assert params["relances_nrp"]["sources_desactivees"] == ["data", main.CLE_SANS_SOURCE]
+    pg.locator("#rel-dev-sources").scroll_into_view_if_needed()
+    pg.screenshot(path=os.path.join(main.DATA_DIR, "admin_relances_sources.png"), full_page=False)
