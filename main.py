@@ -15,6 +15,7 @@ import time
 import urllib.parse
 import urllib.request
 import unicodedata
+from collections import Counter
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
@@ -1928,6 +1929,23 @@ IMPORT_PROSPECT_FIELDS = [
     "ville", "statut", "categorie", "source", "projet_initial",
 ]
 
+# Choix du menu « Provenance » de la fiche (templates/index.html, parité testée) : orthographe de référence
+SOURCES_PROVENANCE = ["Direct", "Call", "Régie commerciale", "Régie", "Compléo", "Meta", "Bouche à oreille",
+                      "Site web", "Salon", "Autre"]
+
+
+def _orthographes_sources(leads) -> dict:
+    """{forme normalisée (sans casse, accents ni espaces en trop) : orthographe existante}. Le menu de la fiche
+    l'emporte ; sinon l'orthographe la plus fréquente parmi les fiches (corbeille comprise)."""
+    comptes = {}
+    for lead in leads:
+        valeur = str((lead or {}).get("source") or "").strip()
+        if valeur:
+            comptes.setdefault(_norm(valeur), Counter())[valeur] += 1
+    out = {cle: c.most_common(1)[0][0] for cle, c in comptes.items()}
+    out.update({_norm(v): v for v in SOURCES_PROVENANCE})
+    return out
+
 
 def _normalize_statut(value: str) -> str:
     raw = str(value or "").strip()
@@ -3495,6 +3513,7 @@ async def import_leads(file: UploadFile = File(...)) -> JSONResponse:
     notes = _read_notes()
     imported = 0
     importes = []
+    orthographes = _orthographes_sources(leads)
 
     for idx, row in df.iterrows():
         raw = {field: str(row[col]).strip() for col, field in col_map.items()}
@@ -3509,6 +3528,8 @@ async def import_leads(file: UploadFile = File(...)) -> JSONResponse:
             record["statut"] = _normalize_statut(record.get("statut"))
         if "categorie" in record:
             record["categorie"] = _normalize_categorie(record.get("categorie"))
+        if record.get("source"):                      # source déjà connue -> son orthographe, jamais une variante
+            record["source"] = orthographes.setdefault(_norm(record["source"]), record["source"])
         note_text = ""
         for col, field in col_map.items():
             if field == "notes":
