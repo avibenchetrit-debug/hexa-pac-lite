@@ -5918,11 +5918,19 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
   /* Page Marges */
   .adm-marges-mention { margin: 0 0 6px; padding: 10px 12px; border-left: 4px solid #F59E0B; background: #FFFBEB; color: #78350F; font-size: 13px; border-radius: 6px; }
   .adm-marges-params { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px 14px; margin: 10px 0; }
-  .adm-marges-table td, .adm-marges-table th { white-space: nowrap; }
-  .adm-marges .adm-table-wrap { overflow-x: auto; }
-  .adm-marges-table td:last-child, .adm-marges-table th:last-child { white-space: normal; min-width: 215px; }
-  .adm-marges-table textarea.adm-pos { width: 100% !important; min-width: 205px !important; max-width: none !important; }
-  .adm-marges-table .adm-pos { display: block; width: 240px; min-height: 38px; padding: 4px 8px; border: 1px solid #CBD5E1; border-radius: 6px; font: inherit; font-size: 12px; line-height: 1.3; resize: vertical; }
+  /* Tableau : colonnes à la largeur de leur contenu (le « table-layout: fixed » des tableaux Admin coupait la dernière
+     colonne) ; s'il ne tient pas, il défile dans son cadre, colonne « Modèle » fixe à gauche — jamais la page. */
+  .adm-marges .adm-table-wrap { overflow-x: auto; max-width: 100%; }
+  .adm-marges-table { table-layout: auto; }
+  .adm-marges-table td, .adm-marges-table th { white-space: nowrap; overflow: visible; padding-left: 5px; padding-right: 5px; }
+  .adm-marges-table th { white-space: normal; }
+  .adm-marges-table th:first-child, .adm-marges-table td:first-child { position: sticky; left: 0; z-index: 1; background: #fff; }
+  .adm-marges-table th:first-child { background: var(--c-navy, #002E5A); }
+  .adm-marges-table tr.adm-grp td:first-child { position: static; background: inherit; }
+  .adm-marges-table td:last-child, .adm-marges-table th:last-child { white-space: normal; width: 19%; min-width: 150px; }
+  /* le texte de positionnement passe à la ligne dans sa case, qui grandit en hauteur */
+  .adm-marges-table textarea.adm-pos { width: 100% !important; min-width: 0 !important; max-width: none !important; box-sizing: border-box; field-sizing: content; }
+  .adm-marges-table .adm-pos { display: block; min-height: 38px; padding: 4px 8px; border: 1px solid #CBD5E1; border-radius: 6px; font: inherit; font-size: 12px; line-height: 1.3; resize: vertical; overflow-wrap: anywhere; }
   .adm-marges-table .adm-neg { color: #B91C1C; }
   .adm-marges-barre { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; margin: 10px 0; }
   .adm-regie-switch { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: #334155; }
