@@ -1067,6 +1067,7 @@ def calculer_notedim(prospect, state_simulateur, catalogue_pac):
     p_pac_reco_kw = int(p_pac_w / 1000 * 10 + 0.5) / 10
     modele = find_modele(catalogue_pac, value(state_simulateur, "modele_pac_id", "modele_pac")) or select_default_modele(prospect, catalogue_pac)
     modele_kw = float_value(value(modele, "puiss_chauf", "puiss35", "puissance_kw", default=p_pac_reco_kw), p_pac_reco_kw)
+    quantite = quantite_pac(state_simulateur)
     return {
         "surface_habitable": number_fr(surface_habitable, 0),
         "surface_chauffee": number_fr(surface_chauffee, 0),
@@ -1098,8 +1099,14 @@ def calculer_notedim(prospect, state_simulateur, catalogue_pac):
         "p_pac_reco_kw": number_fr(p_pac_reco_kw, 1),
         "gamme_min": number_fr(max(p_pac_reco_kw * 0.8, 0), 1),
         "gamme_max": number_fr(p_pac_reco_kw * 1.2, 1),
-        "modele_pac": value(modele, "nom", "ref", default="—"),
-        "modele_pac_specs": f"{number_fr(modele_kw, 1)} kW · {value(modele, 'alim', default='')} · COP {value(modele, 'cop', 'scop35', default='—')}",
+        "modele_pac": value(modele, "nom", "ref", default="—") if quantite == 1
+                      else f"{quantite} × {value(modele, 'nom', 'ref', default='—')} (en cascade)",
+        # Lot 14 : 2 PAC en cascade -> puissance totale = quantité × puissance unitaire
+        "modele_pac_specs": (f"{number_fr(modele_kw, 1)} kW" if quantite == 1
+                             else f"{quantite} × {number_fr(modele_kw, 1)} kW = {number_fr(modele_kw * quantite, 1)} kW")
+                            + f" · {value(modele, 'alim', default='')} · COP {value(modele, 'cop', 'scop35', default='—')}",
+        "quantite_pac": quantite,
+        "puissance_totale_kw": modele_kw * quantite,
     }
 
 def nombre_en_lettres_euros(amount):

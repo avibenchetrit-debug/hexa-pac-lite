@@ -4722,6 +4722,8 @@ def _build_devis_context(request: Request, numero: str, version: int | None = No
         ).strip()
     formatted_calculs = format_devis_amounts(calculs)
     formatted_calculs["lot_titre"] = generer_lot_titre(modele_obj)
+    if calculs.get("quantite_pac") == 2:              # Lot 14 : 2 PAC en cascade
+        formatted_calculs["lot_titre"] += " · 2 unités en cascade"
     description_specs = modele_obj.get("description_specs", []) if modele_obj else []
     if not description_specs and modele_obj and modele_obj.get("description_technique"):
         description_specs = parse_legacy_description(modele_obj["description_technique"])
@@ -6133,7 +6135,9 @@ def _envoyer_notedim(request: Request, numero: str, prospect: dict, email_to: st
     modele_ref = state.get("modele_pac_id") or state.get("modele_pac")
     modele_obj = find_modele(catalogue, modele_ref) or select_default_modele(prospect, catalogue)
     specs = {                                         # None -> « — » dans le modèle d'e-mail
-        "modele": (modele_obj.get("nom") or modele_obj.get("ref")) if modele_obj else None,
+        "modele": (((f"{quantite_pac(state)} × " if quantite_pac(state) > 1 else "")           # Lot 14 : cascade
+                    + (modele_obj.get("nom") or modele_obj.get("ref"))
+                    + (" (en cascade)" if quantite_pac(state) > 1 else "")) if modele_obj else None),
         "etas35": devis_value(modele_obj or {}, "etas35", default=None),
         "etas55": devis_value(modele_obj or {}, "etas55", default=None),
         "surface": round(_float_value(devis_value(state, "surface_chauffee", default="") or devis_value(prospect, "surface_habitable", "surface_logement_m2", default=""), 0)) or None,

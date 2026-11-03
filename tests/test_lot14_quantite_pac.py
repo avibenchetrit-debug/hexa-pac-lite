@@ -10,6 +10,8 @@ import re
 import pytest
 from fastapi.testclient import TestClient
 
+from services.service_devis import number_fr
+
 import main
 
 FIXTURES = os.path.join(os.path.dirname(__file__), "fixtures")
@@ -191,3 +193,59 @@ def test_marge_du_dossier_1_pac_inchangee():
     m = marge_dossier({"recap_total_ht": 16205.69}, {"achat": 5682}, None, ADMIN_PROD["params"], "tout_de_suite")
     assert (m["achat"], m["pose_acc"]) == (5682, 3550)
     assert round(m["marge_brute"], 2) == 6973.69 and round(m["marge_nette"], 2) == 5247.69
+
+
+# ---------- 3. documents : titre, encadré cascade, prix unitaire, note de dimensionnement ----------
+
+PHRASE = ("Installation de 2 pompes à chaleur montées en cascade, pilotées par une régulation commune, dimensionnées "
+          "pour couvrir l'ensemble des besoins de chauffage du logement.")
+NB = " "                                                   # espaces des montants ramen\u00e9s \u00e0 une espace simple
+
+
+def _esp(texte):
+    return re.sub("[\u00a0\u202f]", " ", texte)
+
+
+@pytest.mark.parametrize("variante", ["pre_devis", "devis"])
+def test_document_2_pac(client, variante):
+    _calcul(2)
+    html = client.get(f"/api/devis/{NUM}/preview?variante={variante}").text
+    titre = re.search(r'<div class="lot-title">(.*?)</div>', html).group(1)
+    assert titre.endswith(" · 2 unités en cascade")
+    assert html.count(PHRASE) == 1 and html.count("data-cascade") == 1
+    assert html.index(PHRASE) > html.index('<div class="lot-title">') and html.index(PHRASE) < html.index(">Fourniture<")
+    fourniture = _esp(re.search(r'<span class="sub-line-name">Fourniture</span>(.*?)</div>', html).group(1))
+    assert f'sub-line-qt">2 u.<' in fourniture
+    assert f'sub-line-pu">10{NB}185,69 €<' in fourniture and f'sub-line-total">21{NB}491,80 €<' in fourniture
+    assert html.count('<div class="pac-desc-title">') == 1                       # le modèle n'est décrit qu'une fois
+
+
+def test_document_2_pac_travaux_induits_x2(client):
+    _calcul(2, travaux_induits=2)
+    html = client.get(f"/api/devis/{NUM}/preview?variante=devis").text
+    ti = _esp(re.search(r'<span class="sub-line-name">Travaux induits</span>(.*?)</div>', html).group(1))
+    assert 'sub-line-qt">2 forfaits<' in ti and f'sub-line-pu">2{NB}100,00 €<' in ti and f'sub-line-total">4{NB}431,00 €<' in ti
+
+
+def test_document_2_pac_aides_identiques_a_1_pac(client):
+    _calcul(1)
+    un = client.get(f"/api/devis/{NUM}/preview?variante=devis").text
+    _calcul(2)
+    deux = client.get(f"/api/devis/{NUM}/preview?variante=devis").text
+    aide = lambda h, lib: re.search(lib + r"[^<]*</span><span class=\"amount\">([^<]*)<", h).group(1)
+    for lib in ("Estimation aide Prime CEE", "Estimation aide MaPrimeRénov'[^<]*"):
+        assert aide(un, lib) == aide(deux, lib)
+
+
+def test_note_de_dimensionnement_puissance_totale():
+    _calcul(2)
+    p = main._lead_for_response(main._find_lead(NUM))
+    cat = main._read_catalogue_pac()
+    nd = main.calculer_notedim(p, main._load_state_simulateur(NUM, p, cat), cat)
+    kw = main.find_modele(cat, MODELE)["puiss_chauf"]
+    assert nd["quantite_pac"] == 2 and nd["puissance_totale_kw"] == kw * 2
+    assert nd["modele_pac_specs"].startswith(f"2 × {number_fr(kw, 1)} kW = {number_fr(kw * 2, 1)} kW · ")
+    assert nd["modele_pac"].startswith("2 × ") and nd["modele_pac"].endswith(" (en cascade)")
+    _calcul(1)
+    nd1 = main.calculer_notedim(p, main._load_state_simulateur(NUM, p, cat), cat)
+    assert nd1["modele_pac_specs"].startswith(f"{number_fr(kw, 1)} kW · ") and " × " not in nd1["modele_pac"]
