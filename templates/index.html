@@ -5918,11 +5918,21 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
   /* Page Marges */
   .adm-marges-mention { margin: 0 0 6px; padding: 10px 12px; border-left: 4px solid #F59E0B; background: #FFFBEB; color: #78350F; font-size: 13px; border-radius: 6px; }
   .adm-marges-params { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px 14px; margin: 10px 0; }
-  .adm-marges-table td, .adm-marges-table th { white-space: nowrap; }
-  .adm-marges .adm-table-wrap { overflow-x: auto; }
-  .adm-marges-table td:last-child, .adm-marges-table th:last-child { white-space: normal; min-width: 215px; }
-  .adm-marges-table textarea.adm-pos { width: 100% !important; min-width: 205px !important; max-width: none !important; }
-  .adm-marges-table .adm-pos { display: block; width: 240px; min-height: 38px; padding: 4px 8px; border: 1px solid #CBD5E1; border-radius: 6px; font: inherit; font-size: 12px; line-height: 1.3; resize: vertical; }
+  /* titre en haut, champ en bas : un titre sur deux lignes ne décale plus son champ par rapport aux voisins */
+  .adm-marges-params > .adm-field { justify-content: space-between; }
+  /* Tableau : colonnes à la largeur de leur contenu (le « table-layout: fixed » des tableaux Admin coupait la dernière
+     colonne) ; s'il ne tient pas, il défile dans son cadre, colonne « Modèle » fixe à gauche — jamais la page. */
+  .adm-marges .adm-table-wrap { overflow-x: auto; max-width: 100%; }
+  .adm-marges-table { table-layout: auto; }
+  .adm-marges-table td, .adm-marges-table th { white-space: nowrap; overflow: visible; padding-left: 5px; padding-right: 5px; }
+  .adm-marges-table th { white-space: normal; }
+  .adm-marges-table th:first-child, .adm-marges-table td:first-child { position: sticky; left: 0; z-index: 1; background: #fff; }
+  .adm-marges-table th:first-child { background: var(--c-navy, #002E5A); }
+  .adm-marges-table tr.adm-grp td:first-child { position: static; background: inherit; }
+  .adm-marges-table td:last-child, .adm-marges-table th:last-child { white-space: normal; width: 19%; min-width: 150px; }
+  /* le texte de positionnement passe à la ligne dans sa case, qui grandit en hauteur */
+  .adm-marges-table textarea.adm-pos { width: 100% !important; min-width: 0 !important; max-width: none !important; box-sizing: border-box; field-sizing: content; }
+  .adm-marges-table .adm-pos { display: block; min-height: 38px; padding: 4px 8px; border: 1px solid #CBD5E1; border-radius: 6px; font: inherit; font-size: 12px; line-height: 1.3; resize: vertical; overflow-wrap: anywhere; }
   .adm-marges-table .adm-neg { color: #B91C1C; }
   .adm-marges-barre { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; margin: 10px 0; }
   .adm-regie-switch { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: #334155; }
@@ -15763,6 +15773,8 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     return { ttc, ht, achat, poseAcc, fd, acq, cout, brute, brutePct: ht ? brute / ht : 0, nette, nettePct: ht ? nette / ht : 0 };
   }
   const MENTION_MARGES = "Marges hors CEE supplémentaire : la part de valorisation CEE récupérée en plus de la prime affichée varie selon chaque dossier (revenus, surface, zone, délégataire). Voir la marge réelle sur la fiche du dossier.";
+  // Taux ECAIR du bandeau = valeur du champ « Frais ECAIR » (celle du calcul de la marge du dossier), 12,5 si vide
+  const tauxEcair = (p) => String(p.frais_ecair_pct ?? 12.5).replace('.', ',');
   function renderMarges(c, p){
     const champ = (lab, f, val, unite, cls) => `<div class="adm-field"><span class="adm-lab">${lab}</span><span class="adm-euro"><input type="text" inputmode="decimal" class="adm-p ${cls || ''}" data-p="${f}" value="${val}"><i>${unite}</i></span></div>`;
     const params = `<div class="adm-marges-params">
@@ -15799,7 +15811,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     return `<div class="adm-bloc adm-marges" data-bloc-id="marges">
       <h2 class="adm-bloc-title" style="padding:4px 0 6px">Marges</h2>
       <p class="adm-marges-mention">${MENTION_MARGES}</p>
-      <p class="adm-section-help">Frais ECAIR : 12,5 % de la MaPrimeRénov' préfinancée, dossiers PICOTY seulement (0 pour ACE) — déduits dans la marge du dossier (fiche, étape 6).</p>
+      <p class="adm-section-help">Frais ECAIR : <span id="adm-marges-ecair">${tauxEcair(p)}</span> % de la MaPrimeRénov' préfinancée, dossiers PICOTY seulement (0 pour ACE) — déduits dans la marge du dossier (fiche, étape 6).</p>
       ${params}
       <div class="adm-marges-barre">
         <label class="adm-regie-switch"><input type="checkbox" class="adm-p" data-p="regie_active" ${p.regie_active ? 'checked' : ''}> Réactiver la régie</label>
@@ -15817,6 +15829,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
   function recalcMarges(){
     const c = window.HexaConfig; if (!c) return; const p = c.params;
     const acqEl = document.getElementById('adm-marges-acq'); if (acqEl) acqEl.textContent = eur((+p.conv > 0) ? (+p.lead || 0) / (+p.conv) : 0);
+    const ecairEl = document.getElementById('adm-marges-ecair'); if (ecairEl) ecairEl.textContent = tauxEcair(p);
     document.querySelectorAll('#adm-marges-tbody tr.adm-marge-row').forEach(tr => {
       const m = c.models[+tr.dataset.i]; if (!m) return;
       const r = margeModele(m, p);
