@@ -517,6 +517,7 @@ DEFAULT_PARAMETRES_ADMIN = {
     "relances_nrp": {"max": 4, "niveaux_jours": [2, 6, 12, 21]},
     "params": {
         "pose": 3500,
+        "pose_cascade": 5000,      # Lot 14 : coût d'achat de la pose de 2 PAC en cascade (remplace 2 × « pose »)
         "acc": 550,
         "tva": 0.055,
         "lead": 30,
@@ -537,6 +538,8 @@ DEFAULT_PARAMETRES_ADMIN = {
     "prix_vente_devis": {
         "prix_pose_ht": 3500,
         "prix_travaux_induits_ht": 1200,
+        "prix_pose_cascade_ht": 6500,      # Lot 14 : prix de vente de la pose de 2 PAC en cascade
+        "travaux_induits_cascade": 1,      # Lot 14 : travaux induits facturés × 1 ou × 2 pour 2 PAC en cascade
     },
     "ballon_thermo": {
         "modeles": [

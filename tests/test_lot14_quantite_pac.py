@@ -72,4 +72,35 @@ def test_photo_quantite_1_document_identique_a_avant(client, variante, quantite)
     if os.environ.get("HEXA_LOT14_PHOTOS") == "1" and quantite is None:
         os.makedirs(FIXTURES, exist_ok=True)
         open(_photo(variante), "w", encoding="utf-8", newline="").write(html)
-    assert html == open(_photo(variante), encoding="utf-8").read()
+    assert html.replace("\r\n", "\n") == open(_photo(variante), encoding="utf-8").read().replace("\r\n", "\n")
+
+
+# ---------- 1. réglages Admin ----------
+
+def test_reglages_cascade_par_defaut_sans_toucher_aux_valeurs_1_pac():
+    main._atomic_write_json(main.PARAMETRES_ADMIN_PATH, {
+        "params": {"pose": 3000, "acc": 550},
+        "prix_vente_devis": {"prix_pose_ht": 3920, "prix_travaux_induits_ht": 2100, "description_pose_defaut": "Texte"}})
+    a = main.load_parametres_admin()
+    assert a["params"]["pose"] == 3000 and a["params"]["acc"] == 550 and a["params"]["pose_cascade"] == 5000
+    pv = a["prix_vente_devis"]
+    assert (pv["prix_pose_ht"], pv["prix_travaux_induits_ht"]) == (3920, 2100)
+    assert (pv["prix_pose_cascade_ht"], pv["travaux_induits_cascade"]) == (6500, 1)
+    assert pv["description_pose_defaut"] == "Texte"
+
+
+def test_enregistrer_les_prix_de_vente_garde_les_autres_cles(monkeypatch, client):
+    main._atomic_write_json(main.PARAMETRES_ADMIN_PATH, {
+        "prix_vente_devis": {"prix_pose_ht": 3920, "prix_travaux_induits_ht": 2100, "description_pose_defaut": "Texte"}})
+    monkeypatch.setattr(main, "_require_admin", lambda request: None)
+    r = client.post("/api/admin/params", json={"prix_vente_devis": {
+        "prix_pose_ht": 3920, "prix_travaux_induits_ht": 2100, "prix_pose_cascade_ht": 7000, "travaux_induits_cascade": 2}})
+    assert r.status_code == 200
+    pv = main.load_parametres_admin()["prix_vente_devis"]
+    assert (pv["prix_pose_cascade_ht"], pv["travaux_induits_cascade"], pv["description_pose_defaut"]) == (7000, 2, "Texte")
+
+
+def test_ecran_admin_champs_cascade():
+    html = open(os.path.join(os.path.dirname(main.__file__), "templates", "index.html"), encoding="utf-8").read()
+    assert 'id="adm-prix-vente-pose-cascade-ht"' in html and 'id="adm-travaux-induits-cascade"' in html
+    assert "'pose_cascade', fmtE(p.pose_cascade ?? 5000)" in html

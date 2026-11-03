@@ -15461,6 +15461,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     params: {
       marge: 0.455,        // indicatif (le prix TTC est saisi en dur ici)
       pose: 3500,
+      pose_cascade: 5000,  // Lot 14 : coût d'achat de la pose de 2 PAC en cascade
       acc: 550,
       cout_pose_ballon: 600,
       tva: 0.055,
@@ -15477,6 +15478,8 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     prix_vente_devis: {
       prix_pose_ht: 3500,
       prix_travaux_induits_ht: 1200,
+      prix_pose_cascade_ht: 6500,     // Lot 14 : 2 PAC en cascade
+      travaux_induits_cascade: 1,
     },
     ballon_thermo: {
       modeles: [
@@ -15703,6 +15706,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     const champ = (lab, f, val, unite, cls) => `<div class="adm-field"><span class="adm-lab">${lab}</span><span class="adm-euro"><input type="text" inputmode="decimal" class="adm-p ${cls || ''}" data-p="${f}" value="${val}"><i>${unite}</i></span></div>`;
     const params = `<div class="adm-marges-params">
         ${champ('Pose HT', 'pose', fmtE(p.pose), '€', 'adm-money')}
+        ${champ('Pose 2 PAC en cascade HT (coût)', 'pose_cascade', fmtE(p.pose_cascade ?? 5000), '€', 'adm-money')}
         ${champ('Accessoires HT', 'acc', fmtE(p.acc), '€', 'adm-money')}
         ${champ('Visite technique', 'vt1', fmtE(p.vt1), '€', 'adm-money')}
         ${champ('COFRAC', 'cofrac1', fmtE(p.cofrac1), '€', 'adm-money')}
@@ -15896,7 +15900,19 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
             <span class="adm-unit">€ HT</span>
           </label>
         </div>
-        <p class="adm-section-help">Ces 2 prix apparaissent sur le devis envoyé au client.</p>
+        <div class="adm-fields-row">
+          <label>Prix vente Pose 2 PAC en cascade HT (devis)
+            <input type="number" id="adm-prix-vente-pose-cascade-ht" value="${adminEscape(c.prix_vente_devis?.prix_pose_cascade_ht ?? 6500)}" step="50">
+            <span class="adm-unit">€ HT</span>
+          </label>
+          <label>Travaux induits pour 2 PAC en cascade
+            <select id="adm-travaux-induits-cascade">
+              <option value="1" ${String(c.prix_vente_devis?.travaux_induits_cascade ?? 1) === '2' ? '' : 'selected'}>× 1 (une fois)</option>
+              <option value="2" ${String(c.prix_vente_devis?.travaux_induits_cascade ?? 1) === '2' ? 'selected' : ''}>× 2 (par PAC)</option>
+            </select>
+          </label>
+        </div>
+        <p class="adm-section-help">Ces prix apparaissent sur le devis envoyé au client. Pour 2 PAC en cascade : la pose cascade remplace la pose, les travaux induits sont facturés une ou deux fois.</p>
         <div class="adm-actions"><button type="button" class="adm-btn-save" id="btn-save-prix-vente-devis">Enregistrer</button></div>
       </div>`;
     const optionsCommerciales = `
@@ -16023,10 +16039,13 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
 
   async function savePrixVenteDevis(){
     const cfg = window.HexaConfig || loadConfig();
-    cfg.prix_vente_devis = {
+    // Lot 14 : fusion (les autres clés — textes par défaut de la pose, etc. — sont gardées)
+    cfg.prix_vente_devis = Object.assign({}, cfg.prix_vente_devis || {}, {
       prix_pose_ht: parseFloat(document.getElementById('adm-prix-vente-pose-ht')?.value || '3500') || 3500,
       prix_travaux_induits_ht: parseFloat(document.getElementById('adm-prix-vente-travaux-ht')?.value || '1200') || 1200,
-    };
+      prix_pose_cascade_ht: parseFloat(document.getElementById('adm-prix-vente-pose-cascade-ht')?.value || '6500') || 6500,
+      travaux_induits_cascade: document.getElementById('adm-travaux-induits-cascade')?.value === '2' ? 2 : 1,
+    });
     window.HexaConfig = cfg;
     try { localStorage.setItem(LS_KEY, JSON.stringify(cfg)); } catch(_){}
     await saveAdminParamsServer();
