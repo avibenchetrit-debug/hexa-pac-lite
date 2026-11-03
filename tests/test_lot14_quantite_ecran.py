@@ -174,3 +174,38 @@ def test_retour_a_1_prix_du_catalogue(page):
     page.click("#btn-save")
     _attendre_etat(page, "quantite_pac", 1)
     assert page.locator("#sim-puissance-totale").count() == 0
+
+
+# ---------- alertes rouges à côté du prix (admin, sans blocage) ----------
+
+def _saisir_prix(pg, prix):
+    pg.click("#sim-prix")
+    pg.fill("#sim-prix", str(prix))
+    pg.wait_for_timeout(900)                           # recalcul de la marge (250 ms) + réponse du serveur
+
+
+def _alertes(pg):
+    return pg.evaluate("[...document.querySelectorAll('#sim-alertes-prix .sim-alerte-rouge')].map(a => a.id + '|' + a.textContent)")
+
+
+def test_alertes_prix_1_pac(page):
+    _saisir_prix(page, _prix(page))                    # prix du catalogue : aucune alerte
+    assert _alertes(page) == []
+    _saisir_prix(page, 5000)                           # bien trop bas : marge négative ET fourniture sous l'achat
+    alertes = _alertes(page)
+    assert [a.split("|")[0] for a in alertes] == ["sim-alerte-marge", "sim-alerte-achat"], alertes
+    assert alertes[0].split("|")[1].startswith("Marge négative : −")
+    assert "Fourniture sous le prix d'achat : " in alertes[1] and " HT par PAC (achat " in alertes[1]
+    assert page.is_enabled("#btn-voir-devis")          # alerte seulement : rien n'est bloqué
+    page.locator("#sim-prix").blur()                   # réaffichage complet : les alertes restent
+    page.wait_for_timeout(900)
+    assert len(_alertes(page)) == 2
+
+
+def test_alertes_prix_2_pac(page):
+    page.select_option("#sim-quantite", "2")
+    page.wait_for_timeout(900)
+    assert _alertes(page) == []                        # prix par défaut de 2 PAC
+    _saisir_prix(page, 12000)                          # 2 PAC à 12 000 € : les deux alertes (cas « achat seul » : test serveur)
+    alertes = _alertes(page)
+    assert [a.split("|")[0] for a in alertes] == ["sim-alerte-marge", "sim-alerte-achat"], alertes

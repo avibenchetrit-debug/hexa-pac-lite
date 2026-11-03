@@ -3775,6 +3775,9 @@ async def marge_du_dossier(numero: str, request: Request) -> JSONResponse:
     res = marge_dossier(calc, modele, ballon, admin.get("params") or {}, mode_cee(prospect, state, admin))
     res["modele"] = (modele or {}).get("ref", "")
     res["ballon"] = (ballon or {}).get("nom", "") if ballon else ""
+    # Lot 14 : alertes de l'étape 6 (sans blocage) -> prix unitaire de fourniture d'une PAC vs son prix d'achat HT
+    res["fourniture_unitaire_ht"] = calc.get("prix_fourniture_unitaire_ht")
+    res["achat_unitaire_ht"] = float_value((modele or {}).get("achat")) if modele else None
     return JSONResponse(res)
 
 

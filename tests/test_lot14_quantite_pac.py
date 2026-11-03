@@ -290,3 +290,18 @@ def test_envoi_2_pac_document_archive_avec_la_cascade(monkeypatch, client):
     finally:
         for c, octets in sauve.items():
             open(c, "wb").write(octets)
+
+
+# ---------- 5. alertes de marge (étape 6) : données renvoyées par « Marge du dossier » ----------
+
+@pytest.mark.parametrize("quantite, prix, negative, sous_achat", [
+    (1, PRIX_1, False, False), (1, 9000.0, True, True), (2, 30565.0, False, False), (2, 20000.0, True, True),
+    (2, 21000.0, False, True)])                         # 21 000 € : marge positive, fourniture sous l'achat
+def test_marge_du_dossier_donnees_des_alertes(monkeypatch, client, quantite, prix, negative, sous_achat):
+    _calcul(quantite, prix=prix)
+    monkeypatch.setattr(main, "_require_admin_session", lambda request: None)
+    d = client.post(f"/api/admin/marge-dossier/{NUM}", json={"quantite_pac": quantite, "prix_pac": prix}).json()
+    achat = main.find_modele(main._read_catalogue_pac(), MODELE)["achat"]
+    assert d["achat_unitaire_ht"] == achat and d["quantite_pac"] == quantite
+    assert (d["marge_nette"] < 0) is negative
+    assert (d["fourniture_unitaire_ht"] < d["achat_unitaire_ht"]) is sous_achat

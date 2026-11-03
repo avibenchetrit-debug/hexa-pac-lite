@@ -12940,6 +12940,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
             <span class="p6-pac-lib">Prix TTC posé <i>(modifiable)</i></span>
             <span class="sim-pnl-edit"><input type="text" inputmode="numeric" id="sim-prix" value="${nbFr(state.prix_pac || 0)}"><em>€</em></span>
             ${(ctrlP.q === 2 ? ctrlP.insuffisante : state.sous_dimensionnement) ? '<span class="sim-warn-badge" id="sim-puissance-alerte">⚠ Vérifier</span>' : ''}
+            <span id="sim-alertes-prix" class="sim-alertes-prix" role="alert">${alertesPrixHTML(derniereMarge)}</span>
             <a href="#" class="sim-voir-tous">Tous les modèles</a>
             ${document.body.dataset.vtValidee === '1' ? '' : '<button class="sim-btn-note-dim" type="button" onclick="event.stopPropagation(); window.ouvrirNoteDim(); return false;">Pré-note de dim (provisoire)</button>'}
           </div>
@@ -13378,6 +13379,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
         state.prix_pac=parseInt(clean,10)||0;
         state.user_modified_price = true;
         patch();
+        majMargeDossier();                               // Lot 14 : alertes de marge pendant la frappe
         scheduleSaveSimulatorState();
       });
       prix.addEventListener('blur',()=>{ refresh(); }); // reformate avec séparateurs
@@ -13548,6 +13550,17 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
       Dossier facturé — montants lus dans le ${String(d.source || '').replace(/</g, '&lt;')}${d.facture ? ' (facture ' + String(d.facture).replace(/</g, '&lt;') + ')' : ''}${d.ecart_ttc ? ` · écart de ${eurMd(d.ecart_ttc)} avec le TTC de la facture` : ''}.</div>` : ''}
     <div class="p6-md-note">Visible par les administrateurs seulement. CEE supplémentaire = valorisation du délégataire − prime CEE ${d.indicative ? 'facturée' : 'affichée sur le devis'}.</div>`;
   }
+  // Lot 14 : alertes rouges à côté du prix (admin, sans blocage, 1 et 2 PAC) — marge nette du dossier sous 0 €,
+  // prix unitaire de fourniture (prix saisi − pose − travaux induits, ÷ quantité) sous le prix d'achat HT d'une PAC
+  function alertesPrixHTML(d){
+    if (!estAdmin() || !d || d.indicative) return '';
+    const out = [];
+    if (Number(d.marge_nette) < 0) out.push(`<span class="sim-alerte-rouge" id="sim-alerte-marge">Marge négative : −${eurMd(Math.abs(d.marge_nette))}</span>`);
+    if (d.achat_unitaire_ht != null && Number(d.fourniture_unitaire_ht) < Number(d.achat_unitaire_ht)) {
+      out.push(`<span class="sim-alerte-rouge" id="sim-alerte-achat">Fourniture sous le prix d'achat : ${eurMd(d.fourniture_unitaire_ht)} HT par PAC (achat ${eurMd(d.achat_unitaire_ht)} HT)</span>`);
+    }
+    return out.join('');
+  }
   function margeDossierHTML(){
     if (!estAdmin() || !state.numero) return '';
     const resume = derniereMarge ? `${eurMd(derniereMarge.marge_nette)} · ${pctMd(derniereMarge.marge_nette_pct)}` : '';
@@ -13570,6 +13583,8 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
         const corps = document.getElementById('sim-marge-corps'), res = document.getElementById('sim-marge-resume');
         if (corps) corps.innerHTML = corpsMarge(derniereMarge);
         if (res) res.textContent = `${eurMd(derniereMarge.marge_nette)} · ${pctMd(derniereMarge.marge_nette_pct)}`;
+        const alertes = document.getElementById('sim-alertes-prix');
+        if (alertes) alertes.innerHTML = alertesPrixHTML(derniereMarge);
       } catch (_) {}
     }, 250);
   }
@@ -22653,6 +22668,10 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
   .p6-pac-ligne { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 12px; color: var(--p6-grey); }
   .p6-pac-ligne i { font-style: normal; color: #8A94A3; }
   .p6-pac-ligne .p6-qte { width: auto; min-width: 0; padding: 4px 8px; font-size: 12px; }
+  .sim-alertes-prix { display: inline-flex; flex-wrap: wrap; gap: 6px; }
+  .sim-alertes-prix:empty { display: none; }
+  .sim-alerte-rouge { display: inline-block; background: #FEE2E2; color: #B91C1C; border: 1px solid #F87171; border-radius: 6px;
+    padding: 3px 9px; font-size: 12px; font-weight: 800; }
   .p6-pac-ligne .sim-pnl-edit { display: inline-flex; align-items: center; gap: 4px; }
   body.l6 #p-hotes #sim-prix { height: 32px; width: 110px; font-size: 14px; font-weight: 700; border-radius: 6px; padding: 0 8px; }
   .p6-pac-ligne a, .p6-pac-ligne .sim-btn-note-dim { font-size: 12px; font-weight: 700; color: var(--p6-blue); background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline; font-family: inherit; }
