@@ -3739,6 +3739,10 @@ def get_admin_m3(request: Request) -> JSONResponse:
             "script_appel": _script_appel(),
             # Lot 9b : l'état de la régie, lu par l'écran de tous les comptes (provenance « Régie commerciale »)
             "regie_active": bool((load_parametres_admin().get("params") or {}).get("regie_active")),
+            # Lot 14 : prix de VENTE (ceux du devis, jamais un coût d'achat) -> prix par défaut de 2 PAC en cascade
+            "prix_vente_devis": {k: (load_parametres_admin().get("prix_vente_devis") or {}).get(k) for k in (
+                "prix_pose_ht", "prix_travaux_induits_ht", "prix_pose_cascade_ht", "travaux_induits_cascade")},
+            "tva": (load_parametres_admin().get("params") or {}).get("tva"),
         }
     )
 

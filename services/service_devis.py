@@ -272,7 +272,8 @@ def _taux_tva(admin_params):
 def prix_defaut_pac(prix_catalogue_ttc, quantite, admin_params):
     """Prix TTC posé proposé par défaut. 1 PAC : prix du catalogue (inchangé). 2 PAC : 2 × la fourniture d'une PAC
     (déduite du prix du catalogue exactement comme sur le devis d'une PAC) + pose cascade + travaux induits (× 1 ou
-    × 2), chaque ligne arrondie au centime comme sur le devis. Même calcul que prixDefautPac() de la page."""
+    × 2), chaque ligne arrondie au centime comme sur le devis, puis le total arrondi à l'euro (demi vers le haut)
+    comme tous les prix TTC du simulateur. Même calcul que prixDefautPac() de la page."""
     prix = float_value(prix_catalogue_ttc)
     if quantite == 1:
         return prix
@@ -280,8 +281,8 @@ def prix_defaut_pac(prix_catalogue_ttc, quantite, admin_params):
     pose_1, ti_1, _ = pose_et_travaux_induits_ht(admin_params, 1)
     fourniture_ht = round(max(round(prix / (1 + tva), 2) - pose_1 - ti_1, 0), 2)
     pose, ti, nb = pose_et_travaux_induits_ht(admin_params, quantite)
-    return round(quantite * round(fourniture_ht * (1 + tva), 2) + round(pose * (1 + tva), 2)
-                 + nb * round(ti * (1 + tva), 2), 2)
+    total = quantite * round(fourniture_ht * (1 + tva), 2) + round(pose * (1 + tva), 2) + nb * round(ti * (1 + tva), 2)
+    return float(math.floor(round(total, 2) + 0.5))
 
 
 def get_prix_pac_for_devis(prospect, state_simulateur, catalogue, admin_params=None):

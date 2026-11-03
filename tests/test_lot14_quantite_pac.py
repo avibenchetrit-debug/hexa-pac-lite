@@ -130,17 +130,21 @@ def _calcul(quantite, travaux_induits=1, prix=None):
     return main.calculer_devis(p, st, admin, cat), admin
 
 
-@pytest.mark.parametrize("ti, attendu", [(1, 30564.80), (2, 32780.30)])
+# 2 × EXCELLIA DUO 12 : 30 564,80 € / 32 780,30 € au centime (chiffrage validé), arrondis à l'euro comme tous les prix
+# TTC du simulateur : 30 565 € / 32 780 €. Fourniture déduite côté TTC : (prix − pose TTC − travaux induits TTC) ÷ 2.
+@pytest.mark.parametrize("ti, attendu", [(1, 30565.0), (2, 32780.0)])
 def test_prix_defaut_2_pac(ti, attendu):
     c, _ = _calcul(2, ti)
     assert c["total_ttc"] == attendu and c["quantite_pac"] == 2
-    assert c["prix_fourniture_unitaire_ht"] == 10185.69 and c["prix_fourniture_ht"] == 20371.38
-    assert c["prix_fourniture_ttc"] == 21491.80 and c["qt_fourniture"] == "2 u."
+    unitaire_ttc = round((attendu - 6857.50 - 2215.50 * ti) / 2, 2)               # 10 746,00 / 10 745,75
+    assert c["prix_fourniture_unitaire_ht"] == round(unitaire_ttc / 1.055, 2)
+    assert c["prix_fourniture_ht"] == round(c["prix_fourniture_unitaire_ht"] * 2, 2)
+    assert c["prix_fourniture_ttc"] == round(unitaire_ttc * 2, 2) and c["qt_fourniture"] == "2 u."
     assert c["prix_pose_ht"] == 6500 and c["qt_pose"] == "1 forfait"
     assert c["prix_travaux_induits_unitaire_ht"] == 2100 and c["prix_travaux_induits_ht"] == 2100 * ti
     assert c["qt_travaux_induits"] == ("1 forfait" if ti == 1 else "2 forfaits")
     assert round(c["prix_fourniture_ttc"] + c["prix_pose_ttc"] + c["prix_travaux_induits_ttc"], 2) == attendu
-    assert c["total_ht"] == round(20371.38 + 6500 + 2100 * ti, 2)      # 28 971,38 / 31 071,38 : lignes HT = total HT
+    assert c["total_ht"] == round(c["prix_fourniture_ht"] + 6500 + 2100 * ti, 2)          # lignes HT = total HT
 
 
 def test_quantite_1_calcul_inchange():
@@ -216,7 +220,7 @@ def test_document_2_pac(client, variante):
     assert html.index(PHRASE) > html.index('<div class="lot-title">') and html.index(PHRASE) < html.index(">Fourniture<")
     fourniture = _esp(re.search(r'<span class="sub-line-name">Fourniture</span>(.*?)</div>', html).group(1))
     assert f'sub-line-qt">2 u.<' in fourniture
-    assert f'sub-line-pu">10{NB}185,69 €<' in fourniture and f'sub-line-total">21{NB}491,80 €<' in fourniture
+    assert f'sub-line-pu">10{NB}185,78 €<' in fourniture and f'sub-line-total">21{NB}492,00 €<' in fourniture   # 30 565 €
     assert html.count('<div class="pac-desc-title">') == 1                       # le modèle n'est décrit qu'une fois
 
 
@@ -249,3 +253,40 @@ def test_note_de_dimensionnement_puissance_totale():
     _calcul(1)
     nd1 = main.calculer_notedim(p, main._load_state_simulateur(NUM, p, cat), cat)
     assert nd1["modele_pac_specs"].startswith(f"{number_fr(kw, 1)} kW · ") and " × " not in nd1["modele_pac"]
+
+
+def test_prix_defaut_au_centime_puis_a_l_euro():
+    _calcul(1)
+    admin = dict(ADMIN_PROD)
+    # au centime : 2 × 10 745,90 + 6 857,50 + 2 215,50 = 30 564,80 -> 30 565 € (demi vers le haut, comme Math.round)
+    assert main.prix_defaut_pac(PRIX_1, 2, admin) == 30565.0
+    assert main.prix_defaut_pac(PRIX_1, 1, admin) == PRIX_1
+
+
+# ---------- la quantité survit à l'envoi : document archivé avec la cascade, état inchangé ----------
+
+def test_envoi_2_pac_document_archive_avec_la_cascade(monkeypatch, client):
+    import sys
+    import types
+    chemins = (main.DEVIS_META_PATH, main.DEVIS_ENVOYES_PATH, main.NOTES_PATH)
+    sauve = {c: open(c, "rb").read() for c in chemins if os.path.exists(c)}
+    envois = []
+    faux = types.ModuleType("resend")
+    faux.Emails = types.SimpleNamespace(send=lambda msg: envois.append(msg) or {"id": f"factice-{len(envois)}"})
+    monkeypatch.setitem(sys.modules, "resend", faux)
+    monkeypatch.setenv("RESEND_API_KEY", "cle-factice-locale")
+    monkeypatch.setattr(main, "_html_to_pdf_playwright", lambda html, request=None: b"%PDF-1.4")
+    monkeypatch.setattr(main, "_lead_numero_dossier", lambda numero: "HX26-9999")
+    try:
+        main._atomic_write_json(main.DEVIS_META_PATH, {})
+        _calcul(2)
+        r = client.post(f"/api/devis/{NUM}/send", json={"variante": "pre_devis", "auteur": "Test"})
+        assert r.status_code == 200, r.text
+        item = main._read_devis_meta()[NUM][-1]
+        archive = open(item["html_file"], encoding="utf-8").read()
+        assert PHRASE in archive and "· 2 unités en cascade" in archive
+        assert main.load_state_simulateur(NUM)["quantite_pac"] == 2
+        assert envois and envois[0]["to"] == [LEAD["email"]]
+    finally:
+        for c, octets in sauve.items():
+            open(c, "wb").write(octets)
