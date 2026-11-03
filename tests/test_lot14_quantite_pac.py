@@ -48,7 +48,7 @@ def _preparer(**state):
     main._atomic_write_json(main.LEADS_PATH, [dict(LEAD)])
     main._atomic_write_json(main._state_simulateur_path(NUM), {})
     modele = main.find_modele(main._read_catalogue_pac(), MODELE)
-    main.save_state_simulateur_atomic(NUM, dict(STATE, prix_pac=modele["ttc"], **state))
+    main.save_state_simulateur_atomic(NUM, dict(STATE, **dict({"prix_pac": modele["ttc"]}, **state)))
     return modele
 
 
@@ -104,3 +104,90 @@ def test_ecran_admin_champs_cascade():
     html = open(os.path.join(os.path.dirname(main.__file__), "templates", "index.html"), encoding="utf-8").read()
     assert 'id="adm-prix-vente-pose-cascade-ht"' in html and 'id="adm-travaux-induits-cascade"' in html
     assert "'pose_cascade', fmtE(p.pose_cascade ?? 5000)" in html
+
+
+# ---------- 2. calcul : fourniture × 2, pose cascade, travaux induits × 1 / × 2, aides une fois, marge ----------
+
+ADMIN_PROD = {"params": {"pose": 3000, "pose_cascade": 5000, "acc": 550, "tva": 0.055, "lead": 30, "conv": 0.025,
+                         "vt1": 200, "cofrac1": 226, "urba1": 100, "frais_ecair_pct": 15},
+              "prix_vente_devis": {"prix_pose_ht": 3920, "prix_travaux_induits_ht": 2100,
+                                   "prix_pose_cascade_ht": 6500, "travaux_induits_cascade": 1}}
+PRIX_1 = 17097.0                                          # ALFÉA EXCELLIA S DUO 12 au catalogue de prod
+
+
+def _calcul(quantite, travaux_induits=1, prix=None):
+    admin_prod = dict(ADMIN_PROD, prix_vente_devis=dict(ADMIN_PROD["prix_vente_devis"],
+                                                        travaux_induits_cascade=travaux_induits))
+    main._atomic_write_json(main.PARAMETRES_ADMIN_PATH, admin_prod)
+    admin = main._admin_payload_with_m3()
+    prix = prix if prix is not None else main.prix_defaut_pac(PRIX_1, quantite, admin)
+    _preparer(quantite_pac=quantite, prix_pac=prix)
+    p = main._lead_for_response(main._find_lead(NUM))
+    cat = main._read_catalogue_pac()
+    st = main._load_state_simulateur(NUM, p, cat)
+    return main.calculer_devis(p, st, admin, cat), admin
+
+
+@pytest.mark.parametrize("ti, attendu", [(1, 30564.80), (2, 32780.30)])
+def test_prix_defaut_2_pac(ti, attendu):
+    c, _ = _calcul(2, ti)
+    assert c["total_ttc"] == attendu and c["quantite_pac"] == 2
+    assert c["prix_fourniture_unitaire_ht"] == 10185.69 and c["prix_fourniture_ht"] == 20371.38
+    assert c["prix_fourniture_ttc"] == 21491.80 and c["qt_fourniture"] == "2 u."
+    assert c["prix_pose_ht"] == 6500 and c["qt_pose"] == "1 forfait"
+    assert c["prix_travaux_induits_unitaire_ht"] == 2100 and c["prix_travaux_induits_ht"] == 2100 * ti
+    assert c["qt_travaux_induits"] == ("1 forfait" if ti == 1 else "2 forfaits")
+    assert round(c["prix_fourniture_ttc"] + c["prix_pose_ttc"] + c["prix_travaux_induits_ttc"], 2) == attendu
+    assert c["total_ht"] == round(20371.38 + 6500 + 2100 * ti, 2)      # 28 971,38 / 31 071,38 : lignes HT = total HT
+
+
+def test_quantite_1_calcul_inchange():
+    c, admin = _calcul(1)
+    assert main.prix_defaut_pac(PRIX_1, 1, admin) == PRIX_1
+    assert (c["total_ttc"], c["prix_fourniture_ht"], c["prix_fourniture_unitaire_ht"]) == (PRIX_1, 10185.69, 10185.69)
+    assert (c["qt_fourniture"], c["qt_pose"], c["qt_travaux_induits"]) == ("1 u.", "1 u.", "1 forfait")
+    assert (c["prix_pose_ht"], c["prix_travaux_induits_ht"]) == (3920, 2100)
+
+
+@pytest.mark.parametrize("categorie", ["tres_modeste", "modeste", "intermediaire", "superieur"])
+def test_aides_comptees_une_seule_fois(categorie):
+    global LEAD
+    garde = LEAD
+    LEAD = dict(LEAD, categorie=categorie)
+    try:
+        un, _ = _calcul(1)
+        deux, _ = _calcul(2)
+    finally:
+        LEAD = garde
+    assert (deux["montant_cee"], deux["montant_mpr"]) == (un["montant_cee"], un["montant_mpr"])
+    assert deux["reste_a_charge"] == round(deux["total_ttc"] - deux["montant_cee"] - deux["montant_mpr"], 2)
+
+
+def test_prix_saisi_a_la_main_ecart_sur_la_fourniture():
+    c, _ = _calcul(2, prix=29000.0)
+    unitaire_ttc = round((29000 - round(6500 * 1.055, 2) - round(2100 * 1.055, 2)) / 2, 2)      # 9 963,50
+    assert c["total_ttc"] == 29000.0 and c["prix_fourniture_ttc"] == round(2 * unitaire_ttc, 2)
+    assert c["prix_fourniture_unitaire_ht"] == round(unitaire_ttc / 1.055, 2)
+    assert c["total_ht"] == round(c["prix_fourniture_ht"] + 6500 + 2100, 2)
+    assert c["total_tva"] == round(29000 - c["total_ht"], 2)
+
+
+@pytest.mark.parametrize("valeur", [0, 3, "x", None, ""])
+def test_quantite_invalide_vaut_1(valeur):
+    assert main.quantite_pac({"quantite_pac": valeur}) == 1
+    assert main.quantite_pac({}) == 1 and main.quantite_pac({"quantite_pac": "2"}) == 2
+
+
+@pytest.mark.parametrize("ti, ht, brute, nette", [(1, 28971.38, 11507.38, 9781.38), (2, 31071.38, 13607.38, 11881.38)])
+def test_marge_du_dossier_2_pac(ti, ht, brute, nette):
+    from services.marges import marge_dossier
+    m = marge_dossier({"recap_total_ht": ht, "quantite_pac": 2}, {"achat": 5682}, None, ADMIN_PROD["params"], "tout_de_suite")
+    assert (m["achat"], m["pose_acc"], m["frais_dossier"], m["acquisition"]) == (11364, 6100, 526, 1200)
+    assert round(m["marge_brute"], 2) == brute and round(m["marge_nette"], 2) == nette
+
+
+def test_marge_du_dossier_1_pac_inchangee():
+    from services.marges import marge_dossier
+    m = marge_dossier({"recap_total_ht": 16205.69}, {"achat": 5682}, None, ADMIN_PROD["params"], "tout_de_suite")
+    assert (m["achat"], m["pose_acc"]) == (5682, 3550)
+    assert round(m["marge_brute"], 2) == 6973.69 and round(m["marge_nette"], 2) == 5247.69

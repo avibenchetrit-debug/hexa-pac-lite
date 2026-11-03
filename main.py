@@ -54,6 +54,9 @@ from services.service_devis import (
     etas_html,
     etas_valeur_qui_compte,
     calculer_devis,
+    quantite_pac,
+    prix_defaut_pac,
+    pose_et_travaux_induits_ht,
     calculer_economie_devis,
     resoudre_ballon,
     calculer_financement_devis,
@@ -3801,7 +3804,8 @@ def _marge_dossier_facture(numero: str, prospect: dict, catalogue: list, admin: 
     mode = "attente" if deleg == "PICOTY" else "tout_de_suite"
     valorisation = float((calculer_cee_bar_th_171(prospect, state, admin, mode) or {}).get("montant") or 0)
     calc = {"recap_total_ht": montants["total_ht"], "montant_mpr": montants["mpr"], "montant_cee": montants["cee"],
-            "_cee_conserve": round(valorisation - float(montants["cee"] or 0), 2)}
+            "_cee_conserve": round(valorisation - float(montants["cee"] or 0), 2),
+            "quantite_pac": quantite_pac(state)}       # Lot 14 : 2 PAC -> achat, pose et accessoires du dossier
     modele = find_modele(catalogue, state.get("modele_pac_id") or state.get("modele_pac"))
     ballon = None
     choisi = resoudre_ballon(state, admin)

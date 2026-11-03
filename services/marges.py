@@ -57,8 +57,12 @@ def marge_modele(m: dict, p: dict) -> dict:
 def marge_dossier(calc: dict, modele: dict | None, ballon: dict | None, p: dict, mode_cee: str) -> dict:
     """calc = résultat de calculer_devis (inchangé) ; mode_cee = « attente » (PICOTY) ou « tout_de_suite » (ACE)."""
     ht = _n(calc.get("recap_total_ht")) or _n(calc.get("total_ht"))
-    achat = _n((modele or {}).get("achat"))
-    pose_acc = _n(p.get("pose")) + _n(p.get("acc"))
+    # Lot 14 : 2 PAC en cascade -> achat × 2, pose cascade (remplace 2 × pose), accessoires × 2 ; frais de dossier,
+    # acquisition et frais ECAIR restent comptés une fois par dossier
+    quantite = 2 if int(_n(calc.get("quantite_pac"), 1)) == 2 else 1
+    achat = _n((modele or {}).get("achat")) * quantite
+    pose = _n(p.get("pose_cascade"), 5000.0) if quantite == 2 else _n(p.get("pose"))
+    pose_acc = pose + _n(p.get("acc")) * quantite
     if ballon:
         achat += _n(ballon.get("cout_fourniture_ht"))
         pose_acc += _n(p.get("cout_pose_ballon"), 600.0)
@@ -74,7 +78,7 @@ def marge_dossier(calc: dict, modele: dict | None, ballon: dict | None, p: dict,
             "cee_supplementaire": cee_sup, "frais_ecair": ecair, "taux_ecair": taux_ecair,
             "delegataire": "PICOTY" if mode_cee == "attente" else "ACE",
             "marge_nette": nette, "marge_nette_pct": pct(nette, ht),
-            "mpr": _n(calc.get("montant_mpr")), "cee_devis": _n(calc.get("montant_cee"))}
+            "mpr": _n(calc.get("montant_mpr")), "cee_devis": _n(calc.get("montant_cee")), "quantite_pac": quantite}
 
 
 def positionnement_defaut(m: dict) -> str:

@@ -240,7 +240,51 @@ def _temperature_base_notedim(prospect):
             "mention_deux_zones": MENTION_DEUX_ZONES if t["deux_zones"] else ""}
 
 
-def get_prix_pac_for_devis(prospect, state_simulateur, catalogue):
+# Lot 14 : 1 PAC, ou 2 PAC du même modèle montées en cascade (réglage manuel de l'étape Proposition)
+QUANTITES_PAC = (1, 2)
+
+
+def quantite_pac(state_simulateur) -> int:
+    """Quantité de PAC de la proposition : 1 (défaut, ancien état compris) ou 2 ; toute autre valeur -> 1."""
+    try:
+        q = int(float_value(value(state_simulateur or {}, "quantite_pac", default=1), 1))
+    except (TypeError, ValueError):
+        q = 1
+    return q if q in QUANTITES_PAC else 1
+
+
+def pose_et_travaux_induits_ht(admin_params, quantite=1):
+    """(pose HT, travaux induits HT par forfait, nombre de forfaits) du devis, réglages Admin → Prix de vente.
+    1 PAC : pose et travaux induits habituels ; 2 PAC en cascade : pose cascade, travaux induits × 1 ou × 2."""
+    pv = (admin_params or {}).get("prix_vente_devis") or {}
+    travaux_induits = float_value(pv.get("prix_travaux_induits_ht"), 1200)
+    if quantite == 1:
+        return float_value(pv.get("prix_pose_ht"), 3500), travaux_induits, 1
+    nb = 2 if int(float_value(pv.get("travaux_induits_cascade"), 1)) == 2 else 1
+    return float_value(pv.get("prix_pose_cascade_ht"), 6500), travaux_induits, nb
+
+
+def _taux_tva(admin_params):
+    t = float_value(((admin_params or {}).get("params") or {}).get("tva"), 0.055)
+    return t if t > 0 else 0.055
+
+
+def prix_defaut_pac(prix_catalogue_ttc, quantite, admin_params):
+    """Prix TTC posé proposé par défaut. 1 PAC : prix du catalogue (inchangé). 2 PAC : 2 × la fourniture d'une PAC
+    (déduite du prix du catalogue exactement comme sur le devis d'une PAC) + pose cascade + travaux induits (× 1 ou
+    × 2), chaque ligne arrondie au centime comme sur le devis. Même calcul que prixDefautPac() de la page."""
+    prix = float_value(prix_catalogue_ttc)
+    if quantite == 1:
+        return prix
+    tva = _taux_tva(admin_params)
+    pose_1, ti_1, _ = pose_et_travaux_induits_ht(admin_params, 1)
+    fourniture_ht = round(max(round(prix / (1 + tva), 2) - pose_1 - ti_1, 0), 2)
+    pose, ti, nb = pose_et_travaux_induits_ht(admin_params, quantite)
+    return round(quantite * round(fourniture_ht * (1 + tva), 2) + round(pose * (1 + tva), 2)
+                 + nb * round(ti * (1 + tva), 2), 2)
+
+
+def get_prix_pac_for_devis(prospect, state_simulateur, catalogue, admin_params=None):
     state_price = value(state_simulateur, "prix_pac", default=None)
     if state_price not in (None, ""):
         return float_value(state_price)
@@ -248,7 +292,7 @@ def get_prix_pac_for_devis(prospect, state_simulateur, catalogue):
     modele_ref = value(state_simulateur, "modele_pac_id", "modele_pac", default="")
     modele = find_modele(catalogue, modele_ref)
     if modele:
-        return float_value(value(modele, "ttc", "prix_ttc", default=0))
+        return prix_defaut_pac(value(modele, "ttc", "prix_ttc", default=0), quantite_pac(state_simulateur), admin_params)
     return 0
 
 
@@ -615,22 +659,31 @@ def prime_cee(prospect, state_simulateur, admin_params, prix_pac_ttc):
 
 
 def calculer_devis(prospect, state_simulateur, admin_params, catalogue_pac):
-    prix_pac_ttc = get_prix_pac_for_devis(prospect, state_simulateur, catalogue_pac)
-    tva_rate = float_value(((admin_params or {}).get("params") or {}).get("tva"), 0.055)
-    if tva_rate <= 0:
-        tva_rate = 0.055
+    quantite = quantite_pac(state_simulateur)          # Lot 14 : 1 ou 2 PAC (cascade)
+    prix_pac_ttc = get_prix_pac_for_devis(prospect, state_simulateur, catalogue_pac, admin_params)
+    tva_rate = _taux_tva(admin_params)
 
     total_ttc = round(prix_pac_ttc, 2)
     total_ht = round(total_ttc / (1 + tva_rate), 2)
 
-    pv = (admin_params or {}).get("prix_vente_devis") or {}
-    prix_pose_ht = float_value(pv.get("prix_pose_ht"), 3500)
-    prix_travaux_induits_ht = float_value(pv.get("prix_travaux_induits_ht"), 1200)
+    prix_pose_ht, prix_travaux_induits_unitaire_ht, nb_travaux_induits = pose_et_travaux_induits_ht(admin_params, quantite)
+    prix_travaux_induits_ht = round(prix_travaux_induits_unitaire_ht * nb_travaux_induits, 2)
 
     prix_pose_ttc = round(prix_pose_ht * (1 + tva_rate), 2)
-    prix_travaux_induits_ttc = round(prix_travaux_induits_ht * (1 + tva_rate), 2)
-    prix_fourniture_ht = round(max(total_ht - prix_pose_ht - prix_travaux_induits_ht, 0), 2)
-    prix_fourniture_ttc = round(prix_fourniture_ht * (1 + tva_rate), 2)
+    prix_travaux_induits_ttc = round(round(prix_travaux_induits_unitaire_ht * (1 + tva_rate), 2) * nb_travaux_induits, 2)
+    # Le prix global saisi fait foi : l'écart va sur la fourniture.
+    if quantite == 1:                                  # calcul d'avant le lot 14, inchangé
+        prix_fourniture_ht = round(max(total_ht - prix_pose_ht - prix_travaux_induits_ht, 0), 2)
+        prix_fourniture_unitaire_ht = prix_fourniture_ht
+        prix_fourniture_ttc = round(prix_fourniture_ht * (1 + tva_rate), 2)
+    else:
+        # 2 PAC : fourniture déduite côté TTC -> colonne « Total » = 2 × prix unitaire TTC et lignes TTC = total TTC ;
+        # le total HT est la somme des lignes HT (TVA = TTC − HT, à un centime près des 5,5 %).
+        prix_fourniture_unitaire_ttc = round(max(total_ttc - prix_pose_ttc - prix_travaux_induits_ttc, 0) / quantite, 2)
+        prix_fourniture_unitaire_ht = round(prix_fourniture_unitaire_ttc / (1 + tva_rate), 2)
+        prix_fourniture_ttc = round(prix_fourniture_unitaire_ttc * quantite, 2)
+        prix_fourniture_ht = round(prix_fourniture_unitaire_ht * quantite, 2)
+        total_ht = round(prix_fourniture_ht + prix_pose_ht + prix_travaux_induits_ht, 2)
     total_tva = round(total_ttc - total_ht, 2)
 
     result_plafonds = prime_cee(prospect, state_simulateur, admin_params, total_ttc)
@@ -667,11 +720,14 @@ def calculer_devis(prospect, state_simulateur, admin_params, catalogue_pac):
     categorie_revenu = value(prospect, "categorie_revenu", "categorie", default="")
     return {
         "prix_pac_ttc": total_ttc,
-        "prix_fourniture_ht": prix_fourniture_ht,
+        "quantite_pac": quantite,
+        "prix_fourniture_ht": prix_fourniture_ht,                      # total des PAC (récapitulatif)
+        "prix_fourniture_unitaire_ht": prix_fourniture_unitaire_ht,    # colonne « P.U. H.T. »
         "prix_fourniture_ttc": prix_fourniture_ttc,
         "prix_pose_ht": prix_pose_ht,
         "prix_pose_ttc": prix_pose_ttc,
         "prix_travaux_induits_ht": prix_travaux_induits_ht,
+        "prix_travaux_induits_unitaire_ht": prix_travaux_induits_unitaire_ht,
         "prix_travaux_induits_ttc": prix_travaux_induits_ttc,
         "tva_taux": f"{tva_rate * 100:.1f} %".replace(".", ","),
         "total_ht": total_ht,
@@ -686,9 +742,9 @@ def calculer_devis(prospect, state_simulateur, admin_params, catalogue_pac):
         "_details_plafonds": result_plafonds["details"],
         "categorie_CEE_label": "Précaire" if categorie_revenu == "tres_modeste" else "Classique",
         "categorie_revenu_label": LABELS_ANAH.get(categorie_revenu, ""),
-        "qt_fourniture": "1 u.",
-        "qt_pose": "1 u.",
-        "qt_travaux_induits": "1 forfait",
+        "qt_fourniture": f"{quantite} u.",
+        "qt_pose": "1 u." if quantite == 1 else "1 forfait",
+        "qt_travaux_induits": "1 forfait" if nb_travaux_induits == 1 else f"{nb_travaux_induits} forfaits",
         "lot_titre": generer_lot_titre(find_modele(catalogue_pac, value(state_simulateur, "modele_pac_id", "modele_pac"))),
         "ballon_actif": ballon_actif,
         "ballon_titre": "Chauffe-eau thermodynamique — ECS",
@@ -807,6 +863,7 @@ def format_devis_amounts(calculs):
     for key in (
         "prix_fourniture_ht", "prix_fourniture_ttc", "prix_pose_ht", "prix_pose_ttc",
         "prix_travaux_induits_ht", "prix_travaux_induits_ttc", "total_ht", "total_tva",
+        "prix_fourniture_unitaire_ht", "prix_travaux_induits_unitaire_ht",      # Lot 14 : colonne « P.U. H.T. »
         "total_ttc", "montant_mpr", "montant_cee", "reste_a_charge",
         "prix_ballon_fourniture_ht", "prix_ballon_fourniture_ttc",
         "prix_ballon_pose_ht", "prix_ballon_pose_ttc",
