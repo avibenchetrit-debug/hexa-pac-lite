@@ -302,8 +302,13 @@ def test_anciens_chiffres_selon_la_date_ou_la_marque(champs, bloque):
     assert main._anciens_chiffres(champs) is bloque
 
 
+# Date FIXE d'avant la mise en ligne de la correction : une date relative (« il y a 3 jours ») a cessé d'être
+# « avant la correction » le 23/10/2026 et faisait échouer les deux tests suivants.
+AVANT_CORRECTION = "2026-10-15T10:00:00+02:00"
+
+
 def test_renvoi_d_un_envoi_aux_anciens_chiffres_bloque(monkeypatch, client):
-    _semer_envoi(timedelta(days=3))                                      # aucune marque, avant la correction
+    _semer_envoi(timedelta(days=3), sent_at=AVANT_CORRECTION)            # aucune marque, avant la correction
     envois = _faux_resend(monkeypatch)
     assert client.get(f"/api/devis/{NUM}/list").json()[0]["anciens_chiffres"] is True
     for confirme in (False, True):
@@ -314,7 +319,7 @@ def test_renvoi_d_un_envoi_aux_anciens_chiffres_bloque(monkeypatch, client):
 
 
 def test_nouvel_envoi_marque_et_renvoyable(monkeypatch, client):
-    _semer_envoi(timedelta(days=3))
+    _semer_envoi(timedelta(days=3), sent_at=AVANT_CORRECTION)
     _envoi_sans_pdf(monkeypatch)
     _faux_resend(monkeypatch)
     assert client.post(f"/api/devis/{NUM}/send", json={"variante": "pre_devis"}).status_code == 200
