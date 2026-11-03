@@ -5918,6 +5918,8 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
   /* Page Marges */
   .adm-marges-mention { margin: 0 0 6px; padding: 10px 12px; border-left: 4px solid #F59E0B; background: #FFFBEB; color: #78350F; font-size: 13px; border-radius: 6px; }
   .adm-marges-params { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px 14px; margin: 10px 0; }
+  /* titre en haut, champ en bas : un titre sur deux lignes ne décale plus son champ par rapport aux voisins */
+  .adm-marges-params > .adm-field { justify-content: space-between; }
   /* Tableau : colonnes à la largeur de leur contenu (le « table-layout: fixed » des tableaux Admin coupait la dernière
      colonne) ; s'il ne tient pas, il défile dans son cadre, colonne « Modèle » fixe à gauche — jamais la page. */
   .adm-marges .adm-table-wrap { overflow-x: auto; max-width: 100%; }
