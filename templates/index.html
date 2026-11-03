@@ -15773,6 +15773,8 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     return { ttc, ht, achat, poseAcc, fd, acq, cout, brute, brutePct: ht ? brute / ht : 0, nette, nettePct: ht ? nette / ht : 0 };
   }
   const MENTION_MARGES = "Marges hors CEE supplémentaire : la part de valorisation CEE récupérée en plus de la prime affichée varie selon chaque dossier (revenus, surface, zone, délégataire). Voir la marge réelle sur la fiche du dossier.";
+  // Taux ECAIR du bandeau = valeur du champ « Frais ECAIR » (celle du calcul de la marge du dossier), 12,5 si vide
+  const tauxEcair = (p) => String(p.frais_ecair_pct ?? 12.5).replace('.', ',');
   function renderMarges(c, p){
     const champ = (lab, f, val, unite, cls) => `<div class="adm-field"><span class="adm-lab">${lab}</span><span class="adm-euro"><input type="text" inputmode="decimal" class="adm-p ${cls || ''}" data-p="${f}" value="${val}"><i>${unite}</i></span></div>`;
     const params = `<div class="adm-marges-params">
@@ -15809,7 +15811,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     return `<div class="adm-bloc adm-marges" data-bloc-id="marges">
       <h2 class="adm-bloc-title" style="padding:4px 0 6px">Marges</h2>
       <p class="adm-marges-mention">${MENTION_MARGES}</p>
-      <p class="adm-section-help">Frais ECAIR : 12,5 % de la MaPrimeRénov' préfinancée, dossiers PICOTY seulement (0 pour ACE) — déduits dans la marge du dossier (fiche, étape 6).</p>
+      <p class="adm-section-help">Frais ECAIR : <span id="adm-marges-ecair">${tauxEcair(p)}</span> % de la MaPrimeRénov' préfinancée, dossiers PICOTY seulement (0 pour ACE) — déduits dans la marge du dossier (fiche, étape 6).</p>
       ${params}
       <div class="adm-marges-barre">
         <label class="adm-regie-switch"><input type="checkbox" class="adm-p" data-p="regie_active" ${p.regie_active ? 'checked' : ''}> Réactiver la régie</label>
@@ -15827,6 +15829,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
   function recalcMarges(){
     const c = window.HexaConfig; if (!c) return; const p = c.params;
     const acqEl = document.getElementById('adm-marges-acq'); if (acqEl) acqEl.textContent = eur((+p.conv > 0) ? (+p.lead || 0) / (+p.conv) : 0);
+    const ecairEl = document.getElementById('adm-marges-ecair'); if (ecairEl) ecairEl.textContent = tauxEcair(p);
     document.querySelectorAll('#adm-marges-tbody tr.adm-marge-row').forEach(tr => {
       const m = c.models[+tr.dataset.i]; if (!m) return;
       const r = margeModele(m, p);
