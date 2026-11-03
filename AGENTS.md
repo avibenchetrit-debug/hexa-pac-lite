@@ -191,6 +191,20 @@ derrière la connexion ; `/api/...` répond 401 même pour une route inexistante
   remettait en arrière un statut avancé entre-temps (bug depuis le 03/07, 4b97de1 ; LEVESQUE 19/10). Statut manuel :
   pilule -> `POST /api/leads/{n}/status`. Pilule rafraîchie après envoi / enregistrement (`hexaActualiserStatutFiche`).
   `LIBELLES_STATUT` = STATUTS de la page (parité testée).
+- **Lot 14 (2 PAC en cascade)** : `quantite_pac` (1 par défaut, 2 = cascade ; toute autre valeur -> 1) dans l'état du
+  simulateur, choisi à l'étape 6 (`#sim-quantite`, à côté du prix) ; le choix automatique des 3 gammes reste sur une PAC.
+  Prix par défaut de 2 PAC = 2 × fourniture d'une PAC (déduite du prix catalogue comme sur le devis) + pose cascade +
+  travaux induits × 1 / × 2, arrondi à l'euro (`prix_defaut_pac` serveur = `prixDefautPac` page). Réglages Admin :
+  `prix_vente_devis.prix_pose_cascade_ht` (6 500), `prix_vente_devis.travaux_induits_cascade` (1), `params.pose_cascade`
+  (coût, 5 000) ; l'écran reçoit les prix de VENTE et la TVA par `/api/admin/m3`, jamais un coût. 2 PAC : fourniture
+  déduite côté TTC (total = 2 × unitaire, lignes TTC = total TTC, total HT = somme des lignes HT) ; aides (CEE, MPR)
+  comptées une fois ; marge : achat × 2, pose cascade, accessoires × 2, frais de dossier / acquisition / ECAIR une fois.
+  Document : « · 2 unités en cascade » au titre du lot, encadré cascade (style en ligne : AUCUNE règle CSS ajoutée, pour
+  que le document d'une PAC reste identique) avant la Fourniture, colonne P.U. = vrai prix unitaire. Note de dim :
+  puissance totale. Étape 6 (admin) : alertes rouges « Marge négative » / « Fourniture sous le prix d'achat », sans
+  blocage. Quantité 1 : documents identiques au caractère près (`tests/fixtures/lot14_*.html`, prises avant le lot).
+  Tests Playwright : attendre avec `page.wait_for_timeout`, jamais `time.sleep` (les requêtes passent par `ctx.route`,
+  traité seulement pendant un appel Playwright).
 - Clés DocuSeal / Resend : seulement sur Railway. En local, l'envoi réel est impossible (le script de bout en bout le simule).
 
 ### Tests

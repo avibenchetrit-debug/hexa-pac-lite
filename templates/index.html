@@ -11653,6 +11653,31 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     return Number(modele?.puiss_chauf ?? modele?.puiss35 ?? modele?.puissance_kw ?? 0) || 0;
   }
 
+  // Lot 14 : 1 PAC, ou 2 PAC du même modèle montées en cascade (réglage manuel à côté du modèle choisi ; le choix
+  // automatique des 3 gammes reste sur une PAC). Toute autre valeur -> 1.
+  function quantitePac(s){ return Number((s || state).quantite_pac) === 2 ? 2 : 1; }
+  // Prix TTC posé proposé par défaut — même calcul que prix_defaut_pac() du serveur : 1 PAC = prix du catalogue ;
+  // 2 PAC = 2 × fourniture d'une PAC (déduite du prix catalogue comme sur le devis) + pose cascade + travaux induits
+  // (× 1 ou × 2, Admin → Prix de vente), lignes au centime, total arrondi à l'euro.
+  function prixDefautPac(prixCatalogue, q){
+    const prix = Number(prixCatalogue) || 0;
+    if (q !== 2) return Math.round(prix);
+    const pv = (M3_CONFIG && M3_CONFIG.prix_vente_devis) || {};
+    const t = Number(M3_CONFIG && M3_CONFIG.tva) > 0 ? Number(M3_CONFIG.tva) : 0.055;
+    const val = (v, d) => (v === null || v === undefined || v === '' || !Number.isFinite(Number(v))) ? d : Number(v);
+    const c = x => Math.round(x * 100) / 100;
+    const pose1 = val(pv.prix_pose_ht, 3500), ti = val(pv.prix_travaux_induits_ht, 1200);
+    const fourniture = c(Math.max(c(prix / (1 + t)) - pose1 - ti, 0));
+    const pose = val(pv.prix_pose_cascade_ht, 6500), nb = Number(pv.travaux_induits_cascade) === 2 ? 2 : 1;
+    return Math.round(c(2 * c(fourniture * (1 + t)) + c(pose * (1 + t)) + nb * c(ti * (1 + t))));
+  }
+  // Contrôle de puissance avec la quantité : 2 PAC -> puissance totale (quantité × puissance unitaire) comparée au besoin
+  function controlePuissance(){
+    const m = getModeleActuel(), q = quantitePac();
+    const besoin = Number(state.puissance_requise_kw) || 0, unitaire = puissanceModele(m), total = q * unitaire;
+    return { q, unitaire, total, besoin, insuffisante: q === 2 && !!m && besoin > 0 && total < besoin - TOLERANCE_DIM_KW };
+  }
+
   function isModeleDuo(modele){
     const nomRef = `${modele?.nom || modele?.label || ''} ${modele?.ref || ''}`.toUpperCase();
     return nomRef.includes('DUO');
@@ -11781,6 +11806,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     modele_pac_id: '',
     modele_force: false,
     user_modified_price: false,
+    quantite_pac: 1,               // Lot 14 : 1 PAC ou 2 PAC en cascade
     sous_dimensionnement: false,
     selection_alerte: null,
     ballon_ref: '',
@@ -12038,7 +12064,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     state.modele_pac = modele.label || modele.nom || modele.ref;
     if (modele.id !== state.modele_pac_id) state.user_modified_price = false;
     state.modele_pac_id = modele.id;
-    if (!state.user_modified_price) state.prix_pac = Math.round(modele.prix_ttc || 0);
+    if (!state.user_modified_price) state.prix_pac = prixDefautPac(modele.prix_ttc, quantitePac());
     state.sous_dimensionnement = !!selection.sous_dimensionnement;
   }
 
@@ -12084,6 +12110,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
       modele_pac_nom: state.modele_pac || '',
       prix_pac: Number(state.prix_pac || 0),
       user_modified_price: !!state.user_modified_price,
+      quantite_pac: quantitePac(),                     // Lot 14
       service: state.service || '',
       iso_toit: state.iso_toit || '',
       iso_mur: state.iso_mur || '',
@@ -12157,6 +12184,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
       if (saved.modele_pac_nom) state.modele_pac = saved.modele_pac_nom;
       if (saved.prix_pac) state.prix_pac = Math.round(Number(saved.prix_pac) || 0);
       state.user_modified_price = !!saved.user_modified_price;
+      state.quantite_pac = Number(saved.quantite_pac) === 2 ? 2 : 1;   // Lot 14 : ancien état -> 1
       if (saved.service) state.service = saved.service;
       if (saved.iso_toit) state.iso_toit = saved.iso_toit;
       if (saved.iso_mur) state.iso_mur = saved.iso_mur;
@@ -12205,7 +12233,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     if (forcedModele) {
       state.modele_pac = forcedModele.label || forcedModele.nom || forcedModele.ref;
       state.modele_pac_id = forcedModele.id;
-      if (!state.user_modified_price) state.prix_pac = Math.round(forcedModele.prix_ttc || 0);
+      if (!state.user_modified_price) state.prix_pac = prixDefautPac(forcedModele.prix_ttc, quantitePac());
       state.sous_dimensionnement = false;
       selection = { modele: forcedModele, sous_dimensionnement: false, forced: true };
     } else {
@@ -12735,7 +12763,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     state.modele_pac_id = selected.id;
     state.modele_pac = selected.label;
     state.user_modified_price = false;
-    state.prix_pac = Math.round(selected.prix_ttc || 0);
+    state.prix_pac = prixDefautPac(selected.prix_ttc, quantitePac());
     state.modele_force = true;
     state.sous_dimensionnement = false;
     simTouche = true;
@@ -12900,22 +12928,28 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
       const o = sel.options ? Array.from(sel.options).find(x => x.value === sel.value) : null;
       return escA((o && o.textContent.trim()) || v);
     }
+    const ctrlP = controlePuissance();                  // Lot 14 : quantité × puissance unitaire
     const pac = `
-          <div class="p6-sec">1 · LA POMPE À CHALEUR <span class="p6-sec-sub">· puissance nécessaire <b id="sim-puissance-reco">${kw} kW</b>${ecsDuo ? ' · modèles DUO' : ''}</span></div>
+          <div class="p6-sec">1 · LA POMPE À CHALEUR <span class="p6-sec-sub">· puissance nécessaire <b id="sim-puissance-reco">${kw} kW</b>${ecsDuo ? ' · modèles DUO' : ''}${ctrlP.q === 2 && ctrlP.unitaire ? ` · <span id="sim-puissance-totale">2 × ${nbFr(ctrlP.unitaire)} kW = <b>${nbFr(ctrlP.total)} kW</b> installés</span>` : ''}</span></div>
           ${niv.ok ? `<div class="p6-g p6-g3 p6-pacs p6-imp">${cartesPac}</div>`
             : `<div class="p6-alerte p6-alerte-dim">Aucune PAC bien dimensionnée pour ${kw} kW : ajustez l'isolation ou la surface, ou <a href="#" class="sim-voir-tous">voir tous les modèles</a>.</div>`}
           ${sansAncienSysteme() ? `<div class="p6-aide" id="p6-sans-ancien-systeme">Pas de ligne « Ancien système de chauffage déposé » sur le devis : pas de chaudière fioul / gaz / charbon déposée (énergie : ${sansAncienSysteme()}).</div>` : ''}
           <div class="p6-pac-ligne">
+            <label class="p6-pac-lib" for="sim-quantite">Quantité</label>
+            <select id="sim-quantite" class="p6-in p6-qte" title="2 PAC du même modèle montées en cascade"><option value="1"${ctrlP.q === 2 ? '' : ' selected'}>1</option><option value="2"${ctrlP.q === 2 ? ' selected' : ''}>2 (cascade)</option></select>
             <span class="p6-pac-lib">Prix TTC posé <i>(modifiable)</i></span>
             <span class="sim-pnl-edit"><input type="text" inputmode="numeric" id="sim-prix" value="${nbFr(state.prix_pac || 0)}"><em>€</em></span>
-            ${state.sous_dimensionnement ? '<span class="sim-warn-badge">⚠ Vérifier</span>' : ''}
+            ${(ctrlP.q === 2 ? ctrlP.insuffisante : state.sous_dimensionnement) ? '<span class="sim-warn-badge" id="sim-puissance-alerte">⚠ Vérifier</span>' : ''}
+            <span id="sim-alertes-prix" class="sim-alertes-prix" role="alert">${alertesPrixHTML(derniereMarge)}</span>
             <a href="#" class="sim-voir-tous">Tous les modèles</a>
             ${document.body.dataset.vtValidee === '1' ? '' : '<button class="sim-btn-note-dim" type="button" onclick="event.stopPropagation(); window.ouvrirNoteDim(); return false;">Pré-note de dim (provisoire)</button>'}
           </div>
           <span class="sim-allmodels"${state.show_all_models ? '' : ' hidden'}><select id="sim-modele-select" class="sim-model-select p6-in">
             ${catalogueOptionsOrdonnees(state).map(m => `<option value="${m.id}" ${m.id === state.modele_pac_id ? 'selected' : ''}>${m.label} · ${puissanceModele(m)} kW · ${eur(m.prix_ttc)}</option>`).join('')}
           </select></span>
-          ${state.selection_alerte ? `<div class="sim-note sim-note--warn" id="sim-selection-alerte">${state.selection_alerte}</div>` : ''}`;
+          ${ctrlP.q === 2
+            ? (ctrlP.insuffisante ? `<div class="sim-note sim-note--warn" id="sim-selection-alerte">⚠ Puissance installée (2 × ${nbFr(ctrlP.unitaire)} kW = ${nbFr(ctrlP.total)} kW) inférieure à la puissance nécessaire (${nbFr(ctrlP.besoin)} kW). Vérifier le dimensionnement.</div>` : '')
+            : (state.selection_alerte ? `<div class="sim-note sim-note--warn" id="sim-selection-alerte">${state.selection_alerte}</div>` : '')}`;
     const fin = `<div id="sim-fin">${renderFinancement(c)}</div>`;
 
     // --- étape 6, droite : ① ce que ça coûte, ② qui paie et quand, tuiles ; barre de boutons
@@ -13345,11 +13379,25 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
         state.prix_pac=parseInt(clean,10)||0;
         state.user_modified_price = true;
         patch();
+        majMargeDossier();                               // Lot 14 : alertes de marge pendant la frappe
         scheduleSaveSimulatorState();
       });
       prix.addEventListener('blur',()=>{ refresh(); }); // reformate avec séparateurs
       prix.addEventListener('focus',()=>{ // passer en valeur brute (sans espaces) à l'entrée
         prix.value = String(state.prix_pac || 0);
+      });
+    }
+    // Lot 14 : quantité 1 / 2 — le prix repart du prix par défaut de la quantité choisie (modifiable ensuite)
+    const qte = document.getElementById('sim-quantite');
+    if (qte){
+      qte.addEventListener('change', e => {
+        simTouche = true;
+        state.quantite_pac = Number(e.target.value) === 2 ? 2 : 1;
+        const m = getModeleActuel();
+        state.user_modified_price = false;
+        if (m) state.prix_pac = prixDefautPac(m.prix_ttc, state.quantite_pac);
+        scheduleSaveSimulatorState();
+        refresh();
       });
     }
     const modelSelect = document.getElementById('sim-modele-select');
@@ -13361,7 +13409,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
         state.modele_pac_id = selected.id;
         state.modele_pac = selected.label;
         state.user_modified_price = false;
-        state.prix_pac = Math.round(selected.prix_ttc || 0);
+        state.prix_pac = prixDefautPac(selected.prix_ttc, quantitePac());
         state.modele_force = true;
         state.sous_dimensionnement = false;
         scheduleSaveSimulatorState();
@@ -13502,6 +13550,17 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
       Dossier facturé — montants lus dans le ${String(d.source || '').replace(/</g, '&lt;')}${d.facture ? ' (facture ' + String(d.facture).replace(/</g, '&lt;') + ')' : ''}${d.ecart_ttc ? ` · écart de ${eurMd(d.ecart_ttc)} avec le TTC de la facture` : ''}.</div>` : ''}
     <div class="p6-md-note">Visible par les administrateurs seulement. CEE supplémentaire = valorisation du délégataire − prime CEE ${d.indicative ? 'facturée' : 'affichée sur le devis'}.</div>`;
   }
+  // Lot 14 : alertes rouges à côté du prix (admin, sans blocage, 1 et 2 PAC) — marge nette du dossier sous 0 €,
+  // prix unitaire de fourniture (prix saisi − pose − travaux induits, ÷ quantité) sous le prix d'achat HT d'une PAC
+  function alertesPrixHTML(d){
+    if (!estAdmin() || !d || d.indicative) return '';
+    const out = [];
+    if (Number(d.marge_nette) < 0) out.push(`<span class="sim-alerte-rouge" id="sim-alerte-marge">Marge négative : −${eurMd(Math.abs(d.marge_nette))}</span>`);
+    if (d.achat_unitaire_ht != null && Number(d.fourniture_unitaire_ht) < Number(d.achat_unitaire_ht)) {
+      out.push(`<span class="sim-alerte-rouge" id="sim-alerte-achat">Fourniture sous le prix d'achat : ${eurMd(d.fourniture_unitaire_ht)} HT par PAC (achat ${eurMd(d.achat_unitaire_ht)} HT)</span>`);
+    }
+    return out.join('');
+  }
   function margeDossierHTML(){
     if (!estAdmin() || !state.numero) return '';
     const resume = derniereMarge ? `${eurMd(derniereMarge.marge_nette)} · ${pctMd(derniereMarge.marge_nette_pct)}` : '';
@@ -13524,6 +13583,8 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
         const corps = document.getElementById('sim-marge-corps'), res = document.getElementById('sim-marge-resume');
         if (corps) corps.innerHTML = corpsMarge(derniereMarge);
         if (res) res.textContent = `${eurMd(derniereMarge.marge_nette)} · ${pctMd(derniereMarge.marge_nette_pct)}`;
+        const alertes = document.getElementById('sim-alertes-prix');
+        if (alertes) alertes.innerHTML = alertesPrixHTML(derniereMarge);
       } catch (_) {}
     }, 250);
   }
@@ -15461,6 +15522,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     params: {
       marge: 0.455,        // indicatif (le prix TTC est saisi en dur ici)
       pose: 3500,
+      pose_cascade: 5000,  // Lot 14 : coût d'achat de la pose de 2 PAC en cascade
       acc: 550,
       cout_pose_ballon: 600,
       tva: 0.055,
@@ -15477,6 +15539,8 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     prix_vente_devis: {
       prix_pose_ht: 3500,
       prix_travaux_induits_ht: 1200,
+      prix_pose_cascade_ht: 6500,     // Lot 14 : 2 PAC en cascade
+      travaux_induits_cascade: 1,
     },
     ballon_thermo: {
       modeles: [
@@ -15703,6 +15767,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     const champ = (lab, f, val, unite, cls) => `<div class="adm-field"><span class="adm-lab">${lab}</span><span class="adm-euro"><input type="text" inputmode="decimal" class="adm-p ${cls || ''}" data-p="${f}" value="${val}"><i>${unite}</i></span></div>`;
     const params = `<div class="adm-marges-params">
         ${champ('Pose HT', 'pose', fmtE(p.pose), '€', 'adm-money')}
+        ${champ('Pose 2 PAC en cascade HT (coût)', 'pose_cascade', fmtE(p.pose_cascade ?? 5000), '€', 'adm-money')}
         ${champ('Accessoires HT', 'acc', fmtE(p.acc), '€', 'adm-money')}
         ${champ('Visite technique', 'vt1', fmtE(p.vt1), '€', 'adm-money')}
         ${champ('COFRAC', 'cofrac1', fmtE(p.cofrac1), '€', 'adm-money')}
@@ -15896,7 +15961,19 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
             <span class="adm-unit">€ HT</span>
           </label>
         </div>
-        <p class="adm-section-help">Ces 2 prix apparaissent sur le devis envoyé au client.</p>
+        <div class="adm-fields-row">
+          <label>Prix vente Pose 2 PAC en cascade HT (devis)
+            <input type="number" id="adm-prix-vente-pose-cascade-ht" value="${adminEscape(c.prix_vente_devis?.prix_pose_cascade_ht ?? 6500)}" step="50">
+            <span class="adm-unit">€ HT</span>
+          </label>
+          <label>Travaux induits pour 2 PAC en cascade
+            <select id="adm-travaux-induits-cascade">
+              <option value="1" ${String(c.prix_vente_devis?.travaux_induits_cascade ?? 1) === '2' ? '' : 'selected'}>× 1 (une fois)</option>
+              <option value="2" ${String(c.prix_vente_devis?.travaux_induits_cascade ?? 1) === '2' ? 'selected' : ''}>× 2 (par PAC)</option>
+            </select>
+          </label>
+        </div>
+        <p class="adm-section-help">Ces prix apparaissent sur le devis envoyé au client. Pour 2 PAC en cascade : la pose cascade remplace la pose, les travaux induits sont facturés une ou deux fois.</p>
         <div class="adm-actions"><button type="button" class="adm-btn-save" id="btn-save-prix-vente-devis">Enregistrer</button></div>
       </div>`;
     const optionsCommerciales = `
@@ -16023,10 +16100,13 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
 
   async function savePrixVenteDevis(){
     const cfg = window.HexaConfig || loadConfig();
-    cfg.prix_vente_devis = {
+    // Lot 14 : fusion (les autres clés — textes par défaut de la pose, etc. — sont gardées)
+    cfg.prix_vente_devis = Object.assign({}, cfg.prix_vente_devis || {}, {
       prix_pose_ht: parseFloat(document.getElementById('adm-prix-vente-pose-ht')?.value || '3500') || 3500,
       prix_travaux_induits_ht: parseFloat(document.getElementById('adm-prix-vente-travaux-ht')?.value || '1200') || 1200,
-    };
+      prix_pose_cascade_ht: parseFloat(document.getElementById('adm-prix-vente-pose-cascade-ht')?.value || '6500') || 6500,
+      travaux_induits_cascade: document.getElementById('adm-travaux-induits-cascade')?.value === '2' ? 2 : 1,
+    });
     window.HexaConfig = cfg;
     try { localStorage.setItem(LS_KEY, JSON.stringify(cfg)); } catch(_){}
     await saveAdminParamsServer();
@@ -22587,6 +22667,11 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
   .p6-pay span { font-size: 11px; color: #3A4656; }
   .p6-pac-ligne { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 12px; color: var(--p6-grey); }
   .p6-pac-ligne i { font-style: normal; color: #8A94A3; }
+  .p6-pac-ligne .p6-qte { width: auto; min-width: 0; padding: 4px 8px; font-size: 12px; }
+  .sim-alertes-prix { display: inline-flex; flex-wrap: wrap; gap: 6px; }
+  .sim-alertes-prix:empty { display: none; }
+  .sim-alerte-rouge { display: inline-block; background: #FEE2E2; color: #B91C1C; border: 1px solid #F87171; border-radius: 6px;
+    padding: 3px 9px; font-size: 12px; font-weight: 800; }
   .p6-pac-ligne .sim-pnl-edit { display: inline-flex; align-items: center; gap: 4px; }
   body.l6 #p-hotes #sim-prix { height: 32px; width: 110px; font-size: 14px; font-weight: 700; border-radius: 6px; padding: 0 8px; }
   .p6-pac-ligne a, .p6-pac-ligne .sim-btn-note-dim { font-size: 12px; font-weight: 700; color: var(--p6-blue); background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline; font-family: inherit; }

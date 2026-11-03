@@ -54,6 +54,9 @@ from services.service_devis import (
     etas_html,
     etas_valeur_qui_compte,
     calculer_devis,
+    quantite_pac,
+    prix_defaut_pac,
+    pose_et_travaux_induits_ht,
     calculer_economie_devis,
     resoudre_ballon,
     calculer_financement_devis,
@@ -517,6 +520,7 @@ DEFAULT_PARAMETRES_ADMIN = {
     "relances_nrp": {"max": 4, "niveaux_jours": [2, 6, 12, 21]},
     "params": {
         "pose": 3500,
+        "pose_cascade": 5000,      # Lot 14 : coût d'achat de la pose de 2 PAC en cascade (remplace 2 × « pose »)
         "acc": 550,
         "tva": 0.055,
         "lead": 30,
@@ -537,6 +541,8 @@ DEFAULT_PARAMETRES_ADMIN = {
     "prix_vente_devis": {
         "prix_pose_ht": 3500,
         "prix_travaux_induits_ht": 1200,
+        "prix_pose_cascade_ht": 6500,      # Lot 14 : prix de vente de la pose de 2 PAC en cascade
+        "travaux_induits_cascade": 1,      # Lot 14 : travaux induits facturés × 1 ou × 2 pour 2 PAC en cascade
     },
     "ballon_thermo": {
         "modeles": [
@@ -3733,6 +3739,10 @@ def get_admin_m3(request: Request) -> JSONResponse:
             "script_appel": _script_appel(),
             # Lot 9b : l'état de la régie, lu par l'écran de tous les comptes (provenance « Régie commerciale »)
             "regie_active": bool((load_parametres_admin().get("params") or {}).get("regie_active")),
+            # Lot 14 : prix de VENTE (ceux du devis, jamais un coût d'achat) -> prix par défaut de 2 PAC en cascade
+            "prix_vente_devis": {k: (load_parametres_admin().get("prix_vente_devis") or {}).get(k) for k in (
+                "prix_pose_ht", "prix_travaux_induits_ht", "prix_pose_cascade_ht", "travaux_induits_cascade")},
+            "tva": (load_parametres_admin().get("params") or {}).get("tva"),
         }
     )
 
@@ -3765,6 +3775,9 @@ async def marge_du_dossier(numero: str, request: Request) -> JSONResponse:
     res = marge_dossier(calc, modele, ballon, admin.get("params") or {}, mode_cee(prospect, state, admin))
     res["modele"] = (modele or {}).get("ref", "")
     res["ballon"] = (ballon or {}).get("nom", "") if ballon else ""
+    # Lot 14 : alertes de l'étape 6 (sans blocage) -> prix unitaire de fourniture d'une PAC vs son prix d'achat HT
+    res["fourniture_unitaire_ht"] = calc.get("prix_fourniture_unitaire_ht")
+    res["achat_unitaire_ht"] = float_value((modele or {}).get("achat")) if modele else None
     return JSONResponse(res)
 
 
@@ -3798,7 +3811,8 @@ def _marge_dossier_facture(numero: str, prospect: dict, catalogue: list, admin: 
     mode = "attente" if deleg == "PICOTY" else "tout_de_suite"
     valorisation = float((calculer_cee_bar_th_171(prospect, state, admin, mode) or {}).get("montant") or 0)
     calc = {"recap_total_ht": montants["total_ht"], "montant_mpr": montants["mpr"], "montant_cee": montants["cee"],
-            "_cee_conserve": round(valorisation - float(montants["cee"] or 0), 2)}
+            "_cee_conserve": round(valorisation - float(montants["cee"] or 0), 2),
+            "quantite_pac": quantite_pac(state)}       # Lot 14 : 2 PAC -> achat, pose et accessoires du dossier
     modele = find_modele(catalogue, state.get("modele_pac_id") or state.get("modele_pac"))
     ballon = None
     choisi = resoudre_ballon(state, admin)
@@ -4715,6 +4729,8 @@ def _build_devis_context(request: Request, numero: str, version: int | None = No
         ).strip()
     formatted_calculs = format_devis_amounts(calculs)
     formatted_calculs["lot_titre"] = generer_lot_titre(modele_obj)
+    if calculs.get("quantite_pac") == 2:              # Lot 14 : 2 PAC en cascade
+        formatted_calculs["lot_titre"] += " · 2 unités en cascade"
     description_specs = modele_obj.get("description_specs", []) if modele_obj else []
     if not description_specs and modele_obj and modele_obj.get("description_technique"):
         description_specs = parse_legacy_description(modele_obj["description_technique"])
@@ -6126,7 +6142,9 @@ def _envoyer_notedim(request: Request, numero: str, prospect: dict, email_to: st
     modele_ref = state.get("modele_pac_id") or state.get("modele_pac")
     modele_obj = find_modele(catalogue, modele_ref) or select_default_modele(prospect, catalogue)
     specs = {                                         # None -> « — » dans le modèle d'e-mail
-        "modele": (modele_obj.get("nom") or modele_obj.get("ref")) if modele_obj else None,
+        "modele": (((f"{quantite_pac(state)} × " if quantite_pac(state) > 1 else "")           # Lot 14 : cascade
+                    + (modele_obj.get("nom") or modele_obj.get("ref"))
+                    + (" (en cascade)" if quantite_pac(state) > 1 else "")) if modele_obj else None),
         "etas35": devis_value(modele_obj or {}, "etas35", default=None),
         "etas55": devis_value(modele_obj or {}, "etas55", default=None),
         "surface": round(_float_value(devis_value(state, "surface_chauffee", default="") or devis_value(prospect, "surface_habitable", "surface_logement_m2", default=""), 0)) or None,

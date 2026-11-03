@@ -3498,9 +3498,9 @@
 <!-- LOTS DÉTAILLÉS -->
 <section class="lots-detail"><div class="section-title">Détail technique par poste de travaux</div><div class="lots-table-header"><span>Désignation</span><span>Qt.</span><span>P.U. H.T.</span><span>TVA appli.</span><span>Total T.T.C.</span></div><div class="family">
 <div class="lot">
-<div class="lot-header"><div class="lot-title">{{ lot_titre }}</div></div>
+<div class="lot-header"><div class="lot-title">{{ lot_titre }}</div></div>{% if quantite_pac == 2 %}<div class="pac-cascade-note" data-cascade style="margin:8px 0 10px;padding:12px 16px;background:var(--gris-fond);border-left:3px solid var(--rouge);font-size:11px;line-height:1.5;color:var(--bleu);">Installation de 2 pompes à chaleur montées en cascade, pilotées par une régulation commune, dimensionnées pour couvrir l'ensemble des besoins de chauffage du logement.</div>{% endif %}
 <div class="sub-line">
-<div class="sub-line-header"><span class="sub-line-name">Fourniture</span><span class="sub-line-qt">{{ qt_fourniture }}</span><span class="sub-line-pu">{{ prix_fourniture_ht }}</span><span class="sub-line-tva">{{ tva_taux }}</span><span class="sub-line-total">{{ prix_fourniture_ttc }}</span></div>
+<div class="sub-line-header"><span class="sub-line-name">Fourniture</span><span class="sub-line-qt">{{ qt_fourniture }}</span><span class="sub-line-pu">{{ prix_fourniture_unitaire_ht }}</span><span class="sub-line-tva">{{ tva_taux }}</span><span class="sub-line-total">{{ prix_fourniture_ttc }}</span></div>
 <div class="pac-desc-block">
 {% if modele_pac %}
 <div class="pac-desc-title">{{ modele_pac }}</div>
@@ -3524,7 +3524,7 @@
 {% endif %}
 </div>
 <div class="sub-line">
-<div class="sub-line-header"><span class="sub-line-name">Travaux induits</span><span class="sub-line-qt">{{ qt_travaux_induits }}</span><span class="sub-line-pu">{{ prix_travaux_induits_ht }}</span><span class="sub-line-tva">{{ tva_taux }}</span><span class="sub-line-total">{{ prix_travaux_induits_ttc }}</span></div>
+<div class="sub-line-header"><span class="sub-line-name">Travaux induits</span><span class="sub-line-qt">{{ qt_travaux_induits }}</span><span class="sub-line-pu">{{ prix_travaux_induits_unitaire_ht }}</span><span class="sub-line-tva">{{ tva_taux }}</span><span class="sub-line-total">{{ prix_travaux_induits_ttc }}</span></div>
 <div class="specs"><div class="specs-block"><div class="specs-block-title">Travaux induits</div><ul class="specs-list"><li>Protection et sécurisation des zones d'intervention</li><li>Création ou adaptation des passages techniques</li><li>Reprises localisées d'étanchéité et de calfeutrement</li><li>Adaptation ponctuelle des réseaux et équipements existants</li><li{% if solution_chauffage and solution_chauffage.ancien_systeme %} class="ace-exige" data-ace="depose"{% endif %}>{{ solution_chauffage.depose_induits if solution_chauffage else "Dépose et évacuation des équipements remplacés - chaudière" }}</li></ul></div><div class="specs-block"><div class="specs-block-title">Non inclus</div><ul class="specs-list"><li>Renforcement ou mise en conformité complète de l'installation électrique</li><li>Modification des émetteurs ou réseaux hors descriptif</li><li>Travaux de maçonnerie ou de couverture lourde</li><li>Prestations de décoration et reprises complètes de finition</li></ul></div></div>
 </div>
 <div class="lot-subtotal"><span class="lot-subtotal-label">Sous-total lot</span><div class="lot-subtotal-amounts"><span class="ht"><span class="label">HT</span>{{ total_ht }}</span><span class="ttc"><span class="label">TTC</span>{{ total_ttc }}</span></div></div>
