@@ -13049,6 +13049,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
         + `<span class="p6-pgam" style="color:${COUL_GAMME[nd.key] || '#5A6675'}">${escA(nd.label.toUpperCase())}</span>`
         + `<span class="p6-pmod">${o.quantite === 2 ? '2 × ' : ''}${escA(m.label || m.nom)}</span>`
         + `<span class="p6-pkw">${o.quantite === 2 ? `2 × ${nbFr(o.unitaire)} = ` : ''}${nbFr(o.total)} kW · ${o.pct} %</span>`
+        + (o.origine === '35' ? `<span class="p6-badge35">puissance à 35 °C, non validée</span>` : '')
         + `<span class="p6-pprix">${eur(o.prix)} TTC</span></button>`;
     }).join('');
     // Lot 8c : énergie sans chaudière fioul / gaz / charbon -> pas de ligne « ancien système » sur le devis (dit à l'écran)
@@ -13716,7 +13717,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     const ligne = (o, x) => `<tr data-ref="${escC(o.id)}" data-qte="${o.quantite}"${o.id === state.modele_pac_id && o.quantite === quantitePac() ? ' class="on"' : ''}>
         <td>${o.quantite === 2 ? '2 × ' : ''}${escC(o.modele.label || o.modele.nom)}</td><td>${escC(o.marque)}</td>
         <td class="num">${o.tmax ? nbFr(o.tmax) + ' °C' : '—'}</td>
-        <td class="num">${o.quantite === 2 ? `2 × ${nbFr(o.unitaire)} = ` : ''}${nbFr(o.total)} kW${o.origine === '35' ? '*' : ''} · ${o.pct} %</td>
+        <td class="num">${o.quantite === 2 ? `2 × ${nbFr(o.unitaire)} = ` : ''}${nbFr(o.total)} kW · ${o.pct} %${o.origine === '35' ? '<br><span class="p6-badge35">puissance à 35 °C, non validée</span>' : ''}</td>
         <td class="num">${eur(o.prix)}</td>
         <td class="num">${x ? eur(x.reste_a_charge) : '…'}</td>
         ${estAdmin() ? `<td class="num">${x && x.marge_nette != null ? eur(x.marge_nette) : '…'}</td>` : ''}
@@ -13730,7 +13731,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
         <div class="sim-dim-content">${val.options.length ? `<table class="sim-cmp-table"><thead><tr><th>Modèle × quantité</th><th>Marque</th><th>Temp. max</th>
           <th>Puissance installée · couverture</th><th>Prix TTC client</th><th>Reste à charge</th>${estAdmin() ? '<th>Marge du dossier</th>' : ''}<th></th></tr></thead>
           <tbody>${val.options.map(o => ligne(o, parRef[o.id + '|' + o.quantite])).join('')}</tbody></table>
-          <p class="sim-dim-disclaimer">Options : température de départ max ≥ température requise, puissance installée entre 60 et 130 % du besoin${val.quantite === 2 ? ' — aucune PAC unique ne convient : 2 PAC en cascade' : ''}. * puissance à 35 °C, valeur à −7 °C / 55 °C non renseignée.</p>`
+          <p class="sim-dim-disclaimer">Options : température de départ max ≥ température requise, puissance installée entre 60 et 130 % du besoin${val.quantite === 2 ? ' — aucune PAC unique ne convient : 2 PAC en cascade' : ''}. Badge « puissance à 35 °C, non validée » : pas de valeur à −7 °C / 55 °C validée dans l'Admin, la puissance à 35 °C est utilisée.</p>`
           : '<p>Aucune option valable pour cette puissance.</p>'}</div></div>`;
     };
     rendre(null);
@@ -22905,6 +22906,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
   .p6-pcard.on, body.l6 .p6-pcard.sim-mod-row.on { border: 3px solid var(--p6-navy); background: #F5F9FE; padding: 5px 8px; }
   body.l6 .p6-pcard .p6-pkw { font-size: 11px; color: #5A6675; }
   body.l6 .p6-cmp-ligne { margin: 4px 0 2px; text-align: right; }
+  .p6-badge35 { display: inline-block; margin-top: 2px; font-size: 10px; font-weight: 700; color: #92400E; background: #FEF3C7; border: 1px solid #F59E0B; border-radius: 6px; padding: 0 5px; white-space: nowrap; }
   .p6-btn-comparer { font: inherit; font-size: 12px; font-weight: 700; color: #002E5A; background: #fff; border: 1px solid #002E5A; border-radius: 8px; padding: 4px 10px; cursor: pointer; }
   .sim-cmp-box { max-width: 1040px; width: calc(100% - 32px); }
   .sim-cmp-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
