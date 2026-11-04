@@ -5035,7 +5035,7 @@ def _build_notedim_context(request: Request, numero: str) -> dict:
     missing = validate_prospect_for_devis(prospect, state, load_parametres_admin())
     if missing:
         return {"request": request, "missing": missing, "numero": numero, "_error_template": "erreur_champs_manquants.html"}
-    admin = load_parametres_admin()
+    admin = _admin_payload_with_m3()                 # forfaits MPR compris (mention « MPR » selon la catégorie)
     vt = bool(prospect.get("vt_validee"))
     context = {"request": request, "numero_notedim": generer_numero_notedim(prospect),
                **calculer_notedim(prospect, state, catalogue, admin)}

@@ -61,7 +61,12 @@ def test_note_pre_dimensionnement_document_du_master_avec_la_cascade(client):
     assert "2 × ALTHERMA 3H HT R32 18 TRI (en cascade)" in texte
     assert "2 × 18 kW = 36 kW" in texte and "108 % · cohérent" in texte
     assert "Puissance à 35 °C, valeur à −7 °C / 55 °C non renseignée." in texte
-    assert "BAR-TH-171 + MPR Mono-Geste" in texte and "SAS HEXA RÉNOV'" in texte
+    # correctifs du 04/11 : catégorie Supérieur -> pas de MPR ; maison de 1968 -> pas de badge RT 2012 / RE 2020 ;
+    # surface chauffée (245 m², celle du calcul) d'abord, surface habitable (280 m²) en second
+    assert "Document justificatif du dispositif BAR-TH-171 ." in texte and "MPR" not in texte
+    assert "RT 2012" not in texte and "SAS HEXA RÉNOV'" in texte
+    assert "Surface chauffée 245 m² sur 280 m² habitables" in texte
+    assert "@media screen" in html and "width: 210mm" in html                     # page A4 centrée à l'écran
 
 
 def test_note_definitive_apres_la_vt(client):
@@ -92,3 +97,21 @@ def test_onglet_note_dans_la_fenetre_du_pre_devis_et_pdf(navigateur):
     chemin = dl.value.path()
     assert open(chemin, "rb").read(5) == b"%PDF-" and dl.value.suggested_filename.startswith("Note-pre-dimensionnement")
     assert pg.erreurs_js == []
+
+
+@pytest.mark.parametrize("categorie, avec_mpr", [("superieur", False), ("intermediaire", True), ("modeste", True),
+                                                 ("tres_modeste", True)])
+def test_mention_mpr_selon_la_categorie(client, categorie, avec_mpr):
+    _cascade_altherma()
+    leads = main._read_leads()
+    leads[0]["categorie"] = categorie
+    main._atomic_write_json(main.LEADS_PATH, leads)
+    import html as _html
+    texte = _html.unescape(re.sub(r"<[^>]+>", " ", client.get(f"/api/notedim/{NUM}/preview").text))
+    assert ("BAR-TH-171 + MPR Mono-Geste" in texte) is avec_mpr
+
+
+@pytest.mark.parametrize("annee, avec_rt", [("1700", False), ("1968", False), ("2012", False), ("2013", True),
+                                            ("2021", True), ("", False)])
+def test_badge_rt2012_seulement_apres_2012(annee, avec_rt):
+    assert ("RT 2012 / RE 2020" in note_dim_master.badges_reglementaires({"annee_construction": annee})) is avec_rt
