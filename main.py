@@ -6521,7 +6521,7 @@ async def _send_devis(numero: str, payload: dict, request: Request) -> dict:
     version = _next_sent_version(numero)
     numero_dossier = _lead_numero_dossier(numero) or _commit_numero_dossier()
     devis_path, devis_html, version = _ensure_devis_pdf(numero, request, version, avec_sous_traitant, numero_dossier)
-    notedim_path = _ensure_notedim_pdf(numero, request, version) if variante == "devis" else None
+    notedim_path = _ensure_notedim_pdf(numero, request, version)   # Lot B : la note part aussi avec le pré-devis
 
     auteur = str(payload.get("auteur") or "Anonyme")
     sujet = _sujet_devis(prospect, variante)
@@ -6539,7 +6539,7 @@ async def _send_devis(numero: str, payload: dict, request: Request) -> dict:
     except EnvoiRefuse as exc:
         _noter_echec_envoi(numero, variante, email_to, str(exc), auteur)
         raise HTTPException(status_code=502, detail=f"Échec d'envoi à {email_to} : {exc}. Rien n'a été marqué « Envoyé ».") from exc
-    notedim_id, notedim_erreur = _envoyer_notedim(request, numero, prospect, email_to, contexte) if variante == "devis" else ("", "")
+    notedim_id, notedim_erreur = _envoyer_notedim(request, numero, prospect, email_to, contexte)
     _envoyer_copie_interne(sujet, corps, email_to, contexte)
     email_file = os.path.join(DEVIS_DIR, f"{numero}_v{version}_email.html")
     try:
@@ -6583,10 +6583,9 @@ async def _send_devis(numero: str, payload: dict, request: Request) -> dict:
         **_infos_document_html(devis_html),           # Lot 13j : modèle et montant du document envoyé (relances)
         "chiffres_email": CHIFFRES_EMAIL,             # Lot 13j-bis : e-mail aux chiffres corrigés (« Renvoyer » permis)
     }
-    if variante == "devis":
-        item["notedim_resend_id"] = notedim_id
-        if notedim_erreur:
-            item["notedim_erreur"] = notedim_erreur
+    item["notedim_resend_id"] = notedim_id             # Lot B : pré-devis et devis
+    if notedim_erreur:
+        item["notedim_erreur"] = notedim_erreur
     meta.setdefault(numero, []).append(item)
     _atomic_write_json(DEVIS_META_PATH, meta)
     sent = _read_devis_envoyes()
