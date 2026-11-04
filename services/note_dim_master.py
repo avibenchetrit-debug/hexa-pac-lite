@@ -22,6 +22,8 @@ from services import dimensionnement_pac as dp
 TITRE_DIMENSIONNEMENT = "NOTE DE DIMENSIONNEMENT"
 TITRE_PRE_DIMENSIONNEMENT = "NOTE DE PRÉ-DIMENSIONNEMENT"
 DISPOSITIF = "BAR-TH-171 + MPR Mono-Geste"          # Master : helpers_categories.PARCOURS_CODES_CEE["pac_aireau_seule"]
+DISPOSITIF_SANS_MPR = "BAR-TH-171"                  # 04/11 (Avi) : « MPR » seulement si le client y a droit
+ANNEE_RT2012 = 2012                                 # badge RT 2012 / RE 2020 : logement construit APRÈS 2012
 PARCOURS_LABEL = "Installation Pompe à Chaleur Air-Eau"
 BADGES_REGLEMENTAIRES = ["RT 2012 / RE 2020"]       # Master : SEED_NOTE_DIMENSIONNEMENT["badges_reglementaires"]
 RGE = "RGE CertiRénov'"
@@ -166,6 +168,31 @@ def calcul_paclite(prospect, state):
     }
 
 
+def a_droit_mpr(prospect, state, admin=None):
+    """MaPrimeRénov' : même règle que le devis (`calculer_mpr` — forfait de la catégorie de revenus, 0 en Supérieur)."""
+    from services.service_devis import calculer_mpr
+    p = dict(prospect or {})
+    if not (p.get("categorie_revenu") or p.get("categorie")) and (state or {}).get("categorie_revenu"):
+        p["categorie_revenu"] = state["categorie_revenu"]
+    try:
+        return calculer_mpr(p, state or {}, admin or {}) > 0
+    except Exception:  # noqa: BLE001 — en cas de doute, on n'annonce pas MPR
+        return False
+
+
+def dispositif(prospect, state, admin=None):
+    return DISPOSITIF if a_droit_mpr(prospect, state, admin) else DISPOSITIF_SANS_MPR
+
+
+def badges_reglementaires(prospect):
+    """« RT 2012 / RE 2020 » seulement pour un logement construit après 2012 (04/11, Avi)."""
+    try:
+        annee = int(str((prospect or {}).get("annee_construction") or "").strip()[:4])
+    except ValueError:
+        return []
+    return list(BADGES_REGLEMENTAIRES) if annee > ANNEE_RT2012 else []
+
+
 def construire_note(prospect, state, catalogue, admin=None):
     """Le dict `note` du gabarit du Master, pour une PAC air-eau seule de pac-lite."""
     from services.service_devis import find_modele, quantite_pac, select_default_modele, value
@@ -228,7 +255,7 @@ def construire_note(prospect, state, catalogue, admin=None):
         plage.update(temperature_base_c=c["temperature_base_exterieure"], regime=regime)
     return {
         "applicable": True, "niveau": niveau, "perimetre": {"fige": vt, "declencheur": "vt" if vt else None},
-        "regime": regime, "rattachement": {}, "plage_coherence": plage, "dispositif": DISPOSITIF,
+        "regime": regime, "rattachement": {}, "plage_coherence": plage, "dispositif": dispositif(p, state, admin),
         "calcul": c, "points_de_vigilance": vigilance, "alertes": [], "installation": installation,
         "ecs_integree": c["p_ecs_w"] > 0, "deperditions": {}, "travaux_non_deduits": False,
         "seuils": {"cop_minimum": 3.0, "scop_minimum": 3.4},
@@ -264,6 +291,6 @@ def contexte(prospect, state, catalogue, admin=None, *, reference, maintenant=No
         "date_emission": now.strftime("%d/%m/%Y"),
         "datetime_emission": now.strftime("%d/%m/%Y à %H:%M"),
         "societe": SOCIETE,
-        "badges_conformite": ["Estimation par coefficient volumique G", *BADGES_REGLEMENTAIRES, DISPOSITIF, RGE],
+        "badges_conformite": ["Estimation par coefficient volumique G", *badges_reglementaires(p), note["dispositif"], RGE],
         "inter_fontface_css": "",
     }
