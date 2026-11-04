@@ -770,7 +770,7 @@
     <div class="result-value-wrap">
       <span class="result-value">{{ p_pac_reco_kw }}</span><span class="result-unit">kW</span>
     </div>
-    <div class="result-gamme">Gamme cible : <strong>{{ gamme_min }} à {{ gamme_max }} kW</strong> · Tolérance ± 20%</div>
+    <div class="result-gamme">Plage de cohérence : <strong>{{ gamme_min }} à {{ gamme_max }} kW</strong> · {{ plage_min_pct }} à {{ plage_max_pct }} % de la puissance requise</div>
   </div>
 
   <!-- ============ 7. MODÈLE PROPOSÉ (sans prix) ============ -->
@@ -779,6 +779,9 @@
       <div class="modele-info-label">Modèle catalogue proposé</div>
       <div class="modele-info-value">{{ modele_pac }}</div>
       <div class="modele-info-tech">{{ modele_pac_specs }}</div>
+      {% if puissance_mention %}<div class="modele-info-tech">{{ puissance_mention[:1]|upper }}{{ puissance_mention[1:] }}.</div>{% endif %}
+      {% if temperature_depart_requise %}<div class="modele-info-tech">Température de départ requise {{ temperature_depart_requise }} °C{% if temperature_depart_max %} · maximale du modèle {{ temperature_depart_max }} °C{% endif %}</div>{% endif %}
+      {% if alerte_temperature %}<div class="modele-info-tech" style="color:#B91C1C;font-weight:700">⚠ {{ alerte_temperature }}</div>{% endif %}
     </div>
     <div class="modele-prix">
       <div class="modele-info-label">Conformité</div>
@@ -792,7 +795,7 @@
     <div class="reco-list">
       <div class="reco-row">
         <span class="reco-icon">▸</span>
-        <span><strong>Puissance nominale :</strong> sélectionner un modèle compris entre {{ gamme_min }} et {{ gamme_max }} kW (mesure à -7°C ou en conditions du projet)</span>
+        <span><strong>Puissance nominale :</strong> puissance installée comprise entre {{ gamme_min }} et {{ gamme_max }} kW ({{ plage_min_pct }} à {{ plage_max_pct }} %), mesurée à −7 °C / 55 °C (en dessous de 100 %, l'appoint intégré prend le relais les jours les plus froids ; au-dessus de {{ plage_max_pct }} %, cycles courts)</span>
       </div>
       <div class="reco-row">
         <span class="reco-icon">▸</span>

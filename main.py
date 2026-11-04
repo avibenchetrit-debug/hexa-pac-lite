@@ -1196,6 +1196,17 @@ def _migrate_catalogue_regulateur() -> dict:
     return manques
 
 
+def _migrate_catalogue_dimensionnement() -> bool:
+    """Lot A (notedim-master), démarrage, idempotent : puissance à −7 °C / 55 °C du Master (NON validée) et
+    température de départ max (fiche produit) sur les modèles qui ne les ont pas. Écrit seulement si quelque chose
+    change ; une valeur déjà saisie dans l'Admin n'est jamais touchée."""
+    from services.dimensionnement_pac import migrer_catalogue
+    catalogue, change = migrer_catalogue(_read_catalogue_pac())
+    if change:
+        _write_catalogue_pac(catalogue)
+    return change
+
+
 def _admin_payload_with_m3():
     admin = load_parametres_admin()
     baremes = _read_json(BAREMES_PATH, {})
@@ -2204,6 +2215,7 @@ async def startup_event():
     _init_storage()
     _migrate_leads_schema()
     _migrate_catalogue_regulateur()
+    _migrate_catalogue_dimensionnement()
     _migrate_lot9()
     _migrate_lot10()
     _migrate_lot10c()
@@ -3743,8 +3755,126 @@ def get_admin_m3(request: Request) -> JSONResponse:
             "prix_vente_devis": {k: (load_parametres_admin().get("prix_vente_devis") or {}).get(k) for k in (
                 "prix_pose_ht", "prix_travaux_induits_ht", "prix_pose_cascade_ht", "travaux_induits_cascade")},
             "tva": (load_parametres_admin().get("params") or {}).get("tva"),
+            # Lot A : température de départ requise par émetteur (Admin → Catalogue PAC → Dimensionnement)
+            "temperatures_depart": _temperatures_depart(load_parametres_admin()),
         }
     )
+
+
+def _temperatures_depart(admin):
+    from services.dimensionnement_pac import temperatures_depart
+    return temperatures_depart(admin)
+
+
+@app.get("/api/admin/dimensionnement-pac")
+def get_dimensionnement_pac(request: Request) -> JSONResponse:
+    """Lot A : Admin → Catalogue PAC → Dimensionnement. Températures de départ requises par émetteur, et pour chaque
+    modèle : puissance à 35 °C, à −7 °C / 55 °C (validée ou non, avec sa source), température de départ max."""
+    _require_admin_session(request)
+    from services import dimensionnement_pac as dp
+    modeles = []
+    for m in _read_catalogue_pac():
+        if not isinstance(m, dict):
+            continue
+        modeles.append({"ref": m.get("ref"), "nom": m.get("nom"), "puiss35": dp.puissance_35(m),
+                        dp.CHAMP_M7_55: m.get(dp.CHAMP_M7_55), dp.CHAMP_M7_55_VALIDE: m.get(dp.CHAMP_M7_55_VALIDE) is True,
+                        dp.CHAMP_M7_55_SOURCE: m.get(dp.CHAMP_M7_55_SOURCE) or "", dp.CHAMP_TEMP_MAX: dp.temp_max(m)})
+    return JSONResponse({"temperatures_depart": dp.temperatures_depart(load_parametres_admin()),
+                         "emetteurs": dp.TEMPERATURES_DEPART_DEFAUT, "modeles": modeles,
+                         "version_catalogue": _catalogue_version()})
+
+
+@app.post("/api/admin/dimensionnement-pac")
+async def post_dimensionnement_pac(request: Request) -> JSONResponse:
+    """Enregistre les températures par émetteur et, par modèle, la puissance à −7 °C / 55 °C, sa validation, sa
+    source et la température max. Seuls ces champs sont écrits ; un modèle absent du message n'est pas touché."""
+    _require_admin_session(request)
+    from services import dimensionnement_pac as dp
+    payload = await _read_request_payload(request)
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=400, detail="Payload invalide")
+
+    def nombre(v, mini, maxi, champ):
+        if v in (None, ""):
+            return None
+        try:
+            n = float(str(v).replace(",", ".").replace(" ", ""))
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"{champ} : nombre attendu") from None
+        if not mini <= n <= maxi:
+            raise HTTPException(status_code=400, detail=f"{champ} : valeur hors bornes ({mini} à {maxi})")
+        return n
+
+    temps = payload.get("temperatures_depart")
+    if isinstance(temps, dict):
+        admin = load_parametres_admin()
+        admin["temperatures_depart"] = {k: nombre(v, 20, 90, f"température {k}")
+                                        for k, v in temps.items() if k in dp.TEMPERATURES_DEPART_DEFAUT}
+        save_parametres_admin_atomic(admin)
+    maj = {str(x.get("ref")): x for x in (payload.get("modeles") or []) if isinstance(x, dict) and x.get("ref")}
+    if maj:
+        catalogue = _read_catalogue_pac()
+        for m in catalogue:
+            x = maj.get(str(m.get("ref")))
+            if not x:
+                continue
+            kw = nombre(x.get(dp.CHAMP_M7_55), 0.5, 100, f"{m.get('ref')} −7 °C / 55 °C")
+            m[dp.CHAMP_M7_55] = kw
+            m[dp.CHAMP_M7_55_VALIDE] = bool(x.get(dp.CHAMP_M7_55_VALIDE)) and kw is not None
+            if dp.CHAMP_M7_55_SOURCE in x:
+                m[dp.CHAMP_M7_55_SOURCE] = str(x.get(dp.CHAMP_M7_55_SOURCE) or "").strip()[:300]
+            if dp.CHAMP_TEMP_MAX in x:
+                m[dp.CHAMP_TEMP_MAX] = nombre(x.get(dp.CHAMP_TEMP_MAX), 20, 95, f"{m.get('ref')} température max")
+        _write_catalogue_pac(catalogue)
+    return JSONResponse({"ok": True, "version_catalogue": _catalogue_version()})
+
+
+@app.post("/api/options-pac/{numero}")
+async def options_pac(numero: str, request: Request) -> JSONResponse:
+    """Lot A (notedim-master) — bouton « Comparer » de l'étape 6 : pour chaque option valable (modèle × quantité, prix
+    proposé), le prix TTC client, la prime CEE, MaPrimeRénov' et le reste à charge du devis (calcul du devis existant,
+    sur l'état du simulateur envoyé, rien n'est écrit) ; la marge du dossier pour un compte admin seulement."""
+    from services.marges import marge_dossier
+    u = current_user(request)
+    if not u:
+        raise HTTPException(status_code=401, detail="Non authentifié")
+    prospect = _find_lead(numero)
+    if not prospect:
+        raise HTTPException(status_code=404, detail="Prospect introuvable")
+    prospect = _lead_for_response(prospect)
+    payload = await _read_request_payload(request)
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=400, detail="Payload invalide")
+    catalogue = _read_catalogue_pac()
+    base = dict(_load_state_simulateur(numero, prospect, catalogue) or {})
+    if isinstance(payload.get("state"), dict):
+        base.update({k: v for k, v in payload["state"].items() if k != "numero"})
+    admin = _admin_payload_with_m3()
+    est_admin = u.get("role") == "admin"
+    lignes = []
+    for o in (payload.get("options") or [])[:80]:
+        if not isinstance(o, dict):
+            continue
+        modele = find_modele(catalogue, o.get("ref"))
+        if not modele:
+            continue
+        q = 2 if int(float_value(o.get("quantite"), 1)) == 2 else 1
+        prix = float_value(o.get("prix"), 0) or prix_defaut_pac(modele.get("ttc"), q, admin)
+        st = dict(base, modele_pac_id=modele.get("ref"), modele_pac=modele.get("nom"), quantite_pac=q, prix_pac=prix,
+                  user_modified_price=True)
+        calc = calculer_devis(prospect, st, admin, catalogue)
+        ligne = {"ref": modele.get("ref"), "quantite": q, "prix_ttc": prix, "montant_cee": calc.get("montant_cee"),
+                 "montant_mpr": calc.get("montant_mpr"), "reste_a_charge": calc.get("reste_a_charge")}
+        if est_admin:
+            ballon = None
+            choisi = resoudre_ballon(st, admin)
+            if choisi:
+                ballon = next((b for b in ((admin.get("ballon_thermo") or {}).get("modeles") or [])
+                               if isinstance(b, dict) and b.get("ref") == choisi.get("ref")), dict(choisi))
+            mg = marge_dossier(calc, modele, ballon, admin.get("params") or {}, mode_cee(prospect, st, admin))
+            ligne.update(marge_nette=mg.get("marge_nette"), marge_nette_pct=mg.get("marge_nette_pct"))
+        lignes.append(ligne)
+    return JSONResponse({"lignes": lignes, "admin": est_admin})
 
 
 @app.post("/api/admin/marge-dossier/{numero}")
@@ -4916,7 +5046,7 @@ def _build_notedim_context(request: Request, numero: str) -> dict:
         "ville_chantier": devis_value(prospect, "ville", "ville_chantier", default=""),
         "type_logement": _label_type_logement(prospect.get("type_logement", "")),
         "chauffage_actuel": str(devis_value(prospect, "chauffage_actuel", "mode_chauffage", default="")).capitalize(),
-        **calculer_notedim(prospect, state, catalogue),
+        **calculer_notedim(prospect, state, catalogue, load_parametres_admin()),
     }
     return context
 
