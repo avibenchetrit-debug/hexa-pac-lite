@@ -16036,6 +16036,13 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
         « Ouvert » = le client a affiché l'e-mail. Les lignes rosées ne sont pas confirmées « Livré » : à revoir.</p>
         <div class="adm-actions" style="justify-content:flex-start;gap:8px"><button type="button" class="adm-btn" id="adm-envois-actualiser">↻ Actualiser</button></div>
         <div id="adm-envois-res" class="adm-section-help"></div></div>`);
+    // Lot A (notedim-master) : températures de départ requises par émetteur + puissance à −7 °C / 55 °C (saisie et
+    // validation) et température max de chaque modèle
+    const admB15 = admBloc('15','15. Dimensionnement des PAC (température de départ, puissance à −7 °C / 55 °C)', `<div class="adm-card" id="adm-dim-pac">
+        <p class="adm-section-help">La puissance comparée au besoin est celle à −7 °C extérieur / 55 °C d'eau, <b>seulement si elle est validée</b>.
+        Sinon la puissance à 35 °C est utilisée et la note l'indique. Un modèle dont la température max est inférieure à la température requise n'est jamais proposé.</p>
+        <div id="adm-dim-pac-res" class="adm-section-help">Chargement…</div>
+        <div class="adm-actions"><button type="button" class="adm-btn-save" id="adm-dim-pac-save">Enregistrer</button></div></div>`);
     return `
       <div class="adm-overlay" id="adm-overlay">
         <div class="adm-modal">
@@ -16066,7 +16073,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
             <div class="adm-rootpanel" data-rootpanel="marge" hidden>${admMarges}${admB5_1}</div>
             <div class="adm-rootpanel" data-rootpanel="mpr" hidden>${admB2}</div>
             <div class="adm-rootpanel" data-rootpanel="cee" hidden>${admB3}</div>
-            <div class="adm-rootpanel" data-rootpanel="catalogue" hidden>${admB5_2}${admB9}</div>
+            <div class="adm-rootpanel" data-rootpanel="catalogue" hidden>${admB5_2}${admB9}${admB15}</div>
             <div class="adm-rootpanel" data-rootpanel="ballon" hidden>${admB5_3}</div>
             <div class="adm-rootpanel" data-rootpanel="eco" hidden>${admB8}</div>
             <div class="adm-rootpanel" data-rootpanel="emails" hidden>${admB6}${admB11}</div>
@@ -16754,10 +16761,63 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
           if (bloc && bloc.dataset.open !== 'true') bloc.querySelector('[data-toggle-bloc]')?.click();
           chargerControleEnvois();
         }
+        if (target === 'catalogue') chargerDimensionnementPac();
       });
     });
     document.getElementById('adm-envois-actualiser')?.addEventListener('click', chargerControleEnvois);
+    document.getElementById('adm-dim-pac-save')?.addEventListener('click', enregistrerDimensionnementPac);
     bindAdminM3();
+  }
+
+  // Lot A (notedim-master) : Admin → Catalogue PAC → 15. Dimensionnement des PAC
+  const LIBELLES_EMETTEURS_ADMIN = { radiateurs_fonte: 'Radiateurs fonte', radiateurs_classiques: 'Radiateurs acier récents',
+    radiateurs_basse_temp: 'Radiateurs basse température', plancher_chauffant: 'Plancher chauffant', convecteurs_electriques: 'Convecteurs électriques' };
+  async function chargerDimensionnementPac(){
+    const res = document.getElementById('adm-dim-pac-res');
+    if (!res) return;
+    const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+    const nb = v => (v === null || v === undefined || v === '') ? '' : String(v).replace('.', ',');
+    try {
+      const r = await fetch('/api/admin/dimensionnement-pac', { cache:'no-store' });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.detail || ('erreur ' + r.status));
+      const t = d.temperatures_depart || {};
+      res.innerHTML = `<p><b>Température de départ requise</b> (pré-remplie sur la fiche, étape Chauffage, selon l'émetteur ; modifiable par prospect)</p>
+        <div class="adm-fields-row" style="flex-wrap:wrap;gap:10px">${Object.keys(LIBELLES_EMETTEURS_ADMIN).map(k => `<label>${LIBELLES_EMETTEURS_ADMIN[k]}
+          <input type="text" inputmode="numeric" class="adm-dim-temp" data-emetteur="${k}" value="${nb(t[k])}" style="width:60px"> °C</label>`).join('')}</div>
+        <div style="overflow-x:auto;margin-top:10px"><table class="adm-dim-table" style="border-collapse:collapse;font-size:12.5px;width:100%">
+          <thead><tr>${['Modèle','35 °C','−7 °C / 55 °C (kW)','Validée','Source','Temp. max (°C)'].map(x => `<th style="text-align:left;padding:6px 8px;background:#002E5A;color:#fff;white-space:nowrap">${x}</th>`).join('')}</tr></thead>
+          <tbody>${(d.modeles || []).map(m => `<tr data-ref="${esc(m.ref)}" style="border-bottom:1px solid #E2E8F0${m.puissance_m7_55_valide ? '' : ';background:#FFFBEB'}">
+            <td style="padding:5px 8px">${esc(m.nom)}<small style="display:block;color:#64748B">${esc(m.ref)}</small></td>
+            <td style="padding:5px 8px;white-space:nowrap">${nb(m.puiss35)} kW</td>
+            <td style="padding:5px 8px"><input type="text" inputmode="decimal" class="adm-dim-kw" value="${nb(m.puissance_m7_55_kw)}" style="width:70px"></td>
+            <td style="padding:5px 8px;text-align:center"><input type="checkbox" class="adm-dim-ok"${m.puissance_m7_55_valide ? ' checked' : ''}></td>
+            <td style="padding:5px 8px"><input type="text" class="adm-dim-src" value="${esc(m.puissance_m7_55_source)}" style="width:100%;min-width:220px"></td>
+            <td style="padding:5px 8px"><input type="text" inputmode="numeric" class="adm-dim-tmax" value="${nb(m.temp_max_depart_c)}" style="width:55px"></td></tr>`).join('')}</tbody></table></div>
+        <p class="adm-section-help">Lignes jaunes : valeur à −7 °C / 55 °C absente ou non validée → la puissance à 35 °C est utilisée.</p>`;
+    } catch (err) {
+      res.innerHTML = `<span style="color:#B91C1C">Lecture impossible : ${esc(err.message)}</span>`;
+    }
+  }
+  async function enregistrerDimensionnementPac(){
+    const temps = {};
+    document.querySelectorAll('.adm-dim-temp').forEach(i => { temps[i.dataset.emetteur] = i.value.trim(); });
+    const modeles = [...document.querySelectorAll('.adm-dim-table tr[data-ref]')].map(tr => ({
+      ref: tr.dataset.ref,
+      puissance_m7_55_kw: tr.querySelector('.adm-dim-kw').value.trim(),
+      puissance_m7_55_valide: tr.querySelector('.adm-dim-ok').checked,
+      puissance_m7_55_source: tr.querySelector('.adm-dim-src').value.trim(),
+      temp_max_depart_c: tr.querySelector('.adm-dim-tmax').value.trim() }));
+    try {
+      const r = await fetch('/api/admin/dimensionnement-pac', { method:'POST', headers:{ 'Content-Type':'application/json' },
+        body: JSON.stringify({ temperatures_depart: temps, modeles }) });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.detail || ('erreur ' + r.status));
+      adminToast('Dimensionnement enregistré', '#15803D');
+      await chargerDimensionnementPac();
+    } catch (err) {
+      adminToast('Non enregistré : ' + err.message, '#B91C1C');
+    }
   }
 
   // Lot 13h : Admin → Contrôle des envois
