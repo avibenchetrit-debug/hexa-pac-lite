@@ -142,9 +142,11 @@ def test_vt_non_validee_pre_note_seulement(page):
     assert all("PROVISOIRE — NE PAS SIGNER" in (p.extract_text() or "") for p in pages), len(pages)
     page.emulate_media(media="screen")
     page.click("#sim-dim-close")
-    page.click("#btn-voir-devis")                                          # fenêtre du pré-devis : pas d'onglet note
+    page.click("#btn-voir-devis")                                          # fenêtre du pré-devis
     page.wait_for_selector("#devis-pdf-btn")
-    assert page.query_selector("[data-kind=notedim]") is None and definitifs_visibles(page) == []
+    # Lot B (notedim-master, 04/11/2026) : l'onglet « Note de dimensionnement » existe dès le pré-devis (note de
+    # pré-dimensionnement) ; rien de « définitif » n'est affiché tant que la VT n'est pas validée
+    assert page.inner_text("[data-kind=notedim]") == "📐 Note de dimensionnement" and definitifs_visibles(page) == []
 
 
 # ---------------------------------------------------------------- VT validée : bouton vert, onglet, bandeau, fichier
@@ -156,7 +158,7 @@ def test_vt_validee_note_definitive(page):
     assert bouton.evaluate("e => getComputedStyle(e).backgroundColor") == "rgb(21, 128, 61)"   # vert
     bouton.click()
     page.wait_for_selector("#devis-pdf-btn")
-    assert page.inner_text(".devis-tab.active") == "📐 Note de dim définitive"
+    assert page.inner_text(".devis-tab.active") == "📐 Note de dimensionnement"
     assert "/api/notedim/PR-93002/preview" in page.get_attribute("#devis-preview-frame", "src")
     assert page.inner_text("#devis-note-definitive") == "NOTE DÉFINITIVE — à faire signer par le client et à envoyer au délégataire"
     with page.expect_download(timeout=90000) as dl:

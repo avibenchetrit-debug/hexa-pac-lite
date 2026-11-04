@@ -142,7 +142,9 @@ def test_envoi_accepte_copie_interne_separee_et_sans_pixel(monkeypatch, client):
     envois = _faux_resend(monkeypatch)
     r = client.post(f"/api/devis/{NUM}/send", json={"variante": "pre_devis", "auteur": "Avi"})
     assert r.status_code == 200, r.text
-    au_client, copie = envois
+    # Lot B (notedim-master, 04/11/2026) : la note de (pré-)dimensionnement part aussi avec le pré-devis
+    au_client, note, copie = envois
+    assert note["to"] == [LEAD["email"]] and note["subject"] == "Votre note de dimensionnement Hexa Rénov'"
     assert au_client["to"] == [LEAD["email"]] and "bcc" not in au_client and "cc" not in au_client
     assert au_client["subject"] == "Votre pré-devis Hexa Rénov' — Marcel"
     assert f"/devis-public/{NUM}/1/" in au_client["html"] and "/o.gif" in au_client["html"]

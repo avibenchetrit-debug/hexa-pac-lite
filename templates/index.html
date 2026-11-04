@@ -14185,20 +14185,20 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     const _variante = (varianteForcee === 'pre_devis' || varianteForcee === 'devis') ? varianteForcee : (vtOk ? 'devis' : 'pre_devis');
     const devisUrl = `/api/devis/${encodeURIComponent(numero)}/preview?variante=${_variante}&t=${Date.now()}`;
     const notedimUrl = `/api/notedim/${encodeURIComponent(numero)}/preview?t=${Date.now()}`;
-    const surNote = vtOk && onglet === 'notedim';           // Lot 6h : « Note de dim définitive » ouvre directement sa note
+    const surNote = onglet === 'notedim';                   // Lot 6h : l'onglet de la note ouvre directement sa note
     wrap.innerHTML = `
       <div class="devis-modal-box" role="dialog" aria-modal="true">
         <div class="devis-modal-head">
           <div class="devis-modal-title">${vtOk ? 'Devis' : 'Pré-devis'} ${numero}</div>
           <button type="button" class="adm-btn adm-btn-ghost devis-tab${surNote ? '' : ' active'}" data-url="${devisUrl}" data-kind="devis">📄 ${vtOk ? 'Devis' : 'Pré-devis'}</button>
-          ${vtOk ? `<button type="button" class="adm-btn adm-btn-ghost devis-tab${surNote ? ' active' : ''}" data-url="${notedimUrl}" data-kind="notedim">📐 Note de dim définitive</button>` : ''}
+          <button type="button" class="adm-btn adm-btn-ghost devis-tab${surNote ? ' active' : ''}" data-url="${notedimUrl}" data-kind="notedim" id="devis-tab-notedim">📐 Note de dimensionnement</button>
           ${window.__hexaDossierFige ? '' : '<button type="button" class="adm-btn adm-btn-ghost" id="devis-regen-btn" title="Enregistre la fiche et le simulateur tels qu\'affichés, puis reconstruit le document">🔄 Régénérer</button>'}
           <button type="button" class="adm-btn adm-btn-primary" id="devis-pdf-btn">📥 Télécharger PDF</button>
           <button type="button" class="devis-send-btn" id="devis-send-btn">📧 Envoyer</button>
           <button type="button" class="devis-close-btn" id="devis-close-btn" aria-label="Fermer">×</button>
         </div>
         <div class="devis-pdf-erreur" id="devis-pdf-erreur" role="alert" hidden><span></span><button type="button" aria-label="Masquer le message">×</button></div>
-        <div class="devis-note-definitive" id="devis-note-definitive"${surNote ? '' : ' hidden'}>NOTE DÉFINITIVE — à faire signer par le client et à envoyer au délégataire</div>
+        <div class="devis-note-definitive" id="devis-note-definitive"${surNote ? '' : ' hidden'}>${vtOk ? 'NOTE DÉFINITIVE — à faire signer par le client et à envoyer au délégataire' : 'NOTE DE PRÉ-DIMENSIONNEMENT — envoyée avec le pré-devis'}</div>
         <div class="devis-alerte-regulateur" id="devis-alerte-regulateur" role="alert" hidden>⚠ Classe du régulateur manquante dans la fiche produit : la ligne « Installation et paramétrage du régulateur » part sans classe. Le devis reste possible.</div>
         <div class="devis-modal-body"><iframe id="devis-preview-frame" title="Aperçu devis" src="${surNote ? notedimUrl : devisUrl}"></iframe></div>
         <div class="devis-modal-foot"><button type="button" class="adm-btn adm-btn-cancel" id="devis-close-bottom">Fermer</button></div>

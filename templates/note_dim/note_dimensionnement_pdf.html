@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>{{ reference }} — {{ note.niveau.titre if note.niveau else 'Note de dimensionnement' }}</title>
+{# PAS DE FAVICON ICI, ET C'EST DEFINITIF. Un PDF n'a pas d'icone
+   d'onglet : le navigateur affiche la sienne. J'en avais ajoute un,
+   annonce comme fait — il ne pouvait RIEN produire. Le devis et le
+   pre-devis en ont un parce qu'ils sont servis en text/html ; ce
+   gabarit-ci sort en application/pdf. Ne pas le remettre : une
+   inclusion inerte fait croire que c'est branche. #}
+{# POLICE. `@import url('/static/tokens.css')` ne chargeait RIEN : `set_content()`
+   n'a pas d'URL de base, et le document sortait en sérif au lieu de la typo Hexa.
+   Le devis et le pré-devis embarquent Inter en data-URI — on fait pareil. #}
+{% if inter_fontface_css %}<style>{{ inter_fontface_css|safe }}</style>{% endif %}
+{% include "note_dim/_note_dim_style.html" %}
+<style>
+  .installation-proposee .ic-ok { color: #15803D; font-weight: 700; }
+  .installation-proposee .ic-sous, .installation-proposee .ic-sur { color: #B91C1C; font-weight: 700; }
+  .mentions-societe { display: flex; justify-content: space-between; gap: 16px; margin-top: 18px; padding-top: 10px;
+    border-top: 1px solid #E2E8F0; font-size: 8.5pt; color: #5A6675; line-height: 1.45; }
+</style>
+</head>
+<body>
+
+{# GARDES DE FORME. Ce gabarit imprime un document : il ne doit jamais lever,
+   même sur une note enregistrée sous une forme antérieure. Chaque accès part
+   d'un `default({})`, et l'absence d'un bloc masque sa section — elle ne casse
+   pas la page. #}
+{% set n     = note|default({}) or {} %}
+{% set c     = n.calcul|default({}) or {} %}
+{% set niv   = n.niveau|default({}) or {} %}
+{% set dep   = n.deperditions|default({}) or {} %}
+{% set trav  = c.travaux|default({}) or {} %}
+{% set temp  = c.temperature|default({}) or {} %}
+{% set rat   = n.rattachement|default({}) or {} %}
+{% set doc   = rat.document|default({}) or {} %}
+{% set gamme = n.gamme_cible|default({}) or {} %}
+{% set plage = n.plage_coherence|default({}) or {} %}
+{#- 03/11/2026 : « −7 °C / 55 °C » — la température extérieure de base et le régime de CETTE note. -#}
+{% set cond_plage = ((plage.get('temperature_base_c')|nb ~ ' °C') if plage.get('temperature_base_c') is not none else 'température extérieure de base') ~ ' / ' ~ (plage.get('regime') or n.get('regime') or '55') ~ ' °C' %}
+{% set seuils = n.seuils|default({}) or {} %}
+{#  🔴 DEUX AXES, DEUX VARIABLES — et les confondre a produit deux défauts.
+    `engage`  vient du PÉRIMÈTRE (MAR' validé, VT validée) : c'est le TITRE.
+    `mesure`  vient du CLASSEUR : c'est la QUALITÉ du calcul.
+    Le gabarit n'avait que `etabli` (le périmètre) et s'en servait pour décider
+    d'afficher les DÉPERDITIONS : sur un dossier figé sans classeur, il sortait
+    un tableau « Total enveloppe 0 · 0 · −0 % » et un bandeau « Calcul établi »
+    à côté d'un badge « Estimation ». Trouvé en rendant le cas, pas en le
+    relisant. #}
+{#  Le PÉRIMÈTRE n'a pas de variable ici : il est déjà porté par `niv.titre`
+    (« NOTE » ou « NOTE DE PRÉ-DIMENSIONNEMENT ») et par `niv.perimetre`. Une
+    seconde lecture du même axe rouvrirait la porte à la confusion. #}
+{% set mesure = niv.get('methode') == 'deperditions' %}
+
+{% include "note_dim/_note_dim_entete.html" %}
+
+<!-- ═══ 2. DONNÉES DU LOGEMENT ═══ -->
+<div class="section">
+  <div class="section-title">Données du logement</div>
+  <div class="cards-row bloc">
+    <div class="data-card">
+      <div class="data-card-label">Surface habitable</div>
+      <div class="data-card-value">{{ prospect.surface_habitable_m2|nb }} m²</div>
+      <div class="data-card-sub">{{ prospect.type_logement }}</div>
+    </div>
+    <div class="data-card">
+      <div class="data-card-label">Zone climatique</div>
+      <div class="data-card-value">{{ temp.get('zone_climatique') or c.get('zone_climatique') or prospect.zone_climatique or '—' }}</div>
+      <div class="data-card-sub">T° extérieure retenue&nbsp;: {{ (temp.get('temperature_base_c') if temp else c.get('temperature_base_exterieure'))|nb }}&nbsp;°C</div>
+    </div>
+    <div class="data-card">
+      <div class="data-card-label">Classe énergétique</div>
+      <div class="data-card-value">{{ prospect.dpe.classe or '—' }}</div>
+      <div class="data-card-sub">{{ 'Classeur d’audit déposé' if mesure else ('Relevé déclaré' if prospect.dpe.classe else 'Non renseignée') }}</div>
+    </div>
+    <div class="data-card">
+      <div class="data-card-label">Régime d'eau</div>
+      <div class="data-card-value">{{ n.get('regime') or '55' }} °C</div>
+      <div class="data-card-sub">Régime retenu pour comparer les modèles</div>
+    </div>
+  </div>
+</div>
+
+{% if mesure %}
+<!-- ═══ 3. DÉPERDITIONS POSTE PAR POSTE — mise en page du gabarit, NOS colonnes (①) ═══ -->
+<div class="section">
+  <div class="section-title">Déperditions du logement, poste par poste</div>
+  <div class="note-explic">
+    Une déperdition se mesure en watts par degré (W/K)&nbsp;: c'est la puissance qu'il faut
+    fournir pour maintenir un écart d'un degré entre l'intérieur et l'extérieur. Plus le
+    chiffre est élevé, plus le logement laisse partir la chaleur. La colonne
+    «&nbsp;après travaux&nbsp;» applique, poste par poste, les lots d'isolation retenus dans
+    cette simulation — c'est sur elle que la puissance est calculée, et non sur l'état actuel.
+  </div>
+  <table class="iso-table">
+    <thead>
+      <tr>
+        <th>Poste</th>
+        <th class="num">Surface</th>
+        <th class="num">Actuel</th>
+        <th class="num">Traité</th>
+        <th class="num">Après travaux</th>
+        <th class="num">Gain</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for cle, p in (trav.get('postes') or {}).items() %}
+      {% if p.w_par_k_avant is not none %}
+      <tr class="{{ '' if p.traite else 'inerte' }}">
+        <td>{{ p.libelle }}</td>
+        <td class="num">{{ (p.surface_m2|round|nb ~ ' m²') if p.surface_m2 else '—' }}</td>
+        <td class="num">{{ p.w_par_k_avant|round(1)|nb }}</td>
+        <td class="num">{{ (p.surface_traitee_m2|round|nb ~ ' m²') if p.surface_traitee_m2 else '—' }}</td>
+        <td class="num">{{ p.w_par_k_apres|round(1)|nb }}</td>
+        <td class="num">
+          {%- if p.w_par_k_avant > 0 and p.w_par_k_apres < p.w_par_k_avant -%}
+            <span class="gain">−{{ ((1 - p.w_par_k_apres / p.w_par_k_avant) * 100)|round|nb }} %</span>
+          {%- else -%}<span class="muet">—</span>{%- endif -%}
+        </td>
+      </tr>
+      {% endif %}
+      {% endfor %}
+      <tr class="total">
+        <td>Total enveloppe</td>
+        <td class="num"></td>
+        <td class="num">{{ (c.get('deperditions_avant_w_par_k') or 0)|round(1)|nb }}</td>
+        <td class="num"></td>
+        <td class="num">{{ (c.get('deperditions_apres_w_par_k') or 0)|round(1)|nb }}</td>
+        <td class="num"><span class="gain">−{{ (c.get('reduction_deperditions_pct') or 0)|round|nb }} %</span></td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ═══ 4. TRAVAUX RETENUS ═══ -->
+{% set traites = (trav.get('postes') or {}).items()|selectattr('1.traite')|list %}
+{% if traites %}
+<div class="section">
+  <div class="section-title">Travaux d'isolation pris en compte</div>
+  <div class="note-explic">
+    Deux performances, deux façons de compter. Sur une paroi opaque (murs, planchers),
+    l'isolant <b>s'ajoute</b> à ce qui existe&nbsp;: c'est la résistance R, en m².K/W, et plus
+    elle est grande, mieux la paroi isole. Sur une fenêtre, la menuiserie neuve
+    <b>remplace</b> l'ancienne&nbsp;: c'est le coefficient Uw, en W/m².K, et c'est l'inverse —
+    plus il est petit, mieux elle isole.
+  </div>
+  <table class="iso-table">
+    <thead>
+      <tr><th>Poste traité</th><th class="num">Surface traitée</th><th class="num">Performance</th><th>Origine de la valeur</th></tr>
+    </thead>
+    <tbody>
+      {% for cle, p in traites %}
+      <tr>
+        <td>{{ p.libelle }}{% if p.lots %} <span class="muet">({{ p.lots|join(', ') }})</span>{% endif %}</td>
+        <td class="num">{{ (p.surface_traitee_m2|round|nb ~ ' m²') if p.surface_traitee_m2 else '—' }}</td>
+        <td class="num">
+          {%- if p.r_ou_uw and p.methode == 'uw' -%}Uw {{ p.r_ou_uw|nb }} W/m².K
+          {%- elif p.r_ou_uw -%}R {{ p.r_ou_uw|nb }} m².K/W
+          {%- elif p.reduction_pct is defined and p.reduction_pct -%}−{{ p.reduction_pct|round|nb }} %
+          {%- else -%}—{%- endif -%}
+        </td>
+        <td>
+          {%- if p.origine_valeur == 'catalogue' -%}Fiche produit du matériau retenu
+          {%- elif p.origine_valeur == 'defaut_admin' -%}<b>Valeur par défaut — épaisseur estimée, à confirmer</b>
+          {%- elif p.detail_reduction -%}{{ p.detail_reduction }}
+          {%- else -%}—{%- endif -%}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+{% endif %}
+
+<!-- ═══ 5. PARAMÈTRES DE CALCUL ═══ -->
+<div class="section">
+  <div class="section-title">Paramètres de calcul retenus</div>
+  <div class="note-explic">
+    La puissance nécessaire dépend de l'écart de température à couvrir&nbsp;: ΔT est la
+    différence entre la température de confort visée à l'intérieur et la température
+    extérieure la plus basse retenue pour la région. L'altitude corrige cette dernière,
+    car un même département est plus froid en hauteur.
+  </div>
+  <div class="params-grid">
+    <div class="param-row">
+      <span class="param-label">Méthode appliquée</span>
+      <span class="param-value">{{ 'Déperditions poste par poste' if niv.get('methode') == 'deperditions' else 'Coefficient volumique G' }}</span>
+    </div>
+    {% if temp %}
+    <div class="param-row"><span class="param-label">Zone climatique</span><span class="param-value">{{ temp.zone_climatique or 'non déterminée' }}</span></div>
+    <div class="param-row"><span class="param-label">T° extérieure de base</span><span class="param-value">{{ temp.temperature_base_zone_c|nb }} <span class="param-unit">°C</span></span></div>
+    <div class="param-row"><span class="param-label">Altitude du chantier</span><span class="param-value">{{ (temp.altitude_m|round|nb) if temp.altitude_m else 'non renseignée' }} <span class="param-unit">{{ 'm' if temp.altitude_m else '' }}</span></span></div>
+    <div class="param-row"><span class="param-label">Correction d'altitude</span><span class="param-value">{{ ('−' ~ temp.correction_altitude_c|nb) if temp.correction_altitude_c else 'aucune' }} <span class="param-unit">{{ '°C' if temp.correction_altitude_c else '' }}</span></span></div>
+    <div class="param-row"><span class="param-label">T° extérieure retenue</span><span class="param-value">{{ temp.temperature_base_c|nb }} <span class="param-unit">°C</span></span></div>
+    <div class="param-row"><span class="param-label">Température de confort</span><span class="param-value">{{ c.get('temperature_consigne_c')|nb }} <span class="param-unit">°C</span></span></div>
+    <div class="param-row"><span class="param-label">Écart à couvrir</span><span class="param-value">ΔT = {{ c.get('delta_t_c')|nb }} <span class="param-unit">°C</span></span></div>
+    {% else %}
+    <div class="param-row"><span class="param-label">Zone climatique</span><span class="param-value">{{ c.get('zone_climatique') or '—' }}</span></div>
+    <div class="param-row"><span class="param-label">T° extérieure de base</span><span class="param-value">{{ c.get('temperature_base_exterieure')|nb }} <span class="param-unit">°C</span></span></div>
+    <div class="param-row"><span class="param-label">Température de confort</span><span class="param-value">{{ c.get('temperature_consigne')|nb }} <span class="param-unit">°C</span></span></div>
+    <div class="param-row"><span class="param-label">Écart à couvrir</span><span class="param-value">ΔT = {{ c.get('delta_t_celsius')|nb }} <span class="param-unit">°C</span></span></div>
+    <div class="param-row"><span class="param-label">Coefficient G retenu</span><span class="param-value">{{ c.get('coefficient_g')|nb }} <span class="param-unit">W/m³·°C</span></span></div>
+    <div class="param-row"><span class="param-label">Volume chauffé</span><span class="param-value">{{ c.get('volume_chauffe_m3')|nb }} <span class="param-unit">m³</span></span></div>
+    {% endif %}
+    {#  ④ LE FACTEUR ET LA RÉSERVE ECS VIENNENT DU CALCUL, DONC DE L'ADMIN.
+        Le gabarit pac-lite écrivait « × 1,10 » en dur : un réglage changé en
+        admin n'aurait pas bougé le document. #}
+    <div class="param-row"><span class="param-label">Facteur de sécurité</span><span class="param-value">× {{ c.get('facteur_securite')|nb }}</span></div>
+    <div class="param-row">
+      <span class="param-label">Réserve eau chaude sanitaire</span>
+      <span class="param-value">{% if c.get('p_ecs_w') %}{{ c.get('p_ecs_w')|nb }} <span class="param-unit">W</span>{% else %}<span class="param-unit">non intégrée à la PAC</span>{% endif %}</span>
+    </div>
+    <div class="param-row"><span class="param-label">Régime d'émission</span><span class="param-value">{{ n.get('regime') or '55' }} <span class="param-unit">°C</span></span></div>
+  </div>
+</div>
+
+<!-- ═══ 6. LE CALCUL, EN CLAIR ═══ -->
+<div class="section insecable">
+  <div class="section-title">Calcul des déperditions et de la puissance</div>
+  <div class="note-explic">
+    Le facteur de sécurité couvre les jours exceptionnellement froids et la relance après
+    une absence. Il porte sur le chauffage seul&nbsp;: le besoin d'eau chaude est connu et
+    constant, il n'a pas à être majoré.
+  </div>
+  {# LE BLOC DE CALCUL, COLORIÉ — mise en page reprise de pac-lite v5.
+     Commentaire gris, valeur intermédiaire orange, résultat vert. Le rôle de
+     chaque ligne vient de `pdf_note_dimensionnement.lignes_de_formule`, qui lit
+     la STRUCTURE en étapes écrite par `note_dimensionnement` — il ne devine
+     rien. Un chiffre vert au mauvais endroit se lirait comme la puissance
+     recommandée. #}
+  {# ⚠ AUCUN RETOUR À LA LIGNE ENTRE LES `<span>` : ils sont déjà en
+     `display:block`. Un `\n` de gabarit s'y ajouterait comme un saut de ligne
+     réel (le conteneur est en `pre-wrap`), et chaque ligne compterait double. #}
+  <div class="calc-formula bloc">
+    {%- for l in (c.get('formule_texte') or c.get('details_formule') or '')|formule -%}
+    <span class="cf-{{ l.role }}">{{ l.texte }}</span>
+    {%- endfor -%}
+  </div>
+</div>
+
+<!-- ═══ 7 + 8. BANDEAU DE FONDEMENT PUIS RÉSULTAT ═══════════════════════════
+     PLACEMENT ARBITRÉ PAR AVI : le bandeau vient AVANT le résultat.
+     ⚠ ET ILS NE SE SÉPARENT JAMAIS. C'est toute la raison d'être du placement :
+     le lecteur doit voir « estimation à confirmer » DANS LE MÊME COUP D'ŒIL que
+     le chiffre. Séparés par un saut de page, la réserve devient une note de bas
+     de document que personne ne relie à la puissance.
+     Le prix en est un blanc en fin de page précédente quand l'ensemble ne tient
+     pas — blanc assumé, mesuré à 64 mm sur le dossier d'essai. -->
+<div class="bloc">
+{% if n.get('travaux_non_deduits') %}
+<div class="fondement alerte bloc">
+  <b>Travaux non déduits</b>
+  Aucune donnée de paroi exploitable dans le classeur&nbsp;: les travaux d'isolation retenus
+  ne sont PAS déduits de ce calcul. La puissance ci-dessous est celle du logement dans son
+  état actuel, avant travaux.
+</div>
+{% endif %}
+
+<div class="fondement {{ 'etabli' if mesure else 'estime' }} bloc">
+  <b>{{ 'Calcul établi' if mesure else 'Estimation — à confirmer' }}</b>
+  {{ niv.get('fondement') or '' }}
+  {% if niv.get('perimetre') %}<br>Périmètre&nbsp;: {{ niv.get('perimetre') }}{% if niv.get('perimetre_le') %} ({{ niv.get('perimetre_le')|date_fr }}){% endif %}.{% endif %}
+  {#  ④c LA MÉTHODE RÉELLEMENT EMPLOYÉE, NOMMÉE. L'en-tête annonçait
+      NF EN 12831 pendant que le corps appliquait des forfaits. #}
+  {# Une seule phrase, construite par `niveau_note` — voir le gabarit écran. #}
+  <br><b class="inline">Méthode employée&nbsp;:</b> {{ niv.get('methode_texte') }}
+  {% if niv.get('reserve') %}<br>{{ niv.get('reserve') }}{% endif %}
+  {% if mesure and dep.get('source_fichier') %}<br>Source&nbsp;: {{ dep.get('source_fichier') }}{% if dep.get('source_type') %} ({{ dep.get('source_type') }}){% endif %}.{% endif %}
+</div>
+
+<!-- ═══ 8. RÉSULTAT ═══ -->
+<div class="section">
+  {% if c.get('p_pac_recommandee_kw') %}
+  <div class="result-box bloc">
+    <div class="result-label">Puissance de pompe à chaleur requise</div>
+    <div><span class="result-value">{{ c.get('p_pac_recommandee_kw')|nb }}</span><span class="result-unit">kW</span></div>
+    <div class="result-ctx">
+      au régime {{ n.get('regime') or '55' }} °C
+      {%- if mesure %} · logement après les travaux de cette simulation
+      ({{ (c.get('deperditions_apres_w_par_k') or 0)|round|nb }} W/K){% endif -%}
+    </div>
+    {#- 03/11/2026 (Avi) : ce que la puissance couvre. -#}
+    <div class="result-ctx">Périmètre&nbsp;: pièces du logement desservies par le réseau de chauffage hydraulique.</div>
+    {#  ③ LA GAMME SE CALCULE, elle ne s'écrit pas. Seuil en admin
+        (`note_dimensionnement.tolerance_gamme_pct`). #}
+    {#- 03/11/2026 (Avi) : la PLAGE DE COHÉRENCE (60 à 130 % de la puissance requise, seuils de l'Admin v2) remplace la
+        « gamme cible ». Échelle à trois zones, SANS curseur de modèle : la note reste neutre. -#}
+    {% if plage.get('min_kw') %}
+    <div class="result-gamme">
+      Plage de cohérence&nbsp;: <strong>{{ plage.get('min_kw')|nb }} à {{ plage.get('max_kw')|nb }} kW à {{ cond_plage }}</strong>
+      <div class="echelle-coherence" aria-hidden="true">
+        <span class="ec-zone ec-sous">Sous-dimensionnement<br>(&lt;&nbsp;{{ plage.get('min_pct')|nb }}&nbsp;%)</span>
+        <span class="ec-zone ec-ok">Dimensionnement cohérent<br>({{ plage.get('min_pct')|nb }} à {{ plage.get('max_pct')|nb }}&nbsp;% · {{ plage.get('min_kw')|nb }} à {{ plage.get('max_kw')|nb }}&nbsp;kW)</span>
+        <span class="ec-zone ec-sur">Surdimensionnement<br>(&gt;&nbsp;{{ plage.get('max_pct')|nb }}&nbsp;%)</span>
+      </div>
+      <span class="reserve">En dessous de 100&nbsp;%, l'appoint électrique intégré à la pompe à chaleur prend le relais les jours les plus froids&nbsp;; au-dessus de {{ plage.get('max_pct')|nb }}&nbsp;%, la machine fonctionnerait en cycles courts, au détriment de son rendement et de sa durée de vie.</span>
+    </div>
+    {% elif gamme.get('min_kw') %}
+    <div class="result-gamme">
+      Gamme cible&nbsp;: <strong>{{ gamme.get('min_kw')|nb }} à {{ gamme.get('max_kw')|nb }} kW</strong>
+    </div>
+    {% endif %}
+  </div>
+  {% else %}
+  <div class="fondement estime"><b>Puissance non calculable</b>
+    {{ (c.get('manques')|join(' et ')) if c.get('manques') else 'données insuffisantes' }} — à compléter sur la fiche.</div>
+  {% endif %}
+</div>
+</div>{# fin du couple bandeau + résultat, insécable #}
+
+{#- pac-lite (Avi, 04/11/2026) : l'INSTALLATION PROPOSÉE — modèle, quantité, puissance totale et couverture. C'est le seul
+    bloc que la note du Master ne porte pas (elle reste neutre) ; il se lit sur la même barre 60–130 %. -#}
+{% set inst = n.get('installation') or {} %}
+{% if inst.get('modele') and c.get('p_pac_recommandee_kw') %}
+{% set coh = inst.get('coherence') or {} %}
+<div class="section bloc installation-proposee">
+  <div class="section-title">Installation proposée</div>
+  <div class="params-grid">
+    <div class="param-row"><span class="param-label">Pompe à chaleur</span><span class="param-value" id="nd-inst-modele">{{ inst.get('modele') }}</span></div>
+    <div class="param-row"><span class="param-label">Puissance installée</span><span class="param-value" id="nd-inst-puissance">{% if inst.get('quantite', 1) > 1 %}{{ inst.get('quantite') }} × {{ inst.get('unitaire_kw')|nb }} kW = {% endif %}{{ inst.get('total_kw')|nb }} <span class="param-unit">kW</span></span></div>
+    <div class="param-row"><span class="param-label">Couverture du besoin</span><span class="param-value ic-{{ coh.get('statut') or 'ok' }}" id="nd-inst-couverture">{{ coh.get('pct')|nb }} % · {{ coh.get('libelle') or '—' }}</span></div>
+    {% if inst.get('temp_requise') %}<div class="param-row"><span class="param-label">Température de départ</span><span class="param-value">requise {{ inst.get('temp_requise')|nb }} °C{% if inst.get('temp_max') %} · maximale du modèle {{ inst.get('temp_max')|nb }} °C{% endif %}</span></div>{% endif %}
+  </div>
+  {% if inst.get('mention') %}<div class="note-explic" id="nd-inst-mention">{{ inst.get('mention')[:1]|upper }}{{ inst.get('mention')[1:] }}.</div>{% endif %}
+</div>
+{% endif %}
+
+{#  ⚠ CETTE PHRASE EST HORS DU COUPLE INSÉCABLE, ET C'EST DÉLIBÉRÉ. Ce qui ne
+    doit jamais quitter le chiffre, c'est sa RÉSERVE — « estimation à confirmer »,
+    « travaux non déduits ». Le gain apporté par l'isolation est un commentaire
+    FAVORABLE : le lire une ligne plus bas ne trompe personne. L'enfermer dans le
+    couple lui coûtait 14 mm, donc une page entière au document. #}
+{#- 03/11/2026 (Avi) : « Puissance nominale et puissance utile ». -#}
+{% if c.get('p_pac_recommandee_kw') %}
+<div class="note-explic bloc puissance-utile">
+  <b>Puissance nominale et puissance utile.</b>
+  Les puissances annoncées par les fabricants sont mesurées par une température extérieure douce (+7&nbsp;°C).
+  Par grand froid, une pompe à chaleur air-eau délivre moins de puissance&nbsp;: le choix de la machine doit donc se
+  faire sur sa puissance utile à la température extérieure de base ({{ (plage.get('temperature_base_c')|nb ~ '&nbsp;°C')|safe if plage.get('temperature_base_c') is not none else 'celle du chantier' }} ici)
+  et au régime d'eau retenu ({{ plage.get('regime') or n.get('regime') or '55' }}&nbsp;°C ici), et non sur sa puissance nominale.
+</div>
+{% endif %}
+{% if mesure and c.get('p_avant_travaux_w') %}
+<div class="note-explic" style="text-align:center; margin-bottom:10px">
+  Sans les travaux d'isolation retenus, il aurait fallu
+  <b>{{ ((c.get('p_avant_travaux_w') or 0) / 1000)|round(1)|nb }} kW</b>&nbsp;:
+  l'isolation permet une machine plus petite, moins chère à l'achat comme à l'usage.
+</div>
+{% endif %}
+
+{# ═══ TROIS BLOCS RETIRÉS — décision d'Avi, 28/08/2026 ═══════════════════
+   « Modèle proposé », « Recommandations techniques », « Réserves et points de
+   vigilance ». Une note de dimensionnement est NEUTRE : elle établit une
+   PUISSANCE, pas un produit. Ni le client, ni l'ANAH, ni le délégataire n'ont
+   besoin d'un modèle nommé, et un modèle indisponible périmerait un document
+   déjà remis. « Méthode, portée et références » reste.
+
+   L'AVERTISSEMENT DE PLAFOND SUBSISTE, sorti du catalogue : il compare la
+   puissance requise à un seuil ADMINISTRABLE (« puissance maximale d'une
+   machine unique »), pas au plus gros modèle en stock. #}
+{% if n.get('alerte_puissance_max') %}
+<div class="section">
+  <div class="alerte-plafond bloc">{{ n.get('alerte_puissance_max') }}</div>
+</div>
+{% endif %}
+
+<!-- ═══ 12. MÉTHODE, PORTÉE ET RÉFÉRENCES ═══ -->
+<div class="section">
+  <div class="section-title">Méthode, portée et références</div>
+  <div class="method-block">
+    <div class="method-text">
+      <strong>Méthode.</strong>
+      {% if niv.get('methode') == 'deperditions' %}
+      Bilan des déperditions du logement poste par poste (norme <strong>NF EN 12831</strong>, méthode
+      simplifiée), relevées dans le classeur d'audit énergétique et recalculées après les
+      travaux d'isolation retenus dans cette simulation.
+      P&nbsp;=&nbsp;Σ(déperditions)&nbsp;×&nbsp;ΔT, majorée du facteur de sécurité.
+      {% else %}
+      Estimation par le coefficient volumique de déperdition&nbsp;:
+      P&nbsp;=&nbsp;G&nbsp;×&nbsp;V&nbsp;×&nbsp;ΔT, le coefficient G étant déduit de la classe
+      énergétique du logement. Cette méthode ne connaît pas le détail des parois.
+      {% endif %}
+      Températures extérieures de base&nbsp;: <strong>DTU 65.11</strong>, corrigées de l'altitude du chantier.<br><br>
+
+      <strong>Portée.</strong> Cette note établit la puissance THERMIQUE nécessaire au logement. Elle
+      ne vaut pas étude d'exécution&nbsp;: le dimensionnement des émetteurs, le tracé
+      hydraulique, l'équilibrage et le raccordement électrique relèvent de l'installateur.
+      {% if niv.get('methode') != 'deperditions' %}
+      Les valeurs seront CONFIRMÉES après l'audit énergétique, qui fournira les déperditions
+      réelles paroi par paroi.
+      {% endif %}
+      Les puissances de pompe à chaleur s'entendent aux conditions normalisées
+      <strong>EN&nbsp;14511</strong>&nbsp;; la performance réelle dépend de la température extérieure et
+      du régime d'eau du circuit.<br><br>
+
+      {# ═══ LES POINTS DE VIGILANCE SONT REVENUS ICI — 28/08/2026 ═══════════
+         Ils étaient partis avec « Réserves et points de vigilance ». Ce bloc-là
+         portait du PRODUIT ; ceux-ci portent de l'INGÉNIERIE : réseau haute
+         température, montage monotube, contrôles du classeur. Ils avertissent
+         que le DIMENSIONNEMENT peut être faux — c'est-à-dire le sujet même de
+         cette note. Les retirer revenait à taire la seule chose qui rend le
+         chiffre discutable.
+
+         ⚠ La liste vient du serveur (`points_de_vigilance`), une seule pour les
+         trois surfaces. L'avertissement de plafond n'y est PAS : il a son bloc
+         propre, quelques centimètres plus haut. #}
+      {% if n.get('points_de_vigilance') %}
+      <strong>Points de vigilance.</strong>
+      <ul class="method-vigilance">
+        {% for v in n.get('points_de_vigilance') %}<li>{{ v }}</li>{% endfor %}
+      </ul>
+
+      {% endif %}
+      <strong>Document.</strong> Établi le {{ datetime_emission }} par {{ societe.raison_sociale }},
+      pour le dossier {{ prospect.numero }}. Il accompagne
+      {% if doc.get('numero') %}le {{ 'devis' if doc.get('type') == 'devis' else 'pré-devis' }} {{ doc.get('numero') }}{% else %}le document commercial correspondant{% endif %}
+      {# 02/11/2026 (Avi) : l'accompagnateur Rénov' n'est nommé que là où il intervient (rénovation d'ampleur ANAH).
+         03/11/2026 : commentaire sans « - » — il avalait l'espace avant « et » (« …106GIet peut être remis »). #}
+      {% if (note.get('perimetre') or {}).get('declencheur') == 'mar' %}{{ tx("doc_note_dim.remise", "et peut être remis au délégataire CEE et à l'accompagnateur Mon Accompagnateur Rénov'.") }}{% else %}{{ tx("doc_note_dim.remise_sans_mar", "et peut être remis au délégataire CEE.") }}{% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- ═══ PIED ═══
+     ⚠ LES MENTIONS SOCIÉTÉ NE SONT PLUS ICI. Elles sont dans le pied de page
+     RÉPÉTÉ, celui que Chromium imprime en bas de CHAQUE page avec « Page X / Y »
+     (`pdf_note_dimensionnement._footer_note_html`). Les laisser aussi en flux
+     les aurait imprimées deux fois sur la dernière page — c'est exactement ce
+     que fait le devis, et pour la même raison : `cover-footer` et
+     `footer-devis` y sont masqués en `@media print`.
+
+     Reste la ligne d'émission : elle appartient à la FIN du document (« ce
+     document a été généré le… »), pas à chaque page. -->
+{#- pac-lite : pas de pied répété par Chromium ici — les mentions société sont en fin de document. -#}
+<div class="mentions-societe">
+  <div><strong>{{ societe.raison_sociale }}</strong><br>{{ societe.adresse }}<br>{{ societe.rcs }} · SIRET {{ societe.siret }}<br>TVA {{ societe.tva }}</div>
+  <div><strong>{{ societe.rge }}</strong><br>Assurance décennale &amp; RC Pro — {{ societe.decennale }}<br>Validité des garanties : {{ societe.decennale_validite }}<br>{{ societe.email }} · {{ societe.telephone }}</div>
+</div>
+<div class="footer-emit">
+  Document généré le {{ datetime_emission }} par {{ societe.nom }} — référence {{ reference }}
+</div>
+
+</body>
+</html>

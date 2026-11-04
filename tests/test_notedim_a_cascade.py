@@ -313,6 +313,6 @@ def test_geslot_pre_note_et_note_definitive(navigateur):
     assert (nd["temperature_depart_requise"], nd["temperature_depart_max"], nd["alerte_temperature"]) == ("65", "70", "")
     html = pg.evaluate("u => fetch(u).then(r => r.text())", f"/notedim-public/{NUM}/{main._sign_notedim_token(NUM)}")
     assert "2 × ALTHERMA 3H HT R32 18 TRI (en cascade)" in html and "108 % · cohérent" in html
-    assert "Plage de cohérence" in html and "± 20" not in html
+    assert "Plage de cohérence" in html and "Tolérance ± 20" not in html   # (« ± 20 » subsiste dans un commentaire CSS du Master)
     assert "Puissance à 35 °C, valeur à −7 °C / 55 °C non renseignée." in html
     assert pg.erreurs_js == []

@@ -573,6 +573,8 @@ DEFAULT_CATALOGUE_PAC = _load_default_catalogue()
 
 app = FastAPI(title="hexa-pac-lite")
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
+from services.note_dim_master import installer_filtres as _installer_filtres_note_dim  # noqa: E402
+_installer_filtres_note_dim(templates.env)          # Lot B : filtres du gabarit du Master (nb, formule, date_fr, tx)
 PARIS_TZ = ZoneInfo("Europe/Paris")
 
 # Serve static assets (CSS/JS/images) under /static.
@@ -5020,6 +5022,10 @@ def _build_devis_context(request: Request, numero: str, version: int | None = No
 
 
 def _build_notedim_context(request: Request, numero: str) -> dict:
+    """Lot B (notedim-master) : contexte du gabarit du Master (services/note_dim_master.py). Avant la visite technique :
+    NOTE DE PRÉ-DIMENSIONNEMENT ; après : NOTE DE DIMENSIONNEMENT. Les anciennes clés pac-lite (calculer_notedim)
+    restent dans le contexte pour les appelants existants (e-mail, tests)."""
+    from services import note_dim_master
     prospect = _find_lead(numero)
     if not prospect:
         raise HTTPException(status_code=404, detail="Prospect introuvable")
@@ -5029,25 +5035,13 @@ def _build_notedim_context(request: Request, numero: str) -> dict:
     missing = validate_prospect_for_devis(prospect, state, load_parametres_admin())
     if missing:
         return {"request": request, "missing": missing, "numero": numero, "_error_template": "erreur_champs_manquants.html"}
-    now = datetime.now(PARIS_TZ)
-    cp_chantier = devis_value(prospect, "cp_chantier", "code_postal_chantier", "cp", default="")
-    context = {
-        "request": request,
-        "numero_notedim": generer_numero_notedim(prospect),
-        "date_emission": now.strftime("%d/%m/%Y"),
-        "heure_emission": now.strftime("%H:%M"),
-        "nom": str(prospect.get("nom", "")).upper(),
-        "prenom": prospect.get("prenom", ""),
-        "numero_prospect": numero,
-        "telephone": prospect.get("telephone", ""),
-        "email": str(prospect.get("email", "")).lower(),
-        "adresse_chantier": devis_value(prospect, "adresse", "adresse_chantier", default=""),
-        "cp_chantier": cp_chantier,
-        "ville_chantier": devis_value(prospect, "ville", "ville_chantier", default=""),
-        "type_logement": _label_type_logement(prospect.get("type_logement", "")),
-        "chauffage_actuel": str(devis_value(prospect, "chauffage_actuel", "mode_chauffage", default="")).capitalize(),
-        **calculer_notedim(prospect, state, catalogue, load_parametres_admin()),
-    }
+    admin = load_parametres_admin()
+    vt = bool(prospect.get("vt_validee"))
+    context = {"request": request, "numero_notedim": generer_numero_notedim(prospect),
+               **calculer_notedim(prospect, state, catalogue, admin)}
+    context.update(note_dim_master.contexte(
+        prospect, state, catalogue, admin, reference=context["numero_notedim"], maintenant=datetime.now(PARIS_TZ),
+        document={"type": "devis" if vt else "pre_devis", "numero": ""}))
     return context
 
 
@@ -5236,7 +5230,7 @@ def _numero_notedim_de(numero: str, item: dict | None = None) -> str:
 
 @app.get("/api/notedim/{numero}/preview", response_class=HTMLResponse)
 async def notedim_preview(numero: str, request: Request) -> HTMLResponse:
-    _require_vt_validee(numero)
+    # Lot B : visible dès le pré-devis (titre « NOTE DE PRÉ-DIMENSIONNEMENT » avant la visite technique)
     _item, archive = _notedim_archivee(numero)
     if archive:
         return FileResponse(archive, media_type="application/pdf", headers={"Content-Disposition": "inline"})
@@ -5936,7 +5930,7 @@ async def notedim_public_pdf(numero: str, token: str, request: Request):
 
 @app.get("/api/notedim/{numero}/pdf")
 async def notedim_pdf(numero: str, request: Request):
-    _require_vt_validee(numero)
+    # Lot B : téléchargeable dès le pré-devis (note de pré-dimensionnement avant la visite technique)
     item, archive = _notedim_archivee(numero)
     if archive:                                   # Lot 6h : dossier facturé -> la note archivée, rien n'est régénéré
         return FileResponse(archive, media_type="application/pdf", headers=_entete_pdf("NoteDim-DEFINITIVE", _numero_notedim_de(numero, item)))
@@ -5947,7 +5941,10 @@ async def notedim_pdf(numero: str, request: Request):
     html_nd = templates.env.get_template("notedim_pac.html").render(ctx)
     pdf_bytes = await run_in_threadpool(_html_to_pdf_playwright, html_nd, request)
     _write_pdf(_notedim_path(numero, version), pdf_bytes)
-    return Response(pdf_bytes, media_type="application/pdf", headers=_entete_pdf("NoteDim-DEFINITIVE", ctx.get("numero_notedim") or numero))
+    _lead_nd = _find_lead(numero) or {}
+    return Response(pdf_bytes, media_type="application/pdf",
+                    headers=_entete_pdf("NoteDim-DEFINITIVE" if _lead_nd.get("vt_validee") else "Note-pre-dimensionnement",
+                                        ctx.get("numero_notedim") or numero))
 
 
 def _email_header_html():
@@ -6524,7 +6521,7 @@ async def _send_devis(numero: str, payload: dict, request: Request) -> dict:
     version = _next_sent_version(numero)
     numero_dossier = _lead_numero_dossier(numero) or _commit_numero_dossier()
     devis_path, devis_html, version = _ensure_devis_pdf(numero, request, version, avec_sous_traitant, numero_dossier)
-    notedim_path = _ensure_notedim_pdf(numero, request, version) if variante == "devis" else None
+    notedim_path = _ensure_notedim_pdf(numero, request, version)   # Lot B : la note part aussi avec le pré-devis
 
     auteur = str(payload.get("auteur") or "Anonyme")
     sujet = _sujet_devis(prospect, variante)
@@ -6542,7 +6539,7 @@ async def _send_devis(numero: str, payload: dict, request: Request) -> dict:
     except EnvoiRefuse as exc:
         _noter_echec_envoi(numero, variante, email_to, str(exc), auteur)
         raise HTTPException(status_code=502, detail=f"Échec d'envoi à {email_to} : {exc}. Rien n'a été marqué « Envoyé ».") from exc
-    notedim_id, notedim_erreur = _envoyer_notedim(request, numero, prospect, email_to, contexte) if variante == "devis" else ("", "")
+    notedim_id, notedim_erreur = _envoyer_notedim(request, numero, prospect, email_to, contexte)
     _envoyer_copie_interne(sujet, corps, email_to, contexte)
     email_file = os.path.join(DEVIS_DIR, f"{numero}_v{version}_email.html")
     try:
@@ -6586,10 +6583,9 @@ async def _send_devis(numero: str, payload: dict, request: Request) -> dict:
         **_infos_document_html(devis_html),           # Lot 13j : modèle et montant du document envoyé (relances)
         "chiffres_email": CHIFFRES_EMAIL,             # Lot 13j-bis : e-mail aux chiffres corrigés (« Renvoyer » permis)
     }
-    if variante == "devis":
-        item["notedim_resend_id"] = notedim_id
-        if notedim_erreur:
-            item["notedim_erreur"] = notedim_erreur
+    item["notedim_resend_id"] = notedim_id             # Lot B : pré-devis et devis
+    if notedim_erreur:
+        item["notedim_erreur"] = notedim_erreur
     meta.setdefault(numero, []).append(item)
     _atomic_write_json(DEVIS_META_PATH, meta)
     sent = _read_devis_envoyes()
