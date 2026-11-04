@@ -1,0 +1,351 @@
+{# LA FEUILLE DE STYLE DES NOTES DE DIMENSIONNEMENT — extraite le 02/09/2026.
+
+   🔴 POURQUOI ELLE VIT DANS SON PROPRE FICHIER. La note air-air doit avoir
+   « le MÊME gabarit visuel que la note air-eau » (Avi) : même en-tête, mêmes
+   cartes, même tableau bleu, même pied. Recopier 330 lignes de CSS dans un
+   second gabarit aurait fait deux documents qui se ressemblent le premier jour
+   et divergent au premier ajustement — une couleur corrigée d'un côté, pas de
+   l'autre, sur deux pièces qui partent au même délégataire.
+
+   Elle est INCLUSE, pas liée : `set_content()` n'a pas d'URL de base, un
+   `<link>` vers /static/ ne chargerait rien, en silence. C'est la même raison
+   qui fait embarquer la police en data-URI.
+#}
+<style>
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   NOTE DE DIMENSIONNEMENT PAC AIR-EAU — GABARIT PAC-LITE
+
+   CE GABARIT REPREND LA MISE EN PAGE DE `notedim_pac_template_v5.html`
+   (pac-lite) : mêmes couleurs, mêmes cartes, même tableau bleu, même bloc de
+   calcul sur fond sombre. Ce qu'il NE reprend pas, ce sont ses VALEURS — le
+   gabarit pac-lite écrivait « ± 20 % », « BAR-TH-171 », « COP ≥ 3,0 » et
+   « × 1,10 » en dur dans le HTML. Ici, chacune vient de l'admin ou de la
+   donnée du dossier. Un seuil réglementaire qui bouge ne doit pas se corriger
+   dans une feuille de style.
+
+   A4 PORTRAIT, MULTI-PAGES. L'ancien gabarit était en paysage une page avec
+   `overflow:hidden` : le tableau poste par poste y était COUPÉ EN SILENCE.
+
+   MARGE HAUTE DE LA PAGE 1 = CELLE DU DEVIS (12 mm), les pages suivantes
+   gardent la leur (14 mm). Décision d'Avi : le logo doit être à la même
+   hauteur sur les deux documents.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  --rouge: #E2214B;
+  --bleu: #002E5A;
+  --bleu-light: #1A4775;
+  --bleu-pale: #F0F4F9;
+  --gris-fond: #F8F9FB;
+  --gris-fond-2: #F3F5F8;
+  --gris-ligne: #E1E5EB;
+  --gris-ligne-soft: #EDF0F4;
+  --gris-texte: #4A5567;
+  --gris-mute: #8A92A0;
+  --noir: #1A2233;
+  --vert: #2D7A4F;
+  --vert-pale: #E8F5EE;
+  --jaune-warn: #FFF4E5;
+  --jaune-warn-border: #E6A23C;
+  --rouge-warn: #FEF2F2;
+  --rouge-warn-border: #DC2626;
+  --paper: #FFFFFF;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body {
+  background: var(--paper);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  color: var(--noir);
+  font-feature-settings: 'tnum' 1;
+  line-height: 1.5;
+  font-size: 9.5pt;
+}
+
+@page { size: A4 portrait; margin: 14mm 14mm 16mm 14mm; }
+/* ⚠ MESURÉ, PAS SUPPOSÉ : Chromium honore `@page :first` en impression. La
+   valeur 12 mm est celle de `_DEVIS_MARGES` (app/service_envoi.py), pas une
+   valeur choisie ici — si le devis change, c'est là qu'il faut regarder. */
+@page :first { margin-top: 12mm; }
+
+/* CE QUI NE SE COUPE JAMAIS, ET RIEN DE PLUS.
+   Une LIGNE de tableau, un encadré, le résultat, un bandeau. Mesuré : mettre
+   `avoid` sur les SECTIONS entières laissait un tiers de page blanc avant le
+   résultat et poussait le document à quatre pages — le lecteur y voit un
+   document inachevé alors qu'il ne manque rien.
+   Ce qui PEUT se couper : une section, un tableau, une liste d'alertes. */
+tr, td, th { page-break-inside: avoid; }
+.bloc { page-break-inside: avoid; }
+.section-title, .section-card-title { page-break-after: avoid; }
+.note-explic { page-break-after: avoid; }
+.section { margin-bottom: 14px; }
+
+/* 🔴 `page-break-after: avoid` NE SUFFIT PAS, ET AVI L'A VU AVANT MOI.
+   Il demande de ne pas couper APRÈS l'élément ; il n'empêche pas de couper
+   DEDANS. La phrase d'introduction du calcul se retrouvait tranchée sur « Il
+   porte sur le chauffage seul : le », avec 150 px de blanc dessous et le bloc
+   sombre renvoyé à la page suivante.
+
+   ⚠ J'AVAIS ANNONCÉ CE DÉFAUT CORRIGÉ. Il ne l'était pas : j'avais corrigé
+   l'interligne DOUBLÉ du bloc de calcul, qui produisait un blanc au même
+   endroit. Deux causes, un seul symptôme — la première réparée, la seconde
+   déplacée d'une page. Un PDF regardé après coup l'aurait montré ; je ne
+   l'avais regardé qu'avant.
+
+   `break-inside: avoid` sur le GROUPE ENTIER — titre, intro, bloc — est la
+   seule règle que Chromium honore vraiment. Le prix est un blanc en fin de
+   page précédente quand l'ensemble ne tient pas : blanc assumé, contre une
+   phrase coupée en deux sur un document contractuel. */
+.section.insecable { break-inside: avoid; page-break-inside: avoid; }
+
+/* ═══ EN-TÊTE ═══════════════════════════════════════════════════════════ */
+.doc-header {
+  display: table; width: 100%;
+  padding-bottom: 10px;
+  border-bottom: 2px solid var(--bleu);
+  margin-bottom: 10px;
+}
+.doc-logo { display: table-cell; vertical-align: top; width: 55%; }
+.doc-ref  { display: table-cell; vertical-align: top; width: 45%; text-align: right; }
+.doc-logo svg.logo-hexa { height: 34px; width: auto; display: block; }
+.doc-ref-label { font-size: 7pt; color: var(--gris-mute); text-transform: uppercase; letter-spacing: 2px; font-weight: 700; }
+.doc-ref-num   { font-size: 12pt; font-weight: 700; color: var(--bleu); margin-top: 4px; font-variant-numeric: tabular-nums; }
+.doc-ref-date  { font-size: 8pt; color: var(--gris-mute); margin-top: 3px; }
+
+/* ═══ TITRE ═════════════════════════════════════════════════════════════ */
+.doc-title-row { text-align: center; margin-bottom: 9px; padding: 0 12px; }
+.doc-subtitle {
+  font-size: 7.5pt; color: var(--rouge); text-transform: uppercase;
+  letter-spacing: 3px; font-weight: 700; margin-bottom: 8px;
+}
+.doc-title {
+  font-size: 18pt; font-weight: 800; color: var(--bleu);
+  letter-spacing: -0.4px; line-height: 1.15; margin-bottom: 7px;
+}
+.doc-title-sub { font-size: 9pt; color: var(--gris-texte); line-height: 1.55; }
+.doc-title-sub strong { color: var(--bleu); font-weight: 700; }
+
+/* ═══ BADGES DE CONFORMITÉ ══════════════════════════════════════════════
+   ⚠ DÉRIVÉS, JAMAIS ÉCRITS. Voir `note_dimensionnement.badges_conformite`. */
+/* 🔴 LE QUATRIÈME BADGE PASSAIT SEUL À LA LIGNE — constaté par Avi, puis
+   mesuré sur le PDF : trois badges remplissaient la ligne 1 (x=51 à 544, soit
+   toute la largeur utile) et le quatrième se centrait seul en dessous.
+
+   DEUX FAÇONS DE LE RÉGLER, ET LA PREMIÈRE EST MAUVAISE. Rétrécir la police
+   jusqu'à ce que les quatre tiennent — mesuré : il faudrait descendre à 6,5 pt
+   — rendrait illisible ce qu'un délégataire doit lire, et le défaut
+   reviendrait au premier nom de document un peu long.
+
+   UNE GRILLE 2 × 2 NE PEUT PAS PRODUIRE D'ORPHELIN. Quatre cellules, deux par
+   ligne, quel que soit le texte. On ne règle plus un débordement : on retire
+   la possibilité qu'il existe. */
+.compliance-row {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 5px 8px; margin-bottom: 12px;
+  justify-items: center; align-items: stretch;
+}
+.compliance-badge {
+  display: flex; align-items: center; justify-content: center;
+  white-space: nowrap; width: 100%;
+  background: var(--bleu-pale); border: 1px solid var(--gris-ligne);
+  color: var(--bleu); font-size: 7.5pt; font-weight: 600;
+  padding: 4px 9px; border-radius: 50px; letter-spacing: 0;
+  margin: 0 2px 4px;
+}
+.compliance-badge::before { content: "✓"; color: var(--vert); font-weight: 800; margin-right: 4px; }
+
+/* ═══ RATTACHEMENT (sous le titre — placement arbitré) ═══════════════════ */
+/* ⚠ MÊME INTERLIGNE QUE LES AUTRES BLOCS — constaté par Avi : celui-ci était
+   plus serré que le bloc BÉNÉFICIAIRE juste en dessous, quatre lignes tassées,
+   « Chauffe-eau / thermodynamique » coupé en deux. Deux blocs voisins qui ne
+   respirent pas pareil se lisent comme deux documents collés.
+   9 pt / 1,7 : la taille de `.info-row`, l'interligne qui laisse la ligne de
+   lots respirer quand elle passe sur deux lignes. */
+.rattachement {
+  font-size: 9pt; line-height: 1.7; color: var(--gris-texte);
+  border-left: 3px solid var(--bleu); background: var(--gris-fond);
+  padding: 11px 14px; margin-bottom: 14px; border-radius: 0 5px 5px 0;
+}
+.rattachement b { color: var(--noir); }
+.rattachement .doc-lien { color: var(--bleu); font-weight: 700; }
+.rattachement .doc-absent { color: var(--jaune-warn-border); font-weight: 600; }
+
+/* ═══ BLOCS GÉNÉRIQUES ══════════════════════════════════════════════════ */
+/* (d) DE L'AIR — les blocs étaient à l'étroit. Le padding et l'espace entre
+   sections montent ensemble : élargir l'un sans l'autre déplace le tassement
+   au lieu de le retirer. */
+.section-card {
+  background: var(--gris-fond); border-left: 3px solid var(--rouge);
+  padding: 15px 18px; border-radius: 0 6px 6px 0;
+}
+.section-card-title {
+  font-size: 7.5pt; color: var(--rouge); text-transform: uppercase;
+  letter-spacing: 2px; font-weight: 700; margin-bottom: 8px;
+}
+.info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 24px; width: 100%; }
+.info-row { display: flex; justify-content: space-between; font-size: 9pt; padding: 5px 0; align-items: baseline; gap: 10px; }
+.info-label { color: var(--gris-mute); font-weight: 500; }
+.info-value { color: var(--noir); font-weight: 600; text-align: right; }
+
+.section-title {
+  font-size: 8pt; color: var(--bleu); text-transform: uppercase;
+  letter-spacing: 2px; font-weight: 700; margin-bottom: 10px;
+  padding-bottom: 6px; border-bottom: 1px solid var(--gris-ligne);
+}
+/* Les notes explicatives : le client doit comprendre ce qu'il lit sans
+   connaître la thermique. */
+.note-explic { font-size: 8pt; color: var(--gris-mute); font-style: italic; margin-bottom: 9px; line-height: 1.55; }
+
+/* ═══ CARTES DONNÉES LOGEMENT ═══════════════════════════════════════════ */
+.cards-row { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 8px; width: 100%; }
+.data-card {
+  background: var(--bleu-pale); border: 1px solid var(--gris-ligne);
+  border-radius: 6px; padding: 9px 10px; position: relative;
+  overflow: hidden; min-height: 66px;
+}
+.data-card::before { content: ""; position: absolute; top: 0; left: 0; width: 4px; height: 100%; background: var(--bleu); }
+.data-card-label {
+  font-size: 6.8pt; color: var(--bleu-light); text-transform: uppercase;
+  letter-spacing: 1.2px; font-weight: 700; margin-bottom: 6px; padding-left: 4px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.data-card-value { font-size: 13pt; font-weight: 800; color: var(--bleu); letter-spacing: -0.4px; padding-left: 4px; }
+.data-card-sub { font-size: 7.2pt; color: var(--gris-mute); font-weight: 500; padding-left: 4px; padding-top: 5px; line-height: 1.35; }
+
+/* ═══ TABLEAUX (gabarit pac-lite, NOS colonnes) ═════════════════════════ */
+.iso-table { width: 100%; border-collapse: collapse; background: var(--gris-fond); border-radius: 6px; overflow: hidden; }
+.iso-table th {
+  background: var(--bleu); color: #fff; font-size: 7pt; font-weight: 600;
+  text-transform: uppercase; letter-spacing: .6px; padding: 7px 9px; text-align: left;
+}
+.iso-table th.num { text-align: right; }
+.iso-table td { padding: 6px 9px; border-bottom: 1px solid var(--gris-ligne); font-size: 8.5pt; }
+.iso-table tr:last-child td { border-bottom: none; }
+.iso-table td:first-child { color: var(--gris-texte); font-weight: 500; }
+.iso-table td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--noir); font-weight: 600; }
+.iso-table tr.inerte td { color: var(--gris-mute); font-weight: 500; }
+.iso-table tr.total td {
+  font-weight: 800; color: var(--bleu);
+  border-top: 1.5px solid var(--bleu); border-bottom: none; background: var(--bleu-pale);
+}
+.gain { color: var(--vert); font-weight: 700; }
+.muet { color: var(--gris-mute); font-weight: 500; }
+
+/* ═══ PARAMÈTRES DE CALCUL ══════════════════════════════════════════════ */
+.params-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 0 24px;
+  background: var(--gris-fond); padding: 10px 14px; border-radius: 6px; width: 100%;
+}
+.param-row {
+  display: flex; justify-content: space-between; font-size: 8.5pt;
+  padding: 4px 0; border-bottom: 1px dashed var(--gris-ligne-soft);
+  align-items: baseline; gap: 10px;
+}
+.param-label { color: var(--gris-texte); font-weight: 500; }
+.param-value { color: var(--noir); font-weight: 700; font-variant-numeric: tabular-nums; text-align: right; }
+.param-unit { font-weight: 500; color: var(--gris-mute); font-size: 8pt; }
+
+/* ═══ FORMULE MONOSPACE ═════════════════════════════════════════════════
+   MISE EN PAGE REPRISE DE PAC-LITE v5. Le fond sombre isole le calcul du
+   reste du document, et les trois couleurs le rendent lisible sans le lire :
+   on suit les étapes, on voit les résultats intermédiaires, on trouve la
+   puissance. Les rôles viennent de `lignes_de_formule`, pas d'une devinette
+   dans la feuille de style.
+
+   ⚠ `print-color-adjust: exact` — SANS LUI, Chromium retire les fonds sombres
+   à l'impression pour économiser l'encre, et le bloc sort en texte clair sur
+   blanc : illisible. `print_background=True` côté Playwright ne suffit pas
+   quand la règle vient d'un `background` sur un conteneur imbriqué. */
+.calc-formula {
+  background: var(--noir); color: #E8EEF7; border-left: 4px solid var(--rouge);
+  padding: 12px 16px; font-family: 'Consolas', 'Monaco', monospace;
+  font-size: 8pt; line-height: 1.5; border-radius: 0 6px 6px 0;
+  font-feature-settings: 'tnum' 1;
+  -webkit-print-color-adjust: exact; print-color-adjust: exact;
+}
+/* ⚠ `white-space: pre-wrap` EST SUR LES LIGNES, PAS SUR LE CONTENEUR — et
+   c'est mesuré, pas théorique. Sur le conteneur, les retours à la ligne qui
+   SÉPARENT les `<span>` étaient rendus EN PLUS de leur `display:block` :
+   chaque ligne comptait double, le bloc faisait deux fois sa hauteur, et il ne
+   tenait plus en bas de page 2 — 55 % de page blanche, et une phrase coupée en
+   deux. Trouvé en regardant le PDF, pas en relisant la feuille de style.
+   L'indentation des lignes de continuation, elle, doit être préservée : c'est
+   ce que `pre-wrap` sur le span assure. */
+.calc-formula span { display: block; white-space: pre-wrap; }
+/* Une ligne VIDE sépare les étapes : elle doit occuper une demi-hauteur, pas
+   disparaître (un `display:block` vide se replierait à zéro). */
+.calc-formula span:empty { height: .55em; }
+/* Le commentaire explique, il ne calcule pas : il s'efface. */
+.cf-commentaire { color: #7E8CA0; font-style: italic; }
+/* Les résultats intermédiaires — orange, la couleur qui appelle sans conclure. */
+.cf-valeur { color: #F0A030; font-weight: 700; }
+/* LA PUISSANCE RECOMMANDÉE. Le seul chiffre qu'un lecteur pressé retiendra. */
+.cf-resultat { color: #4ADE80; font-weight: 700; }
+
+/* ═══ BANDEAU DE FONDEMENT (avant le résultat — placement arbitré) ══════ */
+.fondement { border-radius: 5px; padding: 8px 11px; margin-bottom: 9px; font-size: 8.5pt; line-height: 1.45; }
+.fondement b { display: block; margin-bottom: 3px; letter-spacing: .06em; text-transform: uppercase; font-size: 7.5pt; }
+.fondement b.inline { display: inline; text-transform: none; letter-spacing: 0; font-size: 8.5pt; }
+.fondement.etabli { background: var(--vert-pale); border: 1px solid var(--vert); color: #1F5C3B; }
+.fondement.estime { background: var(--jaune-warn); border: 1px solid var(--jaune-warn-border); color: #8A5A10; }
+/* Le manque de données ne se murmure pas : il se lit avant le chiffre. */
+.fondement.alerte { background: var(--rouge-warn); border: 1.5px solid var(--rouge-warn-border); color: #991B1B; }
+
+/* ═══ RÉSULTAT ══════════════════════════════════════════════════════════ */
+.result-box {
+  background: var(--vert-pale); border: 2px solid var(--vert); border-radius: 10px;
+  padding: 11px 16px; text-align: center; margin-bottom: 6px;
+}
+.result-label { font-size: 7.5pt; color: var(--vert); text-transform: uppercase; letter-spacing: 3px; font-weight: 700; margin-bottom: 6px; }
+.result-value { font-size: 28pt; font-weight: 800; color: var(--noir); letter-spacing: -1.5px; line-height: 1; font-variant-numeric: tabular-nums; }
+.result-unit { font-size: 16pt; font-weight: 600; color: var(--gris-texte); margin-left: 5px; }
+.result-ctx { font-size: 8.5pt; color: var(--gris-texte); margin-top: 5px; }
+.result-gamme { font-size: 8.5pt; color: var(--gris-texte); margin-top: 5px; }
+.result-gamme strong { color: var(--vert); font-weight: 700; }
+/* ⚠ La gamme ne remplace pas la puissance requise, et le document le dit. */
+/* 03/11/2026 : l'échelle de cohérence, trois zones, sans curseur. */
+.echelle-coherence { display: flex; margin: 6px auto 2px; max-width: 150mm; font-size: 6.8pt; line-height: 1.25;
+  font-style: normal; text-align: center; }
+.echelle-coherence .ec-zone { padding: 4px 3px; border: 1px solid var(--gris-ligne); }
+.echelle-coherence .ec-sous { flex: 3; background: var(--rouge-warn); color: #991B1B; border-radius: 4px 0 0 4px; }
+.echelle-coherence .ec-ok   { flex: 5; background: var(--vert-pale); color: var(--vert); font-weight: 700; }
+.echelle-coherence .ec-sur  { flex: 2.4; background: var(--jaune-warn); color: #92400E; border-radius: 0 4px 4px 0; }
+.puissance-utile { font-style: normal; color: var(--gris-texte); }
+.result-gamme .reserve { display: block; font-size: 7.5pt; color: var(--gris-mute); margin-top: 3px; font-style: italic; }
+
+/* ═══ LE STYLE DES TROIS BLOCS RETIRÉS PART AVEC EUX ════════════════════
+   `.modele-box`, `.reco-list`, `ul.alertes` : plus aucun élément ne les porte.
+   Laisser du CSS pour ce qui n'existe plus, c'est le décor sans effet que ce
+   projet traque par ailleurs — et le prochain lecteur croirait le bloc encore
+   rendu quelque part. */
+
+/* ═══ L'AVERTISSEMENT DE PLAFOND ════════════════════════════════════════
+   Il ne vient plus du catalogue mais d'un seuil administrable. C'est le seul
+   reliquat des blocs retirés, et il est neutre : il ne nomme aucun produit. */
+.alerte-plafond {
+  background: var(--rouge-warn); border: 1px solid #FCA5A5; color: #991B1B;
+  border-radius: 5px; padding: 9px 12px; font-size: 8.5pt; line-height: 1.5;
+}
+
+/* ═══ MÉTHODE & RÉFÉRENCES ══════════════════════════════════════════════ */
+.method-block { background: var(--gris-fond-2); padding: 11px 16px; border-radius: 6px; }
+.method-text { font-size: 8pt; color: var(--gris-texte); line-height: 1.55; }
+.method-text strong { color: var(--noir); font-weight: 700; }
+.method-vigilance { margin: 4px 0 9px 0; padding-left: 15px; }
+.method-vigilance li { margin: 0 0 3px 0; line-height: 1.45; }
+
+/* ═══ PIED ══════════════════════════════════════════════════════════════ */
+.doc-footer {
+  border-top: 2px solid var(--bleu); padding-top: 8px; margin-top: 12px;
+  display: table; width: 100%; font-size: 7pt; color: var(--gris-mute); line-height: 1.55;
+}
+.doc-footer > div { display: table-cell; vertical-align: top; width: 50%; }
+.doc-footer > div:last-child { text-align: right; }
+.doc-footer strong { color: var(--bleu); font-weight: 700; }
+.footer-emit {
+  text-align: center; margin-top: 9px; padding-top: 7px;
+  border-top: 1px solid var(--gris-ligne-soft);
+  font-size: 7pt; color: var(--gris-mute); font-style: italic;
+}
+</style>

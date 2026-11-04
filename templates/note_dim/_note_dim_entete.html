@@ -1,0 +1,86 @@
+{# L'EN-TÊTE COMMUN DES NOTES DE DIMENSIONNEMENT — extrait le 02/09/2026.
+
+   🔴 « MÊME gabarit visuel que la note air-eau (en-tête, référence ND via le
+   même compteur, bénéficiaire, pied répété) » (Avi). Recopier ce bloc dans le
+   gabarit air-air aurait fait deux en-têtes qui se ressemblent le premier jour :
+   un logo déplacé d'un côté, une référence formatée autrement de l'autre, sur
+   deux pièces qui partent au même délégataire.
+
+   IL NE PREND QU'UN PARAMÈTRE : `soustitre_equipement`, la phrase qui nomme
+   l'équipement dimensionné. Tout le reste — titre, badges, rattachement,
+   bénéficiaire — se lit sur la note, et les deux notes portent les MÊMES clés
+   (`niveau`, `rattachement`, `dispositif`, `badges_document`). C'est ce qui
+   rend ce partage possible sans condition à l'intérieur.
+#}
+{% set soustitre_equipement = soustitre_equipement|default('Pompe à chaleur air-eau') %}
+<!-- ═══ EN-TÊTE ═══ -->
+<div class="doc-header">
+  <div class="doc-logo">
+    {# LE LOGO DE LA NOTE — SANS LA BASELINE DU DEVIS (décision d'Avi, 27 août).
+       J'avais aligné la note sur le logo du devis pour n'avoir qu'un tracé.
+       Le tracé reste unique ; c'est sa BASELINE qui ne va pas sur un document
+       technique, où elle ajoute une accroche commerciale au-dessus d'un calcul
+       de puissance. Même fichier, même géométrie, un bloc en moins. #}
+    {% with avec_signature = False %}{% include "note_dim/_logo_hexa.html" %}{% endwith %}
+  </div>
+  <div class="doc-ref">
+    <div class="doc-ref-label">Référence dossier</div>
+    <div class="doc-ref-num">N° {{ reference }}</div>
+    <div class="doc-ref-date">Émise le {{ date_emission }}</div>
+  </div>
+</div>
+
+<!-- ═══ TITRE ═══ -->
+<div class="doc-title-row">
+  <div class="doc-subtitle">— Note technique de dimensionnement —</div>
+  <div class="doc-title">{{ niv.get('titre') or 'NOTE DE DIMENSIONNEMENT' }}</div>
+  <div class="doc-title-sub">
+    {{ soustitre_equipement }} — <strong>{{ parcours_label or rat.get('parcours_label') or '—' }}</strong>.
+    {#  ②/⑥ LE DISPOSITIF VIENT DU PARCOURS. Le gabarit pac-lite écrivait
+        « CEE BAR-TH-171 » en dur : faux sur un parcours ampleur ANAH, et un
+        délégataire le relèverait. #}
+    {% if n.get('dispositif') %}
+    Document justificatif du dispositif <strong>{{ n.get('dispositif') }}</strong>.
+    {% endif %}
+  </div>
+</div>
+
+<!-- ═══ BADGES DE CONFORMITÉ (dérivés) ═══ -->
+{% if badges_conformite %}
+<div class="compliance-row">
+  {% for b in badges_conformite %}<div class="compliance-badge">{{ b }}</div>{% endfor %}
+</div>
+{% endif %}
+
+<!-- ═══ RATTACHEMENT — sous le titre (placement arbitré) ═══ -->
+{% if rat.get('simulation_id') %}
+<div class="rattachement bloc">
+  {#  A · LE RATTACHEMENT AU DOCUMENT COMMERCIAL, EN CLAIR (arbitrage d'Avi).
+      Si aucun devis ni pré-devis n'existe, on l'ÉCRIT — un rattachement vide
+      laisserait croire à une donnée perdue plutôt qu'à une étape non franchie. #}
+  <div>
+    {{ niv.get('titre')|default('Note de dimensionnement', true)|capitalize }}
+    {%- if doc.get('numero') %} <span class="doc-lien">{{ doc.get('phrase') }}</span>
+    {%- elif doc.get('phrase') %} — <span class="doc-absent">{{ doc.get('phrase') }}</span>
+    {%- endif %}.
+  </div>
+  <div>Établie sur la simulation <b>{{ rat.get('simulation_id') }}</b>{% if rat.get('parcours_label') %} · {{ rat.get('parcours_label') }}{% endif %}</div>
+  {% if rat.get('lots_texte') %}<div>Lots retenus : {{ rat.get('lots_texte') }}</div>{% endif %}
+</div>
+{% endif %}
+
+<!-- ═══ 1. BÉNÉFICIAIRE ET CHANTIER ═══ -->
+<div class="section bloc">
+  <div class="section-card">
+    <div class="section-card-title">Bénéficiaire et chantier</div>
+    <div class="info-grid">
+      <div class="info-row"><span class="info-label">Bénéficiaire</span><span class="info-value">{{ prospect.civilite }} {{ prospect.nom }} {{ prospect.prenom }}</span></div>
+      <div class="info-row"><span class="info-label">N° de dossier</span><span class="info-value">{{ prospect.reference_dossier or prospect.numero }}</span></div>
+      <div class="info-row"><span class="info-label">Téléphone</span><span class="info-value">{{ prospect.telephone }}</span></div>
+      <div class="info-row"><span class="info-label">Email</span><span class="info-value">{{ prospect.email }}</span></div>
+      <div class="info-row"><span class="info-label">Adresse du chantier</span><span class="info-value">{{ prospect.adresse }}</span></div>
+      <div class="info-row"><span class="info-label">Commune</span><span class="info-value">{{ prospect.code_postal }} {{ prospect.ville }}</span></div>
+    </div>
+  </div>
+</div>
+
