@@ -73,6 +73,33 @@ VALEURS_M7_55_MASTER = {
 }
 
 
+# Valeurs à −7 °C / 55 °C VALIDÉES par Avi le 04/11/2026 (tableau des sources officielles : 18 modèles sur 38).
+# Enregistrées UNE fois au démarrage (marque `puissance_m7_55_import`) : une valeur saisie ou décochée ensuite dans
+# l'Admin n'est jamais réécrite. Restent sans valeur : EXCELLIA S 9 / DUO 9, les 6 ALTHERMA 3 H HT, les 12 MONTBLANC
+# (valeurs demandées au fournisseur, saisies par Avi).
+IMPORT_VALIDE_0411 = "2026-11-04 tableau validé par Avi"
+VALEURS_M7_55_VALIDEES_0411 = {
+    "ATL-EXCELLIA-S-12": (8.63, "Atlantic Belgique, « Alféa Excellia S – Documentation commerciale » (mai 2026), p. 4, « Puissance calorifique -7°C/+55°C »"),
+    "ATL-EXCELLIA-S-12 TRI": (8.63, "Atlantic Belgique, « Alféa Excellia S – Documentation commerciale » (mai 2026), p. 4, « Puissance calorifique -7°C/+55°C »"),
+    "ATL-EXCELLIA-S-DUO-12": (8.63, "Atlantic Belgique, « Alféa Excellia S – Documentation commerciale » (mai 2026), p. 4, « Puissance calorifique -7°C/+55°C »"),
+    "ATL-EXCELLIA-S-DUO-12 TRI": (8.63, "Atlantic Belgique, « Alféa Excellia S – Documentation commerciale » (mai 2026), p. 4, « Puissance calorifique -7°C/+55°C »"),
+    "ATL-EXCELLIA-S-14": (10.28, "Atlantic Belgique, « Alféa Excellia S – Documentation commerciale » (mai 2026), p. 4, « Puissance calorifique -7°C/+55°C »"),
+    "ATL-EXCELLIA-S-14 TRI": (10.28, "Atlantic Belgique, « Alféa Excellia S – Documentation commerciale » (mai 2026), p. 4, « Puissance calorifique -7°C/+55°C »"),
+    "ATL-EXCELLIA-S-DUO-14": (10.28, "Atlantic Belgique, « Alféa Excellia S – Documentation commerciale » (mai 2026), p. 4, « Puissance calorifique -7°C/+55°C »"),
+    "ATL-EXCELLIA-S-DUO-14 TRI": (10.28, "Atlantic Belgique, « Alféa Excellia S – Documentation commerciale » (mai 2026), p. 4, « Puissance calorifique -7°C/+55°C »"),
+    "ARI-NIMBUS-NET-R32-8": (6.6, "Ariston, brochure « Nimbus Plus Net R32 » réf. DOCO21 (2023), p. 11, « Puissance calorifique @-7/55°C (nom / max) », valeur nominale"),
+    "ARI-NIMBUS-NET-R32-12": (8.3, "Ariston, brochure « Nimbus Plus Net R32 » réf. DOCO21 (2023), p. 11, « Puissance calorifique @-7/55°C (nom / max) », valeur nominale"),
+    "ARI-NIMBUS-NET-R32-15": (10.2, "Ariston, brochure « Nimbus Plus Net R32 » réf. DOCO21 (2023), p. 11, « Puissance calorifique @-7/55°C (nom / max) », valeur nominale"),
+    "ARI-NIMBUS-NET-R32-12 TRI": (8.3, "Ariston, brochure « Nimbus Plus Net R32 » réf. DOCO21 (2023), p. 11, « Puissance calorifique @-7/55°C (nom / max) », valeur nominale"),
+    "ARI-NIMBUS-NET-R32-15 TRI": (10.2, "Ariston, brochure « Nimbus Plus Net R32 » réf. DOCO21 (2023), p. 11, « Puissance calorifique @-7/55°C (nom / max) », valeur nominale"),
+    "ARI-NIMBUS-NET-R32-DUO-8": (6.6, "Ariston, page produit « Nimbus Compact S Net R32 », « @ -7/55°C (nom / max) », valeur nominale"),
+    "ARI-NIMBUS-NET-R32-DUO-12": (8.3, "Ariston, page produit « Nimbus Compact S Net R32 », « @ -7/55°C (nom / max) », valeur nominale"),
+    "ARI-NIMBUS-NET-R32-DUO-15": (10.2, "Ariston, page produit « Nimbus Compact S Net R32 », « @ -7/55°C (nom / max) », valeur nominale"),
+    "ARI-NIMBUS-NET-R32-DUO-12 TRI": (8.3, "Ariston, page produit « Nimbus Compact S Net R32 », « @ -7/55°C (nom / max) », valeur nominale"),
+    "ARI-NIMBUS-NET-R32-DUO-15 TRI": (10.2, "Ariston, brochure « Nimbus Plus Net R32 » réf. DOCO21 (2023), p. 11, « Puissance calorifique @-7/55°C (nom / max) », valeur nominale (colonne 150 S-T, même groupe extérieur)"),
+}
+
+
 def _n(v):
     try:
         if v is None or v == "" or isinstance(v, bool):
@@ -183,6 +210,7 @@ def _fmt(x):
 def migrer_catalogue(catalogue):
     """Démarrage, idempotent : ajoute aux modèles qui ne l'ont pas la valeur −7 °C / 55 °C du Master (NON validée)
     et sa source, et la température max lue sur la fiche produit. Ne touche jamais une valeur déjà présente.
+    Puis, une seule fois par modèle, les 18 valeurs validées par Avi le 04/11/2026 (VALEURS_M7_55_VALIDEES_0411).
     Rend (catalogue, changé)."""
     change = False
     for m in catalogue if isinstance(catalogue, list) else []:
@@ -194,6 +222,14 @@ def migrer_catalogue(catalogue):
             m[CHAMP_M7_55] = kw
             m[CHAMP_M7_55_SOURCE] = "Master (à valider) — " + src
             m[CHAMP_M7_55_VALIDE] = False
+            change = True
+        if ref in VALEURS_M7_55_VALIDEES_0411 and not m.get("puissance_m7_55_import"):
+            if m.get(CHAMP_M7_55_VALIDE) is not True:          # une valeur déjà validée dans l'Admin est gardée
+                kw, src = VALEURS_M7_55_VALIDEES_0411[ref]
+                m[CHAMP_M7_55] = kw
+                m[CHAMP_M7_55_SOURCE] = src
+                m[CHAMP_M7_55_VALIDE] = True
+            m["puissance_m7_55_import"] = IMPORT_VALIDE_0411
             change = True
         if CHAMP_TEMP_MAX not in m:
             tm = temp_max(m)
