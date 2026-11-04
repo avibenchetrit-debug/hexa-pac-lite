@@ -7,7 +7,8 @@
   "puiss35": 9,
   "etas35": 183,
   "etas55": 141,
-  "ttc": 13694.0
+  "ttc": 13694.0,
+  "temp_max_depart_c": 65.0
  },
  {
   "ref": "ATL-EXCELLIA-S-12",
@@ -17,7 +18,8 @@
   "puiss35": 12,
   "etas35": 183,
   "etas55": 141,
-  "ttc": 14357.0
+  "ttc": 14357.0,
+  "temp_max_depart_c": 65.0
  },
  {
   "ref": "ATL-EXCELLIA-S-14",
@@ -27,7 +29,8 @@
   "puiss35": 14,
   "etas35": 185,
   "etas55": 141,
-  "ttc": 15084.0
+  "ttc": 15084.0,
+  "temp_max_depart_c": 65.0
  },
  {
   "ref": "ATL-EXCELLIA-S-12 TRI",
@@ -37,7 +40,8 @@
   "puiss35": 12,
   "etas35": 183,
   "etas55": 141,
-  "ttc": 14672.0
+  "ttc": 14672.0,
+  "temp_max_depart_c": 65.0
  },
  {
   "ref": "ATL-EXCELLIA-S-14 TRI",
@@ -47,7 +51,8 @@
   "puiss35": 14,
   "etas35": 185,
   "etas55": 141,
-  "ttc": 15399.0
+  "ttc": 15399.0,
+  "temp_max_depart_c": 65.0
  },
  {
   "ref": "ATL-EXCELLIA-S-DUO-9",
@@ -57,7 +62,8 @@
   "puiss35": 9,
   "etas35": 183,
   "etas55": 141,
-  "ttc": 15986.0
+  "ttc": 15986.0,
+  "temp_max_depart_c": 65.0
  },
  {
   "ref": "ATL-EXCELLIA-S-DUO-12",
@@ -67,7 +73,8 @@
   "puiss35": 12,
   "etas35": 183,
   "etas55": 141,
-  "ttc": 17097.0
+  "ttc": 17097.0,
+  "temp_max_depart_c": 65.0
  },
  {
   "ref": "ATL-EXCELLIA-S-DUO-14",
@@ -77,7 +84,8 @@
   "puiss35": 14,
   "etas35": 185,
   "etas55": 141,
-  "ttc": 17769.0
+  "ttc": 17769.0,
+  "temp_max_depart_c": 65.0
  },
  {
   "ref": "ATL-EXCELLIA-S-DUO-12 TRI",
@@ -87,7 +95,8 @@
   "puiss35": 12,
   "etas35": 183,
   "etas55": 141,
-  "ttc": 17390.0
+  "ttc": 17390.0,
+  "temp_max_depart_c": 65.0
  },
  {
   "ref": "ATL-EXCELLIA-S-DUO-14 TRI",
@@ -97,7 +106,8 @@
   "puiss35": 14,
   "etas35": 185,
   "etas55": 141,
-  "ttc": 18047.0
+  "ttc": 18047.0,
+  "temp_max_depart_c": 65.0
  },
  {
   "ref": "DAI-ALTHERMA-3HHT-R32-14",
@@ -107,7 +117,8 @@
   "puiss35": 14,
   "etas35": 180,
   "etas55": 142,
-  "ttc": 15594.0
+  "ttc": 15594.0,
+  "temp_max_depart_c": 70.0
  },
  {
   "ref": "DAI-ALTHERMA-3HHT-R32-16",
@@ -117,7 +128,8 @@
   "puiss35": 16,
   "etas35": 180,
   "etas55": 142,
-  "ttc": 16390.0
+  "ttc": 16390.0,
+  "temp_max_depart_c": 70.0
  },
  {
   "ref": "DAI-ALTHERMA-3HHT-R32-18",
@@ -127,7 +139,8 @@
   "puiss35": 18,
   "etas35": 180,
   "etas55": 142,
-  "ttc": 17882.0
+  "ttc": 17882.0,
+  "temp_max_depart_c": 70.0
  },
  {
   "ref": "DAI-ALTHERMA-3HHT-R32-14 TRI",
@@ -137,7 +150,8 @@
   "puiss35": 14,
   "etas35": 180,
   "etas55": 142,
-  "ttc": 15594.0
+  "ttc": 15594.0,
+  "temp_max_depart_c": 70.0
  },
  {
   "ref": "DAI-ALTHERMA-3HHT-R32-16 TRI",
@@ -147,7 +161,8 @@
   "puiss35": 16,
   "etas35": 180,
   "etas55": 142,
-  "ttc": 16390.0
+  "ttc": 16390.0,
+  "temp_max_depart_c": 70.0
  },
  {
   "ref": "DAI-ALTHERMA-3HHT-R32-18 TRI",
@@ -157,7 +172,8 @@
   "puiss35": 18,
   "etas35": 180,
   "etas55": 142,
-  "ttc": 17882.0
+  "ttc": 17882.0,
+  "temp_max_depart_c": 70.0
  },
  {
   "ref": "ARI-NIMBUS-NET-R32-8",
@@ -167,7 +183,8 @@
   "puiss35": 8,
   "etas35": 195,
   "etas55": 140,
-  "ttc": 13143.0
+  "ttc": 13143.0,
+  "temp_max_depart_c": 60.0
  },
  {
   "ref": "ARI-NIMBUS-NET-R32-12",
@@ -177,7 +194,8 @@
   "puiss35": 12,
   "etas35": 181,
   "etas55": 141,
-  "ttc": 13669.0
+  "ttc": 13669.0,
+  "temp_max_depart_c": 60.0
  },
  {
   "ref": "ARI-NIMBUS-NET-R32-15",
@@ -187,7 +205,8 @@
   "puiss35": 15,
   "etas35": 181,
   "etas55": 151,
-  "ttc": 13952.0
+  "ttc": 13952.0,
+  "temp_max_depart_c": 60.0
  },
  {
   "ref": "ARI-NIMBUS-NET-R32-12 TRI",
@@ -197,7 +216,8 @@
   "puiss35": 12,
   "etas35": 181,
   "etas55": 141,
-  "ttc": 13869.0
+  "ttc": 13869.0,
+  "temp_max_depart_c": 60.0
  },
  {
   "ref": "ARI-NIMBUS-NET-R32-15 TRI",
@@ -207,7 +227,8 @@
   "puiss35": 15,
   "etas35": 181,
   "etas55": 151,
-  "ttc": 14029.0
+  "ttc": 14029.0,
+  "temp_max_depart_c": 60.0
  },
  {
   "ref": "ARI-NIMBUS-NET-R32-DUO-8",
@@ -217,7 +238,8 @@
   "puiss35": 8,
   "etas35": 195,
   "etas55": 140,
-  "ttc": 14997.0
+  "ttc": 14997.0,
+  "temp_max_depart_c": 60.0
  },
  {
   "ref": "ARI-NIMBUS-NET-R32-DUO-12",
@@ -227,7 +249,8 @@
   "puiss35": 12,
   "etas35": 181,
   "etas55": 141,
-  "ttc": 14798.0
+  "ttc": 14798.0,
+  "temp_max_depart_c": 60.0
  },
  {
   "ref": "ARI-NIMBUS-NET-R32-DUO-15",
@@ -237,7 +260,8 @@
   "puiss35": 15,
   "etas35": 181,
   "etas55": 151,
-  "ttc": 15790.0
+  "ttc": 15790.0,
+  "temp_max_depart_c": 60.0
  },
  {
   "ref": "ARI-NIMBUS-NET-R32-DUO-12 TRI",
@@ -247,7 +271,8 @@
   "puiss35": 12,
   "etas35": 181,
   "etas55": 141,
-  "ttc": 14925.0
+  "ttc": 14925.0,
+  "temp_max_depart_c": 60.0
  },
  {
   "ref": "ARI-NIMBUS-NET-R32-DUO-15 TRI",
@@ -257,7 +282,8 @@
   "puiss35": 15,
   "etas35": 178,
   "etas55": 151,
-  "ttc": 15990.0
+  "ttc": 15990.0,
+  "temp_max_depart_c": 60.0
  },
  {
   "ref": "THA-MTBL-R290-4",
@@ -267,7 +293,8 @@
   "puiss35": 4.5,
   "etas35": 195,
   "etas55": 151,
-  "ttc": 11191.0
+  "ttc": 11191.0,
+  "temp_max_depart_c": 80.0
  },
  {
   "ref": "THA-MTBL-R290-6",
@@ -277,7 +304,8 @@
   "puiss35": 6.35,
   "etas35": 194,
   "etas55": 151,
-  "ttc": 11290.0
+  "ttc": 11290.0,
+  "temp_max_depart_c": 80.0
  },
  {
   "ref": "THA-MTBL-R290-8",
@@ -287,7 +315,8 @@
   "puiss35": 8.4,
   "etas35": 198,
   "etas55": 152,
-  "ttc": 11690.0
+  "ttc": 11690.0,
+  "temp_max_depart_c": 80.0
  },
  {
   "ref": "THA-MTBL-R290-10",
@@ -297,7 +326,8 @@
   "puiss35": 10,
   "etas35": 203,
   "etas55": 154,
-  "ttc": 11790.0
+  "ttc": 11790.0,
+  "temp_max_depart_c": 80.0
  },
  {
   "ref": "THA-MTBL-R290-12",
@@ -307,7 +337,8 @@
   "puiss35": 12,
   "etas35": 186,
   "etas55": 150,
-  "ttc": 11990.0
+  "ttc": 11990.0,
+  "temp_max_depart_c": 80.0
  },
  {
   "ref": "THA-MTBL-R290-14",
@@ -317,7 +348,8 @@
   "puiss35": 14,
   "etas35": 186,
   "etas55": 150,
-  "ttc": 12090.0
+  "ttc": 12090.0,
+  "temp_max_depart_c": 80.0
  },
  {
   "ref": "THA-MTBL-R290-16",
@@ -327,7 +359,8 @@
   "puiss35": 15.1,
   "etas35": 188,
   "etas55": 150,
-  "ttc": 12190.0
+  "ttc": 12190.0,
+  "temp_max_depart_c": 80.0
  },
  {
   "ref": "THA-MTBL-R290-8 TRI",
@@ -337,7 +370,8 @@
   "puiss35": 8.4,
   "etas35": 198,
   "etas55": 152,
-  "ttc": 11890.0
+  "ttc": 11890.0,
+  "temp_max_depart_c": 80.0
  },
  {
   "ref": "THA-MTBL-R290-10 TRI",
@@ -347,7 +381,8 @@
   "puiss35": 10,
   "etas35": 203,
   "etas55": 154,
-  "ttc": 11890.0
+  "ttc": 11890.0,
+  "temp_max_depart_c": 80.0
  },
  {
   "ref": "THA-MTBL-R290-12 TRI",
@@ -357,7 +392,8 @@
   "puiss35": 12,
   "etas35": 186,
   "etas55": 150,
-  "ttc": 12190.0
+  "ttc": 12190.0,
+  "temp_max_depart_c": 80.0
  },
  {
   "ref": "THA-MTBL-R290-14 TRI",
@@ -367,7 +403,8 @@
   "puiss35": 14,
   "etas35": 186,
   "etas55": 150,
-  "ttc": 12190.0
+  "ttc": 12190.0,
+  "temp_max_depart_c": 80.0
  },
  {
   "ref": "THA-MTBL-R290-16 TRI",
@@ -377,6 +414,7 @@
   "puiss35": 15.1,
   "etas35": 188,
   "etas55": 150,
-  "ttc": 12290.0
+  "ttc": 12290.0,
+  "temp_max_depart_c": 80.0
  }
 ]

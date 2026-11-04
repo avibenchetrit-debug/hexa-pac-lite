@@ -3829,6 +3829,54 @@ async def post_dimensionnement_pac(request: Request) -> JSONResponse:
     return JSONResponse({"ok": True, "version_catalogue": _catalogue_version()})
 
 
+@app.post("/api/options-pac/{numero}")
+async def options_pac(numero: str, request: Request) -> JSONResponse:
+    """Lot A (notedim-master) — bouton « Comparer » de l'étape 6 : pour chaque option valable (modèle × quantité, prix
+    proposé), le prix TTC client, la prime CEE, MaPrimeRénov' et le reste à charge du devis (calcul du devis existant,
+    sur l'état du simulateur envoyé, rien n'est écrit) ; la marge du dossier pour un compte admin seulement."""
+    from services.marges import marge_dossier
+    u = current_user(request)
+    if not u:
+        raise HTTPException(status_code=401, detail="Non authentifié")
+    prospect = _find_lead(numero)
+    if not prospect:
+        raise HTTPException(status_code=404, detail="Prospect introuvable")
+    prospect = _lead_for_response(prospect)
+    payload = await _read_request_payload(request)
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=400, detail="Payload invalide")
+    catalogue = _read_catalogue_pac()
+    base = dict(_load_state_simulateur(numero, prospect, catalogue) or {})
+    if isinstance(payload.get("state"), dict):
+        base.update({k: v for k, v in payload["state"].items() if k != "numero"})
+    admin = _admin_payload_with_m3()
+    est_admin = u.get("role") == "admin"
+    lignes = []
+    for o in (payload.get("options") or [])[:80]:
+        if not isinstance(o, dict):
+            continue
+        modele = find_modele(catalogue, o.get("ref"))
+        if not modele:
+            continue
+        q = 2 if int(float_value(o.get("quantite"), 1)) == 2 else 1
+        prix = float_value(o.get("prix"), 0) or prix_defaut_pac(modele.get("ttc"), q, admin)
+        st = dict(base, modele_pac_id=modele.get("ref"), modele_pac=modele.get("nom"), quantite_pac=q, prix_pac=prix,
+                  user_modified_price=True)
+        calc = calculer_devis(prospect, st, admin, catalogue)
+        ligne = {"ref": modele.get("ref"), "quantite": q, "prix_ttc": prix, "montant_cee": calc.get("montant_cee"),
+                 "montant_mpr": calc.get("montant_mpr"), "reste_a_charge": calc.get("reste_a_charge")}
+        if est_admin:
+            ballon = None
+            choisi = resoudre_ballon(st, admin)
+            if choisi:
+                ballon = next((b for b in ((admin.get("ballon_thermo") or {}).get("modeles") or [])
+                               if isinstance(b, dict) and b.get("ref") == choisi.get("ref")), dict(choisi))
+            mg = marge_dossier(calc, modele, ballon, admin.get("params") or {}, mode_cee(prospect, st, admin))
+            ligne.update(marge_nette=mg.get("marge_nette"), marge_nette_pct=mg.get("marge_nette_pct"))
+        lignes.append(ligne)
+    return JSONResponse({"lignes": lignes, "admin": est_admin})
+
+
 @app.post("/api/admin/marge-dossier/{numero}")
 async def marge_du_dossier(numero: str, request: Request) -> JSONResponse:
     """Lot 9 · 4 — « Marge du dossier » (étape 6) : ADMIN seulement. Calculée sur l'état du simulateur envoyé (non

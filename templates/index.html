@@ -11718,11 +11718,56 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     const pose = val(pv.prix_pose_cascade_ht, 6500), nb = Number(pv.travaux_induits_cascade) === 2 ? 2 : 1;
     return Math.round(c(2 * c(fourniture * (1 + t)) + c(pose * (1 + t)) + nb * c(ti * (1 + t))));
   }
-  // Contrôle de puissance avec la quantité : 2 PAC -> puissance totale (quantité × puissance unitaire) comparée au besoin
+  // Lot A (notedim-master) — mêmes règles que services/dimensionnement_pac.py :
+  // · puissance RETENUE : −7 °C / 55 °C si saisie ET validée dans l'Admin, sinon 35 °C (et on le dit) ;
+  // · plage de cohérence du Master : puissance installée entre 60 % et 130 % du besoin ;
+  // · température de départ max du modèle (catalogue, sinon fiche produit).
+  const PLAGE_COHERENCE_MIN_PCT = 60, PLAGE_COHERENCE_MAX_PCT = 130;
+  const LIBELLES_COHERENCE = { sous: 'sous-dimensionnement', ok: 'cohérent', sur: 'surdimensionnement' };
+  const MENTION_35 = 'puissance à 35 °C, valeur à −7 °C / 55 °C non renseignée';
+  function coherencePuissance(totalKw, besoinKw){
+    const t = Number(totalKw) || 0, b = Number(besoinKw) || 0;
+    if (!(t > 0) || !(b > 0)) return null;
+    const statut = t < b * PLAGE_COHERENCE_MIN_PCT / 100 ? 'sous' : (t > b * PLAGE_COHERENCE_MAX_PCT / 100 ? 'sur' : 'ok');
+    return { pct: Math.round(t / b * 100), statut, libelle: LIBELLES_COHERENCE[statut] };
+  }
+  window.coherencePuissance = coherencePuissance;
+  function puissanceRetenue(m){
+    const raw = (m && m.raw) || m || {};
+    const v = Number(String(raw.puissance_m7_55_kw ?? '').replace(',', '.'));
+    if (raw.puissance_m7_55_valide === true && v > 0) return { kw: v, origine: 'm7_55' };
+    return { kw: puissanceModele(m), origine: '35' };
+  }
+  function tempMaxModele(m){
+    const raw = (m && m.raw) || m || {};
+    const v = Number(String(raw.temp_max_depart_c ?? '').replace(',', '.'));
+    if (v > 0) return v;
+    for (const sp of (raw.description_specs || [])) {
+      const ch = String(sp && sp.champ || '').toLowerCase(), va = String(sp && sp.valeur || '');
+      if (ch.includes('max de départ')) { const n = Number(va.split('/')[0].trim().replace(',', '.')); if (n > 0) return n; }
+      if (ch.includes('sortie d') && va.includes('/')) { const n = Number(va.split('/').pop().trim().replace(',', '.')); if (n > 0) return n; }
+    }
+    return null;
+  }
+  const LIBELLES_EMETTEURS_T = { radiateurs_fonte: 'des radiateurs fonte', radiateurs_classiques: 'des radiateurs acier',
+    radiateurs_basse_temp: 'des radiateurs basse température', plancher_chauffant: 'un plancher chauffant',
+    convecteurs_electriques: 'des convecteurs électriques remplacés par des radiateurs' };
+  function alerteTemperature(m){
+    const tr = (typeof window.hexaTemperatureRequise === 'function') ? window.hexaTemperatureRequise() : { t: null };
+    const tm = tempMaxModele(m);
+    if (!m || !tm || !tr.t || tm >= tr.t) return '';
+    const pour = LIBELLES_EMETTEURS_T[tr.emetteur] || ('une température de départ de ' + nbFrT(tr.t) + ' °C');
+    return `Température max ${nbFrT(tm)} °C : insuffisante pour ${pour} (${nbFrT(tr.t)} °C requis)`;
+  }
+  function nbFrT(n){ return String(Math.round(Number(n) * 10) / 10).replace('.', ','); }
+  // Contrôle de la proposition affichée : quantité × puissance retenue comparée au besoin, température de départ
   function controlePuissance(){
     const m = getModeleActuel(), q = quantitePac();
-    const besoin = Number(state.puissance_requise_kw) || 0, unitaire = puissanceModele(m), total = q * unitaire;
-    return { q, unitaire, total, besoin, insuffisante: q === 2 && !!m && besoin > 0 && total < besoin - TOLERANCE_DIM_KW };
+    const besoin = Number(state.puissance_requise_kw) || 0, pr = puissanceRetenue(m), unitaire = pr.kw, total = q * unitaire;
+    const coherence = m ? coherencePuissance(total, besoin) : null;
+    const alerteT = alerteTemperature(m);
+    return { q, unitaire, total, besoin, origine: pr.origine, coherence, alerteT,
+             horsPlage: !!coherence && coherence.statut !== 'ok' };
   }
 
   function isModeleDuo(modele){
@@ -12014,35 +12059,61 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     const sorted = cands.slice().sort(function(a, b){ return (puissanceModele(a) - puissanceModele(b)) || ((a.prix_ttc || 0) - (b.prix_ttc || 0)); });
     return sorted.find(function(m){ return puissanceModele(m) >= note; }) || sorted[sorted.length - 1];
   }
-  function selectionnerParNiveau(note, simState){
-    const TOL = TOLERANCE_DIM_KW;   // 1 kW sous la note
-    const CAP = 2;                  // note + 2 kW = borne haute anti-surdimensionnement
-    const cfg = (typeof MARQUES_CONFIG === 'object' && MARQUES_CONFIG) ? MARQUES_CONFIG : {};
-    const niveauxDef = window.HEXA_NIVEAUX || [];
-    const compat = getCatalogueCompatibles(simState);          // ECS/DUO + phase
-    const dimensionnes = compat.filter(function(m){
-      const p = puissanceModele(m);
-      return p >= note - TOL && p <= note + CAP;               // Regle N1 : dimension d'abord
-    });
-    const niveaux = [];
-    niveauxDef.forEach(function(niv){
-      const marquesDuNiveau = Object.keys(cfg).filter(function(mq){ return cfg[mq] && cfg[mq].niveau === niv.key; });
-      const marquesOut = [];
-      marquesDuNiveau.forEach(function(mq){
-        const mods = dimensionnes.filter(function(m){ return (m.marque || '') === mq; })
-          .sort(function(a, b){ return (puissanceModele(a) - puissanceModele(b)) || ((a.prix_ttc || 0) - (b.prix_ttc || 0)); }); // puissance puis prix
-        if (mods.length) marquesOut.push({ marque: mq, avantages: (Array.isArray(cfg[mq].avantages) ? cfg[mq].avantages : []), modeles: mods });
+  // Lot A (notedim-master) — TOUTES les options valables pour la puissance requise : modèles compatibles (ECS / DUO,
+  // phase) dont la température de départ max couvre la température requise ET dont la puissance installée
+  // (quantité × puissance retenue) est dans la plage de cohérence 60–130 %. Une PAC d'abord ; 2 PAC du même modèle en
+  // cascade seulement si aucune PAC unique ne convient. Prix : celui du catalogue (1 PAC) ou prixDefautPac (2 PAC).
+  function optionsValables(note, simState){
+    const tReq = (typeof window.hexaTemperatureRequise === 'function') ? window.hexaTemperatureRequise().t : null;
+    const compat = getCatalogueCompatibles(simState || state);
+    const tempOk = m => { const tm = tempMaxModele(m); return !tReq || !tm || tm >= tReq; };
+    for (const q of [1, 2]) {
+      const opts = [];
+      compat.forEach(function(m){
+        if (!tempOk(m)) return;
+        const pr = puissanceRetenue(m), total = q * pr.kw, coh = coherencePuissance(total, note);
+        if (!coh || coh.statut !== 'ok') return;
+        opts.push({ modele: m, id: m.id, marque: m.marque || '', quantite: q, unitaire: pr.kw, origine: pr.origine, total,
+                    pct: coh.pct, statut: coh.statut, prix: prixDefautPac(m.prix_ttc, q), tmax: tempMaxModele(m) });
       });
-      marquesOut.sort(function(a, b){ return (a.modeles[0].prix_ttc || 0) - (b.modeles[0].prix_ttc || 0); }); // marques : moins cher d'abord
-      if (marquesOut.length) niveaux.push({ key: niv.key, label: niv.label, icone: niv.icone, marques: marquesOut });
+      if (opts.length) return { quantite: q, options: opts.sort((a, b) => (a.prix - b.prix) || (b.total - a.total)), tReq };
+    }
+    return { quantite: 1, options: [], tReq };
+  }
+  window.optionsValables = optionsValables;
+  // Les 3 gammes = 3 vrais choix (décision d'Avi, 04/11) : Essentiel = l'option la moins chère ; Recommandé = le
+  // meilleur prix par kW installé retenu ; Confort = une marque réglée « Confort » dans l'Admin si elle passe (sa
+  // couverture la plus juste), sinon l'option la plus chère. Trois options différentes ; à égalité, une autre marque.
+  function choisirGammes(opts){
+    const cfg = (typeof MARQUES_CONFIG === 'object' && MARQUES_CONFIG) ? MARQUES_CONFIG : {};
+    const pris = [], marques = new Set();
+    const libres = () => opts.filter(o => !pris.includes(o));
+    const prendre = o => { if (o) { pris.push(o); marques.add(o.marque); } return o || null; };
+    const essentiel = prendre(opts.slice().sort((a, b) => (a.prix - b.prix) || (b.total - a.total))[0]);
+    const autreMarqueD = o => marques.has(o.marque) ? 1 : 0;      // la diversité des marques ne départage qu'à égalité
+    const recommande = prendre(libres().sort((a, b) => (a.prix / a.total - b.prix / b.total) || (autreMarqueD(a) - autreMarqueD(b)) || (a.prix - b.prix))[0]);
+    const confortMarque = libres().filter(o => cfg[o.marque] && cfg[o.marque].niveau === 'confort');
+    // la couverture la plus juste : la plus petite au-dessus de 100 %, sinon la plus grande en dessous
+    const rang = o => o.pct >= 100 ? o.pct : 1000 - o.pct;
+    const parCouverture = (a, b) => (rang(a) - rang(b)) || (a.prix - b.prix);
+    const confort = prendre(confortMarque.length ? confortMarque.sort((a, b) => parCouverture(a, b) || (autreMarqueD(a) - autreMarqueD(b)))[0]
+                                                 : libres().sort((a, b) => (b.prix - a.prix) || (autreMarqueD(a) - autreMarqueD(b)))[0]);
+    return { essentiel, recommande, confort };
+  }
+  function selectionnerParNiveau(note, simState){
+    const val = optionsValables(note, simState);
+    if (!val.options.length) return { ok: false, note: note, niveaux: [], preselection: null, options: [], quantite: 1,
+                                      raison: 'Aucun modele bien dimensionne pour ' + note + ' kW (verifier gamme/dimensionnement)' };
+    const g = choisirGammes(val.options);
+    const niveaux = [];
+    (window.HEXA_NIVEAUX || []).forEach(function(niv){
+      const o = g[niv.key];
+      if (o) niveaux.push({ key: niv.key, label: niv.label, icone: niv.icone, option: o, quantite: o.quantite,
+                            marques: [{ marque: o.marque, avantages: [], modeles: [o.modele], quantite: o.quantite }] });
     });
-    if (!niveaux.length) return { ok: false, note: note, niveaux: [], preselection: null, raison: 'Aucun modele bien dimensionne pour ' + note + ' kW (verifier gamme/dimensionnement)' };
-    let preNivObj = niveaux.find(function(n){ return n.key === 'recommande'; }) || niveaux[0];
-    const tousDuNiveau = [];
-    preNivObj.marques.forEach(function(mo){ mo.modeles.forEach(function(m){ tousDuNiveau.push(m); }); });
-    const preModele = meilleurModeleMarque(tousDuNiveau, note);
-    const preselection = { niveau: preNivObj.key, modeleId: preModele ? preModele.id : null };
-    return { ok: true, note: note, niveaux: niveaux, preselection: preselection };
+    const pre = g.recommande || g.essentiel || g.confort;
+    const preselection = { niveau: (niveaux.find(n => n.option === pre) || niveaux[0]).key, modeleId: pre.id, quantite: pre.quantite };
+    return { ok: true, note: note, niveaux: niveaux, preselection: preselection, options: val.options, quantite: val.quantite };
   }
   window.selectionnerParNiveau = selectionnerParNiveau;
   window.marquesDisponibles = marquesDisponibles;
@@ -12287,8 +12358,9 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     } else {
       const _pn = selectionnerParNiveau(dim.puissance_kw, state);
       const _pm = (_pn.ok && _pn.preselection && _pn.preselection.modeleId) ? (CATALOGUE_PAC || []).find(function(m){ return m.id === _pn.preselection.modeleId; }) : null;
-      if (_pm) { selection = { modele: _pm, sous_dimensionnement: false }; appliquerSelectionPac(selection); }
-      else { selection = selectionnerPAC(dim.puissance_kw, CATALOGUE_PAC, state); appliquerSelectionPac(selection); }
+      // Lot A : la présélection porte sa quantité (2 = cascade, quand aucune PAC unique ne convient)
+      if (_pm) { state.quantite_pac = _pn.preselection.quantite === 2 ? 2 : 1; selection = { modele: _pm, sous_dimensionnement: false }; appliquerSelectionPac(selection); }
+      else { state.quantite_pac = 1; selection = selectionnerPAC(dim.puissance_kw, CATALOGUE_PAC, state); appliquerSelectionPac(selection); }
     }
 
     state.selection_alerte = selection?.alerte || null;
@@ -12838,8 +12910,18 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
         if (wrap) wrap.hidden = false;
         return;
       }
+      if (e.target.closest('#sim-comparer')) { e.preventDefault(); ouvrirComparaison(); return; }
+      const choix = e.target.closest('.sim-cmp-choisir');
+      if (choix) {
+        state.quantite_pac = Number(choix.dataset.qte) === 2 ? 2 : 1;
+        document.getElementById('sim-cmp-modal')?.remove();
+        selectionnerModeleParId(choix.dataset.modeleId);
+        return;
+      }
+      if (e.target.closest('.sim-cmp-fermer') || (e.target.id === 'sim-cmp-modal')) { document.getElementById('sim-cmp-modal')?.remove(); return; }
       const row = e.target.closest('.sim-mod-row');
       if (row) {
+        if (row.dataset.qte) state.quantite_pac = Number(row.dataset.qte) === 2 ? 2 : 1;   // Lot A : la carte porte sa quantité
         selectionnerModeleParId(row.getAttribute('data-modele-id'));
         return;
       }
@@ -12957,16 +13039,17 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     // --- étape 6, gauche : les 3 gammes (modèle et prix TTC du catalogue)
     const niv = (typeof selectionnerParNiveau === 'function') ? selectionnerParNiveau(Number(state.puissance_requise_kw) || 0, state) : { ok: false, niveaux: [] };
     const COUL_GAMME = { recommande: '#D7263D' };
+    // Lot A : une carte = une option (modèle × quantité), son prix pour la quantité (pose cascade de l'Admin pour 2 PAC)
     const cartesPac = (window.HEXA_NIVEAUX || []).map(nd => {
       const n = (niv.niveaux || []).find(x => x.key === nd.key);
-      if (!n) return `<button type="button" class="p6-pcard p6-pcard--vide" disabled><span class="p6-pgam">${escA(nd.label.toUpperCase())}</span><span class="p6-pmod">Aucun modèle à cette puissance</span></button>`;
-      const tous = [];
-      n.marques.forEach(mo => mo.modeles.forEach(m => tous.push(m)));
-      const choisi = tous.find(m => m.id === state.modele_pac_id);
-      const m = choisi || meilleurModeleMarque(tous, Number(state.puissance_requise_kw) || 0);
-      return `<button type="button" class="p6-pcard sim-mod-row${choisi ? ' on' : ''}" data-modele-id="${escA(m.id)}" data-pac-niv="${nd.key}">`
+      if (!n || !n.option) return `<button type="button" class="p6-pcard p6-pcard--vide" disabled><span class="p6-pgam">${escA(nd.label.toUpperCase())}</span><span class="p6-pmod">Aucun modèle à cette puissance</span></button>`;
+      const o = n.option, m = o.modele;
+      const choisi = m.id === state.modele_pac_id && quantitePac() === o.quantite;
+      return `<button type="button" class="p6-pcard sim-mod-row${choisi ? ' on' : ''}" data-modele-id="${escA(m.id)}" data-qte="${o.quantite}" data-pac-niv="${nd.key}">`
         + `<span class="p6-pgam" style="color:${COUL_GAMME[nd.key] || '#5A6675'}">${escA(nd.label.toUpperCase())}</span>`
-        + `<span class="p6-pmod">${escA(m.label || m.nom)}</span><span class="p6-pprix">${eur(m.prix_ttc)} TTC</span></button>`;
+        + `<span class="p6-pmod">${o.quantite === 2 ? '2 × ' : ''}${escA(m.label || m.nom)}</span>`
+        + `<span class="p6-pkw">${o.quantite === 2 ? `2 × ${nbFr(o.unitaire)} = ` : ''}${nbFr(o.total)} kW · ${o.pct} %</span>`
+        + `<span class="p6-pprix">${eur(o.prix)} TTC</span></button>`;
     }).join('');
     // Lot 8c : énergie sans chaudière fioul / gaz / charbon -> pas de ligne « ancien système » sur le devis (dit à l'écran)
     function sansAncienSysteme() {
@@ -12978,8 +13061,8 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     }
     const ctrlP = controlePuissance();                  // Lot 14 : quantité × puissance unitaire
     const pac = `
-          <div class="p6-sec">1 · LA POMPE À CHALEUR <span class="p6-sec-sub">· puissance nécessaire <b id="sim-puissance-reco">${kw} kW</b>${ecsDuo ? ' · modèles DUO' : ''}${ctrlP.q === 2 && ctrlP.unitaire ? ` · <span id="sim-puissance-totale">2 × ${nbFr(ctrlP.unitaire)} kW = <b>${nbFr(ctrlP.total)} kW</b> installés</span>` : ''}</span></div>
-          ${niv.ok ? `<div class="p6-g p6-g3 p6-pacs p6-imp">${cartesPac}</div>`
+          <div class="p6-sec">1 · LA POMPE À CHALEUR <span class="p6-sec-sub">· puissance nécessaire <b id="sim-puissance-reco">${kw} kW</b>${ecsDuo ? ' · modèles DUO' : ''}${ctrlP.q === 2 && ctrlP.unitaire ? ` · <span id="sim-puissance-totale">2 × ${nbFr(ctrlP.unitaire)} kW = <b>${nbFr(ctrlP.total)} kW</b> installés</span>` : ''}${ctrlP.coherence ? ` · <span id="sim-puissance-coherence" class="p6-coh p6-coh--${ctrlP.coherence.statut}">${ctrlP.q === 2 ? '' : `${nbFr(ctrlP.total)} kW installés · `}${ctrlP.coherence.pct} % · ${ctrlP.coherence.libelle}</span>` : ''}</span></div>
+          ${niv.ok ? `<div class="p6-g p6-g3 p6-pacs p6-imp">${cartesPac}</div><div class="p6-cmp-ligne"><button type="button" class="p6-btn-comparer" id="sim-comparer">Comparer les ${niv.options.length} option${niv.options.length > 1 ? 's' : ''} valable${niv.options.length > 1 ? 's' : ''}</button></div>`
             : `<div class="p6-alerte p6-alerte-dim">Aucune PAC bien dimensionnée pour ${kw} kW : ajustez l'isolation ou la surface, ou <a href="#" class="sim-voir-tous">voir tous les modèles</a>.</div>`}
           ${sansAncienSysteme() ? `<div class="p6-aide" id="p6-sans-ancien-systeme">Pas de ligne « Ancien système de chauffage déposé » sur le devis : pas de chaudière fioul / gaz / charbon déposée (énergie : ${sansAncienSysteme()}).</div>` : ''}
           <div class="p6-pac-ligne">
@@ -12987,7 +13070,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
             <select id="sim-quantite" class="p6-in p6-qte" title="2 PAC du même modèle montées en cascade"><option value="1"${ctrlP.q === 2 ? '' : ' selected'}>1</option><option value="2"${ctrlP.q === 2 ? ' selected' : ''}>2 (cascade)</option></select>
             <span class="p6-pac-lib">Prix TTC posé <i>(modifiable)</i></span>
             <span class="sim-pnl-edit"><input type="text" inputmode="numeric" id="sim-prix" value="${nbFr(state.prix_pac || 0)}"><em>€</em></span>
-            ${(ctrlP.q === 2 ? ctrlP.insuffisante : state.sous_dimensionnement) ? '<span class="sim-warn-badge" id="sim-puissance-alerte">⚠ Vérifier</span>' : ''}
+            ${(ctrlP.horsPlage || ctrlP.alerteT || (!ctrlP.coherence && state.sous_dimensionnement)) ? '<span class="sim-warn-badge" id="sim-puissance-alerte">⚠ Vérifier</span>' : ''}
             <span id="sim-alertes-prix" class="sim-alertes-prix" role="alert">${alertesPrixHTML(derniereMarge)}</span>
             <a href="#" class="sim-voir-tous">Tous les modèles</a>
             ${document.body.dataset.vtValidee === '1' ? '' : '<button class="sim-btn-note-dim" type="button" onclick="event.stopPropagation(); window.ouvrirNoteDim(); return false;">Pré-note de dim (provisoire)</button>'}
@@ -12995,9 +13078,11 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
           <span class="sim-allmodels"${state.show_all_models ? '' : ' hidden'}><select id="sim-modele-select" class="sim-model-select p6-in">
             ${catalogueOptionsOrdonnees(state).map(m => `<option value="${m.id}" ${m.id === state.modele_pac_id ? 'selected' : ''}>${m.label} · ${puissanceModele(m)} kW · ${eur(m.prix_ttc)}</option>`).join('')}
           </select></span>
-          ${ctrlP.q === 2
-            ? (ctrlP.insuffisante ? `<div class="sim-note sim-note--warn" id="sim-selection-alerte">⚠ Puissance installée (2 × ${nbFr(ctrlP.unitaire)} kW = ${nbFr(ctrlP.total)} kW) inférieure à la puissance nécessaire (${nbFr(ctrlP.besoin)} kW). Vérifier le dimensionnement.</div>` : '')
-            : (state.selection_alerte ? `<div class="sim-note sim-note--warn" id="sim-selection-alerte">${state.selection_alerte}</div>` : '')}`;
+          ${ctrlP.alerteT ? `<div class="sim-note sim-note--warn" id="sim-alerte-temperature">⚠ ${escA(ctrlP.alerteT)}</div>` : ''}
+          ${ctrlP.horsPlage
+            ? `<div class="sim-note sim-note--warn" id="sim-selection-alerte">⚠ Puissance installée (${ctrlP.q === 2 ? `2 × ${nbFr(ctrlP.unitaire)} kW = ` : ''}${nbFr(ctrlP.total)} kW, ${ctrlP.coherence.pct} %) hors de la plage de cohérence (60 à 130 % de ${nbFr(ctrlP.besoin)} kW) : ${ctrlP.coherence.libelle}. Vérifier le dimensionnement.</div>`
+            : (!ctrlP.coherence && state.selection_alerte ? `<div class="sim-note sim-note--warn" id="sim-selection-alerte">${state.selection_alerte}</div>` : '')}
+          ${getModeleActuel() && ctrlP.origine === '35' ? `<div class="p6-aide" id="sim-puissance-origine">Puissance à 35 °C, valeur à −7 °C / 55 °C non renseignée.</div>` : ''}`;
     const fin = `<div id="sim-fin">${renderFinancement(c)}</div>`;
 
     // --- étape 6, droite : ① ce que ça coûte, ② qui paie et quand, tuiles ; barre de boutons
@@ -13441,6 +13526,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
       qte.addEventListener('change', e => {
         simTouche = true;
         state.quantite_pac = Number(e.target.value) === 2 ? 2 : 1;
+        state.modele_force = true;                       // Lot A : quantité choisie à la main = choix manuel (gardé)
         const m = getModeleActuel();
         state.user_modified_price = false;
         if (m) state.prix_pac = prixDefautPac(m.prix_ttc, state.quantite_pac);
@@ -13616,6 +13702,48 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
       <summary>Marge du dossier <span class="p6-md-resume" id="sim-marge-resume">${resume}</span></summary>
       <div id="sim-marge-corps">${corpsMarge(derniereMarge)}</div></details>`;
   }
+  // Lot A (notedim-master) — « Comparer » : TOUTES les options valables (1 PAC, ou 2 en cascade si aucune PAC unique ne
+  // convient), avec prix TTC client, reste à charge (calcul du devis, serveur) et marge du dossier (admin). On choisit
+  // dedans : la ligne « Choisir » fixe le modèle et la quantité, comme une carte.
+  async function ouvrirComparaison(){
+    const escC = (x) => String(x == null ? '' : x).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    const note = Number(state.puissance_requise_kw) || 0;
+    const val = optionsValables(note, state);
+    document.getElementById('sim-cmp-modal')?.remove();
+    const wrap = document.createElement('div');
+    wrap.id = 'sim-cmp-modal';
+    wrap.className = 'sim-dim-modal';
+    const ligne = (o, x) => `<tr data-ref="${escC(o.id)}" data-qte="${o.quantite}"${o.id === state.modele_pac_id && o.quantite === quantitePac() ? ' class="on"' : ''}>
+        <td>${o.quantite === 2 ? '2 × ' : ''}${escC(o.modele.label || o.modele.nom)}</td><td>${escC(o.marque)}</td>
+        <td class="num">${o.tmax ? nbFr(o.tmax) + ' °C' : '—'}</td>
+        <td class="num">${o.quantite === 2 ? `2 × ${nbFr(o.unitaire)} = ` : ''}${nbFr(o.total)} kW${o.origine === '35' ? '*' : ''} · ${o.pct} %</td>
+        <td class="num">${eur(o.prix)}</td>
+        <td class="num">${x ? eur(x.reste_a_charge) : '…'}</td>
+        ${estAdmin() ? `<td class="num">${x && x.marge_nette != null ? eur(x.marge_nette) : '…'}</td>` : ''}
+        <td><button type="button" class="sim-cmp-choisir" data-modele-id="${escC(o.id)}" data-qte="${o.quantite}">Choisir</button></td></tr>`;
+    const rendre = (extra) => {
+      const parRef = {};
+      (extra || []).forEach(x => { parRef[x.ref + '|' + x.quantite] = x; });
+      wrap.innerHTML = `<div class="sim-dim-box sim-cmp-box">
+        <div class="sim-dim-head"><h3>COMPARER LES OPTIONS — ${nbFr(note)} kW requis${val.tReq ? ` · départ ${nbFr(val.tReq)} °C` : ''}</h3>
+          <button type="button" class="sim-cmp-fermer" aria-label="Fermer">×</button></div>
+        <div class="sim-dim-content">${val.options.length ? `<table class="sim-cmp-table"><thead><tr><th>Modèle × quantité</th><th>Marque</th><th>Temp. max</th>
+          <th>Puissance installée · couverture</th><th>Prix TTC client</th><th>Reste à charge</th>${estAdmin() ? '<th>Marge du dossier</th>' : ''}<th></th></tr></thead>
+          <tbody>${val.options.map(o => ligne(o, parRef[o.id + '|' + o.quantite])).join('')}</tbody></table>
+          <p class="sim-dim-disclaimer">Options : température de départ max ≥ température requise, puissance installée entre 60 et 130 % du besoin${val.quantite === 2 ? ' — aucune PAC unique ne convient : 2 PAC en cascade' : ''}. * puissance à 35 °C, valeur à −7 °C / 55 °C non renseignée.</p>`
+          : '<p>Aucune option valable pour cette puissance.</p>'}</div></div>`;
+    };
+    rendre(null);
+    document.body.appendChild(wrap);
+    if (!state.numero || !val.options.length) return;
+    try {
+      const r = await fetch(`/api/options-pac/${encodeURIComponent(state.numero)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ state: simulatorPayload(), options: val.options.map(o => ({ ref: o.id, quantite: o.quantite, prix: o.prix })) }) });
+      if (r.ok && document.body.contains(wrap)) rendre((await r.json()).lignes || []);
+    } catch (_) {}
+  }
+  window.ouvrirComparaison = ouvrirComparaison;
+
   function majMargeDossier(){
     const el = document.getElementById('sim-marge-dossier');
     if (el && !el.dataset.lie) { el.dataset.lie = '1'; el.addEventListener('toggle', () => { margeOuverte = el.open; }); }
@@ -22774,6 +22902,18 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
   .p6-pcard, body.l6 .p6-pcard.sim-mod-row { display: flex; flex-direction: column; align-items: flex-start; justify-content: flex-start; gap: 1px; padding: 7px 10px; border-radius: 10px;
     text-align: left; color: var(--p6-txt); border: 1px solid var(--p6-fieldb); background: var(--p6-field); font-family: inherit; cursor: pointer; height: 100%; min-width: 0; margin: 0; }
   .p6-pcard.on, body.l6 .p6-pcard.sim-mod-row.on { border: 3px solid var(--p6-navy); background: #F5F9FE; padding: 5px 8px; }
+  body.l6 .p6-pcard .p6-pkw { font-size: 11px; color: #5A6675; }
+  body.l6 .p6-cmp-ligne { margin: 4px 0 2px; text-align: right; }
+  .p6-btn-comparer { font: inherit; font-size: 12px; font-weight: 700; color: #002E5A; background: #fff; border: 1px solid #002E5A; border-radius: 8px; padding: 4px 10px; cursor: pointer; }
+  .sim-cmp-box { max-width: 1040px; width: calc(100% - 32px); }
+  .sim-cmp-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  .sim-cmp-table th { text-align: left; background: #002E5A; color: #fff; padding: 6px 8px; white-space: nowrap; }
+  .sim-cmp-table td { padding: 6px 8px; border-bottom: 1px solid #E2E8F0; }
+  .sim-cmp-table td.num { text-align: right; white-space: nowrap; }
+  .sim-cmp-table tr.on td { background: #F5F9FE; font-weight: 700; }
+  .sim-cmp-fermer { font-size: 22px; background: none; border: 0; cursor: pointer; color: #5A6675; }
+  body.l6 .p6-coh--ok { color: #15803D; font-weight: 700; }
+  body.l6 .p6-coh--sous, body.l6 .p6-coh--sur { color: #B91C1C; font-weight: 700; }
   .p6-pcard--vide { opacity: .5; cursor: default; }
   .p6-g.p6-pacs, .p6-g.p6-pays { gap: 8px; align-items: stretch; }
   .p6-pgam { font-size: 11px; font-weight: 800; color: var(--p6-grey); }

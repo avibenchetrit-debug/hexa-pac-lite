@@ -18,11 +18,14 @@ uvicorn = pytest.importorskip("uvicorn")
 PHRASE = "Installation de 2 pompes à chaleur montées en cascade"
 LEAD = {"numero": "PR-14101", "civilite": "Monsieur", "nom": "Cascade", "prenom": "Romaric", "email": "c@example.invalid",
         "telephone": "0600001401", "adresse_chantier": "1 RUE IMAGINAIRE", "cp_chantier": "49800",
-        "code_postal_chantier": "49800", "ville_chantier": "TRELAZE", "type_logement": "maison", "surface_logement_m2": "280",
+        "code_postal_chantier": "49800", "ville_chantier": "TRELAZE", "type_logement": "maison", "surface_logement_m2": "200",
         "hsp": "2,5", "annee_construction": "1968", "type_emetteurs": "radiateurs_classiques",
         "alimentation_electrique": "monophase", "nombre_personnes": "4", "rfr": "60000", "categorie": "superieur",
         "statut": "a_rappeler", "mode_chauffage": "fioul", "ecs": "chaudiere", "cout_energetique_mensuel_eur": "268",
         "cout_energie_source": "reel"}
+# Lot A (notedim-master, 04/11/2026) : 200 m² (et non plus 280) — à 280 m² le besoin (24,3 kW) dépasse ce qu'une PAC du
+# catalogue de test couvre dans la plage 60–130 %, et le choix automatique propose désormais une cascade. Ce fichier
+# teste la quantité changée À LA MAIN en partant d'une PAC unique.
 NUM = LEAD["numero"]
 PRIX_VENTE = {"prix_pose_ht": 3920, "prix_travaux_induits_ht": 2100, "prix_pose_cascade_ht": 6500,
               "travaux_induits_cascade": 1}

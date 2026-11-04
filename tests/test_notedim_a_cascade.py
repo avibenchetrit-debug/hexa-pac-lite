@@ -37,7 +37,7 @@ LEAD = {"numero": NUM, "civilite": "Monsieur", "nom": "Cascadegeslot", "prenom":
         "telephone": "0600001641", "adresse_chantier": "1 RUE IMAGINAIRE", "cp_chantier": "49800",
         "code_postal_chantier": "49800", "ville_chantier": "TRELAZE", "type_logement": "maison",
         "surface_logement_m2": "280", "hsp": "2,7", "altitude": "28", "annee_construction": "1968",
-        "type_emetteurs": "radiateurs_fonte", "alimentation_electrique": "monophase", "nombre_personnes": "4",
+        "type_emetteurs": "radiateurs_fonte", "alimentation_electrique": "triphase", "nombre_personnes": "4",
         "rfr": "60000", "categorie": "superieur", "statut": "a_rappeler", "mode_chauffage": "fioul", "ecs": "chaudiere",
         "cout_energetique_mensuel_eur": "268", "cout_energie_source": "reel"}
 ETAT_GESLOT = {"service": "chauffage_seul", "option": "opt3", "iso_toit": "peu", "iso_mur": "peu",
@@ -191,4 +191,92 @@ def test_temperature_depart_preremplie_et_modifiable(navigateur):
     while time.time() < fin and main._find_lead(NUM).get("temperature_depart_c") != "45":
         pg.wait_for_timeout(200)
     assert main._find_lead(NUM).get("temperature_depart_c") == "45"
+    assert pg.erreurs_js == []
+
+
+# ---------- GESLOT : cascade proposée, cohérente ----------
+
+def _cartes(pg):
+    return pg.evaluate("""[...document.querySelectorAll('.p6-pcard.sim-mod-row')].map(b => ({ niv: b.dataset.pacNiv,
+        id: b.dataset.modeleId, q: b.dataset.qte, texte: b.innerText.replace(/\s+/g, ' ') }))""")
+
+
+def test_geslot_cascade_proposee_et_coherente(navigateur):
+    pg = navigateur
+    _ouvrir_etape6(pg, ETAT_GESLOT)
+    assert pg.inner_text("#sim-puissance-reco") == "33,4 kW"
+    assert pg.locator(".p6-alerte-dim").count() == 0                      # plus d'alerte « Aucune PAC »
+    cartes = {c["niv"]: c for c in _cartes(pg)}
+    assert set(cartes) == {"essentiel", "recommande", "confort"} and all(c["q"] == "2" for c in cartes.values())
+    # Confort = DAIKIN (marque réglée Confort dans l'Admin) : 2 × ALTHERMA 18 TRI = 36 kW, 108 %
+    assert cartes["confort"]["id"] == ALTHERMA_18 + " TRI"
+    assert "2 × ALTHERMA 3H HT R32 18 TRI" in cartes["confort"]["texte"] and "2 × 18 = 36 kW · 108 %" in cartes["confort"]["texte"]
+    # aucune NIMBUS (60 °C max < 65 °C requis pour des radiateurs fonte)
+    assert not any("NIMBUS" in c["texte"] for c in cartes.values())
+    # Essentiel = la moins chère des options valables ; les 3 sont différentes
+    opts = pg.evaluate("window.optionsValables(33.4).options.map(o => ({ id: o.id, prix: o.prix, q: o.quantite }))")
+    assert all(o["q"] == 2 for o in opts) and cartes["essentiel"]["id"] == min(opts, key=lambda o: o["prix"])["id"]
+    assert len({c["id"] for c in cartes.values()}) == 3
+    # choisir la Confort : quantité 2, prix de 2 PAC, en-tête « 2 × 18 kW = 36 kW installés · 108 % · cohérent »
+    pg.click('.p6-pcard[data-pac-niv="confort"]')
+    pg.wait_for_function("document.querySelector('#sim-quantite').value === '2'")
+    attendu = int(main.prix_defaut_pac(17882.0, 2, main._admin_payload_with_m3()))
+    pg.wait_for_function(f"document.querySelector('#sim-prix').value.replace(/\D/g, '') === '{attendu}'")
+    entete = (pg.inner_text("#sim-puissance-totale") + " · " + pg.inner_text("#sim-puissance-coherence")).replace(" ", " ")
+    assert entete == "2 × 18 kW = 36 kW installés · 108 % · cohérent", entete
+    assert pg.locator("#sim-selection-alerte").count() == 0 and pg.locator("#sim-puissance-alerte").count() == 0
+    assert pg.inner_text("#sim-puissance-origine") == "Puissance à 35 °C, valeur à −7 °C / 55 °C non renseignée."
+    assert pg.erreurs_js == []
+
+
+def test_geslot_nimbus_choisie_a_la_main_alerte_temperature(navigateur):
+    pg = navigateur
+    _ouvrir_etape6(pg, dict(ETAT_GESLOT, modele_pac_id="ARI-NIMBUS-NET-R32-15 TRI", quantite_pac=2))
+    pg.wait_for_selector("#sim-alerte-temperature")
+    assert pg.inner_text("#sim-alerte-temperature") ==         "⚠ Température max 60 °C : insuffisante pour des radiateurs fonte (65 °C requis)"
+    assert pg.locator(".p6-alerte-dim").count() == 0                      # des options valables existent
+    assert pg.inner_text("#sim-puissance-coherence") == "90 % · cohérent"
+    assert pg.erreurs_js == []
+
+
+def test_une_pac_suffit_pas_de_cascade(navigateur):
+    pg = navigateur
+    _ouvrir_etape6(pg, dict(ETAT_GESLOT, iso_toit="tres_bien", iso_mur="bien", surface_chauffee=120))
+    kw = float(pg.inner_text("#sim-puissance-reco").replace(" kW", "").replace(",", "."))
+    assert kw < 12
+    cartes = _cartes(pg)
+    assert cartes and all(c["q"] == "1" for c in cartes)                  # une PAC unique convient : pas de cascade
+    assert pg.input_value("#sim-quantite") == "1"
+    assert pg.locator("#sim-puissance-totale").count() == 0
+    assert pg.erreurs_js == []
+
+
+def test_geslot_comparer_toutes_les_options_et_choisir(navigateur):
+    pg = navigateur
+    _ouvrir_etape6(pg, ETAT_GESLOT)
+    nb = pg.evaluate("window.optionsValables(33.4).options.length")
+    assert pg.inner_text("#sim-comparer") == f"Comparer les {nb} options valables"
+    pg.click("#sim-comparer")
+    pg.wait_for_selector("#sim-cmp-modal .sim-cmp-table tbody tr")
+    # reste à charge et marge (compte admin) calculés par le serveur
+    pg.wait_for_function("![...document.querySelectorAll('#sim-cmp-modal td')].some(td => td.textContent === '…')")
+    lignes = pg.evaluate("""[...document.querySelectorAll('#sim-cmp-modal tbody tr')].map(tr =>
+        [...tr.querySelectorAll('td')].map(td => td.innerText.replace(/\s+/g, ' ').trim()))""")
+    assert len(lignes) == nb and all(l[0].startswith("2 × ") for l in lignes)
+    entetes = pg.evaluate("[...document.querySelectorAll('#sim-cmp-modal th')].map(th => th.innerText)")
+    assert entetes[:7] == ["Modèle × quantité", "Marque", "Temp. max", "Puissance installée · couverture",
+                           "Prix TTC client", "Reste à charge", "Marge du dossier"]
+    assert not any("NIMBUS" in l[0] for l in lignes)
+    # le reste à charge vient du calcul du devis : prix − aides
+    ref = ALTHERMA_18 + " TRI"
+    st = dict(main.load_state_simulateur(NUM), modele_pac_id=ref, quantite_pac=2,
+              prix_pac=main.prix_defaut_pac(17882.0, 2, main._admin_payload_with_m3()), user_modified_price=True)
+    calc = main.calculer_devis(main._lead_for_response(main._find_lead(NUM)), st, main._admin_payload_with_m3(),
+                               main._read_catalogue_pac())
+    ligne = next(l for l in lignes if "ALTHERMA 3H HT R32 18 TRI" in l[0])
+    attendu = f"{round(calc['reste_a_charge']):,}".replace(",", " ")
+    assert ligne[5].replace(" ", " ").replace("\xa0", " ").startswith(attendu), (ligne, attendu)
+    pg.click(f'#sim-cmp-modal tr[data-ref="{ref}"] .sim-cmp-choisir')
+    pg.wait_for_function("document.querySelector('#sim-quantite').value === '2' && !document.querySelector('#sim-cmp-modal')")
+    assert pg.evaluate("document.querySelector('.p6-pcard.on')?.dataset.modeleId") == ref
     assert pg.erreurs_js == []
