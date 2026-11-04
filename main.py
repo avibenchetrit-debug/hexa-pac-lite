@@ -1196,6 +1196,17 @@ def _migrate_catalogue_regulateur() -> dict:
     return manques
 
 
+def _migrate_catalogue_dimensionnement() -> bool:
+    """Lot A (notedim-master), démarrage, idempotent : puissance à −7 °C / 55 °C du Master (NON validée) et
+    température de départ max (fiche produit) sur les modèles qui ne les ont pas. Écrit seulement si quelque chose
+    change ; une valeur déjà saisie dans l'Admin n'est jamais touchée."""
+    from services.dimensionnement_pac import migrer_catalogue
+    catalogue, change = migrer_catalogue(_read_catalogue_pac())
+    if change:
+        _write_catalogue_pac(catalogue)
+    return change
+
+
 def _admin_payload_with_m3():
     admin = load_parametres_admin()
     baremes = _read_json(BAREMES_PATH, {})
@@ -2204,6 +2215,7 @@ async def startup_event():
     _init_storage()
     _migrate_leads_schema()
     _migrate_catalogue_regulateur()
+    _migrate_catalogue_dimensionnement()
     _migrate_lot9()
     _migrate_lot10()
     _migrate_lot10c()
@@ -3743,8 +3755,78 @@ def get_admin_m3(request: Request) -> JSONResponse:
             "prix_vente_devis": {k: (load_parametres_admin().get("prix_vente_devis") or {}).get(k) for k in (
                 "prix_pose_ht", "prix_travaux_induits_ht", "prix_pose_cascade_ht", "travaux_induits_cascade")},
             "tva": (load_parametres_admin().get("params") or {}).get("tva"),
+            # Lot A : température de départ requise par émetteur (Admin → Catalogue PAC → Dimensionnement)
+            "temperatures_depart": _temperatures_depart(load_parametres_admin()),
         }
     )
+
+
+def _temperatures_depart(admin):
+    from services.dimensionnement_pac import temperatures_depart
+    return temperatures_depart(admin)
+
+
+@app.get("/api/admin/dimensionnement-pac")
+def get_dimensionnement_pac(request: Request) -> JSONResponse:
+    """Lot A : Admin → Catalogue PAC → Dimensionnement. Températures de départ requises par émetteur, et pour chaque
+    modèle : puissance à 35 °C, à −7 °C / 55 °C (validée ou non, avec sa source), température de départ max."""
+    _require_admin_session(request)
+    from services import dimensionnement_pac as dp
+    modeles = []
+    for m in _read_catalogue_pac():
+        if not isinstance(m, dict):
+            continue
+        modeles.append({"ref": m.get("ref"), "nom": m.get("nom"), "puiss35": dp.puissance_35(m),
+                        dp.CHAMP_M7_55: m.get(dp.CHAMP_M7_55), dp.CHAMP_M7_55_VALIDE: m.get(dp.CHAMP_M7_55_VALIDE) is True,
+                        dp.CHAMP_M7_55_SOURCE: m.get(dp.CHAMP_M7_55_SOURCE) or "", dp.CHAMP_TEMP_MAX: dp.temp_max(m)})
+    return JSONResponse({"temperatures_depart": dp.temperatures_depart(load_parametres_admin()),
+                         "emetteurs": dp.TEMPERATURES_DEPART_DEFAUT, "modeles": modeles,
+                         "version_catalogue": _catalogue_version()})
+
+
+@app.post("/api/admin/dimensionnement-pac")
+async def post_dimensionnement_pac(request: Request) -> JSONResponse:
+    """Enregistre les températures par émetteur et, par modèle, la puissance à −7 °C / 55 °C, sa validation, sa
+    source et la température max. Seuls ces champs sont écrits ; un modèle absent du message n'est pas touché."""
+    _require_admin_session(request)
+    from services import dimensionnement_pac as dp
+    payload = await _read_request_payload(request)
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=400, detail="Payload invalide")
+
+    def nombre(v, mini, maxi, champ):
+        if v in (None, ""):
+            return None
+        try:
+            n = float(str(v).replace(",", ".").replace(" ", ""))
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"{champ} : nombre attendu") from None
+        if not mini <= n <= maxi:
+            raise HTTPException(status_code=400, detail=f"{champ} : valeur hors bornes ({mini} à {maxi})")
+        return n
+
+    temps = payload.get("temperatures_depart")
+    if isinstance(temps, dict):
+        admin = load_parametres_admin()
+        admin["temperatures_depart"] = {k: nombre(v, 20, 90, f"température {k}")
+                                        for k, v in temps.items() if k in dp.TEMPERATURES_DEPART_DEFAUT}
+        save_parametres_admin_atomic(admin)
+    maj = {str(x.get("ref")): x for x in (payload.get("modeles") or []) if isinstance(x, dict) and x.get("ref")}
+    if maj:
+        catalogue = _read_catalogue_pac()
+        for m in catalogue:
+            x = maj.get(str(m.get("ref")))
+            if not x:
+                continue
+            kw = nombre(x.get(dp.CHAMP_M7_55), 0.5, 100, f"{m.get('ref')} −7 °C / 55 °C")
+            m[dp.CHAMP_M7_55] = kw
+            m[dp.CHAMP_M7_55_VALIDE] = bool(x.get(dp.CHAMP_M7_55_VALIDE)) and kw is not None
+            if dp.CHAMP_M7_55_SOURCE in x:
+                m[dp.CHAMP_M7_55_SOURCE] = str(x.get(dp.CHAMP_M7_55_SOURCE) or "").strip()[:300]
+            if dp.CHAMP_TEMP_MAX in x:
+                m[dp.CHAMP_TEMP_MAX] = nombre(x.get(dp.CHAMP_TEMP_MAX), 20, 95, f"{m.get('ref')} température max")
+        _write_catalogue_pac(catalogue)
+    return JSONResponse({"ok": True, "version_catalogue": _catalogue_version()})
 
 
 @app.post("/api/admin/marge-dossier/{numero}")

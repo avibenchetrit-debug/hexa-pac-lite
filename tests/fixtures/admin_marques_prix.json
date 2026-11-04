@@ -1,0 +1,72 @@
+{
+ "marques": {
+  "ATLANTIC": {
+   "niveau": "recommande",
+   "positionnement": "Marque française de référence, rassurante pour une installation fiable et suivie dans le temps.",
+   "avantages": [
+    "Marque très connue en France.",
+    "SAV et pièces plus faciles à gérer.",
+    "Bon équilibre entre fiabilité, prix et suivi."
+   ],
+   "prefixes": [
+    "ATL"
+   ]
+  },
+  "DAIKIN": {
+   "niveau": "confort",
+   "positionnement": "Marque japonaise premium, reconnue pour la qualité et la fiabilité de ses PAC.",
+   "avantages": [
+    "Image haut de gamme.",
+    "Très forte réputation sur la fiabilité en pompe à chaleur.",
+    "Bon choix pour un client qui veut de la tranquillité."
+   ],
+   "prefixes": [
+    "DAI"
+   ]
+  },
+  "THALEOS": {
+   "niveau": "essentiel",
+   "positionnement": "Marque française, idéale pour une PAC efficace, simple et bien placée en prix.",
+   "avantages": [
+    "Bon rapport qualité/prix.",
+    "Solution sérieuse sans aller sur du premium.",
+    "Bien adaptée aux projets simples et classiques."
+   ],
+   "prefixes": [
+    "THA"
+   ]
+  },
+  "NIBE": {
+   "prefixes": [
+    "NIB"
+   ],
+   "niveau": "confort",
+   "positionnement": "",
+   "avantages": [
+    "",
+    "",
+    ""
+   ]
+  },
+  "ARISTON": {
+   "prefixes": [
+    "ARI"
+   ],
+   "niveau": "essentiel",
+   "positionnement": "",
+   "avantages": [
+    "",
+    "",
+    ""
+   ]
+  }
+ },
+ "prix_vente_devis": {
+  "prix_pose_ht": 3920,
+  "prix_travaux_induits_ht": 2100,
+  "prix_pose_cascade_ht": 6500,
+  "travaux_induits_cascade": 1,
+  "description_pose_defaut": "Pose et mise en service de la pompe à chaleur, raccordements hydrauliques et électriques, dépose et évacuation de l'ancien système, contrôle d'étanchéité, paramétrage de la régulation.",
+  "description_travaux_induits_defaut": "Adaptation du circuit chauffage existant, modification de la ligne électrique dédiée, mise en place des éléments de sécurité, protections et reprises nécessaires à la bonne intégration de la pompe à chaleur."
+ }
+}

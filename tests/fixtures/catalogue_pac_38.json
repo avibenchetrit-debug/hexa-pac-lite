@@ -1,0 +1,382 @@
+[
+ {
+  "ref": "ATL-EXCELLIA-S-9",
+  "nom": "ALFÉA EXCELLIA S 9",
+  "usage": "Chauffage seul",
+  "alim": "Monophasé",
+  "puiss35": 9,
+  "etas35": 183,
+  "etas55": 141,
+  "ttc": 13694.0
+ },
+ {
+  "ref": "ATL-EXCELLIA-S-12",
+  "nom": "ALFÉA EXCELLIA S 12",
+  "usage": "Chauffage seul",
+  "alim": "Monophasé",
+  "puiss35": 12,
+  "etas35": 183,
+  "etas55": 141,
+  "ttc": 14357.0
+ },
+ {
+  "ref": "ATL-EXCELLIA-S-14",
+  "nom": "ALFÉA EXCELLIA S 14",
+  "usage": "Chauffage seul",
+  "alim": "Monophasé",
+  "puiss35": 14,
+  "etas35": 185,
+  "etas55": 141,
+  "ttc": 15084.0
+ },
+ {
+  "ref": "ATL-EXCELLIA-S-12 TRI",
+  "nom": "ALFÉA EXCELLIA S 12 TRI",
+  "usage": "Chauffage seul",
+  "alim": "Triphasé",
+  "puiss35": 12,
+  "etas35": 183,
+  "etas55": 141,
+  "ttc": 14672.0
+ },
+ {
+  "ref": "ATL-EXCELLIA-S-14 TRI",
+  "nom": "ALFÉA EXCELLIA S 14 TRI",
+  "usage": "Chauffage seul",
+  "alim": "Triphasé",
+  "puiss35": 14,
+  "etas35": 185,
+  "etas55": 141,
+  "ttc": 15399.0
+ },
+ {
+  "ref": "ATL-EXCELLIA-S-DUO-9",
+  "nom": "ALFÉA EXCELLIA S DUO 9",
+  "usage": "Chauffage + ECS",
+  "alim": "Monophasé",
+  "puiss35": 9,
+  "etas35": 183,
+  "etas55": 141,
+  "ttc": 15986.0
+ },
+ {
+  "ref": "ATL-EXCELLIA-S-DUO-12",
+  "nom": "ALFÉA EXCELLIA S DUO 12",
+  "usage": "Chauffage + ECS",
+  "alim": "Monophasé",
+  "puiss35": 12,
+  "etas35": 183,
+  "etas55": 141,
+  "ttc": 17097.0
+ },
+ {
+  "ref": "ATL-EXCELLIA-S-DUO-14",
+  "nom": "ALFÉA EXCELLIA S DUO 14",
+  "usage": "Chauffage + ECS",
+  "alim": "Monophasé",
+  "puiss35": 14,
+  "etas35": 185,
+  "etas55": 141,
+  "ttc": 17769.0
+ },
+ {
+  "ref": "ATL-EXCELLIA-S-DUO-12 TRI",
+  "nom": "ALFÉA EXCELLIA S DUO 12 TRI",
+  "usage": "Chauffage + ECS",
+  "alim": "Triphasé",
+  "puiss35": 12,
+  "etas35": 183,
+  "etas55": 141,
+  "ttc": 17390.0
+ },
+ {
+  "ref": "ATL-EXCELLIA-S-DUO-14 TRI",
+  "nom": "ALFÉA EXCELLIA S DUO 14 TRI",
+  "usage": "Chauffage + ECS",
+  "alim": "Triphasé",
+  "puiss35": 14,
+  "etas35": 185,
+  "etas55": 141,
+  "ttc": 18047.0
+ },
+ {
+  "ref": "DAI-ALTHERMA-3HHT-R32-14",
+  "nom": "ALTHERMA 3H HT R32 14",
+  "usage": "Chauffage",
+  "alim": "Monophasé",
+  "puiss35": 14,
+  "etas35": 180,
+  "etas55": 142,
+  "ttc": 15594.0
+ },
+ {
+  "ref": "DAI-ALTHERMA-3HHT-R32-16",
+  "nom": "ALTHERMA 3H HT R32 16",
+  "usage": "Chauffage",
+  "alim": "Monophasé",
+  "puiss35": 16,
+  "etas35": 180,
+  "etas55": 142,
+  "ttc": 16390.0
+ },
+ {
+  "ref": "DAI-ALTHERMA-3HHT-R32-18",
+  "nom": "ALTHERMA 3H HT R32 18",
+  "usage": "Chauffage",
+  "alim": "Monophasé",
+  "puiss35": 18,
+  "etas35": 180,
+  "etas55": 142,
+  "ttc": 17882.0
+ },
+ {
+  "ref": "DAI-ALTHERMA-3HHT-R32-14 TRI",
+  "nom": "ALTHERMA 3H HT R32 14 TRI",
+  "usage": "Chauffage",
+  "alim": "Triphasé",
+  "puiss35": 14,
+  "etas35": 180,
+  "etas55": 142,
+  "ttc": 15594.0
+ },
+ {
+  "ref": "DAI-ALTHERMA-3HHT-R32-16 TRI",
+  "nom": "ALTHERMA 3H HT R32 16 TRI",
+  "usage": "Chauffage",
+  "alim": "Triphasé",
+  "puiss35": 16,
+  "etas35": 180,
+  "etas55": 142,
+  "ttc": 16390.0
+ },
+ {
+  "ref": "DAI-ALTHERMA-3HHT-R32-18 TRI",
+  "nom": "ALTHERMA 3H HT R32 18 TRI",
+  "usage": "Chauffage",
+  "alim": "Triphasé",
+  "puiss35": 18,
+  "etas35": 180,
+  "etas55": 142,
+  "ttc": 17882.0
+ },
+ {
+  "ref": "ARI-NIMBUS-NET-R32-8",
+  "nom": "NIMBUS PLUS R32 8",
+  "usage": "Chauffage",
+  "alim": "Monophasé",
+  "puiss35": 8,
+  "etas35": 195,
+  "etas55": 140,
+  "ttc": 13143.0
+ },
+ {
+  "ref": "ARI-NIMBUS-NET-R32-12",
+  "nom": "NIMBUS PLUS R32 12",
+  "usage": "Chauffage",
+  "alim": "Monophasé",
+  "puiss35": 12,
+  "etas35": 181,
+  "etas55": 141,
+  "ttc": 13669.0
+ },
+ {
+  "ref": "ARI-NIMBUS-NET-R32-15",
+  "nom": "NIMBUS PLUS R32 15",
+  "usage": "Chauffage",
+  "alim": "Monophasé",
+  "puiss35": 15,
+  "etas35": 181,
+  "etas55": 151,
+  "ttc": 13952.0
+ },
+ {
+  "ref": "ARI-NIMBUS-NET-R32-12 TRI",
+  "nom": "NIMBUS PLUS R32 12 TRI",
+  "usage": "Chauffage",
+  "alim": "Triphasé",
+  "puiss35": 12,
+  "etas35": 181,
+  "etas55": 141,
+  "ttc": 13869.0
+ },
+ {
+  "ref": "ARI-NIMBUS-NET-R32-15 TRI",
+  "nom": "NIMBUS PLUS R32 15 TRI",
+  "usage": "Chauffage",
+  "alim": "Triphasé",
+  "puiss35": 15,
+  "etas35": 181,
+  "etas55": 151,
+  "ttc": 14029.0
+ },
+ {
+  "ref": "ARI-NIMBUS-NET-R32-DUO-8",
+  "nom": "NIMBUS PLUS R32 DUO 8",
+  "usage": "Chauffage + ECS",
+  "alim": "Monophasé",
+  "puiss35": 8,
+  "etas35": 195,
+  "etas55": 140,
+  "ttc": 14997.0
+ },
+ {
+  "ref": "ARI-NIMBUS-NET-R32-DUO-12",
+  "nom": "NIMBUS PLUS R32 DUO 12",
+  "usage": "Chauffage + ECS",
+  "alim": "Monophasé",
+  "puiss35": 12,
+  "etas35": 181,
+  "etas55": 141,
+  "ttc": 14798.0
+ },
+ {
+  "ref": "ARI-NIMBUS-NET-R32-DUO-15",
+  "nom": "NIMBUS PLUS R32 DUO 15",
+  "usage": "Chauffage + ECS",
+  "alim": "Monophasé",
+  "puiss35": 15,
+  "etas35": 181,
+  "etas55": 151,
+  "ttc": 15790.0
+ },
+ {
+  "ref": "ARI-NIMBUS-NET-R32-DUO-12 TRI",
+  "nom": "NIMBUS PLUS R32 DUO 12 TRI",
+  "usage": "Chauffage + ECS",
+  "alim": "Triphasé",
+  "puiss35": 12,
+  "etas35": 181,
+  "etas55": 141,
+  "ttc": 14925.0
+ },
+ {
+  "ref": "ARI-NIMBUS-NET-R32-DUO-15 TRI",
+  "nom": "NIMBUS PLUS R32 DUO 15 TRI",
+  "usage": "Chauffage + ECS",
+  "alim": "Triphasé",
+  "puiss35": 15,
+  "etas35": 178,
+  "etas55": 151,
+  "ttc": 15990.0
+ },
+ {
+  "ref": "THA-MTBL-R290-4",
+  "nom": "MONTBLANC R290 4",
+  "usage": "Chauffage",
+  "alim": "Monophasé",
+  "puiss35": 4.5,
+  "etas35": 195,
+  "etas55": 151,
+  "ttc": 11191.0
+ },
+ {
+  "ref": "THA-MTBL-R290-6",
+  "nom": "MONTBLANC R290 6",
+  "usage": "Chauffage",
+  "alim": "Monophasé",
+  "puiss35": 6.35,
+  "etas35": 194,
+  "etas55": 151,
+  "ttc": 11290.0
+ },
+ {
+  "ref": "THA-MTBL-R290-8",
+  "nom": "MONTBLANC R290 8",
+  "usage": "Chauffage",
+  "alim": "Monophasé",
+  "puiss35": 8.4,
+  "etas35": 198,
+  "etas55": 152,
+  "ttc": 11690.0
+ },
+ {
+  "ref": "THA-MTBL-R290-10",
+  "nom": "MONTBLANC R290 10",
+  "usage": "Chauffage",
+  "alim": "Monophasé",
+  "puiss35": 10,
+  "etas35": 203,
+  "etas55": 154,
+  "ttc": 11790.0
+ },
+ {
+  "ref": "THA-MTBL-R290-12",
+  "nom": "MONTBLANC R290 12",
+  "usage": "Chauffage",
+  "alim": "Monophasé",
+  "puiss35": 12,
+  "etas35": 186,
+  "etas55": 150,
+  "ttc": 11990.0
+ },
+ {
+  "ref": "THA-MTBL-R290-14",
+  "nom": "MONTBLANC R290 14",
+  "usage": "Chauffage",
+  "alim": "Monophasé",
+  "puiss35": 14,
+  "etas35": 186,
+  "etas55": 150,
+  "ttc": 12090.0
+ },
+ {
+  "ref": "THA-MTBL-R290-16",
+  "nom": "MONTBLANC R290 16",
+  "usage": "Chauffage",
+  "alim": "Monophasé",
+  "puiss35": 15.1,
+  "etas35": 188,
+  "etas55": 150,
+  "ttc": 12190.0
+ },
+ {
+  "ref": "THA-MTBL-R290-8 TRI",
+  "nom": "MONTBLANC R290 8 TRI",
+  "usage": "Chauffage",
+  "alim": "Triphasé",
+  "puiss35": 8.4,
+  "etas35": 198,
+  "etas55": 152,
+  "ttc": 11890.0
+ },
+ {
+  "ref": "THA-MTBL-R290-10 TRI",
+  "nom": "MONTBLANC R290 10 TRI",
+  "usage": "Chauffage",
+  "alim": "Triphasé",
+  "puiss35": 10,
+  "etas35": 203,
+  "etas55": 154,
+  "ttc": 11890.0
+ },
+ {
+  "ref": "THA-MTBL-R290-12 TRI",
+  "nom": "MONTBLANC R290 12 TRI",
+  "usage": "Chauffage",
+  "alim": "Triphasé",
+  "puiss35": 12,
+  "etas35": 186,
+  "etas55": 150,
+  "ttc": 12190.0
+ },
+ {
+  "ref": "THA-MTBL-R290-14 TRI",
+  "nom": "MONTBLANC R290 14 TRI",
+  "usage": "Chauffage",
+  "alim": "Triphasé",
+  "puiss35": 14,
+  "etas35": 186,
+  "etas55": 150,
+  "ttc": 12190.0
+ },
+ {
+  "ref": "THA-MTBL-R290-16 TRI",
+  "nom": "MONTBLANC R290 16 TRI",
+  "usage": "Chauffage",
+  "alim": "Triphasé",
+  "puiss35": 15.1,
+  "etas35": 188,
+  "etas55": 150,
+  "ttc": 12290.0
+ }
+]
