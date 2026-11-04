@@ -280,3 +280,39 @@ def test_geslot_comparer_toutes_les_options_et_choisir(navigateur):
     pg.wait_for_function("document.querySelector('#sim-quantite').value === '2' && !document.querySelector('#sim-cmp-modal')")
     assert pg.evaluate("document.querySelector('.p6-pcard.on')?.dataset.modeleId") == ref
     assert pg.erreurs_js == []
+
+
+def test_geslot_pre_note_et_note_definitive(navigateur):
+    pg = navigateur
+    _ouvrir_etape6(pg, ETAT_GESLOT)
+    pg.click('.p6-pcard[data-pac-niv="confort"]')
+    pg.wait_for_function("document.querySelector('#sim-quantite').value === '2'")
+    pg.click("#sim-prix")                                                  # prix saisi à la main (comme le lot 14)
+    pg.fill("#sim-prix", "33000")
+    pg.locator("#sim-prix").blur()
+    pg.wait_for_timeout(900)
+    pg.evaluate("window.ouvrirNoteDim()")
+    pg.wait_for_selector("#sim-dim-modele")
+    assert pg.inner_text("#sim-dim-modele") == "2 × ALTHERMA 3H HT R32 18 TRI (en cascade)"
+    assert pg.inner_text("#sim-dim-puissance").replace(" ", " ") == "2 × 18,0 kW = 36,0 kW · 108 % · cohérent"
+    prix_aff = pg.inner_text("#sim-dim-prix")
+    assert re.sub(r"\D", "", prix_aff) == "33000", prix_aff
+    # note définitive (serveur) : quantité, total, couverture, plage 60–130 %
+    pg.click("#sim-dim-close")
+    pg.click("#btn-save")
+    fin = time.time() + 10
+    while time.time() < fin and main.load_state_simulateur(NUM).get("quantite_pac") != 2:
+        pg.wait_for_timeout(200)
+    p = main._lead_for_response(main._find_lead(NUM))
+    cat = main._read_catalogue_pac()
+    nd = main.calculer_notedim(p, main._load_state_simulateur(NUM, p, cat), cat, main.load_parametres_admin())
+    assert nd["modele_pac"] == "2 × ALTHERMA 3H HT R32 18 TRI (en cascade)"
+    assert nd["modele_pac_specs"].startswith("2 × 18,0 kW = 36,0 kW · 108 % · cohérent · "), nd["modele_pac_specs"]
+    assert (nd["gamme_min"], nd["gamme_max"], nd["coherence_statut"]) == (service_devis.number_fr(20.0, 1), "43,4", "ok")
+    assert nd["puissance_mention"] == "puissance à 35 °C, valeur à −7 °C / 55 °C non renseignée"
+    assert (nd["temperature_depart_requise"], nd["temperature_depart_max"], nd["alerte_temperature"]) == ("65", "70", "")
+    html = pg.evaluate("u => fetch(u).then(r => r.text())", f"/notedim-public/{NUM}/{main._sign_notedim_token(NUM)}")
+    assert "2 × ALTHERMA 3H HT R32 18 TRI (en cascade)" in html and "108 % · cohérent" in html
+    assert "Plage de cohérence" in html and "± 20" not in html
+    assert "Puissance à 35 °C, valeur à −7 °C / 55 °C non renseignée." in html
+    assert pg.erreurs_js == []

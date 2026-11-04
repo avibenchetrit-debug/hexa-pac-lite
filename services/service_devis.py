@@ -1021,7 +1021,7 @@ def validate_prospect_for_devis(prospect, state_simulateur, admin_params=None):
     return missing
 
 
-def calculer_notedim(prospect, state_simulateur, catalogue_pac):
+def calculer_notedim(prospect, state_simulateur, catalogue_pac, admin_params=None):
     surface_habitable = float_value(value(prospect, "surface_habitable", "surface_logement_m2", default=100), 100)
     surface_chauffee = float_value(value(state_simulateur, "surface_chauffee", default=0), 0)
     if surface_chauffee <= 0:
@@ -1067,8 +1067,18 @@ def calculer_notedim(prospect, state_simulateur, catalogue_pac):
     p_pac_reco_w = int(p_pac_w + 0.5)
     p_pac_reco_kw = int(p_pac_w / 1000 * 10 + 0.5) / 10
     modele = find_modele(catalogue_pac, value(state_simulateur, "modele_pac_id", "modele_pac")) or select_default_modele(prospect, catalogue_pac)
-    modele_kw = float_value(value(modele, "puiss_chauf", "puiss35", "puissance_kw", default=p_pac_reco_kw), p_pac_reco_kw)
+    # Lot A (notedim-master) : puissance RETENUE (−7 °C / 55 °C validée, sinon 35 °C), plage de cohérence 60–130 %,
+    # température de départ requise / max — mêmes règles que l'écran (services/dimensionnement_pac.py)
+    from services import dimensionnement_pac as _dp
     quantite = quantite_pac(state_simulateur)
+    if modele:
+        modele_kw, _origine_kw = _dp.puissance_retenue(modele)
+    else:
+        modele_kw, _origine_kw = p_pac_reco_kw, _dp.ORIGINE_35
+    _coh = _dp.coherence(modele_kw * quantite, p_pac_reco_kw) or {}
+    _plage = _dp.plage(p_pac_reco_kw) or {}
+    _t_req, _t_origine = _dp.temperature_requise(prospect, admin_params or {})
+    _t_max = _dp.temp_max(modele) if modele else None
     return {
         "surface_habitable": number_fr(surface_habitable, 0),
         "surface_chauffee": number_fr(surface_chauffee, 0),
@@ -1098,13 +1108,25 @@ def calculer_notedim(prospect, state_simulateur, catalogue_pac):
         "p_chauffage_secu": _fmt_fr_num(int(p_chauffage_secu + 0.5)),
         "p_pac_reco_w": _fmt_fr_num(p_pac_reco_w),
         "p_pac_reco_kw": number_fr(p_pac_reco_kw, 1),
-        "gamme_min": number_fr(max(p_pac_reco_kw * 0.8, 0), 1),
-        "gamme_max": number_fr(p_pac_reco_kw * 1.2, 1),
+        # Lot A : la plage de cohérence du Master (60–130 %) remplace la gamme ± 20 %
+        "gamme_min": number_fr(_plage.get("min_kw", 0), 1),
+        "gamme_max": number_fr(_plage.get("max_kw", 0), 1),
+        "plage_min_pct": _dp.PLAGE_COHERENCE_MIN_PCT,
+        "plage_max_pct": _dp.PLAGE_COHERENCE_MAX_PCT,
+        "coherence_pct": _coh.get("pct"),
+        "coherence_statut": _coh.get("statut", ""),
+        "coherence_libelle": _coh.get("libelle", ""),
+        "puissance_origine": _origine_kw,
+        "puissance_mention": "" if _origine_kw == _dp.ORIGINE_M7_55 else _dp.MENTION_35,
+        "temperature_depart_requise": number_fr(_t_req, 0) if _t_req else "",
+        "temperature_depart_max": number_fr(_t_max, 0) if _t_max else "",
+        "alerte_temperature": _dp.alerte_temperature(modele, _t_req, value(prospect, "type_emetteurs", default="")) if modele else "",
         "modele_pac": value(modele, "nom", "ref", default="—") if quantite == 1
                       else f"{quantite} × {value(modele, 'nom', 'ref', default='—')} (en cascade)",
         # Lot 14 : 2 PAC en cascade -> puissance totale = quantité × puissance unitaire
         "modele_pac_specs": (f"{number_fr(modele_kw, 1)} kW" if quantite == 1
                              else f"{quantite} × {number_fr(modele_kw, 1)} kW = {number_fr(modele_kw * quantite, 1)} kW")
+                            + (f" · {_coh['pct']} % · {_coh['libelle']}" if _coh else "")
                             + f" · {value(modele, 'alim', default='')} · COP {value(modele, 'cop', 'scop35', default='—')}",
         "quantite_pac": quantite,
         "puissance_totale_kw": modele_kw * quantite,

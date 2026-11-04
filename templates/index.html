@@ -14006,13 +14006,10 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
   function ouvrirNoteDim(){
     lireContexteFiche();
     const dim = calculerPuissancePAC(state);
-    let modele = state.modele_force ? getModeleActuel() : null;
-    if (!modele) {
-      const selection = selectionnerPAC(dim.puissance_kw, CATALOGUE_PAC, state);
-      appliquerSelectionPac(selection);
-      state.selection_alerte = selection?.alerte || null;
-      modele = selection?.modele || null;
-    }
+    // Lot A : le modèle et la quantité de l'étape 6 (choix automatique des gammes ou choix manuel), jamais un autre
+    if (!state.modele_force) syncDimensionnement();
+    const modele = getModeleActuel();
+    const ctrlN = controlePuissance();
     const serviceTxt = state.service === 'chauffage_ecs' ? 'Chauffage + ECS' : 'Chauffage seul';
     const fmt1 = n => Number.isFinite(Number(n)) ? Number(n).toLocaleString('fr-FR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : '—';
     const fmt0 = n => Number.isFinite(Number(n)) ? Math.round(Number(n)).toLocaleString('fr-FR') : '—';
@@ -14063,8 +14060,12 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
             <strong>${fmt1(dim.puissance_kw)} kW</strong>
           </div>
 
-          <p>Modèle proposé : ${modele ? modele.label : '—'}<br>
-          Prix TTC : ${modele ? eur(modele.prix_ttc) : eur(state.prix_pac || 0)}</p>
+          <p>Modèle proposé : <span id="sim-dim-modele">${modele ? (ctrlN.q === 2 ? `2 × ${modele.label} (en cascade)` : modele.label) : '—'}</span><br>
+          ${modele ? `Puissance installée : <span id="sim-dim-puissance">${ctrlN.q === 2 ? `2 × ${fmt1(ctrlN.unitaire)} kW = ` : ''}${fmt1(ctrlN.total)} kW${ctrlN.coherence ? ` · ${ctrlN.coherence.pct} % · ${ctrlN.coherence.libelle}` : ''}</span>
+          (plage de cohérence ${fmt1(dim.puissance_kw * 0.6)} à ${fmt1(dim.puissance_kw * 1.3)} kW, 60 à 130 %)<br>` : ''}
+          ${modele && ctrlN.origine === '35' ? 'Puissance à 35 °C, valeur à −7 °C / 55 °C non renseignée.<br>' : ''}
+          ${ctrlN.alerteT ? `<b style="color:#B91C1C">⚠ ${ctrlN.alerteT}</b><br>` : ''}
+          Prix TTC : <span id="sim-dim-prix">${eur(state.prix_pac || (modele ? prixDefautPac(modele.prix_ttc, ctrlN.q) : 0))}</span></p>
 
           <p class="sim-dim-disclaimer">Ce calcul constitue un pré-dimensionnement simplifié basé sur les informations déclarées dans la fiche prospect et le simulateur. La puissance finale de la pompe à chaleur doit être vérifiée avec les données fabricant, la température extérieure de base réelle du projet et le régime d'eau des émetteurs.</p>
         </div>

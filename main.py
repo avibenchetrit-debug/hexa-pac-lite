@@ -5046,7 +5046,7 @@ def _build_notedim_context(request: Request, numero: str) -> dict:
         "ville_chantier": devis_value(prospect, "ville", "ville_chantier", default=""),
         "type_logement": _label_type_logement(prospect.get("type_logement", "")),
         "chauffage_actuel": str(devis_value(prospect, "chauffage_actuel", "mode_chauffage", default="")).capitalize(),
-        **calculer_notedim(prospect, state, catalogue),
+        **calculer_notedim(prospect, state, catalogue, load_parametres_admin()),
     }
     return context
 
