@@ -17,6 +17,13 @@
 <style>
   .installation-proposee .ic-ok { color: #15803D; font-weight: 700; }
   .installation-proposee .ic-sous, .installation-proposee .ic-sur { color: #B91C1C; font-weight: 700; }
+  /* pac-lite (Avi, 04/11) : à l'écran, une page A4 centrée comme le pré-devis ; l'impression (PDF) ne change pas. */
+  @media screen {
+    html { background: #EEF2F7; }
+    body { box-sizing: border-box; width: 210mm; max-width: calc(100% - 32px); min-height: 297mm; margin: 32px auto;
+      padding: 12mm 14mm 16mm; background: #FFFFFF;
+      box-shadow: 0 4px 24px rgba(0, 46, 90, 0.08), 0 1px 3px rgba(0, 46, 90, 0.04); }
+  }
   .mentions-societe { display: flex; justify-content: space-between; gap: 16px; margin-top: 18px; padding-top: 10px;
     border-top: 1px solid #E2E8F0; font-size: 8.5pt; color: #5A6675; line-height: 1.45; }
 </style>
@@ -59,10 +66,11 @@
 <div class="section">
   <div class="section-title">Données du logement</div>
   <div class="cards-row bloc">
+    {#- pac-lite (Avi, 04/11) : la SURFACE CHAUFFÉE d'abord — celle du calcul —, la surface habitable en second. -#}
     <div class="data-card">
-      <div class="data-card-label">Surface habitable</div>
-      <div class="data-card-value">{{ prospect.surface_habitable_m2|nb }} m²</div>
-      <div class="data-card-sub">{{ prospect.type_logement }}</div>
+      <div class="data-card-label">Surface chauffée</div>
+      <div class="data-card-value" id="nd-surface-chauffee">{{ (c.get('surface_chauffee_m2') or prospect.surface_habitable_m2)|nb }} m²</div>
+      <div class="data-card-sub" id="nd-surface-habitable">sur {{ prospect.surface_habitable_m2|nb }} m² habitables · {{ prospect.type_logement }}</div>
     </div>
     <div class="data-card">
       <div class="data-card-label">Zone climatique</div>
