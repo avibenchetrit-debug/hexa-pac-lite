@@ -167,3 +167,28 @@ def test_admin_saisie_et_validation_m7_55(navigateur):
     m = next(x for x in main._read_catalogue_pac() if x["ref"] == ALTHERMA_18 + " TRI")
     assert (m["puissance_m7_55_kw"], m["puissance_m7_55_valide"]) == (17.4, True)
     assert pg.erreurs_js == []
+
+
+# ---------- étape Chauffage : température de départ ----------
+
+def test_temperature_depart_preremplie_et_modifiable(navigateur):
+    pg = navigateur
+    _ouvrir_etape6(pg, ETAT_GESLOT)
+    pg.evaluate("window.hexaParcoursEtape(3)")
+    pg.wait_for_selector('[name="temperature_depart_c"]', state="visible")
+    assert pg.get_attribute('[name="temperature_depart_c"]', "placeholder") == "65"       # radiateurs fonte
+    assert pg.evaluate("window.hexaTemperatureRequise()") == {"t": 65, "origine": "emetteur", "emetteur": "radiateurs_fonte"}
+    sel = '#form-prospect [name="type_emetteurs"]'
+    pg.evaluate(f"(() => {{ const s = document.querySelector('{sel}'); s.value = 'plancher_chauffant';"
+                " s.dispatchEvent(new Event('change', { bubbles: true })); })()")
+    assert pg.input_value('[name="temperature_depart_c"]') == "35"                       # pré-rempli
+    pg.fill('[name="temperature_depart_c"]', "45")                                       # modifié à la main
+    pg.evaluate(f"(() => {{ const s = document.querySelector('{sel}'); s.value = 'radiateurs_fonte';"
+                " s.dispatchEvent(new Event('change', { bubbles: true })); })()")
+    assert pg.input_value('[name="temperature_depart_c"]') == "45"                       # saisie gardée
+    pg.click("#btn-save")
+    fin = time.time() + 10
+    while time.time() < fin and main._find_lead(NUM).get("temperature_depart_c") != "45":
+        pg.wait_for_timeout(200)
+    assert main._find_lead(NUM).get("temperature_depart_c") == "45"
+    assert pg.erreurs_js == []

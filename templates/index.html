@@ -6865,7 +6865,13 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
       [anneeField, dateVisiteField].forEach(f => { if (f) rowB.appendChild(f); });
       const rowC = document.createElement('div');
       rowC.className = 'row row-3';
-      [modeField, typeEmetteursField, ecsField].forEach(f => { if (f) rowC.appendChild(f); });
+      // Lot A (notedim-master) : température de départ requise, modifiable par prospect, pré-remplie selon l'émetteur
+      const tempDepartField = document.createElement('div');
+      tempDepartField.className = 'field p6-tdep';
+      tempDepartField.innerHTML = `
+        <label>Température de départ</label>
+        <span class="p6-tdep-in"><input type="text" inputmode="numeric" name="temperature_depart_c" id="temperature-depart-c" maxlength="4" autocomplete="off"><i>°C</i></span>`;
+      [modeField, typeEmetteursField, ecsField, tempDepartField].forEach(f => { if (f) rowC.appendChild(f); });
       const rowD = document.createElement('div');
       rowD.className = 'row row-2';
       [alimentationField, puissanceField].forEach(f => { if (f) rowD.appendChild(f); });
@@ -7137,6 +7143,37 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     return iso;
   }
 
+  // Lot A (notedim-master) : température de départ requise = champ de la fiche (étape Chauffage), sinon celle de
+  // l'émetteur (Admin → Catalogue PAC → Dimensionnement, transmise par /api/admin/m3). Même règle que
+  // services/dimensionnement_pac.temperature_requise. Le champ se pré-remplit quand l'émetteur change, sauf s'il a été
+  // modifié à la main (valeur différente du défaut de l'émetteur précédent).
+  window.HEXA_TEMP_DEPART_DEFAUT = { radiateurs_fonte: 65, radiateurs_classiques: 55, radiateurs_basse_temp: 55,
+                                     plancher_chauffant: 35, convecteurs_electriques: 55 };
+  window.hexaTempDepartTable = function () { return Object.assign({}, window.HEXA_TEMP_DEPART_DEFAUT, window.HEXA_TEMP_DEPART || {}); };
+  window.hexaTemperatureRequise = function () {
+    const f = document.querySelector('#form-prospect [name="temperature_depart_c"]');
+    const em = (document.querySelector('#form-prospect [name="type_emetteurs"]') || {}).value || '';
+    const defaut = Number(window.hexaTempDepartTable()[em]) || null;
+    if (f) f.placeholder = defaut ? String(defaut) : '—';
+    const v = Number(String((f && f.value) || '').replace(',', '.'));
+    if (v >= 20 && v <= 90) return { t: v, origine: 'fiche', emetteur: em };
+    return { t: defaut, origine: defaut ? 'emetteur' : '', emetteur: em };
+  };
+  document.addEventListener('change', function (e) {
+    const sel = e.target;
+    if (!sel || sel.name !== 'type_emetteurs' || !sel.closest || !sel.closest('#form-prospect')) return;
+    const f = document.querySelector('#form-prospect [name="temperature_depart_c"]');
+    if (!f) return;
+    const table = window.hexaTempDepartTable();
+    const prec = sel.dataset.emPrec || '';
+    const auto = String(f.value || '').trim() === '' || Number(String(f.value).replace(',', '.')) === Number(table[prec] || table[sel.value]);
+    if (auto && table[sel.value]) {
+      f.value = String(table[sel.value]);
+      f.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+    sel.dataset.emPrec = sel.value;
+    window.hexaTemperatureRequise();
+  }, true);
   window.REQUIS_SIMU_FIELDS = ['surface_logement_m2','code_postal_chantier','type_logement','hsp','altitude','type_emetteurs','mode_chauffage','alimentation_electrique','rfr','nombre_personnes','cout_energetique_mensuel_eur'];
   window.majRequisSimu = function () {
     (window.REQUIS_SIMU_FIELDS || []).forEach(function (nm) {
@@ -11753,6 +11790,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
       try {
         const rM3 = await fetch('/api/admin/m3', { cache:'no-store' });
         if (rM3.ok) M3_CONFIG = await rM3.json();
+        if (M3_CONFIG && M3_CONFIG.temperatures_depart) window.HEXA_TEMP_DEPART = M3_CONFIG.temperatures_depart;   // Lot A
         if (M3_CONFIG && M3_CONFIG.baremes_anah) window.HEXA_BAREMES_ANAH = M3_CONFIG.baremes_anah;
       } catch(_) {}
       try {
@@ -20759,6 +20797,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
   let etapeCourante = 1, techOuvert = false;
   function allerEtape(n, opts) {
     n = Math.min(ETAPES_P.length, Math.max(1, Number(n) || 1));
+    if (typeof window.hexaTemperatureRequise === 'function') window.hexaTemperatureRequise();   // Lot A : placeholder
     const change = n !== etapeCourante;
     etapeCourante = n;
     const E = ETAPES_P[n - 1];
@@ -21409,6 +21448,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     const sa = fEm && q('.l4-aide[data-aide="sous-choix"]', fEm);
     if (sa) fSous.appendChild(sa);
     gM.appendChild(fSous);
+    mettre(gM, 'temperature_depart_c');                         // Lot A : température de départ requise
     const al = q('#l4-alerte-convecteurs');
     if (al && fEm) { al.classList.remove('l4-span3'); fEm.appendChild(al); }
     const gC = grille('p6-g-ecs');                               // Lot 6b : eau chaude + compteur, une rangée
@@ -22570,7 +22610,10 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
   body.l6 .p6-g-log { grid-template-columns: 1.3fr 1fr 1fr 1fr; }
   body.l6 .p6-g-bail { grid-template-columns: 2fr 1fr 1fr; padding: 10px; background: var(--p6-orangebg); border: 1px solid var(--p6-orange); border-radius: 8px; }
   body.l6 .p6-g-bail .field > label { color: #6B3500 !important; }
-  body.l6 .p6-g-em { grid-template-columns: 3fr 2fr; }
+  body.l6 .p6-g-em { grid-template-columns: 3fr 2fr 1.2fr; }
+  body.l6 .p6-tdep-in { display: flex; align-items: center; gap: 4px; }
+  body.l6 .p6-tdep-in input { width: 64px; text-align: right; }
+  body.l6 .p6-tdep-in i { font-style: normal; color: #5A6675; }
   body.l6 .p6-g-fact { grid-template-columns: 1.2fr 2fr; }
   body.l6 .p6-g-iso { grid-template-columns: 1.6fr 1fr 1fr 1fr; }
   body.l6 .p6-g > .l4-span2, body.l6 .p6-g > .l4-span3, body.l6 #l4-bloc-1 .l4-grid > * { grid-column: auto !important; }
