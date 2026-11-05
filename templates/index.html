@@ -10776,15 +10776,30 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     }
   }
 
+  function brancherNotesVt(root) {
+    const base = `/api/notedim/${encodeURIComponent(currentProspect)}/archives/`;
+    root.querySelectorAll('[data-note-vt-voir]').forEach(b => b.addEventListener('click', () => window.open(base + b.dataset.noteVtVoir, '_blank')));
+    root.querySelectorAll('[data-note-vt-dl]').forEach(b => b.addEventListener('click', () => window.open(base + b.dataset.noteVtDl + '?telecharger=1', '_blank')));
+  }
+
   async function refreshDevisList() {
     const root = document.getElementById('docs-devis-list');
     if (!root || !currentProspect) return;
     try {
-      const [r, echecs] = await Promise.all([
+      const [r, echecs, archivesNd] = await Promise.all([
         fetch(`/api/devis/${encodeURIComponent(currentProspect)}/list`, { cache:'no-store' }),
         fetch(`/api/devis/${encodeURIComponent(currentProspect)}/envois-echoues`, { cache:'no-store' })
-          .then(x => x.ok ? x.json() : []).catch(err => { console.error('[envois échoués]', err); return []; })
+          .then(x => x.ok ? x.json() : []).catch(err => { console.error('[envois échoués]', err); return []; }),
+        // A.1 + A.2 : pré-note et note définitive archivées à la validation de la VT (datées, jamais écrasées)
+        fetch(`/api/notedim/${encodeURIComponent(currentProspect)}/archives`, { cache:'no-store' })
+          .then(x => x.ok ? x.json() : []).catch(err => { console.error('[notes archivées]', err); return []; })
       ]);
+      const archivesHtml = (Array.isArray(archivesNd) && archivesNd.length) ? `<div class="docs-notes-vt" style="margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #E2E8F0;">
+          <div style="font-size:12px;font-weight:700;color:#002E5A;margin-bottom:4px;">📐 Notes de dimensionnement archivées</div>
+          ${archivesNd.slice().reverse().map(a => `<div class="docs-notedim-row docs-note-vt" data-nature="${escapeHtml(a.nature || '')}"><span class="docs-notedim-label">${escapeHtml(a.libelle || '')}</span>`
+            + `<button type="button" class="hexa-meta-card-action" data-note-vt-voir="${a.index}">👁 Aperçu</button>`
+            + `<button type="button" class="hexa-meta-card-action" data-note-vt-dl="${a.index}">📥 Télécharger</button></div>`).join('')}
+        </div>` : '';
       if (!r.ok) throw new Error(`liste des devis : erreur ${r.status}`);
       const items = await r.json();
       // Envois refusés par Resend : rien n'a été marqué « Envoyé », l'échec reste visible en rouge.
@@ -10796,12 +10811,13 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
       if (!items.length) {
         const title = document.getElementById('docs-devis-title');
         if (title) title.textContent = '📋 Devis envoyés (0)';
-        root.innerHTML = echecsHtml + '<div class="pv-muted">Aucun devis envoyé pour ce prospect</div>';
+        root.innerHTML = archivesHtml + echecsHtml + '<div class="pv-muted">Aucun devis envoyé pour ce prospect</div>';
+        brancherNotesVt(root);
         return;
       }
       const title = document.getElementById('docs-devis-title');
       if (title) title.textContent = `📋 Devis envoyés (${items.length})`;
-      root.innerHTML = echecsHtml + items.map(item => `
+      root.innerHTML = archivesHtml + echecsHtml + items.map(item => `
         <div class="docs-devis-row">
           <div><b>${escapeHtml((item.variante === 'pre_devis' && (item.numero_devis || '').startsWith('DE')) ? ('PD' + item.numero_devis.slice(2)) : (item.numero_devis || ('v' + item.version)))}</b> — Envoyé le ${formatParis(item.sent_at)} à ${escapeHtml(item.email || '')}</div>
           <div style="font-size:12px;font-weight:600;margin-top:2px;"><span style="${item.first_opened_at ? 'color:#15803D' : 'color:#94A3B8'}">${item.first_opened_at ? `✅ Ouvert le ${formatParis(item.first_opened_at)}${(item.open_count||0) > 1 ? ` · ${item.open_count} ouvertures` : ''}` : '⏳ Pas encore ouvert'}</span> · ${livraisonHtml(item.livraison)}</div>
@@ -10894,6 +10910,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
       root.querySelectorAll('[data-notedim-preview]').forEach(btn => {
         btn.addEventListener('click', () => openNotedimPdfViewer(btn.dataset.notedimPreview, btn.dataset.notedimLibelle));
       });
+      brancherNotesVt(root);
       root.querySelectorAll('[data-notedim-download]').forEach(btn => {
         btn.addEventListener('click', () => window.open(`/api/notedim/${encodeURIComponent(currentProspect)}/download?version=${encodeURIComponent(btn.dataset.notedimDownload)}`, '_blank'));
       });

@@ -2885,6 +2885,63 @@ async def update_lead_status(numero: str, request: Request) -> JSONResponse:
     return JSONResponse({"success": True, "statut": new_status})
 
 
+# A.1 + A.2 (05/11/2026) — À LA VALIDATION DE LA VT : la pré-note telle qu'elle était juste avant, puis la note
+# DÉFINITIVE (gabarit du Master, données ACTUELLES de la fiche), toutes deux archivées et datées dans
+# notes_dimensionnement.json ({n° de lead: [{nature, date, file, numero_notedim}]}). Rien n'est jamais écrasé : une
+# nouvelle validation ajoute deux entrées. Un échec (fiche incomplète…) ne bloque pas la validation, il est rendu.
+NOTES_DIM_ARCHIVES_PATH = os.path.join(DATA_DIR, "notes_dimensionnement.json")
+LIBELLES_NOTE_ARCHIVE = {"pre": "Note de pré-dimensionnement — état juste avant la validation de la VT",
+                         "definitive": "Note de dimensionnement définitive — générée à la validation de la VT"}
+
+
+def _archiver_note_dim(numero: str, request: Request, nature: str) -> dict:
+    ctx = _build_notedim_context(request, numero)
+    if ctx.get("_error_template"):
+        return {"nature": nature, "erreur": "fiche incomplète : " + " ; ".join(str(x) for x in ctx.get("missing") or [])}
+    ctx.setdefault("request", request)
+    pdf = _html_to_pdf_playwright(templates.env.get_template("notedim_pac.html").render(ctx), request)
+    horo = datetime.now(PARIS_TZ)
+    chemin = os.path.join(DEVIS_DIR, f"{numero}_note_{nature}_{horo.strftime('%Y%m%d-%H%M%S')}.pdf")
+    _write_pdf(chemin, pdf)
+    entree = {"nature": nature, "date": horo.isoformat(timespec="seconds"), "file": chemin,
+              "numero_notedim": ctx.get("numero_notedim") or ""}
+    registre = _read_json(NOTES_DIM_ARCHIVES_PATH, {})
+    if not isinstance(registre, dict):
+        registre = {}
+    registre.setdefault(numero, []).append(entree)
+    _atomic_write_json(NOTES_DIM_ARCHIVES_PATH, registre)
+    return entree
+
+
+def _notes_archivees_vt(numero: str) -> list:
+    registre = _read_json(NOTES_DIM_ARCHIVES_PATH, {})
+    return [e for e in ((registre or {}).get(numero) or []) if isinstance(e, dict)]
+
+
+@app.get("/api/notedim/{numero}/archives")
+async def notes_dim_archivees(numero: str) -> JSONResponse:
+    out = []
+    for i, e in enumerate(_notes_archivees_vt(numero)):
+        if not os.path.exists(str(e.get("file") or "")):
+            continue
+        d = _instant(e.get("date"))
+        quand = d.astimezone(PARIS_TZ).strftime("%d/%m/%Y à %H:%M") if d else ""
+        out.append({"index": i, "nature": e.get("nature"), "date": e.get("date"),
+                    "libelle": f"{LIBELLES_NOTE_ARCHIVE.get(e.get('nature'), 'Note de dimensionnement')} ({quand})"})
+    return JSONResponse(out)
+
+
+@app.get("/api/notedim/{numero}/archives/{index}")
+async def note_dim_archivee_pdf(numero: str, index: int, telecharger: int = 0):
+    archives = _notes_archivees_vt(numero)
+    if not 0 <= index < len(archives) or not os.path.exists(str(archives[index].get("file") or "")):
+        raise HTTPException(status_code=404, detail="Note archivée introuvable")
+    e = archives[index]
+    nom = "NoteDim-DEFINITIVE" if e.get("nature") == "definitive" else "Note-pre-dimensionnement"
+    entete = _entete_pdf(nom, e.get("numero_notedim") or numero) if telecharger else {"Content-Disposition": "inline"}
+    return FileResponse(e["file"], media_type="application/pdf", headers=entete)
+
+
 @app.post("/api/leads/{numero}/vt")
 async def update_lead_vt(numero: str, request: Request) -> JSONResponse:
     """Visite technique : valide / refuse / annule la marque VT.
@@ -2902,7 +2959,16 @@ async def update_lead_vt(numero: str, request: Request) -> JSONResponse:
     if index is None:
         raise HTTPException(status_code=404, detail="Prospect non trouvé")
     now_paris = _now_paris_iso()
+    notes = []
+    if action == "valider" and not leads[index].get("vt_validee"):
+        try:                                          # A.2 : la pré-note telle qu'elle était, avant de basculer
+            notes.append(await run_in_threadpool(_archiver_note_dim, numero, request, "pre"))
+        except Exception as exc:  # noqa: BLE001 — la note ne bloque jamais la validation
+            notes.append({"nature": "pre", "erreur": f"{type(exc).__name__}: {exc}"})
+        leads = _read_leads()
+        index = _find_lead_index(leads, numero)
     if action == "valider":                          # statut : _avancer_statut plus bas (Lot 13i)
+        deja_validee = bool(leads[index].get("vt_validee"))
         leads[index]["vt_validee"] = True
         leads[index]["vt_date"] = now_paris
     elif action == "refuser":
@@ -2917,8 +2983,14 @@ async def update_lead_vt(numero: str, request: Request) -> JSONResponse:
     _atomic_write_json(LEADS_PATH, leads)
     if action == "valider" and _avancer_statut(numero, "vt_valide"):
         leads[index] = _find_lead(numero) or leads[index]
+    if action == "valider" and not deja_validee:
+        try:                                          # A.1 : la note définitive, données actuelles, gabarit du Master
+            notes.append(await run_in_threadpool(_archiver_note_dim, numero, request, "definitive"))
+        except Exception as exc:  # noqa: BLE001
+            notes.append({"nature": "definitive", "erreur": f"{type(exc).__name__}: {exc}"})
     return JSONResponse({
         "success": True,
+        "notes_dimensionnement": [{k: v for k, v in n.items() if k != "file"} for n in notes],
         "vt_validee": bool(leads[index].get("vt_validee", False)),
         "vt_date": leads[index].get("vt_date", ""),
         "statut": leads[index].get("statut", ""),
