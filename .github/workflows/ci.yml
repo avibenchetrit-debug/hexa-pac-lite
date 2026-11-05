@@ -36,8 +36,7 @@ jobs:
           cache-to: type=gha,mode=max
       - name: Tests (une moitié des fichiers, en alternance)
         run: |
-          FICHIERS=$(ls tests/test_*.py | awk -v t=${{ matrix.tranche }} 'NR % 2 == t % 2' | tr '
-' ' ')
+          FICHIERS=$(ls tests/test_*.py | awk -v t=${{ matrix.tranche }} 'NR % 2 == t % 2' | paste -sd ' ' -)
           echo "Tranche ${{ matrix.tranche }} : $(echo $FICHIERS | wc -w) fichiers"
           # `node` sert à des tests (vérification de scripts) : sans lui, ils se sautent en silence.
           docker run --rm -v "$PWD":/app -w /app -e ADMIN_PASSWORD=hexarenov2026 pac-lite-ci:latest sh -c "
