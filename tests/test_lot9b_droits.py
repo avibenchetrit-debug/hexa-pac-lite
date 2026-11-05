@@ -140,6 +140,6 @@ def test_parcours_commercial_identique_a_l_admin(serveur):
     assert c["etape6"] == a["etape6"] and "€" in c["etape6"]                        # mêmes montants à l'écran
     assert c["nom"] == a["nom"]
     pypdf = pytest.importorskip("pypdf")
-    texte = lambda b: " ".join((p.extract_text() or "") for p in pypdf.PdfReader(io.BytesIO(b)).pages)
+    texte = lambda b: " ".join((p.extract_text() or "") for p in pypdf.PdfReader(io.BytesIO(b)).pages).replace("\x00", " ")
     assert texte(c["pdf"]) == texte(a["pdf"])                                            # même document client
     assert c["erreurs"] == [], c["erreurs"]                                             # aucune requête refusée au commercial

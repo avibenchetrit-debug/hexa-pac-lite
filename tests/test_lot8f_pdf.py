@@ -7,6 +7,7 @@ import time
 
 import pytest
 
+from tests.defauts_connus import POLICE_PDF  # noqa: E402
 import main
 import test_lot7a_documents as docs
 import test_lot7b as l7b
@@ -19,7 +20,7 @@ SPECS = l7b.SPECS + [{"champ": LIBELLE, "valeur": "A+++ / A++"}]
 
 
 def _texte(pdf):
-    return " ".join((p.extract_text() or "") for p in pypdf.PdfReader(io.BytesIO(pdf)).pages)
+    return " ".join((p.extract_text() or "") for p in pypdf.PdfReader(io.BytesIO(pdf)).pages).replace("\x00", " ")
 
 
 def _html(quoi="devis", **surcharges):
@@ -34,6 +35,7 @@ def _html(quoi="devis", **surcharges):
     return main.templates.env.get_template("devis_pac.html").render(ctx)
 
 
+@POLICE_PDF
 def test_libelle_de_fiche_produit_jamais_coupe():
     t = _texte(main._html_to_pdf_playwright(_html(), None))
     assert LIBELLE in " ".join(t.split()) and "(…" not in t

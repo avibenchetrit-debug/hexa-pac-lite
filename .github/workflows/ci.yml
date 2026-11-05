@@ -1,0 +1,54 @@
+name: CI
+# CI minimale de pac-lite (décision d'Avi, 05/11/2026) : toute la suite à chaque mise en ligne sur main, lancement
+# manuel sur une branche (Actions › CI › Run workflow), un nouveau push annule le test précédent encore en cours.
+# Railway déploie main ; pour qu'il attende le vert : Railway › service › Settings › Source › « Wait for CI ».
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tranches:
+    name: Tests pytest (tranche ${{ matrix.tranche }}/2)
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        tranche: [1, 2]
+    steps:
+      - uses: actions/checkout@v4
+      # LES TESTS TOURNENT DANS L'IMAGE DE PRODUCTION (le Dockerfile que Railway déploie) : mêmes polices, même
+      # Chromium, même Python. Un PDF qui sortirait mal en prod sort mal ici aussi. Cache des couches entre les runs.
+      - uses: docker/setup-buildx-action@v3
+      - name: Image de production
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: pac-lite-ci:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Tests (une moitié des fichiers, en alternance)
+        run: |
+          FICHIERS=$(ls tests/test_*.py | awk -v t=${{ matrix.tranche }} 'NR % 2 == t % 2' | paste -sd ' ' -)
+          echo "Tranche ${{ matrix.tranche }} : $(echo $FICHIERS | wc -w) fichiers"
+          # `node` sert à des tests (vérification de scripts) : sans lui, ils se sautent en silence.
+          docker run --rm -v "$PWD":/app -w /app -e ADMIN_PASSWORD=hexarenov2026 pac-lite-ci:latest sh -c "
+            apt-get update -qq && apt-get install -y -qq --no-install-recommends nodejs >/dev/null && node --version &&
+            pip install -q pytest httpx pymupdf &&
+            python -m pytest $FICHIERS -q --tb=short -p no:cacheprovider --durations=10"
+
+  tests:
+    # Le résultat à suivre (et celui qu'attend Railway) : vert seulement si les deux tranches le sont.
+    name: Tests pytest
+    needs: tranches
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - run: test "${{ needs.tranches.result }}" = "success"

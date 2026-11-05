@@ -5612,8 +5612,9 @@ def _facture_d_origine(numero: str, annule: str = "") -> dict:
 def _texte_pdf(path: str) -> str:
     try:
         from pypdf import PdfReader
-        # espaces ASCII seulement : les espaces insécables des montants (« 4 095,00 ») restent
-        return re.sub(r"[ \t\r\n]+", " ", " ".join((p.extract_text() or "") for p in PdfReader(path).pages))
+        # espaces ASCII seulement : les espaces insécables des montants (« 4 095,00 ») restent.
+        # 05/11/2026 (CI dans l'image de prod) : sous Linux, pypdf rend les espaces de nos PDF en « \x00 » -> espaces.
+        return re.sub(r"[ \t\r\n\x00]+", " ", " ".join((p.extract_text() or "") for p in PdfReader(path).pages))
     except Exception:
         return ""
 
@@ -5639,7 +5640,9 @@ def _lignes_pdf(source) -> list:
     try:
         from pypdf import PdfReader
         r = PdfReader(io.BytesIO(source) if isinstance(source, (bytes, bytearray)) else source)
-        return [re.sub(r"[ \t]+", " ", l).strip() for pg in r.pages for l in (pg.extract_text() or "").splitlines() if l.strip()]
+        # \x00 : espaces de nos PDF tels que pypdf les rend sous Linux (production) — voir _texte_pdf
+        return [re.sub(r"[ \t\x00]+", " ", l).strip() for pg in r.pages
+                for l in (pg.extract_text() or "").splitlines() if l.replace("\x00", "").strip()]
     except Exception:
         return []
 

@@ -34,21 +34,23 @@ if os.name == "nt":
 # 05/11/2026 — ISOLATION ENTRE FICHIERS DE TEST. Tous les tests partagent ce DATA_DIR ; plusieurs fichiers y écrivent
 # leur propre catalogue, leurs fiches ou leurs paramètres sans les remettre en place, et le fichier suivant héritait de
 # cet état (24 échecs de test_lot14_quantite_pac en suite complète, alors qu'il passait seul). Désormais les fichiers
-# de données PARTAGÉS sont photographiés au début de chaque fichier de test et remis à l'identique à la fin (créés
+# JSON du DATA_DIR (fiches, catalogue, paramètres, compteurs, devis, factures…) sont photographiés au début de chaque fichier de test et remis à l'identique à la fin (créés
 # pendant le fichier = supprimés). Le contenu et l'ordre des tests ne changent pas.
 import pytest  # noqa: E402
 
-_PARTAGES = ("catalogue_pac.json", "parametres_admin.json", "leads.json", "notes.json", "counters.json",
-             "baremes.json", "delegataires.json", "devis_envoyes.json", "echanges.json", "modeles_email.json",
-             "numeros_dossier.json", "users.json", os.path.join("devis", "devis_meta.json"))
+def _fichiers_json():
+    """Tous les fichiers JSON du DATA_DIR de test (fiches, catalogue, paramètres, compteurs, devis, factures…)."""
+    out = []
+    for racine, _dossiers, noms in os.walk(_TMP):
+        out += [os.path.join(racine, n) for n in noms if n.endswith(".json")]
+    return out
 
 
 @pytest.fixture(autouse=True, scope="module")
 def _donnees_partagees_par_fichier():
-    chemins = [os.path.join(_TMP, n) for n in _PARTAGES]
-    photo = {c: open(c, "rb").read() for c in chemins if os.path.exists(c)}
+    photo = {c: open(c, "rb").read() for c in _fichiers_json()}
     yield
-    for c in chemins:
+    for c in set(_fichiers_json()) | set(photo):
         if c in photo:
             os.makedirs(os.path.dirname(c), exist_ok=True)
             with open(c, "wb") as f:
