@@ -84,6 +84,14 @@ def test_bouton_ballon_prix_lisible_en_entier(page, largeur):
 
 def test_dossier_facture_sans_alerte_de_dimensionnement(page):
     _semer(fige=True)
+    # 05/11/2026 : depuis le lot A (cascades, plage 60–130 %), 180 m² trouvent des options valables et l'alerte
+    # « Aucune PAC bien dimensionnée » ne s'affiche plus ; ce test ne passait en suite complète que grâce au petit
+    # catalogue laissé par un autre fichier. On lui donne un besoin qu'AUCUNE option ne couvre (1 000 m²).
+    leads = main._read_leads()
+    for l in leads:
+        if l["numero"] in ("PR-98001", "PR-98005"):
+            l["surface_logement_m2"] = "1000"
+    main._atomic_write_json(main.LEADS_PATH, leads)
     _ouvrir(page, "PR-98005", 6, 1280)
     assert page.evaluate("document.body.classList.contains('p6-fige')")
     assert page.evaluate("[...document.querySelectorAll('.p6-alerte-dim')].every(e => !e.offsetParent)")
