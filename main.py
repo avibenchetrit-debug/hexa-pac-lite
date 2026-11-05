@@ -1219,6 +1219,15 @@ def _migrate_catalogue_daikin_0511() -> bool:
     return change
 
 
+def _migrate_catalogue_eprel_0511() -> bool:
+    """Numéros EPREL et d'agrément du 05/11/2026 (services/catalogue_eprel_0511.py) : une seule fois par modèle."""
+    from services.catalogue_eprel_0511 import migrer_catalogue
+    catalogue, change = migrer_catalogue(_read_catalogue_pac())
+    if change:
+        _write_catalogue_pac(catalogue)
+    return change
+
+
 def _admin_payload_with_m3():
     admin = load_parametres_admin()
     baremes = _read_json(BAREMES_PATH, {})
@@ -2229,6 +2238,7 @@ async def startup_event():
     _migrate_catalogue_regulateur()
     _migrate_catalogue_dimensionnement()
     _migrate_catalogue_daikin_0511()
+    _migrate_catalogue_eprel_0511()
     _migrate_lot9()
     _migrate_lot10()
     _migrate_lot10c()
