@@ -4,6 +4,7 @@ Quantité 1 : documents identiques, caractère pour caractère, à ceux du code 
 tests/fixtures/lot14_*.html, prises avec le code d'avant). Quantité 2 : fourniture × 2, pose cascade et travaux induits
 réglables dans l'Admin, aides (CEE, MaPrimeRénov') comptées UNE fois, phrase cascade dans le document.
 Régénérer les photos (code d'avant seulement) : HEXA_LOT14_PHOTOS=1 pytest tests/test_lot14_quantite_pac.py -k photo"""
+import json
 import os
 import re
 
@@ -30,9 +31,13 @@ STATE = {"service": "chauffage_ecs", "option": "opt1", "modele_pac_id": MODELE, 
 
 @pytest.fixture(autouse=True)
 def _donnees_restaurees():
-    chemins = (main.LEADS_PATH, main.PARAMETRES_ADMIN_PATH, main._state_simulateur_path(NUM))
+    # 05/11/2026 : le catalogue est INSTALLÉ ici (celui du dépôt, qui porte MODELE) et restauré ensuite. Avant, le test
+    # lisait le catalogue laissé par le fichier précédent : en suite complète, test_catalogue_regulateur y laissait un
+    # catalogue de 4 modèles sans ATL-EXCELLIA-S-DUO-12, et les 24 tests tombaient avant de vérifier quoi que ce soit.
+    chemins = (main.LEADS_PATH, main.PARAMETRES_ADMIN_PATH, main._state_simulateur_path(NUM), main.CATALOGUE_PATH)
     sauve = {c: open(c, "rb").read() for c in chemins if os.path.exists(c)}
     absents = [c for c in chemins if not os.path.exists(c)]
+    main._atomic_write_json(main.CATALOGUE_PATH, json.load(open(main.REPO_CATALOGUE_PATH, encoding="utf-8")))
     yield
     for c, octets in sauve.items():
         open(c, "wb").write(octets)
