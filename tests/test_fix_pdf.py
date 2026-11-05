@@ -12,6 +12,7 @@ import time
 
 import pytest
 
+from tests.defauts_connus import POLICE_PDF  # noqa: E402
 import main
 
 pypdf = pytest.importorskip("pypdf")
@@ -160,6 +161,7 @@ def _verifier(nom, pdf, prefixe):
     return m.group(1)
 
 
+@POLICE_PDF
 def test_nouvelle_fiche_pdf_du_premier_clic(page):
     page.goto(page.base + "/nouveau")
     page.wait_for_selector("#form-prospect [name=nom]", state="attached")
@@ -171,6 +173,7 @@ def test_nouvelle_fiche_pdf_du_premier_clic(page):
     assert _verifier(nom, pdf, "Pre-devis").startswith("PD")
 
 
+@POLICE_PDF
 def test_fiche_existante_pdf_du_premier_clic(page):
     _ouvrir_devis(page, "PR-90001")
     nom, pdf = _telecharger(page)
@@ -185,6 +188,7 @@ def test_dossier_facture_rend_le_devis_archive(page):
     assert pdf == open(os.path.join(main.DEVIS_DIR, "PR-90002_v1.pdf"), "rb").read()   # l'archive, pas un nouveau rendu
 
 
+@POLICE_PDF
 def test_clics_repetes_et_ouvertures_successives(page):
     from services import pdf_chromium
     pdf_chromium.vider_cache()        # Lot 8f : une vraie génération (pas le cache, qui répond en ~50 ms) pendant la rafale
@@ -211,6 +215,7 @@ def test_clics_repetes_et_ouvertures_successives(page):
     assert len(page.context.pages) == 1
 
 
+@POLICE_PDF
 def test_echec_message_clair_dans_la_fenetre(page):
     _ouvrir_devis(page, "PR-90001")
     page.route("**/api/devis/*/pdf*", lambda r: r.fulfill(status=500, content_type="application/json",

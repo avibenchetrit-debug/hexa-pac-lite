@@ -7,6 +7,7 @@ import time
 
 import pytest
 
+from tests.defauts_connus import POLICE_PDF  # noqa: E402
 import main
 import test_lot7a_documents as docs
 import test_lot7b as l7b
@@ -34,6 +35,7 @@ def _html(quoi="devis", **surcharges):
     return main.templates.env.get_template("devis_pac.html").render(ctx)
 
 
+@POLICE_PDF
 def test_libelle_de_fiche_produit_jamais_coupe():
     t = _texte(main._html_to_pdf_playwright(_html(), None))
     assert LIBELLE in " ".join(t.split()) and "(…" not in t

@@ -13,6 +13,7 @@ import time
 
 import pytest
 
+from tests.defauts_connus import POLICE_PDF  # noqa: E402
 import main
 import test_lot7a_documents as docs
 
@@ -76,6 +77,7 @@ def test_reservee_a_l_admin_et_au_dossier_verrouille(base, dossier_facture):
     assert httpx.post(f"{base}/api/facture/{NUM}/rectificative", json={}, timeout=60).status_code == 401
 
 
+@POLICE_PDF
 def test_apercu_sans_numero_ne_consomme_rien(base, dossier_facture):
     avant = json.dumps(main._read_json(main.COUNTERS_PATH, {}), sort_keys=True)
     r = httpx.get(f"{base}/api/facture/{NUM}/rectificative/apercu", cookies=_cookies("admin"), timeout=120)
@@ -87,6 +89,7 @@ def test_apercu_sans_numero_ne_consomme_rien(base, dossier_facture):
     assert len(main._read_factures_meta()[NUM]) == 1
 
 
+@POLICE_PDF
 def test_rectificative_identique_sauf_ajouts(base, dossier_facture):
     octets_orig = open(dossier_facture["file"], "rb").read()
     empreinte = hashlib.sha256(octets_orig).hexdigest()
@@ -136,6 +139,7 @@ def test_montant_different_refuse(base, dossier_facture):
     assert main._read_json(main.COUNTERS_PATH, {}).get(f"facture_{time.strftime('%Y')}") == 1
 
 
+@POLICE_PDF
 def test_ecart_hors_ajouts_prevus_refuse(base, dossier_facture):
     """Le sous-traitant a changé dans l'admin depuis l'originale : la rectificative ne serait plus identique."""
     params = main.load_parametres_admin()

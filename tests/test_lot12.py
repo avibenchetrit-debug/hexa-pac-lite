@@ -14,6 +14,7 @@ import types
 
 import pytest
 
+from tests.defauts_connus import POLICE_PDF  # noqa: E402
 import main
 
 pypdf = pytest.importorskip("pypdf")
@@ -217,6 +218,7 @@ def texte_pdf(pg):
     return espaces(" ".join((p.extract_text() or "") for p in pypdf.PdfReader(io.BytesIO(pdf)).pages).replace("\x00", " "))
 
 
+@POLICE_PDF
 def test_regenerer_reconstruit_depuis_l_ecran_et_le_pdf_suit(page):
     ouvrir_etape6(page)
     choisir_nimbus_et_prix(page, 17321)
