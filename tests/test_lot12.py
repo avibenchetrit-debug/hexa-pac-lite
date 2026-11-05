@@ -214,7 +214,7 @@ def texte_pdf(pg):
     with pg.expect_download(timeout=90000) as dl:
         pg.click("#devis-pdf-btn")
     pdf = open(dl.value.path(), "rb").read()
-    return espaces(" ".join((p.extract_text() or "") for p in pypdf.PdfReader(io.BytesIO(pdf)).pages))
+    return espaces(" ".join((p.extract_text() or "") for p in pypdf.PdfReader(io.BytesIO(pdf)).pages).replace("\x00", " "))
 
 
 def test_regenerer_reconstruit_depuis_l_ecran_et_le_pdf_suit(page):

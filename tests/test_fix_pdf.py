@@ -148,7 +148,7 @@ def _telecharger(pg):
 
 
 def _numero_dans(pdf):
-    texte = "".join(pg.extract_text() or "" for pg in pypdf.PdfReader(io.BytesIO(pdf)).pages)
+    texte = "".join(pg.extract_text() or "" for pg in pypdf.PdfReader(io.BytesIO(pdf)).pages).replace("\x00", " ")
     return set(NUM_IMPRIME.findall(texte))
 
 

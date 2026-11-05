@@ -139,7 +139,7 @@ def test_vt_non_validee_pre_note_seulement(page):
     assert page.is_visible(".sim-dim-filigrane")
     pdf = page.pdf(format="A4")                                            # impression : filigrane sur chaque page
     pages = pypdf.PdfReader(io.BytesIO(pdf)).pages
-    assert all("PROVISOIRE — NE PAS SIGNER" in (p.extract_text() or "") for p in pages), len(pages)
+    assert all("PROVISOIRE — NE PAS SIGNER" in (p.extract_text() or "").replace("\x00", " ") for p in pages), len(pages)
     page.emulate_media(media="screen")
     page.click("#sim-dim-close")
     page.click("#btn-voir-devis")                                          # fenêtre du pré-devis
@@ -166,7 +166,7 @@ def test_vt_validee_note_definitive(page):
     d = dl.value
     m = re.fullmatch(r"NoteDim-DEFINITIVE_(ND2026-93002-FI)\.pdf", d.suggested_filename)
     assert m, d.suggested_filename
-    texte = "".join(p.extract_text() or "" for p in pypdf.PdfReader(d.path()).pages)
+    texte = "".join(p.extract_text() or "" for p in pypdf.PdfReader(d.path()).pages).replace("\x00", " ")
     assert m.group(1) in texte and "NOTE DÉFINITIVE" not in texte             # bandeau à l'écran seulement
     page.click(".devis-tab[data-kind=devis]")                              # onglet devis : pas de bandeau vert
     assert page.is_hidden("#devis-note-definitive")

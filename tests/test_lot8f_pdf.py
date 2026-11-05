@@ -19,7 +19,7 @@ SPECS = l7b.SPECS + [{"champ": LIBELLE, "valeur": "A+++ / A++"}]
 
 
 def _texte(pdf):
-    return " ".join((p.extract_text() or "") for p in pypdf.PdfReader(io.BytesIO(pdf)).pages)
+    return " ".join((p.extract_text() or "") for p in pypdf.PdfReader(io.BytesIO(pdf)).pages).replace("\x00", " ")
 
 
 def _html(quoi="devis", **surcharges):

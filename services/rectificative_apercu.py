@@ -24,7 +24,7 @@ class ApercuInvalide(ValueError):
 
 
 def _texte_normalise(t: str) -> str:
-    return re.sub(r"[\s  ]+", " ", t or "").strip()
+    return re.sub(r"[\s  \x00]+", " ", t or "").strip()
 
 
 def _lecteur(pdf: bytes):

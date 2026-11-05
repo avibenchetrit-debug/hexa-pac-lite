@@ -48,7 +48,8 @@ def _cookies(role):
 
 def _lignes(pdf: bytes) -> list[str]:
     r = pypdf.PdfReader(io.BytesIO(pdf))
-    return [l.strip() for p in r.pages for l in (p.extract_text() or "").splitlines() if l.strip()]
+    return [" ".join(l.replace("\x00", " ").split()) for p in r.pages for l in (p.extract_text() or "").splitlines()
+            if l.replace("\x00", "").strip()]
 
 
 @pytest.fixture

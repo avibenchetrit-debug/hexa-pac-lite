@@ -61,7 +61,7 @@ def _c(role="admin"):
 
 
 def _texte(pdf: bytes) -> str:
-    t = " ".join((p.extract_text() or "") for p in pypdf.PdfReader(io.BytesIO(pdf)).pages)
+    t = " ".join((p.extract_text() or "") for p in pypdf.PdfReader(io.BytesIO(pdf)).pages).replace("\x00", " ")
     return re.sub(r"[\s  ]+", " ", t)
 
 
