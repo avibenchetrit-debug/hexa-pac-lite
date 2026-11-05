@@ -1,0 +1,53 @@
+name: CI
+# CI minimale de pac-lite (décision d'Avi, 05/11/2026) : toute la suite à chaque mise en ligne sur main, lancement
+# manuel sur une branche (Actions › CI › Run workflow), un nouveau push annule le test précédent encore en cours.
+# Railway déploie main ; pour qu'il attende le vert : Railway › service › Settings › Source › « Wait for CI ».
+
+on:
+  push:
+    branches: [main, ci-minimale]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tranches:
+    name: Tests pytest (tranche ${{ matrix.tranche }}/2)
+    runs-on: ubuntu-latest
+    # Image Playwright officielle à la version de requirements.txt (playwright==1.49.0) : Chromium et ses
+    # dépendances sont déjà dedans. Si playwright change de version, changer le tag AVEC lui.
+    container: mcr.microsoft.com/playwright/python:v1.49.0-noble
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        tranche: [1, 2]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Dépendances
+        # `node` sert à des tests (vérification de scripts) : sans lui, ils se sautent en silence.
+        run: |
+          command -v python >/dev/null || ln -s "$(command -v python3)" /usr/local/bin/python
+          command -v node >/dev/null || (apt-get update -qq && apt-get install -y -qq --no-install-recommends nodejs >/dev/null)
+          node --version
+          python --version
+          python -m pip install -q -r requirements.txt
+          python -m pip install -q pytest httpx pymupdf
+      - name: Tests (une moitié des fichiers, en alternance)
+        env:
+          ADMIN_PASSWORD: "hexarenov2026"
+        run: |
+          FICHIERS=$(ls tests/test_*.py | awk -v t=${{ matrix.tranche }} 'NR % 2 == t % 2')
+          echo "Tranche ${{ matrix.tranche }} : $(echo $FICHIERS | wc -w) fichiers"
+          python -m pytest $FICHIERS -q --tb=short -p no:cacheprovider --durations=10
+
+  tests:
+    # Le résultat à suivre (et celui qu'attend Railway) : vert seulement si les deux tranches le sont.
+    name: Tests pytest
+    needs: tranches
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - run: test "${{ needs.tranches.result }}" = "success"
