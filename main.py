@@ -4734,6 +4734,32 @@ def _commit_numero_dossier() -> str:
     return numero_dossier
 
 
+# Point 0 (05/11/2026, Avi) : UN numéro de dossier par lead, attribué dès le PREMIER document produit (aperçu, PDF
+# téléchargé, envoi) et enregistré dans numeros_dossier.json ({n° de lead: HXaa-NNNN}). Avant, l'aperçu et le PDF
+# imprimaient le « prochain numéro libre » sans le réserver : deux dossiers non envoyés portaient le même numéro
+# (GESLOT et PLUMAS, HX26-0530). Un numéro déjà porté par un envoi (devis_meta) est repris tel quel, jamais changé.
+# Le verrou couvre la lecture du registre, l'incrément du compteur et l'écriture : deux documents simultanés ne
+# peuvent pas recevoir le même numéro.
+NUMEROS_DOSSIER_PATH = os.path.join(DATA_DIR, "numeros_dossier.json")
+_VERROU_NUMERO_DOSSIER = threading.Lock()
+
+
+def _numero_dossier_attribue(numero: str) -> str:
+    """Le numéro de dossier du lead : celui du registre, sinon celui de ses envois, sinon un nouveau (alloué ici)."""
+    numero = str(numero or "").strip()
+    with _VERROU_NUMERO_DOSSIER:
+        registre = _read_json(NUMEROS_DOSSIER_PATH, {})
+        if not isinstance(registre, dict):
+            registre = {}
+        deja = str(registre.get(numero) or "").strip()
+        if deja:
+            return deja
+        attribue = _lead_numero_dossier(numero) or _commit_numero_dossier()
+        registre[numero] = attribue
+        _atomic_write_json(NUMEROS_DOSSIER_PATH, registre)
+        return attribue
+
+
 def _lead_numero_dossier(numero: str) -> str | None:
     """Numero de dossier de l'AFFAIRE (le lead) : le PLUS ANCIEN numero_dossier persiste sur ses devis
     (min lexicographique du format HXyy-NNNN zero-padde = plus petit compteur = premier devis envoye).
@@ -4892,7 +4918,7 @@ def _build_devis_context(request: Request, numero: str, version: int | None = No
         "ville_chantier": ville_chantier,
         "usage_bien": prospect.get("usage_bien", "proprietaire_occupant"),
         "numero_devis": generer_numero_devis(prospect, version if version is not None else _next_sent_version(numero)),
-        "numero_dossier": numero_dossier or _lead_numero_dossier(numero) or _peek_numero_dossier(),
+        "numero_dossier": numero_dossier or _numero_dossier_attribue(numero),   # point 0 : jamais un numéro provisoire
         "date_emission": today.strftime("%d/%m/%Y"),
         "date_validite": (today + timedelta(days=60)).strftime("%d/%m/%Y"),
         "date_visite_technique": date_visite,
@@ -6530,7 +6556,7 @@ async def _send_devis(numero: str, payload: dict, request: Request) -> dict:
     _refuser_si_envoi_recent(numero, payload.get("confirmer_envoi_recent"))   # Lot 13j : envoyé il y a moins de 24 h
 
     version = _next_sent_version(numero)
-    numero_dossier = _lead_numero_dossier(numero) or _commit_numero_dossier()
+    numero_dossier = _numero_dossier_attribue(numero)                # point 0 : le numéro du lead, attribué une fois
     devis_path, devis_html, version = _ensure_devis_pdf(numero, request, version, avec_sous_traitant, numero_dossier)
     notedim_path = _ensure_notedim_pdf(numero, request, version)   # Lot B : la note part aussi avec le pré-devis
 
