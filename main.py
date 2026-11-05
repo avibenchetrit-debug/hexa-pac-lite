@@ -5150,7 +5150,9 @@ def _build_notedim_context(request: Request, numero: str) -> dict:
                **calculer_notedim(prospect, state, catalogue, admin)}
     context.update(note_dim_master.contexte(
         prospect, state, catalogue, admin, reference=context["numero_notedim"], maintenant=datetime.now(PARIS_TZ),
-        document={"type": "devis" if vt else "pre_devis", "numero": ""}))
+        # A.6 : le document accompagné est NOMMÉ (« le pré-devis du dossier HX26-0531 ») — avant, « le document
+        # commercial correspondant », que l'on lisait comme une phrase tronquée
+        document={"type": "devis" if vt else "pre_devis", "numero": "du dossier " + _numero_dossier_attribue(numero)}))
     return context
 
 
