@@ -386,18 +386,22 @@
       travaux d'isolation retenus dans cette simulation.
       P&nbsp;=&nbsp;Σ(déperditions)&nbsp;×&nbsp;ΔT, majorée du facteur de sécurité.
       {% else %}
-      Estimation par le coefficient volumique de déperdition&nbsp;:
-      P&nbsp;=&nbsp;G&nbsp;×&nbsp;V&nbsp;×&nbsp;ΔT, le coefficient G étant déduit de la classe
-      énergétique du logement. Cette méthode ne connaît pas le détail des parois.
+      {#- A.5 (05/11/2026, pac-lite) : la méthode RÉELLEMENT employée — G du questionnaire d'isolation, température de
+          base de la table NF P52-612/CN (pas la classe énergétique, pas le DTU 65.11). -#}
+      Estimation par le coefficient volumique de déperdition (norme <strong>NF EN 12831</strong>, méthode
+      simplifiée)&nbsp;: P&nbsp;=&nbsp;G&nbsp;×&nbsp;V&nbsp;×&nbsp;ΔT, majorée du facteur de sécurité sur le chauffage,
+      le coefficient G étant déduit du questionnaire d'isolation du logement (toiture, murs, menuiseries) et V étant
+      le volume chauffé (surface chauffée × hauteur sous plafond). Cette méthode ne connaît pas le détail des parois.
       {% endif %}
-      Températures extérieures de base&nbsp;: <strong>DTU 65.11</strong>, corrigées de l'altitude du chantier.<br><br>
+      Températures extérieures de base&nbsp;: table <strong>NF P52-612/CN</strong> (guide ACE), selon le département et
+      le palier d'altitude du chantier.<br><br>
 
       <strong>Portée.</strong> Cette note établit la puissance THERMIQUE nécessaire au logement. Elle
       ne vaut pas étude d'exécution&nbsp;: le dimensionnement des émetteurs, le tracé
       hydraulique, l'équilibrage et le raccordement électrique relèvent de l'installateur.
       {% if niv.get('methode') != 'deperditions' %}
-      Les valeurs seront CONFIRMÉES après l'audit énergétique, qui fournira les déperditions
-      réelles paroi par paroi.
+      Les valeurs seront CONFIRMÉES par la visite technique, qui vérifie sur place l'isolation, les surfaces et les
+      émetteurs.
       {% endif %}
       Les puissances de pompe à chaleur s'entendent aux conditions normalisées
       <strong>EN&nbsp;14511</strong>&nbsp;; la performance réelle dépend de la température extérieure et

@@ -70,3 +70,15 @@ def test_fiche_incomplete_la_vt_est_quand_meme_validee(client, monkeypatch):
     assert r["vt_validee"] is True
     assert all(n.get("erreur", "").startswith("fiche incomplète") for n in r["notes_dimensionnement"])
     assert main._notes_archivees_vt(NUM) == []
+
+
+def test_textes_methode_et_document_accompagne(client):
+    """A.5 : la méthode réellement employée ; A.6 : le document accompagné est nommé (plus de phrase « tronquée »)."""
+    import html as _html
+    import re
+    t = re.sub(r"\s+", " ", _html.unescape(re.sub(r"<[^>]+>", " ", client.get(f"/api/notedim/{NUM}/preview").text)))
+    assert "déduit du questionnaire d'isolation du logement (toiture, murs, menuiseries)" in t
+    assert "table NF P52-612/CN" in t and "DTU 65.11" not in t
+    assert "déduit de la classe énergétique" not in t and "après l'audit énergétique" not in t
+    assert re.search(r"Il accompagne le pré-devis du dossier HX\d{2}-\d{4} et peut être remis au délégataire CEE\.", t)
+    assert "document commercial correspondant" not in t
