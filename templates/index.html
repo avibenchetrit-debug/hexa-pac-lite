@@ -10817,7 +10817,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
             <button type="button" class="hexa-meta-card-action" data-devis-download="${item.version}">📥 Télécharger</button>
             <button type="button" class="hexa-meta-card-action" data-devis-resend="${item.version}" data-anciens-chiffres="${item.anciens_chiffres ? '1' : ''}" data-email="${escapeHtml(item.email || '')}" data-email-fiche="${escapeHtml(item.email_fiche || '')}">📧 Renvoyer</button>
           </div>
-          ${item.has_notedim ? `<div class="docs-notedim-row"><span class="docs-notedim-label">Note de dim définitive (envoyée avec le devis ${escapeHtml(item.numero_devis || '')})</span><button type="button" class="hexa-meta-card-action" data-notedim-preview="${item.version}" data-numero-devis="${escapeHtml(item.numero_devis || '')}">👁 Aperçu</button><button type="button" class="hexa-meta-card-action" data-notedim-download="${item.version}">📥 Télécharger</button></div>` : ''}
+          ${item.has_notedim ? `<div class="docs-notedim-row"><span class="docs-notedim-label">${escapeHtml(item.notedim_libelle || 'Note de dimensionnement')}</span><button type="button" class="hexa-meta-card-action" data-notedim-preview="${item.version}" data-notedim-libelle="${escapeHtml(item.notedim_libelle || 'Note de dimensionnement')}">👁 Aperçu</button><button type="button" class="hexa-meta-card-action" data-notedim-download="${item.version}">📥 Télécharger</button></div>` : ''}
         </div>`).join('');
       root.insertAdjacentHTML('beforeend', '<div class="docs-facture-row" style="margin-top:12px;padding-top:10px;border-top:1px solid #E2E8F0;display:flex;flex-wrap:wrap;align-items:center;gap:8px;">'
         + '<span style="font-size:12px;font-weight:700;color:#002E5A;">Installation finie</span>'
@@ -10892,7 +10892,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
         btn.addEventListener('click', () => renvoyerDevis(btn));
       });
       root.querySelectorAll('[data-notedim-preview]').forEach(btn => {
-        btn.addEventListener('click', () => openNotedimPdfViewer(btn.dataset.notedimPreview, btn.dataset.numeroDevis));
+        btn.addEventListener('click', () => openNotedimPdfViewer(btn.dataset.notedimPreview, btn.dataset.notedimLibelle));
       });
       root.querySelectorAll('[data-notedim-download]').forEach(btn => {
         btn.addEventListener('click', () => window.open(`/api/notedim/${encodeURIComponent(currentProspect)}/download?version=${encodeURIComponent(btn.dataset.notedimDownload)}`, '_blank'));
@@ -11306,7 +11306,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     ov.classList.add('open');
   }
 
-  function openNotedimPdfViewer(version, numeroDevis) {
+  function openNotedimPdfViewer(version, libelle) {   // A.3 : le libellé exact de la note archivée (serveur)
     ensureViewer();
     const ov = document.getElementById('doc-viewer-overlay');
     const body = document.getElementById('doc-viewer-body');
@@ -11314,7 +11314,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     if (!ov || !body) return;
     const viewUrl = `/api/notedim/${encodeURIComponent(currentProspect)}/view?version=${encodeURIComponent(version)}`;
     const dlUrl = `/api/notedim/${encodeURIComponent(currentProspect)}/download?version=${encodeURIComponent(version)}`;
-    ttl.textContent = 'Note de dim définitive' + (numeroDevis ? ` (envoyée avec le devis ${numeroDevis})` : '');
+    ttl.textContent = libelle || 'Note de dimensionnement';
     body.innerHTML = `<iframe title="Note v${version}" src="${viewUrl}"></iframe>`;
     document.getElementById('doc-viewer-dl').onclick = () => window.open(dlUrl, '_blank');
     ov.classList.add('open');

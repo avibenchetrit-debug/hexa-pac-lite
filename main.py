@@ -5204,9 +5204,10 @@ def _ensure_devis_pdf(numero: str, request: Request, version: int | None = None,
 
 
 def _ensure_notedim_pdf(numero: str, request: Request, version: int) -> str:
+    """A.3 : la note jointe à un envoi est TOUJOURS régénérée avec les données actuelles de la fiche (gabarit du
+    Master). Avant, un fichier déjà présent sous ce numéro d'envoi (un PDF téléchargé plus tôt) partait tel quel."""
     path = _notedim_path(numero, version)
-    if not os.path.exists(path):
-        _write_pdf(path, _html_to_pdf_playwright(_render_notedim_html(request, numero), request))
+    _write_pdf(path, _html_to_pdf_playwright(_render_notedim_html(request, numero), request))
     return path
 
 
@@ -5970,14 +5971,15 @@ async def notedim_pdf(numero: str, request: Request):
     # Lot B : téléchargeable dès le pré-devis (note de pré-dimensionnement avant la visite technique)
     item, archive = _notedim_archivee(numero)
     if archive:                                   # Lot 6h : dossier facturé -> la note archivée, rien n'est régénéré
-        return FileResponse(archive, media_type="application/pdf", headers=_entete_pdf("NoteDim-DEFINITIVE", _numero_notedim_de(numero, item)))
-    version = _next_devis_version(numero)
+        return FileResponse(archive, media_type="application/pdf",                 # A.3 : nom selon la nature réelle
+                            headers=_entete_pdf(_note_archivee(item or {}, _find_lead(numero))["nom_fichier"],
+                                                _numero_notedim_de(numero, item)))
     ctx = _build_notedim_context(request, numero)
     _refuser_pdf_incomplet(ctx)
     ctx.setdefault("request", request)
     html_nd = templates.env.get_template("notedim_pac.html").render(ctx)
     pdf_bytes = await run_in_threadpool(_html_to_pdf_playwright, html_nd, request)
-    _write_pdf(_notedim_path(numero, version), pdf_bytes)
+    # A.3 : le PDF téléchargé n'est plus enregistré sous le numéro du prochain envoi (il partait ensuite tel quel)
     _lead_nd = _find_lead(numero) or {}
     return Response(pdf_bytes, media_type="application/pdf",
                     headers=_entete_pdf("NoteDim-DEFINITIVE" if _lead_nd.get("vt_validee") else "Note-pre-dimensionnement",
@@ -7259,6 +7261,48 @@ async def post_relance_send(numero: str, request: Request) -> JSONResponse:
     return JSONResponse(_send_relance(numero, version, request))
 
 
+# A.3 (05/11/2026) — LE LIBELLÉ D'UNE NOTE ARCHIVÉE dit ce qu'elle est : avant, toute note envoyée s'affichait « Note
+# de dim définitive (envoyée avec le devis …) », y compris une note partie avec un PRÉ-DEVIS en juillet (PR-000164,
+# 06/07/2026, ancien gabarit, données de l'époque). « Définitive » seulement pour un devis envoyé APRÈS la validation
+# de la VT ; « ancien modèle » pour une note envoyée avant le gabarit du Master (lot B, en ligne le 04/11/2026 16:41).
+LOT_B_EN_LIGNE = "2026-11-04T16:41:00+01:00"
+# Depuis le 07/07/2026 15:11 (commit 47c871f), un DEVIS ne peut partir qu'avec la VT validée : sa note est définitive
+# même si `vt_date` est plus récente (elle est réécrite à chaque revalidation, ex. PR-000173 : devis le 15/07, VT
+# enregistrée le 16/07). Avant cette date, définitive seulement si la VT était validée avant l'envoi.
+DEVIS_EXIGE_VT_DEPUIS = "2026-07-07T15:11:37+02:00"
+
+
+def _instant(v):
+    try:
+        d = datetime.fromisoformat(str(v or "").strip())
+        return d if d.tzinfo else d.replace(tzinfo=PARIS_TZ)
+    except ValueError:
+        return None
+
+
+def _note_archivee(item: dict, lead: dict | None) -> dict:
+    """{libelle, definitive, ancien_modele, nom_fichier} de la note archivée d'un envoi."""
+    variante = (item or {}).get("variante") or "devis"
+    envoi = _instant((item or {}).get("sent_at"))
+    vt = _instant((lead or {}).get("vt_date")) if (lead or {}).get("vt_validee") else None
+    definitive = variante == "devis" and bool(envoi) and (
+        envoi >= _instant(DEVIS_EXIGE_VT_DEPUIS) or bool(vt and vt <= envoi))
+    ancien = bool(envoi and envoi < _instant(LOT_B_EN_LIGNE))
+    if variante == "pre_devis":
+        nature, doc, fichier = "Note de pré-dimensionnement", "le pré-devis", "Note-pre-dimensionnement"
+    elif definitive:
+        nature, doc, fichier = "Note de dimensionnement définitive", "le devis", "NoteDim-DEFINITIVE"
+    else:
+        nature, doc, fichier = "Note de dimensionnement", "le devis", "Note-dimensionnement"
+    numero_doc = str((item or {}).get("numero_devis") or "").strip()
+    libelle = f"{nature} — envoyée avec {doc}{(' ' + numero_doc) if numero_doc else ''}"
+    if envoi:
+        libelle += f" le {envoi.astimezone(PARIS_TZ).strftime('%d/%m/%Y')}"
+    if ancien:
+        libelle += " — ancien modèle"
+    return {"libelle": libelle, "definitive": definitive, "ancien_modele": ancien, "nom_fichier": fichier}
+
+
 @app.get("/api/devis/{numero}/list")
 async def list_devis(numero: str) -> JSONResponse:
     try:                                              # Lot 13h : statut de livraison relu chez Resend (10 min au plus)
@@ -7266,7 +7310,8 @@ async def list_devis(numero: str) -> JSONResponse:
     except Exception as exc:  # noqa: BLE001 — la liste s'affiche quand même, avec le dernier statut connu
         print(f"[envoi] statuts de livraison {numero} non actualisés : {type(exc).__name__}: {exc}")
     meta = _read_devis_meta().get(numero, [])
-    email_fiche = str((_find_lead(numero) or {}).get("email") or "").strip()
+    lead_liste = _find_lead(numero) or {}
+    email_fiche = str(lead_liste.get("email") or "").strip()
     items = []
     for item in meta:
         version = int(item.get("version") or 0)
@@ -7282,6 +7327,7 @@ async def list_devis(numero: str) -> JSONResponse:
                 "anciens_chiffres": _anciens_chiffres(item),  # Lot 13j-bis : « Renvoyer » bloqué
                 "file": path,
                 "has_notedim": bool(item.get("notedim_file") and os.path.exists(item.get("notedim_file"))),
+                "notedim_libelle": _note_archivee(item, lead_liste)["libelle"],          # A.3
                 "first_opened_at": item.get("first_opened_at") or "",
                 "open_count": int(item.get("open_count") or 0),
                 "relance_count": int(item.get("relance_count") or 0),
@@ -7705,7 +7751,8 @@ async def download_notedim(numero: str, version: int):
     if not os.path.exists(path):
         raise HTTPException(status_code=404, detail="Note de dimensionnement introuvable")
     item = next((x for x in _sent_devis_items(numero) if isinstance(x, dict) and int(x.get("version") or 0) == version), None)
-    return FileResponse(path, media_type="application/pdf", headers=_entete_pdf("NoteDim-DEFINITIVE", _numero_notedim_de(numero, item)))
+    nom = _note_archivee(item or {}, _find_lead(numero))["nom_fichier"]          # A.3 : plus de « DEFINITIVE » d'office
+    return FileResponse(path, media_type="application/pdf", headers=_entete_pdf(nom, _numero_notedim_de(numero, item)))
 
 
 # ---------------------------------------------------------------------------

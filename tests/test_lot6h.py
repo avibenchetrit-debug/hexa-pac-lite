@@ -179,9 +179,10 @@ def test_dossier_facture_note_archivee(page):
     assert apercu.status == 200 and apercu.body() == archive
     r = page.request.get(page.base + "/api/notedim/PR-93003/pdf")
     assert r.body() == archive
-    assert r.headers["content-disposition"] == 'attachment; filename="NoteDim-DEFINITIVE_ND2025-93003-AR.pdf"'
+    # A.3 (05/11/2026) : devis envoyé en 2025, avant que la VT soit exigée -> pas « définitive »
+    assert r.headers["content-disposition"] == 'attachment; filename="Note-dimensionnement_ND2025-93003-AR.pdf"'
     dl = page.request.get(page.base + "/api/notedim/PR-93003/download?version=1")
-    assert 'filename="NoteDim-DEFINITIVE_ND2025-93003-AR.pdf"' in dl.headers["content-disposition"]
+    assert 'filename="Note-dimensionnement_ND2025-93003-AR.pdf"' in dl.headers["content-disposition"]
     assert not os.path.exists(os.path.join(main.DEVIS_DIR, "PR-93003_notedim_v2.pdf"))   # rien de régénéré
 
 
@@ -211,7 +212,7 @@ def test_installation_finie_generer_la_facture(page):
     assert "Installation finie" in ligne.inner_text() and ligne.is_visible()
     assert page.evaluate("document.activeElement && document.activeElement.id") == "facture-date-fin"
     # panneau Documents : la note a son libellé sans ambiguïté
-    assert page.inner_text("#documents-panel .docs-notedim-label") == "Note de dim définitive (envoyée avec le devis DE2025-7512-1AF)"
+    assert page.inner_text("#documents-panel .docs-notedim-label") == ("Note de dimensionnement — envoyée avec le devis DE2025-7512-1AF le 03/11/2025 — ancien modèle")
 
 
 def test_facture_existante_voir_la_facture(page):
