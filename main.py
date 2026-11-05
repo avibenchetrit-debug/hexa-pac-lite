@@ -5024,6 +5024,7 @@ def _build_devis_context(request: Request, numero: str, version: int | None = No
     context["mode_mpr"] = "sans_attente" if _sans_attente else "attente"
     context["montant_mpr_affiche"] = f"{round(_mpr_total):,}".replace(",", " ")
     context["afficher_mention_mpr"] = state.get("afficher_mention_mpr") is not False
+    context["mpr_eligible"] = _mpr_total > 0                          # point 7 : pas d'aide MPR à 0 € affichée
     # financement choisi dans le simulateur (opt1 Crédit Travaux par défaut, comme le simulateur ; opt3 comptant : aucune
     # mensualité). Mode inconnu : aucun financement inventé -> le bloc économies (document + e-mail) est masqué.
     try:
