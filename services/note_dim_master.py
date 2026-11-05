@@ -211,8 +211,10 @@ def construire_note(prospect, state, catalogue, admin=None):
         "source_coefficient_g": "questionnaire d'isolation (méthode pac-lite)",
         "avec_classeur": False,
         "fondement": fondement,
-        "perimetre": "Visite technique réalisée — le logement a été vu" if vt else "En attente de la visite technique",
-        "perimetre_le": p.get("vt_validee_le") or p.get("date_vt") if vt else None,
+        # A.4 (05/11/2026) : la date de VT de la fiche (`vt_date`, posée à la validation)
+        "perimetre": (("Visite technique réalisée le " + date_fr(p.get("vt_date"))) if p.get("vt_date")
+                      else "Visite technique réalisée") if vt else "En attente de la visite technique",
+        "perimetre_le": None,
         "reserve": "" if vt else ("Le périmètre des travaux n'est pas encore arrêté : cette puissance est un ORDRE DE "
                                    "GRANDEUR, appelé à changer si les travaux retenus changent."),
     }
