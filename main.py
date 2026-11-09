@@ -20,7 +20,7 @@ from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response, StreamingResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.concurrency import run_in_threadpool
 from fastapi.templating import Jinja2Templates
@@ -587,7 +587,7 @@ app.add_middleware(GZipMiddleware, minimum_size=1024)
 
 # ============ ENFORCEMENT AUTH (Lot 2) — middleware global ============
 # Kill-switch anti-verrouillage : AUTH_ENFORCE=0 désactive tout l'enforcement (retour au comportement pré-Lot 2).
-_AUTH_PUBLIC_EXACT = {"/login", "/health", "/api/auth/login", "/api/auth/logout", "/api/auth/me", "/api/admin/auth"}
+_AUTH_PUBLIC_EXACT = {"/login", "/health", "/robots.txt", "/api/auth/login", "/api/auth/logout", "/api/auth/me", "/api/admin/auth"}
 _AUTH_PUBLIC_PREFIX = ("/static/", "/devis-public/", "/notedim-public/")
 # GET /api/admin/* lues par le simulateur/accueil (commerciaux) -> connecté, PAS admin-only.
 _AUTH_ADMIN_GET_OK = {"/api/admin/m3", "/api/admin/marques", "/api/admin/config"}
@@ -680,7 +680,14 @@ APP_VERSION = _app_version()
 async def _version_header(request: Request, call_next):
     response = await call_next(request)
     response.headers["x-hexa-version"] = APP_VERSION
+    # Outil interne : aucune page ne doit être indexée par les moteurs (toutes les réponses, y compris 302/401).
+    response.headers["X-Robots-Tag"] = "noindex, nofollow"
     return response
+
+
+@app.get("/robots.txt", include_in_schema=False)
+async def robots_txt():
+    return PlainTextResponse("User-agent: *\nDisallow: /\n")
 
 
 def _admin_password() -> str:
