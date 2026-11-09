@@ -687,7 +687,7 @@ async def _version_header(request: Request, call_next):
 
 @app.get("/robots.txt", include_in_schema=False)
 async def robots_txt():
-    return PlainTextResponse("User-agent: *\nDisallow: /\n")
+    return PlainTextResponse("User-agent: *\nAllow: /\n")
 
 
 def _admin_password() -> str:

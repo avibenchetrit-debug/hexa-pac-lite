@@ -1,4 +1,4 @@
-"""Outil interne : en-tête X-Robots-Tag sur toutes les réponses et robots.txt « Disallow: / » (09/11/2026)."""
+"""Outil interne : en-tête X-Robots-Tag sur toutes les réponses et robots.txt « Allow: / » (Google doit explorer pour lire le noindex) (09/11/2026)."""
 from fastapi.testclient import TestClient
 
 import main
@@ -6,11 +6,12 @@ import main
 client = TestClient(main.app)
 
 
-def test_robots_txt_public_et_interdit_tout():
+def test_robots_txt_public_et_autorise_tout():
     r = client.get("/robots.txt")
     assert r.status_code == 200
     assert "User-agent: *" in r.text
-    assert "Disallow: /" in r.text
+    assert "Allow: /" in r.text
+    assert "Disallow" not in r.text
     assert r.headers["x-robots-tag"] == "noindex, nofollow"
 
 
