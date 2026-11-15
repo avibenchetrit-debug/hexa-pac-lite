@@ -8512,7 +8512,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     // Badge CEE
     const catCee = ANAH_TO_CEE[catAnah];
     const badgeC = CEE_BADGES[catCee];
-    const ceeLabels = { precaire: "Précaire", modeste: "Modeste", classique: "Classique" };
+    const ceeLabels = { precaire: "Très modeste", modeste: "Précarité énergétique", classique: "Autres ménages" };
     badgeCee.textContent = ceeLabels[catCee];
     badgeCee.className = 'cat-badge';
     badgeCee.style.background = badgeC.bg;
@@ -11910,7 +11910,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
   const state = { ...DEFAULT_SIM_STATE };
 
   const LABELS_ANAH = { tres_modeste:'TMO', modeste:'MO', intermediaire:'INT', superieur:'SUP' };
-  const LABELS_CEE  = { tres_modeste:'Précaire', modeste:'Classique', intermediaire:'Classique', superieur:'Classique' };
+  const LABELS_CEE  = { tres_modeste:'Très modeste', modeste:'Précarité énergétique', intermediaire:'Autres ménages', superieur:'Autres ménages' };
   const ENERGIE_LABEL = { fioul:'fioul', gaz:'gaz', bois:'bois/granulés', electricite:'électricité', pac:'électricité' };
 
   // Format € avec séparateur de milliers (espace insécable)
@@ -12542,10 +12542,27 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
       ? Number(delegataire.mwh_precaire || 0)
       : Number(delegataire.mwh_classique || 0);
     const bonif = m3Config.bonification_cee || {};
-    const mult = bonif.actif ? Number(bonif.multiplicateur || 1) : 1;
+    const mult = coupDePouce(bonif, categorie);
     const montant = Math.round(mwhc * prixUnitaire * mult * 100) / 100;
     return { montant, erreur: null, delegataire: delegataire.nom || '', alerte: choix.alerte,
              details: { typeLogement, etas, surface, zone, categorie, kwhc, mwhc, prixUnitaire, mult } };
+  }
+  // CEE au 16/11/2026 (arrêté du 5 novembre 2026, art. 3 III 1°) : × 5 très modestes, × 3 précarité énergétique
+  // (ex-« modestes »), × 5 autres ménages à partir du 16/11 ; × 5 pour tous avant. Même barème que le serveur
+  // (`services/service_devis.coup_de_pouce`) ; date d'engagement = aujourd'hui (heure de Paris).
+  function coupDePouce(bonif, categorie){
+    if (!bonif || bonif.actif === false) return 1;
+    const periodes = (bonif.periodes && bonif.periodes.length) ? bonif.periodes : [
+      { effet: '2026-09-01', multiplicateurs: { tres_modeste: 5, precarite: 5, autres: 5 } },
+      { effet: '2026-11-16', multiplicateurs: { tres_modeste: 5, precarite: 3, autres: 5 } }];
+    const jour = String(bonif.aujourdhui || new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Paris' })).slice(0, 10);
+    const cc = categorie === 'tres_modeste' ? 'tres_modeste' : (categorie === 'modeste' ? 'precarite' : 'autres');
+    let choisie = null;
+    periodes.slice().sort((a, b) => String(a.effet).localeCompare(String(b.effet))).forEach(p => {
+      if (String(p.effet).slice(0, 10) <= jour) choisie = p; });
+    if (!choisie) return Number(bonif.multiplicateur || 1);
+    const m = (choisie.multiplicateurs || {})[cc];
+    return Number(m || bonif.multiplicateur || 1);
   }
   // Plafond réglementaire des aides (MaPrimeRénov' gardée, CEE réduite au plafond) = appliquer_plafonds_reglementaires
   function ecreterAides(categorie, prixPac, mprBase, cee, cfg){
@@ -15541,7 +15558,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     return `<div class="adm-card">
       <label class="adm-check"><input type="checkbox" id="adm-bonif-actif" ${bonif.actif ? 'checked' : ''}> Coup de pouce actif</label>
       <div class="adm-field adm-field-row"><span class="adm-lab">Multiplicateur</span><input type="number" min="1" max="10" id="adm-bonif-mult" value="${adminEscape(bonif.multiplicateur || 5)}"></div>
-      <p class="adm-opt2-note">La bonification multiplie le montant CEE (précaire ou classique selon le revenu). Par défaut ×5 (Coup de pouce Chauffage).</p>
+      <p class="adm-opt2-note">La bonification multiplie le montant CEE. Depuis le 16/11/2026 (arrêté du 5 novembre 2026, art. 3 III 1°) : ×5 ménages très modestes, ×3 précarité énergétique (ex-« modestes »), ×5 autres ménages ; avant : ×5 pour tous. Le multiplicateur ci-dessus ne sert que hors des périodes datées.</p>
       <div class="adm-actions"><button type="button" class="adm-btn-save" id="adm-save-bonif">Enregistrer</button></div>
     </div>`;
   }
@@ -17813,10 +17830,10 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
 
   // Couleurs des catégories ANAH (reprises de la fiche prospect) + libellé concaténé ANAH - CEE
   const CAT = {
-    tres_modeste: { court:"TMO", cee:"Précaire",  bg:"#1D4ED8", fg:"#FFFFFF" },
-    modeste:      { court:"MO",  cee:"Modeste",   bg:"#D97706", fg:"#FFFFFF" },
-    intermediaire:{ court:"INT", cee:"Classique", bg:"#7C3AED", fg:"#FFFFFF" },
-    superieur:    { court:"SUP", cee:"Classique", bg:"#BE185D", fg:"#FFFFFF" },
+    tres_modeste: { court:"TMO", cee:"Très modeste",  bg:"#1D4ED8", fg:"#FFFFFF" },
+    modeste:      { court:"MO",  cee:"Précarité énergétique",   bg:"#D97706", fg:"#FFFFFF" },
+    intermediaire:{ court:"INT", cee:"Autres ménages", bg:"#7C3AED", fg:"#FFFFFF" },
+    superieur:    { court:"SUP", cee:"Autres ménages", bg:"#BE185D", fg:"#FFFFFF" },
   };
   function catBadge(key){
     const c = CAT[key];

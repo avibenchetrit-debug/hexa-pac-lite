@@ -422,6 +422,51 @@ def calculer_mpr_ballon(prospect, admin_params):
 # celui de l'attente, avec une alerte. Réglage absent (ancien fichier) : PICOTY = attente, ACE = tout de suite.
 # Précaire = Très modestes, classique pour tous les autres (inchangé). Même règle dans la page (choisirDelegataire).
 USAGES_DELEGATAIRE = ("attente", "tout_de_suite")
+
+# ── CEE AU 16/11/2026 (Avi, 15/11/2026) ─────────────────────────────────────────────────────────────────────────────
+# Arrêté du 5 novembre 2026 (JORF du 10/11/2026), art. 3 III, qui remplace l'art. 3-6 de l'arrêté du 29/12/2014.
+# III 1° (BAR-TH-171/172) : Coup de pouce × 5 ménages très modestes, × 3 ménages en situation de précarité énergétique
+# hors très modestes, × 5 autres ménages, pour les opérations engagées à partir du 16/11/2026 (avant : × 5 pour tous).
+# Catégories renommées : l'ancienne « précarité énergétique » (II bis, très modestes) devient « ménages très modestes »,
+# l'ancienne « ménages modestes » (II ter) devient « ménages en situation de précarité énergétique » ; plafonds
+# inchangés. Même barème que le CRM (`app/aides_pac.py`). Date d'engagement = signature du devis (sinon aujourd'hui).
+CATEGORIE_CEE_DE_ANAH = {"tres_modeste": "tres_modeste", "modeste": "precarite"}
+LIBELLES_CATEGORIE_CEE = {"tres_modeste": "Ménages très modestes",
+                          "precarite": "Ménages en situation de précarité énergétique",
+                          "autres": "Autres ménages"}
+PERIODES_COUP_DE_POUCE = [
+    {"effet": "2026-09-01", "multiplicateurs": {"tres_modeste": 5, "precarite": 5, "autres": 5}},
+    {"effet": "2026-11-16", "multiplicateurs": {"tres_modeste": 5, "precarite": 3, "autres": 5},
+     "source": "Arrêté du 5 novembre 2026, art. 3 III 1° (remplace l'art. 3-6 de l'arrêté du 29/12/2014)"},
+]
+
+
+def aujourd_hui_paris():
+    from zoneinfo import ZoneInfo
+    return datetime.now(ZoneInfo("Europe/Paris")).date().isoformat()
+
+
+def categorie_cee(categorie):
+    return CATEGORIE_CEE_DE_ANAH.get(str(categorie or "").strip(), "autres")
+
+
+def coup_de_pouce(bonif, categorie, date_engagement=None):
+    """(multiplicateur, catégorie CEE, date d'effet) — la période du barème qui couvre la date d'engagement."""
+    bonif = bonif or {}
+    if not bonif.get("actif", True):
+        return 1.0, categorie_cee(categorie), ""
+    jour = str(date_engagement or "")[:10] or aujourd_hui_paris()
+    cc = categorie_cee(categorie)
+    periodes = sorted((p for p in (bonif.get("periodes") or PERIODES_COUP_DE_POUCE) if isinstance(p, dict)
+                       and p.get("effet")), key=lambda p: str(p["effet"]))
+    choisie = None
+    for per in periodes:
+        if str(per["effet"])[:10] <= jour:
+            choisie = per
+    if choisie is None:
+        return float_value(bonif.get("multiplicateur"), 1), cc, ""
+    m = (choisie.get("multiplicateurs") or {}).get(cc)
+    return float_value(m, float_value(bonif.get("multiplicateur"), 1)), cc, str(choisie["effet"])[:10]
 MODE_MPR_DEFAUT = "attente"        # Lot 13f : choix de démarrage d'un lead neuf = attend l'accord MaPrimeRénov' (PICOTY)
 _USAGE_PAR_NOM = {"PICOTY": "attente", "ACE": "tout_de_suite"}
 
@@ -533,7 +578,9 @@ def calculer_cee_bar_th_171(prospect, state_simulateur, admin_params, mode=None)
         type_prix = "classique"
 
     bonif = (admin_params or {}).get("bonification_cee") or {}
-    multiplicateur = float_value(bonif.get("multiplicateur"), 1) if bonif.get("actif", True) else 1
+    date_engagement = (value(state_simulateur, "date_engagement", default="")
+                       or value(prospect, "date_signature_devis", default="") or "")
+    multiplicateur, cat_cee, effet = coup_de_pouce(bonif, categorie, date_engagement)
     montant = round(mwhc * prix_unitaire * multiplicateur, 2)
 
     return {
@@ -556,6 +603,9 @@ def calculer_cee_bar_th_171(prospect, state_simulateur, admin_params, mode=None)
             "mode": mode,
             "alerte_delegataire": alerte_delegataire,
             "bonification": multiplicateur,
+            "categorie_cee": cat_cee,
+            "categorie_cee_libelle": LIBELLES_CATEGORIE_CEE[cat_cee],
+            "bareme_effet": effet,
         },
     }
 
@@ -741,7 +791,10 @@ def calculer_devis(prospect, state_simulateur, admin_params, catalogue_pac):
         "_cee_conserve": result_plafonds["cee_conserve"],
         **volume_cee(prospect, state_simulateur, admin_params),        # Lot 10 : affiché sur devis / pré-devis / facture
         "_details_plafonds": result_plafonds["details"],
-        "categorie_CEE_label": "Précaire" if categorie_revenu == "tres_modeste" else "Classique",
+        # 15/11/2026 : à partir du 16/11/2026, le nom de la catégorie de l'arrêté du 5 novembre 2026.
+        "categorie_CEE_label": (LIBELLES_CATEGORIE_CEE[categorie_cee(categorie_revenu)]
+                                if aujourd_hui_paris() >= PERIODES_COUP_DE_POUCE[-1]["effet"]
+                                else ("Précaire" if categorie_revenu == "tres_modeste" else "Classique")),
         "categorie_revenu_label": LABELS_ANAH.get(categorie_revenu, ""),
         "qt_fourniture": f"{quantite} u.",
         "qt_pose": "1 u." if quantite == 1 else "1 forfait",

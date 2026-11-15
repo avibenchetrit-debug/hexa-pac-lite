@@ -3768,7 +3768,10 @@ def get_admin_m3(request: Request) -> JSONResponse:
                 "forfaits_mpr",
                 {"tres_modeste": 5000, "modeste": 4000, "intermediaire": 3000, "superieur": 0},
             ),
-            "bonification_cee": baremes.get("bonification_cee", {"actif": True, "multiplicateur": 5}),
+            # 15/11/2026 : la page reçoit la DATE DU JOUR du serveur (heure de Paris) avec le barème daté du Coup de
+            # pouce — la page et le serveur calculent la même prime, le même jour.
+            "bonification_cee": {**baremes.get("bonification_cee", {"actif": True, "multiplicateur": 5}),
+                                 "aujourdhui": __import__("services.service_devis", fromlist=["x"]).aujourd_hui_paris()},
             "delegataires": _read_delegataires(),
             "modeles_email": _read_modeles_email(),
             "formule_bar_th_171": load_parametres_admin().get("formule_bar_th_171", DEFAULT_FORMULE_BAR_TH_171),
@@ -4673,7 +4676,8 @@ async def post_admin_m3(request: Request) -> JSONResponse:
     if isinstance(payload.get("forfaits_mpr"), dict):
         baremes["forfaits_mpr"] = payload["forfaits_mpr"]
     if isinstance(payload.get("bonification_cee"), dict):
-        baremes["bonification_cee"] = payload["bonification_cee"]
+        # 15/11/2026 : le barème daté (`periodes`) déjà enregistré n'est pas effacé par la case et le multiplicateur.
+        baremes["bonification_cee"] = {**(baremes.get("bonification_cee") or {}), **payload["bonification_cee"]}
     _atomic_write_json(BAREMES_PATH, baremes)
     if isinstance(payload.get("delegataires"), list):
         delegataires = payload["delegataires"] or DEFAULT_DELEGATAIRES
