@@ -60,3 +60,15 @@ def _donnees_partagees_par_fichier():
                 os.remove(c)
             except OSError:
                 pass
+
+
+
+@pytest.fixture(autouse=True)
+def _cee_engagement_fige(monkeypatch, request):
+    """15/11/2026 (Avi, CEE au 16/11) : le Coup de pouce dépend de la date d'engagement (sans signature : aujourd'hui).
+    Les cas de référence (photos de documents, parité page / serveur) sont figés au 15/11/2026 — la page reçoit cette
+    date du serveur. Le barème daté se teste avec des dates explicites (`test_cee_1611.py`)."""
+    if request.node.get_closest_marker("cee_date_reelle"):
+        return
+    from services import service_devis
+    monkeypatch.setattr(service_devis, "aujourd_hui_paris", lambda: "2026-11-15")
