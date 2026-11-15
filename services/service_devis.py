@@ -450,19 +450,43 @@ def categorie_cee(categorie):
     return CATEGORIE_CEE_DE_ANAH.get(str(categorie or "").strip(), "autres")
 
 
-def coup_de_pouce(bonif, categorie, date_engagement=None):
-    """(multiplicateur, catégorie CEE, date d'effet) — la période du barème qui couvre la date d'engagement."""
-    bonif = bonif or {}
-    if not bonif.get("actif", True):
-        return 1.0, categorie_cee(categorie), ""
+def periode_applicable(bonif, date_engagement=None):
+    """La période du barème daté (Admin › 3.2) qui couvre la date d'engagement, ou None."""
     jour = str(date_engagement or "")[:10] or aujourd_hui_paris()
-    cc = categorie_cee(categorie)
-    periodes = sorted((p for p in (bonif.get("periodes") or PERIODES_COUP_DE_POUCE) if isinstance(p, dict)
+    periodes = sorted((p for p in ((bonif or {}).get("periodes") or PERIODES_COUP_DE_POUCE) if isinstance(p, dict)
                        and p.get("effet")), key=lambda p: str(p["effet"]))
     choisie = None
     for per in periodes:
         if str(per["effet"])[:10] <= jour:
             choisie = per
+    return choisie
+
+
+def delegataires_de_la_periode(delegataires, bonif, categorie, date_engagement=None):
+    """15/11/2026 (Avi) : les PRIX PAR DÉLÉGATAIRE du barème daté (Admin › 3.2, « prix » de la période : {nom :
+    {tres_modeste, precarite, autres}}). Renseigné pour le délégataire et la catégorie du ménage, il remplace son prix
+    de base (3.3) — précaire pour un ménage très modeste, classique sinon. Vide : rien ne change."""
+    per = periode_applicable(bonif, date_engagement) or {}
+    prix = per.get("prix") or {}
+    cc = categorie_cee(categorie)
+    out = []
+    for d in delegataires or []:
+        if not isinstance(d, dict):
+            continue
+        v = ((prix.get(str(d.get("nom") or "")) or {}) if isinstance(prix, dict) else {}).get(cc)
+        if v not in (None, "") and float_value(v, 0) > 0:
+            d = {**d, ("mwh_precaire" if categorie == "tres_modeste" else "mwh_classique"): float_value(v, 0)}
+        out.append(d)
+    return out
+
+
+def coup_de_pouce(bonif, categorie, date_engagement=None):
+    """(multiplicateur, catégorie CEE, date d'effet) — la période du barème qui couvre la date d'engagement."""
+    bonif = bonif or {}
+    if not bonif.get("actif", True):
+        return 1.0, categorie_cee(categorie), ""
+    cc = categorie_cee(categorie)
+    choisie = periode_applicable(bonif, date_engagement)
     if choisie is None:
         return float_value(bonif.get("multiplicateur"), 1), cc, ""
     m = (choisie.get("multiplicateurs") or {}).get(cc)
@@ -566,7 +590,12 @@ def calculer_cee_bar_th_171(prospect, state_simulateur, admin_params, mode=None)
     mwhc = kwhc / 1000
 
     mode = mode or mode_cee(prospect, state_simulateur, admin_params)
-    delegataire, alerte_delegataire = choisir_delegataire((admin_params or {}).get("delegataires") or [], mode, categorie)
+    _bonif = (admin_params or {}).get("bonification_cee") or {}
+    _date_eng = (value(state_simulateur, "date_engagement", default="")
+                 or value(prospect, "date_signature_devis", default="") or "")
+    delegataire, alerte_delegataire = choisir_delegataire(
+        delegataires_de_la_periode((admin_params or {}).get("delegataires") or [], _bonif, categorie, _date_eng),
+        mode, categorie)
     if not delegataire:
         return {"montant": 0, "erreur": "Aucun délégataire CEE actif", "details": {}}
 

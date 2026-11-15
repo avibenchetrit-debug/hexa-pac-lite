@@ -12535,7 +12535,7 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
 
     const kwhc = Number(ligneBase.montant_kwhc || 0) * Number(ligneSurface.facteur || 0) * Number(ligneZone.facteur || 0);
     const mwhc = kwhc / 1000;
-    const choix = choisirDelegataire(m3Config.delegataires, mode || 'attente', categorie);
+    const choix = choisirDelegataire(delegatairesDeLaPeriode(m3Config.delegataires, m3Config.bonification_cee || {}, categorie), mode || 'attente', categorie);
     const delegataire = choix.d;
     if (!delegataire) return { montant: 0, erreur: 'Aucun délégataire actif' };
     const prixUnitaire = categorie === 'tres_modeste'
@@ -12550,16 +12550,36 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
   // CEE au 16/11/2026 (arrêté du 5 novembre 2026, art. 3 III 1°) : × 5 très modestes, × 3 précarité énergétique
   // (ex-« modestes »), × 5 autres ménages à partir du 16/11 ; × 5 pour tous avant. Même barème que le serveur
   // (`services/service_devis.coup_de_pouce`) ; date d'engagement = aujourd'hui (heure de Paris).
-  function coupDePouce(bonif, categorie){
-    if (!bonif || bonif.actif === false) return 1;
-    const periodes = (bonif.periodes && bonif.periodes.length) ? bonif.periodes : [
+  const PERIODES_CDP_DEFAUT = [
       { effet: '2026-09-01', multiplicateurs: { tres_modeste: 5, precarite: 5, autres: 5 } },
       { effet: '2026-11-16', multiplicateurs: { tres_modeste: 5, precarite: 3, autres: 5 } }];
-    const jour = String(bonif.aujourdhui || new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Paris' })).slice(0, 10);
-    const cc = categorie === 'tres_modeste' ? 'tres_modeste' : (categorie === 'modeste' ? 'precarite' : 'autres');
+  window.PERIODES_CDP_DEFAUT = PERIODES_CDP_DEFAUT;
+  function categorieCee(categorie){
+    return categorie === 'tres_modeste' ? 'tres_modeste' : (categorie === 'modeste' ? 'precarite' : 'autres');
+  }
+  function periodeCdp(bonif){
+    const periodes = (bonif && bonif.periodes && bonif.periodes.length) ? bonif.periodes : PERIODES_CDP_DEFAUT;
+    const jour = String((bonif && bonif.aujourdhui) || new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Paris' })).slice(0, 10);
     let choisie = null;
     periodes.slice().sort((a, b) => String(a.effet).localeCompare(String(b.effet))).forEach(p => {
       if (String(p.effet).slice(0, 10) <= jour) choisie = p; });
+    return choisie;
+  }
+  // 15/11/2026 : les prix par délégataire de la période (Admin › 3.2) remplacent le prix de base quand ils sont saisis
+  // (même règle que le serveur, `delegataires_de_la_periode`).
+  function delegatairesDeLaPeriode(delegataires, bonif, categorie){
+    const prix = ((periodeCdp(bonif) || {}).prix) || {};
+    const cc = categorieCee(categorie);
+    return (delegataires || []).map(d => {
+      const v = Number(((prix[d && d.nom] || {})[cc]) || 0);
+      if (!d || !(v > 0)) return d;
+      return Object.assign({}, d, categorie === 'tres_modeste' ? { mwh_precaire: v } : { mwh_classique: v });
+    });
+  }
+  function coupDePouce(bonif, categorie){
+    if (!bonif || bonif.actif === false) return 1;
+    const cc = categorieCee(categorie);
+    const choisie = periodeCdp(bonif);
     if (!choisie) return Number(bonif.multiplicateur || 1);
     const m = (choisie.multiplicateurs || {})[cc];
     return Number(m || bonif.multiplicateur || 1);
@@ -15552,6 +15572,34 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
     </div>`;
   }
 
+  // 15/11/2026 (Avi) : LE BARÈME DATÉ, réglable — une ligne par période (date d'effet AAAA-MM-JJ, coefficient par
+  // catégorie CEE, prix €/MWh cumac par délégataire et par catégorie ; un prix vide garde celui de 3.3). Une ligne
+  // vide de plus pour ajouter une période. Défaut : ×5 jusqu'au 15/11/2026, puis ×5 / ×3 / ×5.
+  function renderBaremeDate(bonif, delegataires){
+    const per = (bonif.periodes && bonif.periodes.length) ? bonif.periodes : (window.PERIODES_CDP_DEFAUT || []);
+    const cats = [['tres_modeste','Très modestes'],['precarite','Précarité énergétique (ex-« modestes »)'],['autres','Autres ménages']];
+    const noms = (delegataires || []).map(d => d && d.nom).filter(Boolean);
+    const lignes = per.concat([{}]).map(p => {
+      const m = p.multiplicateurs || {}; const px = p.prix || {};
+      const coefs = cats.map(([c]) => `<td><input type="text" inputmode="decimal" class="adm-cdp-coef" data-cat="${c}" style="width:52px" value="${adminEscape(m[c] == null ? '' : m[c])}"></td>`).join('');
+      const prix = noms.map(n => cats.map(([c]) => `<td><input type="text" inputmode="decimal" class="adm-cdp-prix" data-del="${adminEscape(n)}" data-cat="${c}" style="width:58px" placeholder="—" value="${adminEscape(((px[n] || {})[c]) == null ? '' : (px[n] || {})[c])}"></td>`).join('')).join('');
+      return `<tr class="adm-cdp-periode"><td><input type="text" class="adm-cdp-effet" style="width:100px" placeholder="AAAA-MM-JJ" value="${adminEscape(p.effet || '')}"></td>${coefs}${prix}<td><input type="text" class="adm-cdp-source" style="width:160px" value="${adminEscape(p.source || '')}"></td></tr>`;
+    }).join('');
+    const tete = cats.map(([, l]) => `<th>×&nbsp;${l}</th>`).join('') + noms.map(n => cats.map(([, l]) => `<th>${adminEscape(n)} €/MWhc ${l}</th>`).join('')).join('');
+    return `<div class="adm-field" style="overflow-x:auto"><span class="adm-lab">Barème daté (date d'engagement = signature du devis)</span>
+      <table class="adm-cdp-table" style="font-size:12px"><thead><tr><th>En vigueur à partir du</th>${tete}<th>Source</th></tr></thead><tbody>${lignes}</tbody></table>
+      <p class="adm-opt2-note">Prix vide : le prix du délégataire (3.3). Une ligne sans date est ignorée.</p></div>`;
+  }
+  function lireBaremeDate(){
+    return Array.from(document.querySelectorAll('.adm-cdp-periode')).map(tr => {
+      const effet = String(tr.querySelector('.adm-cdp-effet')?.value || '').trim();
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(effet)) return null;
+      const multiplicateurs = {}; const prix = {};
+      tr.querySelectorAll('.adm-cdp-coef').forEach(i => { const v = Number(String(i.value).replace(',', '.')); if (v > 0) multiplicateurs[i.dataset.cat] = v; });
+      tr.querySelectorAll('.adm-cdp-prix').forEach(i => { const v = Number(String(i.value).replace(',', '.')); if (v > 0) { (prix[i.dataset.del] = prix[i.dataset.del] || {})[i.dataset.cat] = v; } });
+      return { effet, multiplicateurs, prix, source: String(tr.querySelector('.adm-cdp-source')?.value || '').trim() };
+    }).filter(Boolean).sort((a, b) => a.effet.localeCompare(b.effet));
+  }
   function renderBonificationFields(){
     const cfg = M3_ADMIN || {};
     const bonif = cfg.bonification_cee || { actif:true, multiplicateur:5 };
@@ -15559,6 +15607,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
       <label class="adm-check"><input type="checkbox" id="adm-bonif-actif" ${bonif.actif ? 'checked' : ''}> Coup de pouce actif</label>
       <div class="adm-field adm-field-row"><span class="adm-lab">Multiplicateur</span><input type="number" min="1" max="10" id="adm-bonif-mult" value="${adminEscape(bonif.multiplicateur || 5)}"></div>
       <p class="adm-opt2-note">La bonification multiplie le montant CEE. Depuis le 16/11/2026 (arrêté du 5 novembre 2026, art. 3 III 1°) : ×5 ménages très modestes, ×3 précarité énergétique (ex-« modestes »), ×5 autres ménages ; avant : ×5 pour tous. Le multiplicateur ci-dessus ne sert que hors des périodes datées.</p>
+      ${renderBaremeDate(bonif, cfg.delegataires || [])}
       <div class="adm-actions"><button type="button" class="adm-btn-save" id="adm-save-bonif">Enregistrer</button></div>
     </div>`;
   }
@@ -17322,7 +17371,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
       else adminToast("❌ Erreur lors de l'enregistrement", '#B91C1C');
     });
     document.getElementById('adm-save-bonif')?.addEventListener('click', async ()=>{
-      const bonification_cee = { actif: !!document.getElementById('adm-bonif-actif')?.checked, multiplicateur: Number(document.getElementById('adm-bonif-mult')?.value || 5) };
+      const bonification_cee = { actif: !!document.getElementById('adm-bonif-actif')?.checked, multiplicateur: Number(document.getElementById('adm-bonif-mult')?.value || 5), periodes: lireBaremeDate() };
       const r = await fetch('/api/admin/m3', { method:'POST', headers: window.adminHeaders(), body: JSON.stringify({ bonification_cee }) });
       if (r.ok) { M3_ADMIN.bonification_cee = bonification_cee; adminToast('✓ Paramètres enregistrés', '#0D6B3B'); window.dispatchEvent(new CustomEvent('hexa-config-changed')); }
       else adminToast("❌ Erreur lors de l'enregistrement", '#B91C1C');
