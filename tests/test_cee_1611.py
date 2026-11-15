@@ -22,3 +22,23 @@ def test_sans_signature_la_date_est_aujourd_hui(monkeypatch):
     monkeypatch.setattr(sd, "aujourd_hui_paris", lambda: "2026-11-20")
     assert sd.coup_de_pouce({"actif": True}, "modeste")[0] == 3
     assert sd.coup_de_pouce({"actif": True}, "modeste", "2026-11-10")[0] == 5
+
+
+def test_prix_par_delegataire_de_la_periode():
+    """15/11/2026 (Avi) : la grille ACE saisie dans le barème daté remplace le prix de base, pour sa catégorie."""
+    dels = [{"nom": "ACE", "usage": "tout_de_suite", "mwh_precaire": 14, "mwh_classique": 7.5}]
+    bonif = {"actif": True, "periodes": [
+        {"effet": "2026-11-16", "multiplicateurs": {"tres_modeste": 5, "precarite": 3, "autres": 5},
+         "prix": {"ACE": {"precarite": 9.1}}}]}
+    d = sd.delegataires_de_la_periode(dels, bonif, "modeste", "2026-11-20")[0]
+    assert d["mwh_classique"] == 9.1 and d["mwh_precaire"] == 14
+    assert sd.delegataires_de_la_periode(dels, bonif, "intermediaire", "2026-11-20")[0]["mwh_classique"] == 7.5
+    assert sd.delegataires_de_la_periode(dels, bonif, "modeste", "2026-11-10")[0]["mwh_classique"] == 7.5
+
+
+def test_le_bareme_date_enregistre_n_efface_rien(tmp_path):
+    import main
+    src = open("main.py", encoding="utf-8").read()
+    assert "{**(baremes.get(\"bonification_cee\") or {}), **payload[\"bonification_cee\"]}" in src
+    assert "renderBaremeDate" in open("templates/index.html", encoding="utf-8").read()
+    assert main is not None
