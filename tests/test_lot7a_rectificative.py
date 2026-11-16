@@ -61,11 +61,13 @@ def dossier_facture(base, monkeypatch):
     main._atomic_write_json(main.COUNTERS_PATH, {"dossier": 0})
     ace = dict(docs.DELEG[1], mention_titre="Mention RAI — Partenaire ACE Énergie", mention_devis=MENTION_ORIGINE)
     docs._preparer(deleg=[docs.DELEG[0], ace])
-    monkeypatch.setattr(main, "lignes_solution_chauffage", lambda *a, **k: None)
-    monkeypatch.setattr(main, "ligne_regulateur", lambda *a, **k: None)          # Lot 7b : absente en juillet
-    r = httpx.post(f"{base}/api/facture/{NUM}", json={"date_fin_travaux": "2026-07-30"}, timeout=120)
-    assert r.status_code == 200, r.text
-    monkeypatch.undo()
+    # 16/11/2026 : un CONTEXTE limité à ces deux remplacements — `monkeypatch.undo()` annulait aussi la date
+    # d'engagement CEE figée au 15/11/2026 par conftest, et la rectificative se recalculait au barème du 16/11.
+    with monkeypatch.context() as m:
+        m.setattr(main, "lignes_solution_chauffage", lambda *a, **k: None)
+        m.setattr(main, "ligne_regulateur", lambda *a, **k: None)          # Lot 7b : absente en juillet
+        r = httpx.post(f"{base}/api/facture/{NUM}", json={"date_fin_travaux": "2026-07-30"}, timeout=120)
+        assert r.status_code == 200, r.text
     orig = main._read_factures_meta()[NUM][0]
     main._atomic_write_json(main.DELEGATAIRES_PATH, docs.DELEG)          # la mention de l'admin a changé depuis
     return orig
