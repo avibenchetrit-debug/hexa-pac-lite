@@ -1,0 +1,214 @@
+{
+ "_source": "Tableaux de puissance et performance Thaleos Montblanc (fichiers du fabricant fournis par Avi le 16/11/2026) — DB −7 °C, régime 100 % (Normal), LWT 35 et 55 °C.",
+ "valeurs": {
+  "THA-MTBL-R290-4": {
+   "feuille": "THAHP04M",
+   "titre": "Montblanc 4 kW R290 MONOBLOC",
+   "fichier": "TABLEAU DE PUISSANCE PERFORMANCE MONTBLANC MONOBLOC R290.xlsx",
+   "m7_35": {
+    "hc_kw": 4.57,
+    "cop": 3.13
+   },
+   "m7_55": {
+    "hc_kw": 4.77,
+    "cop": 2.16
+   }
+  },
+  "THA-MTBL-R290-6": {
+   "feuille": "THAHP06M",
+   "titre": "Montblanc 6 kW R290 MONOBLOC",
+   "fichier": "TABLEAU DE PUISSANCE PERFORMANCE MONTBLANC MONOBLOC R290.xlsx",
+   "m7_35": {
+    "hc_kw": 6.04,
+    "cop": 2.98
+   },
+   "m7_55": {
+    "hc_kw": 5.37,
+    "cop": 2.17
+   }
+  },
+  "THA-MTBL-R290-8": {
+   "feuille": "THAHP08MT",
+   "titre": "Montblanc 8 kW R290 MONOBLOC",
+   "fichier": "TABLEAU DE PUISSANCE PERFORMANCE MONTBLANC MONOBLOC R290.xlsx",
+   "m7_35": {
+    "hc_kw": 7.19,
+    "cop": 3.03
+   },
+   "m7_55": {
+    "hc_kw": 7.09,
+    "cop": 2.17
+   }
+  },
+  "THA-MTBL-R290-10": {
+   "feuille": "THAHP10MT",
+   "titre": "Montblanc 10 kW R290 MONOBLOC",
+   "fichier": "TABLEAU DE PUISSANCE PERFORMANCE MONTBLANC MONOBLOC R290.xlsx",
+   "m7_35": {
+    "hc_kw": 8.22,
+    "cop": 2.88
+   },
+   "m7_55": {
+    "hc_kw": 7.6,
+    "cop": 2.12
+   }
+  },
+  "THA-MTBL-R290-12": {
+   "feuille": "THAHP12MT",
+   "titre": "Montblanc 12 kW R290 MONOBLOC",
+   "fichier": "TABLEAU DE PUISSANCE PERFORMANCE MONTBLANC MONOBLOC R290.xlsx",
+   "m7_35": {
+    "hc_kw": 10.14,
+    "cop": 2.84
+   },
+   "m7_55": {
+    "hc_kw": 10.55,
+    "cop": 2.18
+   }
+  },
+  "THA-MTBL-R290-14": {
+   "feuille": "THAHP14MT",
+   "titre": "Montblanc 14 kW R290 MONOBLOC",
+   "fichier": "TABLEAU DE PUISSANCE PERFORMANCE MONTBLANC MONOBLOC R290.xlsx",
+   "m7_35": {
+    "hc_kw": 11.66,
+    "cop": 2.74
+   },
+   "m7_55": {
+    "hc_kw": 11.46,
+    "cop": 2.13
+   }
+  },
+  "THA-MTBL-R290-16": {
+   "feuille": "THAHP16MT",
+   "titre": "Montblanc 16 kW R290 MONOBLOC",
+   "fichier": "TABLEAU DE PUISSANCE PERFORMANCE MONTBLANC MONOBLOC R290.xlsx",
+   "m7_35": {
+    "hc_kw": 12.88,
+    "cop": 2.54
+   },
+   "m7_55": {
+    "hc_kw": 12.57,
+    "cop": 2.08
+   }
+  },
+  "THA-MTBL-R290-DUO-12": {
+   "feuille": "THAHP190L12M",
+   "titre": "Montblanc 12 kW R290 MONOBLOC avec ECS",
+   "fichier": "TABLEAU DE PUISSANCE PERFORMANCE MONTBLANC MONOBLOC R290.xlsx",
+   "m7_35": {
+    "hc_kw": 10.25,
+    "cop": 2.9
+   },
+   "m7_55": {
+    "hc_kw": 10.66,
+    "cop": 2.22
+   }
+  },
+  "THA-MTBL-R290-DUO-14": {
+   "feuille": "THAHP190L14M",
+   "titre": "Montblanc 14 kW R290 MONOBLOC avec ECS",
+   "fichier": "TABLEAU DE PUISSANCE PERFORMANCE MONTBLANC MONOBLOC R290.xlsx",
+   "m7_35": {
+    "hc_kw": 11.56,
+    "cop": 2.74
+   },
+   "m7_55": {
+    "hc_kw": 11.71,
+    "cop": 2.14
+   }
+  },
+  "THA-MTBL-R290-DUO-16": {
+   "feuille": "THAHP190L16M",
+   "titre": "Montblanc 16 kW R290 MONOBLOC avec ECS",
+   "fichier": "TABLEAU DE PUISSANCE PERFORMANCE MONTBLANC MONOBLOC R290.xlsx",
+   "m7_35": {
+    "hc_kw": 12.99,
+    "cop": 2.58
+   },
+   "m7_55": {
+    "hc_kw": 12.8,
+    "cop": 2.13
+   }
+  },
+  "THA-MTBL-R32-8": {
+   "feuille": "THASPLIT08M",
+   "titre": "Montblanc 8 kW R32 SPLIT",
+   "fichier": "TABLEAU DE PUISSANCE PERFORMANCE MONTBLANC SPLIT R32.xlsx",
+   "m7_35": {
+    "hc_kw": 7.19,
+    "cop": 3.03
+   },
+   "m7_55": {
+    "hc_kw": 7.09,
+    "cop": 2.17
+   }
+  },
+  "THA-MTBL-R32-10": {
+   "feuille": "THASPLIT10M",
+   "titre": "Montblanc 10 kW R32 SPLIT",
+   "fichier": "TABLEAU DE PUISSANCE PERFORMANCE MONTBLANC SPLIT R32.xlsx",
+   "m7_35": {
+    "hc_kw": 8.22,
+    "cop": 2.88
+   },
+   "m7_55": {
+    "hc_kw": 7.6,
+    "cop": 2.12
+   }
+  },
+  "THA-MTBL-R32-12": {
+   "feuille": "THASPLIT12MT",
+   "titre": "Montblanc 12 kW R32 SPLIT",
+   "fichier": "TABLEAU DE PUISSANCE PERFORMANCE MONTBLANC SPLIT R32.xlsx",
+   "m7_35": {
+    "hc_kw": 10.05,
+    "cop": 2.56
+   },
+   "m7_55": {
+    "hc_kw": 9.87,
+    "cop": 2.45
+   }
+  },
+  "THA-MTBL-R32-14": {
+   "feuille": "THASPLIT14MT",
+   "titre": "Montblanc 14 kW R32 SPLIT",
+   "fichier": "TABLEAU DE PUISSANCE PERFORMANCE MONTBLANC SPLIT R32.xlsx",
+   "m7_35": {
+    "hc_kw": 11.72,
+    "cop": 2.57
+   },
+   "m7_55": {
+    "hc_kw": 11.51,
+    "cop": 2.46
+   }
+  },
+  "THA-MTBL-R32-16": {
+   "feuille": "THASPLIT16MT",
+   "titre": "Montblanc 16 kW R32 SPLIT",
+   "fichier": "TABLEAU DE PUISSANCE PERFORMANCE MONTBLANC SPLIT R32.xlsx",
+   "m7_35": {
+    "hc_kw": 13.4,
+    "cop": 2.52
+   },
+   "m7_55": {
+    "hc_kw": 13.16,
+    "cop": 2.42
+   }
+  }
+ },
+ "sans_feuille": [
+  "THA-MTBL-R290-DUO-8",
+  "THA-MTBL-R290-DUO-10"
+ ],
+ "identiques": [
+  [
+   "THA-MTBL-R290-8",
+   "THA-MTBL-R32-8"
+  ],
+  [
+   "THA-MTBL-R290-10",
+   "THA-MTBL-R32-10"
+  ]
+ ]
+}

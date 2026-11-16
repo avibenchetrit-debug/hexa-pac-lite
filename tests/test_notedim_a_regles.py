@@ -68,7 +68,9 @@ def test_migration_idempotente_et_respecte_les_saisies():
     assert cat[0][dp.CHAMP_M7_55] == 9.81 and cat[0][dp.CHAMP_M7_55_VALIDE] is False and cat[0][dp.CHAMP_TEMP_MAX] == 70
     assert cat[0][dp.CHAMP_M7_55_SOURCE].startswith("Master (à valider) — Daikin")
     assert cat[1][dp.CHAMP_M7_55] == 11.5 and cat[1][dp.CHAMP_M7_55_VALIDE] is True     # saisie gardée
-    assert dp.CHAMP_M7_55 not in cat[2]                                                  # pas de valeur au Master
+    # 16/11/2026 (Avi) : les tableaux Thaleos du fabricant — puissance et COP à −7 °C, 35 et 55 °C, validés.
+    assert cat[2][dp.CHAMP_M7_55] == 10.55 and cat[2][dp.CHAMP_M7_35] == 10.14 and cat[2][dp.CHAMP_M7_55_VALIDE]
+    assert cat[2][dp.CHAMP_COP_M7_35] == 2.84 and "THAHP12MT" in cat[2][dp.CHAMP_M7_55_SOURCE]
     assert dp.migrer_catalogue(cat) == (cat, False)
 
 

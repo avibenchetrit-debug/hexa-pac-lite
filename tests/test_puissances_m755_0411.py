@@ -16,7 +16,9 @@ SANS_VALEUR = {"ATL-EXCELLIA-S-9", "ATL-EXCELLIA-S-DUO-9"} | {m["ref"] for m in 
 def test_dix_huit_valeurs_validees_une_seule_fois():
     cat, change = dp.migrer_catalogue(copy.deepcopy(CATALOGUE))
     assert change
-    valides = {m["ref"]: m[dp.CHAMP_M7_55] for m in cat if m.get(dp.CHAMP_M7_55_VALIDE) is True}
+    # 16/11/2026 : les Thaleos reçoivent aussi leurs valeurs (tableaux du fabricant) — les 18 du 04/11 restent.
+    valides = {m["ref"]: m[dp.CHAMP_M7_55] for m in cat if m.get(dp.CHAMP_M7_55_VALIDE) is True
+               and not m.get("thaleos_m7_import")}
     assert len(valides) == 18 and set(valides) == {m["ref"] for m in CATALOGUE} - SANS_VALEUR
     assert valides["ATL-EXCELLIA-S-14 TRI"] == 10.28 and valides["ARI-NIMBUS-NET-R32-15 TRI"] == 10.2
     m = next(x for x in cat if x["ref"] == "ATL-EXCELLIA-S-12")

@@ -11738,6 +11738,20 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
     if (raw.puissance_m7_55_valide === true && v > 0) return { kw: v, origine: 'm7_55' };
     return { kw: puissanceModele(m), origine: '35' };
   }
+  /* 16/11/2026 (Avi) : la couverture se calcule à −7 °C À LA TEMPÉRATURE D'EAU DU DOSSIER (35 °C plancher chauffant,
+     55 °C sinon), jamais sur la nominale — sans valeur à −7 °C, pas de pourcentage. */
+  function regimeDossier(){
+    const tr = (typeof window.hexaTemperatureRequise === 'function') ? window.hexaTemperatureRequise() : {};
+    return tr && tr.emetteur === 'plancher_chauffant' ? '35' : '55';
+  }
+  function puissanceM7(m){
+    const raw = (m && m.raw) || m || {}, reg = regimeDossier();
+    const v35 = Number(String(raw.puissance_m7_35_kw ?? '').replace(',', '.'));
+    if (reg === '35' && v35 > 0) return { kw: v35, origine: 'm7_35', regime: reg };
+    const v = Number(String(raw.puissance_m7_55_kw ?? '').replace(',', '.'));
+    if (raw.puissance_m7_55_valide === true && v > 0) return { kw: v, origine: 'm7_55', regime: reg };
+    return { kw: 0, origine: '', regime: reg };
+  }
   function tempMaxModele(m){
     const raw = (m && m.raw) || m || {};
     const v = Number(String(raw.temp_max_depart_c ?? '').replace(',', '.'));
@@ -11764,7 +11778,9 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
   function controlePuissance(){
     const m = getModeleActuel(), q = quantitePac();
     const besoin = Number(state.puissance_requise_kw) || 0, pr = puissanceRetenue(m), unitaire = pr.kw, total = q * unitaire;
-    const coherence = m ? coherencePuissance(total, besoin) : null;
+    /* 16/11/2026 : la couverture à −7 °C à la température d'eau du dossier ; sans cette valeur, pas de pourcentage. */
+    const m7 = puissanceM7(m);
+    const coherence = (m && m7.kw > 0) ? coherencePuissance(q * m7.kw, besoin) : null;
     const alerteT = alerteTemperature(m);
     return { q, unitaire, total, besoin, origine: pr.origine, coherence, alerteT,
              horsPlage: !!coherence && coherence.statut !== 'ok' };

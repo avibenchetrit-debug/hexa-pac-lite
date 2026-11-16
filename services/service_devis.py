@@ -1153,11 +1153,16 @@ def calculer_notedim(prospect, state_simulateur, catalogue_pac, admin_params=Non
     # température de départ requise / max — mêmes règles que l'écran (services/dimensionnement_pac.py)
     from services import dimensionnement_pac as _dp
     quantite = quantite_pac(state_simulateur)
+    # 16/11/2026 (Avi) : la couverture se lit à −7 °C À LA TEMPÉRATURE D'EAU DU DOSSIER (35 °C plancher chauffant,
+    # 55 °C sinon), jamais sur la puissance nominale : sans valeur à −7 °C, pas de couverture.
+    _regime = "35" if str(value(prospect, "type_emetteurs", default="") or "").strip().lower() == "plancher_chauffant" \
+        else "55"
     if modele:
-        modele_kw, _origine_kw = _dp.puissance_retenue(modele)
+        modele_kw, _origine_kw = _dp.puissance_retenue(modele)      # la puissance affichée du modèle (inchangée)
     else:
         modele_kw, _origine_kw = p_pac_reco_kw, _dp.ORIGINE_35
-    _coh = _dp.coherence(modele_kw * quantite, p_pac_reco_kw) or {}
+    _kw_m7 = _dp.puissance_m7(modele, _regime)[0] if modele else None
+    _coh = (_dp.coherence(_kw_m7 * quantite, p_pac_reco_kw) or {}) if _kw_m7 else {}
     _plage = _dp.plage(p_pac_reco_kw) or {}
     _t_req, _t_origine = _dp.temperature_requise(prospect, admin_params or {})
     _t_max = _dp.temp_max(modele) if modele else None
