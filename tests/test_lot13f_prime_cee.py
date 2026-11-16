@@ -85,7 +85,11 @@ def test_parite_js_python(tmp_path):
     runner = tmp_path / "parite13f.js"
     runner.write_text(NODE_RUNNER, encoding="utf-8")
     html = os.path.join(os.path.dirname(__file__), "..", "templates", "index.html")
-    res = subprocess.run(["node", str(runner), html], input=json.dumps({"cas": cas_js, "admin": admin}),
+    # 16/11/2026 : la page reçoit la date d'engagement du serveur (`bonification_cee.aujourdhui`) — la MÊME que le
+    # Python (figée au 15/11/2026 par conftest), sinon le JS prenait la vraie date du jour et l'autre barème.
+    admin_js = json.loads(json.dumps(admin))
+    admin_js.setdefault("bonification_cee", {})["aujourdhui"] = sd.aujourd_hui_paris()
+    res = subprocess.run(["node", str(runner), html], input=json.dumps({"cas": cas_js, "admin": admin_js}),
                          capture_output=True, text=True, encoding="utf-8", check=True)
     js = json.loads(res.stdout)
     for (st, _), j, p in zip(cas_js, js, cas_py):
