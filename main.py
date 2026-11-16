@@ -2462,7 +2462,14 @@ async def login_page() -> HTMLResponse:
 
 @app.get("/health")
 async def health() -> JSONResponse:
-    return JSONResponse({"status": "ok", "version": APP_VERSION})
+    # 16/11/2026 : la preuve que le code déployé est le bon — le nombre de modèles Thaleos à −7 °C chargés (référentiel
+    # services/referentiels/thaleos_m7_20261116.json) ; 0 = l'ancien code ou le référentiel absent.
+    try:
+        from services import dimensionnement_pac as _dp
+        nb_thaleos = len(getattr(_dp, "THALEOS", {}) or {})
+    except Exception:  # noqa: BLE001
+        nb_thaleos = -1
+    return JSONResponse({"status": "ok", "version": APP_VERSION, "thaleos_m7": nb_thaleos})
 
 
 @app.get("/api/baremes")
