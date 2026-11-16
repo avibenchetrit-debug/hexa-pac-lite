@@ -222,8 +222,9 @@ def test_geslot_cascade_proposee_et_coherente(navigateur):
     pg.wait_for_function("document.querySelector('#sim-quantite').value === '2'")
     attendu = int(main.prix_defaut_pac(17882.0, 2, main._admin_payload_with_m3()))
     pg.wait_for_function(f"document.querySelector('#sim-prix').value.replace(/\D/g, '') === '{attendu}'")
-    entete = (pg.inner_text("#sim-puissance-totale") + " · " + pg.inner_text("#sim-puissance-coherence")).replace(" ", " ")
-    assert entete == "2 × 18 kW = 36 kW installés · 108 % · cohérent", entete
+    entete = pg.inner_text("#sim-puissance-totale").replace(" ", " ")   # 16/11 : pas de % sans −7 °C
+    assert entete == "2 × 18 kW = 36 kW installés", entete
+    assert pg.locator("#sim-puissance-coherence").count() == 0
     assert pg.locator("#sim-selection-alerte").count() == 0 and pg.locator("#sim-puissance-alerte").count() == 0
     assert pg.inner_text("#sim-puissance-origine") == "Puissance à 35 °C, valeur à −7 °C / 55 °C non renseignée."
     assert pg.erreurs_js == []
@@ -235,7 +236,7 @@ def test_geslot_nimbus_choisie_a_la_main_alerte_temperature(navigateur):
     pg.wait_for_selector("#sim-alerte-temperature")
     assert pg.inner_text("#sim-alerte-temperature") ==         "⚠ Température max 60 °C : insuffisante pour des radiateurs fonte (65 °C requis)"
     assert pg.locator(".p6-alerte-dim").count() == 0                      # des options valables existent
-    assert pg.inner_text("#sim-puissance-coherence") == "90 % · cohérent"
+    assert pg.locator("#sim-puissance-coherence").count() == 0              # 16/11 : pas de −7 °C, pas de %
     assert pg.erreurs_js == []
 
 
@@ -294,7 +295,7 @@ def test_geslot_pre_note_et_note_definitive(navigateur):
     pg.evaluate("window.ouvrirNoteDim()")
     pg.wait_for_selector("#sim-dim-modele")
     assert pg.inner_text("#sim-dim-modele") == "2 × ALTHERMA 3H HT R32 18 TRI (en cascade)"
-    assert pg.inner_text("#sim-dim-puissance").replace(" ", " ") == "2 × 18,0 kW = 36,0 kW · 108 % · cohérent"
+    assert pg.inner_text("#sim-dim-puissance").replace(" ", " ") == "2 × 18,0 kW = 36,0 kW"     # 16/11 : couverture seulement à −7 °C
     prix_aff = pg.inner_text("#sim-dim-prix")
     assert re.sub(r"\D", "", prix_aff) == "33000", prix_aff
     # note définitive (serveur) : quantité, total, couverture, plage 60–130 %
@@ -307,12 +308,12 @@ def test_geslot_pre_note_et_note_definitive(navigateur):
     cat = main._read_catalogue_pac()
     nd = main.calculer_notedim(p, main._load_state_simulateur(NUM, p, cat), cat, main.load_parametres_admin())
     assert nd["modele_pac"] == "2 × ALTHERMA 3H HT R32 18 TRI (en cascade)"
-    assert nd["modele_pac_specs"].startswith("2 × 18,0 kW = 36,0 kW · 108 % · cohérent · "), nd["modele_pac_specs"]
-    assert (nd["gamme_min"], nd["gamme_max"], nd["coherence_statut"]) == (service_devis.number_fr(20.0, 1), "43,4", "ok")
+    assert nd["modele_pac_specs"].startswith("2 × 18,0 kW = 36,0 kW · Triphas"), nd["modele_pac_specs"]
+    assert (nd["gamme_min"], nd["gamme_max"], nd["coherence_statut"]) == (service_devis.number_fr(20.0, 1), "43,4", "")  # 16/11 : sans −7 °C
     assert nd["puissance_mention"] == "puissance à 35 °C, valeur à −7 °C / 55 °C non renseignée"
     assert (nd["temperature_depart_requise"], nd["temperature_depart_max"], nd["alerte_temperature"]) == ("65", "70", "")
     html = pg.evaluate("u => fetch(u).then(r => r.text())", f"/notedim-public/{NUM}/{main._sign_notedim_token(NUM)}")
-    assert "2 × ALTHERMA 3H HT R32 18 TRI (en cascade)" in html and "108 % · cohérent" in html
+    assert "2 × ALTHERMA 3H HT R32 18 TRI (en cascade)" in html and "non calculée" in html   # 16/11 : sans −7 °C, pas de %
     assert "Plage de cohérence" in html and "Tolérance ± 20" not in html   # (« ± 20 » subsiste dans un commentaire CSS du Master)
-    assert "Puissance à 35 °C, valeur à −7 °C / 55 °C non renseignée." in html
+    assert "Puissance à −7 °C / 55 °C non renseignée : couverture non calculée" in html
     assert pg.erreurs_js == []

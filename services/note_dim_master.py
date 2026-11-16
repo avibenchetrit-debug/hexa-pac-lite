@@ -237,14 +237,16 @@ def construire_note(prospect, state, catalogue, admin=None):
     installation = None
     t_req, _orig = dp.temperature_requise(p, admin or {})
     if modele:
-        unitaire, origine = dp.puissance_retenue(modele)
-        total = unitaire * q
+        # 16/11/2026 (Avi) : la puissance à −7 °C à la température d'eau du dossier, jamais la nominale.
+        unitaire, origine = dp.puissance_m7(modele, regime)
+        total = unitaire * q if unitaire else None
         installation = {
             "modele": (f"{q} × " if q > 1 else "") + str(modele.get("nom") or modele.get("ref"))
                       + (" (en cascade)" if q > 1 else ""),
             "quantite": q, "unitaire_kw": unitaire, "total_kw": total, "origine": origine,
-            "mention": "" if origine == dp.ORIGINE_M7_55 else dp.MENTION_35,
-            "coherence": dp.coherence(total, besoin) or {},
+            "regime": regime, "cop": dp.cop_m7(modele, regime),
+            "mention": "" if unitaire else dp.mention_m7_absente(regime),
+            "coherence": (dp.coherence(total, besoin) or {}) if total else {},
             "temp_requise": t_req, "temp_max": dp.temp_max(modele),
             "alerte_temperature": dp.alerte_temperature(modele, t_req, emetteur),
         }

@@ -327,8 +327,8 @@
   <div class="section-title">Installation proposée</div>
   <div class="params-grid">
     <div class="param-row"><span class="param-label">Pompe à chaleur</span><span class="param-value" id="nd-inst-modele">{{ inst.get('modele') }}</span></div>
-    <div class="param-row"><span class="param-label">Puissance installée</span><span class="param-value" id="nd-inst-puissance">{% if inst.get('quantite', 1) > 1 %}{{ inst.get('quantite') }} × {{ inst.get('unitaire_kw')|nb }} kW = {% endif %}{{ inst.get('total_kw')|nb }} <span class="param-unit">kW</span></span></div>
-    <div class="param-row"><span class="param-label">Couverture du besoin</span><span class="param-value ic-{{ coh.get('statut') or 'ok' }}" id="nd-inst-couverture">{{ coh.get('pct')|nb }} % · {{ coh.get('libelle') or '—' }}</span></div>
+    <div class="param-row"><span class="param-label">Puissance installée</span><span class="param-value" id="nd-inst-puissance">{% if inst.get('total_kw') %}{% if inst.get('quantite', 1) > 1 %}{{ inst.get('quantite') }} × {{ inst.get('unitaire_kw')|nb }} kW = {% endif %}{{ inst.get('total_kw')|nb }} <span class="param-unit">kW à −7 °C / {{ inst.get('regime') or '55' }} °C</span>{% if inst.get('cop') %} · COP {{ inst.get('cop')|nb }}{% endif %}{% else %}non renseignée à −7 °C{% endif %}</span></div>
+    <div class="param-row"><span class="param-label">Couverture du besoin</span><span class="param-value ic-{{ coh.get('statut') or 'ok' }}" id="nd-inst-couverture">{% if coh.get('pct') %}{{ coh.get('pct')|nb }} % · {{ coh.get('libelle') }}{% else %}non calculée{% endif %}</span></div>
     {% if inst.get('temp_requise') %}<div class="param-row"><span class="param-label">Température de départ</span><span class="param-value">requise {{ inst.get('temp_requise')|nb }} °C{% if inst.get('temp_max') %} · maximale du modèle {{ inst.get('temp_max')|nb }} °C{% endif %}</span></div>{% endif %}
   </div>
   {% if inst.get('mention') %}<div class="note-explic" id="nd-inst-mention">{{ inst.get('mention')[:1]|upper }}{{ inst.get('mention')[1:] }}.</div>{% endif %}

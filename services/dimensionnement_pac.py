@@ -150,6 +150,50 @@ def puissance_retenue(m):
     return puissance_35(m), ORIGINE_35
 
 
+# 16/11/2026 (Avi) — THALEOS À −7 °C, importées des tableaux du fabricant (même référentiel que le Master :
+# services/referentiels/thaleos_m7_20261116.json, produit par app/thaleos_import.py du Master) : puissance et COP à −7 °C,
+# régime 100 %, à 35 °C et à 55 °C d'eau. Le dimensionnement compare le besoin à la puissance à −7 °C À LA
+# TEMPÉRATURE D'EAU DU DOSSIER (55 °C radiateurs, 35 °C plancher chauffant), plus jamais à la nominale.
+CHAMP_M7_35 = "puissance_m7_35_kw"
+CHAMP_COP_M7_35 = "cop_m7_35"
+CHAMP_COP_M7_55 = "cop_m7_55"
+ORIGINE_M7_35 = "m7_35"
+IMPORT_THALEOS_1611 = "2026-11-16 tableaux Thaleos (fabricant)"
+
+
+def _thaleos():
+    import json
+    import os as _os
+    chemin = _os.path.join(_os.path.dirname(__file__), "referentiels", "thaleos_m7_20261116.json")
+    try:
+        with open(chemin, encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return {"valeurs": {}}
+
+
+def puissance_m7(m, regime="55"):
+    """(kW, origine) à −7 °C à la température d'eau du dossier, ou (None, "") — JAMAIS la nominale (16/11/2026)."""
+    m = m or {}
+    if str(regime) == "35":
+        v35 = _n(m.get(CHAMP_M7_35))
+        if v35 and v35 > 0:
+            return v35, ORIGINE_M7_35
+    v = _n(m.get(CHAMP_M7_55))
+    if v and v > 0 and m.get(CHAMP_M7_55_VALIDE) is True:
+        return v, ORIGINE_M7_55
+    return None, ""
+
+
+def cop_m7(m, regime="55"):
+    return _n((m or {}).get(CHAMP_COP_M7_35 if str(regime) == "35" else CHAMP_COP_M7_55))
+
+
+def mention_m7_absente(regime="55"):
+    return (f"puissance à −7 °C / {regime} °C non renseignée : couverture non calculée (jamais à partir de la "
+            "puissance nominale)")
+
+
 def libelle_origine(origine):
     return "à −7 °C / 55 °C" if origine == ORIGINE_M7_55 else MENTION_35
 
@@ -231,9 +275,25 @@ def migrer_catalogue(catalogue):
                 m[CHAMP_M7_55_VALIDE] = True
             m["puissance_m7_55_import"] = IMPORT_VALIDE_0411
             change = True
+        # 16/11/2026 : les valeurs Thaleos du fabricant, une seule fois par modèle (marqueur `thaleos_m7_import`).
+        th = THALEOS.get(ref)
+        if th and not m.get("thaleos_m7_import"):
+            src = f"{_THALEOS.get('_source')} — fichier « {th['fichier']} », feuille {th['feuille']}."
+            m[CHAMP_M7_55] = th["m7_55"]["hc_kw"]
+            m[CHAMP_COP_M7_55] = th["m7_55"]["cop"]
+            m[CHAMP_M7_35] = th["m7_35"]["hc_kw"]
+            m[CHAMP_COP_M7_35] = th["m7_35"]["cop"]
+            m[CHAMP_M7_55_SOURCE] = src
+            m[CHAMP_M7_55_VALIDE] = True
+            m["thaleos_m7_import"] = IMPORT_THALEOS_1611
+            change = True
         if CHAMP_TEMP_MAX not in m:
             tm = temp_max(m)
             if tm:
                 m[CHAMP_TEMP_MAX] = tm
                 change = True
     return catalogue, change
+
+
+_THALEOS = _thaleos()
+THALEOS = _THALEOS.get("valeurs") or {}

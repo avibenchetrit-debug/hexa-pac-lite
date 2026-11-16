@@ -59,8 +59,9 @@ def test_note_pre_dimensionnement_document_du_master_avec_la_cascade(client):
     assert "33,4 kW" in texte or "33,4 kW" in texte.replace(" kW", " kW")
     assert "Plage de cohérence : 20 à 43,4 kW à −7 °C / 55 °C" in texte.replace("\xa0", " ")
     assert "2 × ALTHERMA 3H HT R32 18 TRI (en cascade)" in texte
-    assert "2 × 18 kW = 36 kW" in texte and "108 % · cohérent" in texte
-    assert "Puissance à 35 °C, valeur à −7 °C / 55 °C non renseignée." in texte
+    # 16/11/2026 (Avi) : jamais la nominale — sans puissance à −7 °C validée, la couverture n'est pas calculée.
+    assert "non renseignée à −7 °C" in texte and "non calculée" in texte and "108 % · cohérent" not in texte
+    assert "Puissance à −7 °C / 55 °C non renseignée : couverture non calculée" in texte
     # correctifs du 04/11 : catégorie Supérieur -> pas de MPR ; maison de 1968 -> pas de badge RT 2012 / RE 2020 ;
     # surface chauffée (245 m², celle du calcul) d'abord, surface habitable (280 m²) en second
     assert "Document justificatif du dispositif BAR-TH-171 ." in texte and "MPR" not in texte
