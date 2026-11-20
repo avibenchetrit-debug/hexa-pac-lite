@@ -40,8 +40,12 @@ def lignes_solution_chauffage(prospect, state=None) -> dict:
     # Lot 7b : plus de ligne « Usage » dans le bloc (déjà dans le titre du lot et la fiche produit)
     return {"ancien_systeme": ancien, "application": application,
             "depose_induits": (f"Dépose et évacuation de l'ancienne chaudière {energie}" if ancien
-                               else "Dépose et évacuation des équipements remplacés - chaudière"),
+                               else DEPOSE_SANS_ENERGIE),
             "energie_non_mentionnee": "" if ancien else (energie or "non renseignée")}
+
+
+# 20/11/2026 (Avi, descriptifs PAC = catalogue du Master) : la ligne de dépose quand l'énergie n'est pas connue.
+DEPOSE_SANS_ENERGIE = "Dépose et évacuation de l'ancien générateur de chauffage (chaudière fioul, gaz ou autre)"
 
 
 # 20/11/2026 (Avi) — l'AIDE À LA DÉPOSE DE CUVE FIOUL citée en bas du devis et de la facture, selon la catégorie de
@@ -455,6 +459,9 @@ LIBELLES_CATEGORIE_CEE = {"tres_modeste": "Ménages très modestes",
 PERIODES_COUP_DE_POUCE = [
     {"effet": "2026-09-01", "multiplicateurs": {"tres_modeste": 5, "precarite": 5, "autres": 5}},
     {"effet": "2026-11-16", "multiplicateurs": {"tres_modeste": 5, "precarite": 3, "autres": 5},
+     # 20/11/2026 (Avi) : la grille ACE des devis signés à partir du 16/11 (14 / 14 / 7,50 €/MWhc) — les ménages
+     # « précarité » au prix précaire. Modifiable dans Admin › 3.2 ; vérifiée par tests/test_grille_ace_1611.py.
+     "prix": {"ACE": {"tres_modeste": 14, "precarite": 14, "autres": 7.5}},
      "source": "Arrêté du 5 novembre 2026, art. 3 III 1° (remplace l'art. 3-6 de l'arrêté du 29/12/2014)"},
 ]
 

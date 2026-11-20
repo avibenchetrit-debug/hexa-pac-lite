@@ -5701,7 +5701,8 @@ AJOUTS_RECTIFICATIVE = ("Ancien système de chauffage déposé : chaudière — 
                         "Volume ballon ECS (L) / Profil soutirage", "Volume ballon ECS / Profil soutirage",   # Lot 10b
                         "Poids module ext. en fonction (kg)", "Poids module ext. / int. en fonction (kg)",
                         "Poids à vide unité extérieure", "Classe éner. chauffage",
-                        "Dimensions groupe extérieur (HxLxP) (mm)")                 # Lot 10c
+                        "Dimensions groupe extérieur (HxLxP) (mm)",                 # Lot 10c
+                        "Dépose et évacuation de l'ancien générateur de chauffage")  # 20/11/2026 (Master)
 
 
 def _differences_avec_l_originale(rec: dict, pdf_rectificative: bytes, numero_facture: str) -> list | None:
@@ -5727,6 +5728,14 @@ def _montant_depuis_texte(v) -> float:
     return float_value(re.sub(r"[^\d,.-]", "", str(v or "")).replace(",", "."))
 
 
+#: Une ligne que seuls les descriptifs d'avant le 20/11/2026 portaient (remplacés par ceux du catalogue du Master).
+SIGNATURE_DESCRIPTIFS_AVANT_2011 = "Adaptation ponctuelle des réseaux et équipements existants"
+
+
+def _descriptifs_avant_2011(rec: dict) -> bool:
+    return any(SIGNATURE_DESCRIPTIFS_AVANT_2011 in l for l in _lignes_pdf(rec.get("file") or ""))
+
+
 def _rendu_rectificative(request: Request, numero: str, rec: dict, numero_facture: str) -> tuple:
     """(html, infos) — infos : mention_source, montant_origine, montant_recalcule."""
     ctx0 = _build_devis_context(request, numero, avec_sous_traitant=True, numero_dossier=_lead_numero_dossier(numero))
@@ -5736,6 +5745,8 @@ def _rendu_rectificative(request: Request, numero: str, rec: dict, numero_factur
         "facture_rectificative": {"numero": rec.get("numero_facture", ""), "date": rec.get("date_emission", "")},
         "facture_mise_en_page_avant_lot7d": rec.get("mise_en_page") not in (MISE_EN_PAGE_LOT7D, MISE_EN_PAGE_FACTURE),
         "specs_libelles_tronques": rec.get("mise_en_page") != MISE_EN_PAGE_FACTURE,
+        # 20/11/2026 : facture émise avant les descriptifs du Master → ses lignes d'origine (rectificative identique).
+        "descriptifs_avant_2011": _descriptifs_avant_2011(rec),
         "mention_cee_titre": titre, "mention_cee_texte": texte, "mention_cee_sous_traitant": sous_traitant,
         "reglements": regl, "reglements_total": money(sum(_montant_depuis_texte(x.get("montant")) for x in regl)),
     }

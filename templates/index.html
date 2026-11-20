@@ -12568,7 +12568,9 @@ body.hexa-role-commercial #pv-admin, body.hexa-role-commercial #pv-regie{ displa
   // (`services/service_devis.coup_de_pouce`) ; date d'engagement = aujourd'hui (heure de Paris).
   const PERIODES_CDP_DEFAUT = [
       { effet: '2026-09-01', multiplicateurs: { tres_modeste: 5, precarite: 5, autres: 5 } },
-      { effet: '2026-11-16', multiplicateurs: { tres_modeste: 5, precarite: 3, autres: 5 } }];
+      { effet: '2026-11-16', multiplicateurs: { tres_modeste: 5, precarite: 3, autres: 5 },
+        // 20/11/2026 : grille ACE (devis signés à partir du 16/11), même défaut que le serveur.
+        prix: { ACE: { tres_modeste: 14, precarite: 14, autres: 7.5 } } }];
   window.PERIODES_CDP_DEFAUT = PERIODES_CDP_DEFAUT;
   function categorieCee(categorie){
     return categorie === 'tres_modeste' ? 'tres_modeste' : (categorie === 'modeste' ? 'precarite' : 'autres');

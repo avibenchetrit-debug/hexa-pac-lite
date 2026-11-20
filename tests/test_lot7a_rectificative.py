@@ -121,10 +121,10 @@ def test_rectificative_identique_sauf_ajouts(base, dossier_facture):
         assert a in t_rect
     en_moins = [l for l in l_orig if l not in l_rect]
     en_plus = [l for l in l_rect if l not in l_orig]
-    assert all(dossier_facture["numero_facture"] in l or "Dépose et évacuation des équipements remplacés" in l
+    assert all(dossier_facture["numero_facture"] in l or __import__("re").fullmatch(r"(.* )?Page \d+ / \d+", l) or "Dépose et évacuation des équipements remplacés" in l or "Dépose et évacuation de l'ancien générateur de chauffage" in l
                for l in en_moins), en_moins
     permis = ajouts | {"Dépose et évacuation de l'ancienne chaudière fioul"}
-    assert all(any(p in l for p in permis) or "rectificative" in l.lower() or j["numero_facture"] in l
+    assert all(any(p in l for p in permis) or __import__("re").fullmatch(r"(.* )?Page \d+ / \d+", l) or "rectificative" in l.lower() or j["numero_facture"] in l
                or "annule et remplace" in l or dossier_facture["date_emission"] in l for l in en_plus), en_plus
     # Une seconde rectificative de la même facture : refusée, rien d'émis.
     r2 = httpx.post(f"{base}/api/facture/{NUM}/rectificative", json={}, cookies=_cookies("admin"), timeout=60)

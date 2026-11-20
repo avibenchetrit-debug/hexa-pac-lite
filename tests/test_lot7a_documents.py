@@ -110,5 +110,5 @@ def test_plancher_chauffant_basse_temperature_et_ecs(client):
 def test_pas_de_chaudiere_inventee_hors_fioul_gaz_charbon(client):
     brut = _devis(client, "devis", lead={"mode_chauffage": "electricite"})
     assert "Ancien système de chauffage déposé" not in brut
-    assert "Dépose et évacuation des équipements remplacés - chaudière" in _texte(brut)
+    assert "Dépose et évacuation de l'ancien générateur de chauffage (chaudière fioul, gaz ou autre)" in _texte(brut)   # 20/11/2026 : ligne du Master
     assert main.lignes_solution_chauffage({"mode_chauffage": "bois"})["energie_non_mentionnee"] == "bois"
