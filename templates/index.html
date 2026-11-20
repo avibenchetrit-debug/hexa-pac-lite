@@ -15549,6 +15549,20 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
       <div class="adm-actions"><button type="button" class="adm-btn-save" id="adm-save-mpr">Enregistrer</button></div>
     </div>`;
   }
+  // 20/11/2026 (Avi) : l'aide à la dépose de cuve fioul citée sur le devis et la facture, par catégorie (0 = aucune mention).
+  function renderAideCuveFields(){
+    const cfg = M3_ADMIN || {};
+    const a = cfg.aide_depose_cuve_fioul || { tres_modeste:1200, modeste:800, intermediaire:400, superieur:0 };
+    return `<div class="adm-card">
+      ${[
+        ['tres_modeste','Bleu — très modestes'],
+        ['modeste','Jaune — modestes'],
+        ['intermediaire','Violet — intermédiaires'],
+        ['superieur','Rose — supérieurs (0 = aucune mention)']
+      ].map(([k,l])=>`<div class="adm-field adm-field-row"><span class="adm-lab">${l}</span><span class="adm-euro"><input type="text" inputmode="numeric" class="adm-m3-cuve adm-money" data-cat="${k}" value="${adminEscape(a[k] ?? 0)}"><i>€</i></span></div>`).join('')}
+      <div class="adm-actions"><button type="button" class="adm-btn-save" id="adm-save-cuve">Enregistrer</button></div>
+    </div>`;
+  }
   function renderBallonThermoFields(){
     const cfg = (window.HexaConfig && window.HexaConfig.ballon_thermo) || {};
     const modeles = (Array.isArray(cfg.modeles) && cfg.modeles.length) ? cfg.modeles : [
@@ -16261,7 +16275,7 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
       <div class="adm-legend regie-only"><div class="adm-legend-row"><span class="adm-dot adm-dot1"></span><span>Option 1 — vente directe : marge brute − CAC − visite − COFRAC − urbanisme.</span></div><div class="adm-legend-row"><span class="adm-dot adm-dot2"></span><span>Option 2 — prix de cession : marge garantie au-dessus de (coût + visite + COFRAC + urbanisme). La régie revend au-dessus et garde le surplus ; la colonne « Commission régie » montre ce qu'elle gagne si elle revend à ton prix catalogue.</span></div><div class="adm-legend-row"><span>Marges théoriques — calculées sur un MPR forfaitaire de 5 000 € (estimation commune à tous les modèles), pas un calcul réel par prospect.</span></div></div>
       <div class="adm-actions"><button type="button" class="adm-btn-save" id="adm-save-catalogue">Enregistrer</button></div>`;
     const admB1 = admBloc('1','1. Réglages généraux',admSousBloc('1-1','1.1 Coût Hexa',coutHexa)+admSousBloc('1-2','1.2 Vente Hexa',venteHexa));
-    const admB2 = admBloc('2','2. MPR',admSousBloc('2-1','2.1 Forfait MPR',renderMprFields())+admSousBloc('2-2','2.2 Plafonds réglementaires',renderPlafondsSection())+admSousBloc('2-3','2.3 Barèmes ANAH (plafonds RFR)',renderBaremesAnahSection()));
+    const admB2 = admBloc('2','2. MPR',admSousBloc('2-1','2.1 Forfait MPR',renderMprFields())+admSousBloc('2-2','2.2 Plafonds réglementaires',renderPlafondsSection())+admSousBloc('2-3','2.3 Barèmes ANAH (plafonds RFR)',renderBaremesAnahSection())+admSousBloc('2-4','2.4 Aide à la dépose de cuve fioul',renderAideCuveFields()));
     const admB3 = admBloc('3','3. CEE',admSousBloc('3-1','3.1 Formule BAR-TH-171 (PAC Air-Eau)',renderFormuleBarSection())+admSousBloc('3-2','3.2 Bonification CEE',renderBonificationFields())+admSousBloc('3-3','3.3 Délégataires CEE',renderDelegatairesFields()));
     const admB4 = admBloc('4','4. Sous-traitants',renderSousTraitantsSection());
     const admB5_1 = '<div class="regie-only">' + admBloc('5-1','Régie — prix de cession',optionsCommerciales) + '</div>';
@@ -17384,6 +17398,13 @@ ${c.sansAttente && c.finMpr !== 'credit' ? `<li>L'avance de la prime (${eur(c.mp
       document.querySelectorAll('.adm-m3-mpr').forEach(input=>{ forfaits_mpr[input.dataset.cat] = Number(String(input.value).replace(/\s/g,'').replace(',','.')) || 0; });
       const r = await fetch('/api/admin/m3', { method:'POST', headers: window.adminHeaders(), body: JSON.stringify({ forfaits_mpr }) });
       if (r.ok) { M3_ADMIN.forfaits_mpr = forfaits_mpr; adminToast('✓ Paramètres enregistrés', '#0D6B3B'); window.dispatchEvent(new CustomEvent('hexa-config-changed')); }
+      else adminToast("❌ Erreur lors de l'enregistrement", '#B91C1C');
+    });
+    document.getElementById('adm-save-cuve')?.addEventListener('click', async ()=>{
+      const aide_depose_cuve_fioul = {};
+      document.querySelectorAll('.adm-m3-cuve').forEach(input=>{ aide_depose_cuve_fioul[input.dataset.cat] = Number(String(input.value).replace(/\s/g,'').replace(',','.')) || 0; });
+      const r = await fetch('/api/admin/m3', { method:'POST', headers: window.adminHeaders(), body: JSON.stringify({ aide_depose_cuve_fioul }) });
+      if (r.ok) { M3_ADMIN.aide_depose_cuve_fioul = aide_depose_cuve_fioul; adminToast('✓ Paramètres enregistrés', '#0D6B3B'); }
       else adminToast("❌ Erreur lors de l'enregistrement", '#B91C1C');
     });
     document.getElementById('adm-save-bonif')?.addEventListener('click', async ()=>{
