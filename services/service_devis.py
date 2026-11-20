@@ -44,6 +44,24 @@ def lignes_solution_chauffage(prospect, state=None) -> dict:
             "energie_non_mentionnee": "" if ancien else (energie or "non renseignée")}
 
 
+# 20/11/2026 (Avi) — l'AIDE À LA DÉPOSE DE CUVE FIOUL citée en bas du devis et de la facture, selon la catégorie de
+# revenus : Bleu 1 200 €, Jaune 800 €, Violet 400 €, Rose aucune mention. Défauts seulement : les montants se règlent
+# dans Admin › 2. MPR › 2.4 (`baremes.json` → `aide_depose_cuve_fioul`).
+DEFAUT_AIDE_CUVE_FIOUL = {"tres_modeste": 1200, "modeste": 800, "intermediaire": 400, "superieur": 0}
+
+
+def aide_cuve_fioul(reglage, categorie) -> str:
+    """« 1 200 € » pour la catégorie (montant de l'Admin), ou "" (aucune mention : catégorie Rose, montant 0)."""
+    r = {**DEFAUT_AIDE_CUVE_FIOUL, **(reglage if isinstance(reglage, dict) else {})}
+    try:
+        v = float(str(r.get(str(categorie or "").strip(), 0) or 0).replace(",", "."))
+    except ValueError:
+        v = 0.0
+    if v <= 0:
+        return ""
+    return f"{int(round(v)):,}".replace(",", "\u00a0") + "\u00a0€"
+
+
 CHAMP_CLASSE_REGULATEUR = "Classe du régulateur (ErP)"
 #: Lot 7b — les éléments de la fiche produit exigés par ACE, mis en évidence (gras léger) sur les documents.
 CHAMPS_FICHE_EXIGES_ACE = ("Marque", "Référence EPREL", "Usage", "ETAS chauffage 35°C / 55°C", CHAMP_CLASSE_REGULATEUR)

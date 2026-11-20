@@ -3775,6 +3775,9 @@ def get_admin_m3(request: Request) -> JSONResponse:
                 "forfaits_mpr",
                 {"tres_modeste": 5000, "modeste": 4000, "intermediaire": 3000, "superieur": 0},
             ),
+            # 20/11/2026 (Avi) : l'aide à la dépose de cuve fioul par catégorie (Admin › 2.4).
+            "aide_depose_cuve_fioul": {**__import__("services.service_devis", fromlist=["x"]).DEFAUT_AIDE_CUVE_FIOUL,
+                                       **(baremes.get("aide_depose_cuve_fioul") or {})},
             # 15/11/2026 : la page reçoit la DATE DU JOUR du serveur (heure de Paris) avec le barème daté du Coup de
             # pouce — la page et le serveur calculent la même prime, le même jour.
             "bonification_cee": {**baremes.get("bonification_cee", {"actif": True, "multiplicateur": 5}),
@@ -4682,6 +4685,16 @@ async def post_admin_m3(request: Request) -> JSONResponse:
         baremes = {}
     if isinstance(payload.get("forfaits_mpr"), dict):
         baremes["forfaits_mpr"] = payload["forfaits_mpr"]
+    if isinstance(payload.get("aide_depose_cuve_fioul"), dict):
+        # 20/11/2026 (Avi) : les 4 montants de l'aide à la dépose de cuve fioul (nombres ≥ 0, catégories connues).
+        _cats = ("tres_modeste", "modeste", "intermediaire", "superieur")
+        _aide = {}
+        for _k in _cats:
+            try:
+                _aide[_k] = max(0.0, float(str(payload["aide_depose_cuve_fioul"].get(_k, 0) or 0).replace(",", ".")))
+            except ValueError:
+                _aide[_k] = 0.0
+        baremes["aide_depose_cuve_fioul"] = _aide
     if isinstance(payload.get("bonification_cee"), dict):
         # 15/11/2026 : le barème daté (`periodes`) déjà enregistré n'est pas effacé par la case et le multiplicateur.
         baremes["bonification_cee"] = {**(baremes.get("bonification_cee") or {}), **payload["bonification_cee"]}
@@ -4997,6 +5010,11 @@ def _build_devis_context(request: Request, numero: str, version: int | None = No
     # le pré-devis, lui, ne nomme pas de sous-traitant).
     context["solution_chauffage"] = lignes_solution_chauffage(prospect, state)   # Lot 7a · 3 et 4
     context["regulateur"] = ligne_regulateur(description_specs)                  # Lot 7b · 3
+    # 20/11/2026 (Avi) : l'aide à la dépose de cuve fioul selon la catégorie (montants d'Admin › 2.4).
+    _bar_cuve = _read_json(BAREMES_PATH, {})
+    context["aide_cuve_fioul"] = __import__("services.service_devis", fromlist=["x"]).aide_cuve_fioul(
+        (_bar_cuve if isinstance(_bar_cuve, dict) else {}).get("aide_depose_cuve_fioul"),
+        devis_value(prospect, "categorie_revenu", "categorie", default=""))
     context["champ_exige_ace"] = champ_exige_ace                                  # Lot 7b · 4
     # Lot 7d · 3 : ETAS 35 / 55 — seule la valeur qui compte (émetteurs) en gras
     context["etas_qui_compte"] = etas_valeur_qui_compte(prospect)
